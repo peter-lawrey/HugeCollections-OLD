@@ -31,31 +31,62 @@ import static junit.framework.Assert.assertNotNull;
  * User: plawrey Date: 07/12/13 Time: 11:48
  */
 public class HugeHashMapTest {
-    private static final int N_THREADS = 128;
+    static final int N_THREADS = 128;
+    static final int COUNT = 50 * 1000000;
+    static final long stride;
+
+    static {
+        long _stride = Long.MAX_VALUE / COUNT;
+        while (_stride % 2 == 0)
+            _stride--;
+        stride = _stride;
+    }
 
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
-        final int COUNT = 20000000;
-        ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        final String[] users = new String[COUNT];
-        // use a simple pseudo-random distribution over 64-bits
-        long stride = Long.MAX_VALUE / COUNT;
-        while (stride % 2 == 0)
-            stride--;
-        for (int i = 0; i < COUNT; i++)
-            users[i] = "user:" + Long.toString(i * stride, Character.MAX_RADIX);
-        System.gc();
-
-        System.out.println("Starting test");
 
         HugeConfig config = HugeConfig.DEFAULT.clone()
                 .setSegments(128)
                 .setSmallEntrySize(128)
                 .setEntriesPerSegment(100000);
 
-        final HugeHashMap<String, SampleValues> map =
-                new HugeHashMap<String, SampleValues>(
-                        config, String.class, SampleValues.class);
+        final HugeHashMap<CharSequence, SampleValues> map =
+                new HugeHashMap<CharSequence, SampleValues>(
+                        config, CharSequence.class, SampleValues.class);
+        long start = System.nanoTime();
+
+
+        final SampleValues value = new SampleValues();
+        StringBuilder user = new StringBuilder();
+        int count = 4000000;
+        for (int i = 0; i < count; i++)
+            map.put(users(user, i), value);
+        for (int i = 0; i < count; i++)
+            assertNotNull(map.get(users(user, i), value));
+        for (int i = 0; i < count; i++)
+            assertNotNull(map.get(users(user, i), value));
+        for (int i = 0; i < count; i++)
+            map.remove(users(user, i));
+        long time = System.nanoTime() - start;
+        System.out.printf("Put/get %,d K operations per second%n",
+                (int) (count * 4 * 1e6 / time));
+    }
+
+    @Test
+    public void testPutPerf() throws ExecutionException, InterruptedException {
+        ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        // use a simple pseudo-random distribution over 64-bits
+
+        System.out.println("Starting test");
+
+        HugeConfig config = HugeConfig.DEFAULT.clone()
+                .setSegments(128)
+                .setSmallEntrySize(128);
+        config.setEntriesPerSegment(COUNT / config.getSegments());
+
+        final HugeHashMap<CharSequence, SampleValues> map =
+                new HugeHashMap<CharSequence, SampleValues>(
+                        config, CharSequence.class, SampleValues.class);
         long start = System.nanoTime();
 
         List<Future<?>> futures = new ArrayList<Future<?>>();
@@ -65,14 +96,15 @@ public class HugeHashMapTest {
                 @Override
                 public void run() {
                     final SampleValues value = new SampleValues();
+                    StringBuilder user = new StringBuilder();
                     for (int i = finalT; i < COUNT; i += N_THREADS)
-                        map.put(users[i], value);
+                        map.put(users(user, i), value);
                     for (int i = finalT; i < COUNT; i += N_THREADS)
-                        assertNotNull(map.get(users[i], value));
+                        assertNotNull(map.get(users(user, i), value));
                     for (int i = finalT; i < COUNT; i += N_THREADS)
-                        assertNotNull(map.get(users[i], value));
+                        assertNotNull(map.get(users(user, i), value));
                     for (int i = finalT; i < COUNT; i += N_THREADS)
-                        map.remove(users[i]);
+                        map.remove(users(user, i));
                 }
             }));
         }
@@ -82,5 +114,12 @@ public class HugeHashMapTest {
         System.out.printf("Put/get %,d K operations per second%n",
                 (int) (COUNT * 4 * 1e6 / time));
         es.shutdown();
+    }
+
+    CharSequence users(StringBuilder user, int i) {
+        user.setLength(0);
+        user.append("user:");
+        user.append(i);
+        return user;
     }
 }
