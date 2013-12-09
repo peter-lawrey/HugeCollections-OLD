@@ -32,7 +32,11 @@ import static org.junit.Assert.assertNotNull;
  */
 public class HugeHashMapTest {
     static final int N_THREADS = 128;
-    static final int COUNT = 100 * 1000000;
+    // 32M needs 5 GB of memory
+    // 64M needs 10 GB of memory
+    // 128M needs 20 GB of memory
+    // 256M needs 40 GB of memory
+    static final int COUNT = 32 * 1000000;
     static final long stride;
 
     static {
@@ -80,7 +84,7 @@ public class HugeHashMapTest {
         System.out.println("Starting test");
 
         HugeConfig config = HugeConfig.DEFAULT.clone()
-                .setSegments(128)
+                .setSegments(64)
                 .setSmallEntrySize(128)
                 .setCapacity(COUNT);
 

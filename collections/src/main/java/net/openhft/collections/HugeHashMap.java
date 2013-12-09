@@ -184,10 +184,10 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             smallEntrySize = Maths.nextPower2(config.getSmallEntrySize(), 32);
             smallEntryBits = Maths.intLog2(smallEntrySize);
             entriesPerSegment = config.getEntriesPerSegment();
-            store = new DirectStore(bmf, smallEntrySize * entriesPerSegment);
+            store = new DirectStore(bmf, smallEntrySize * entriesPerSegment, false);
             usedSet = new BitSet(config.getEntriesPerSegment());
             smallMap = new IntIntMultiMap(entriesPerSegment * 2);
-            tmpBytes = new DirectStore(bmf, 64 * smallEntrySize).createSlice();
+            tmpBytes = new DirectStore(bmf, 64 * smallEntrySize, false).createSlice();
             offHeapUsed = tmpBytes.capacity() + store.size();
             sbKey = csKey ? new StringBuilder() : null;
         }
@@ -220,6 +220,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                     return;
                 }
             }
+            System.out.println(".");
             size = size - startOfValuePos;
             DirectStore store = new DirectStore(bmf, size);
             bytes.storePositionAndSize(store, 0, size);
