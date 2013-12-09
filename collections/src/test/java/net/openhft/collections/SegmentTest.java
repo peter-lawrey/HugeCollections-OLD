@@ -30,8 +30,9 @@ public class SegmentTest {
     @Test
     public void testSegment() {
         HugeConfig config = HugeConfig.SMALL.clone();
+        config.setSegments(1);
         config.setSmallEntrySize(32);
-        config.setEntriesPerSegment(32);
+        config.setCapacity(config.getSegments() * 32);
         HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
         segment.put(1, 111, "one");
         segment.put(1, 112, "two");

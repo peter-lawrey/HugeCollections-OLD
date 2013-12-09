@@ -25,14 +25,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static junit.framework.Assert.assertNotNull;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * User: plawrey Date: 07/12/13 Time: 11:48
  */
 public class HugeHashMapTest {
     static final int N_THREADS = 128;
-    static final int COUNT = 50 * 1000000;
+    static final int COUNT = 100 * 1000000;
     static final long stride;
 
     static {
@@ -45,10 +45,11 @@ public class HugeHashMapTest {
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
 
+        int count = 4000000;
         HugeConfig config = HugeConfig.DEFAULT.clone()
                 .setSegments(128)
                 .setSmallEntrySize(128)
-                .setEntriesPerSegment(100000);
+                .setCapacity(count);
 
         final HugeHashMap<CharSequence, SampleValues> map =
                 new HugeHashMap<CharSequence, SampleValues>(
@@ -58,7 +59,6 @@ public class HugeHashMapTest {
 
         final SampleValues value = new SampleValues();
         StringBuilder user = new StringBuilder();
-        int count = 4000000;
         for (int i = 0; i < count; i++)
             map.put(users(user, i), value);
         for (int i = 0; i < count; i++)
@@ -81,8 +81,8 @@ public class HugeHashMapTest {
 
         HugeConfig config = HugeConfig.DEFAULT.clone()
                 .setSegments(128)
-                .setSmallEntrySize(128);
-        config.setEntriesPerSegment(COUNT / config.getSegments());
+                .setSmallEntrySize(128)
+                .setCapacity(COUNT);
 
         final HugeHashMap<CharSequence, SampleValues> map =
                 new HugeHashMap<CharSequence, SampleValues>(
