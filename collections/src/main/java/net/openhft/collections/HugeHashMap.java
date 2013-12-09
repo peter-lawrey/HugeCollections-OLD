@@ -28,14 +28,13 @@ import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import java.util.*;
 
 /**
- * User: plawrey
- * Date: 07/12/13
- * Time: 10:38
+ * User: plawrey Date: 07/12/13 Time: 10:38
  */
 public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V> {
     private final Segment<K, V>[] segments;
     private final int segmentMask;
     private final int segmentShift;
+    private final boolean stringKey;
     private final boolean longHashable;
     private final boolean bytesMarshallable;
     private final Class<K> kClass;
@@ -55,12 +54,19 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             segments[i] = new Segment<K, V>(config);
         segmentMask = segmentCount - 1;
         segmentShift = Maths.intLog2(segmentCount);
+        stringKey = CharSequence.class.isAssignableFrom(kClass);
         longHashable = LongHashable.class.isAssignableFrom(kClass);
         bytesMarshallable = BytesMarshallable.class.isAssignableFrom(vClass);
     }
 
     protected long hash(K key) {
         long h = longHashable ? ((LongHashable) key).longHashCode() : (long) key.hashCode() << 31;
+        if (stringKey) {
+            CharSequence cs = (CharSequence) key;
+            int length = cs.length();
+            if (length > 2)
+                h ^= (cs.charAt(length - 2) << 8) + cs.charAt(length - 1);
+        }
         h += (h >>> 42) - (h >>> 21);
         h += (h >>> 14) - (h >>> 7);
         return h;

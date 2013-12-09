@@ -35,18 +35,28 @@ public class HugeHashMapTest {
 
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
+        final int COUNT = 20000000;
         ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        long start = System.nanoTime();
+        final String[] users = new String[COUNT];
+        // use a simple pseudo-random distribution over 64-bits
+        long stride = Long.MAX_VALUE / COUNT;
+        while (stride % 2 == 0)
+            stride--;
+        for (int i = 0; i < COUNT; i++)
+            users[i] = "user:" + Long.toString(i * stride, Character.MAX_RADIX);
+        System.gc();
+
+        System.out.println("Starting test");
+
         HugeConfig config = HugeConfig.DEFAULT.clone()
+                .setSegments(128)
                 .setSmallEntrySize(128)
                 .setEntriesPerSegment(100000);
 
         final HugeHashMap<String, SampleValues> map =
                 new HugeHashMap<String, SampleValues>(
                         config, String.class, SampleValues.class);
-        final int COUNT = 20000000;
-        final String[] users = new String[COUNT];
-        for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
+        long start = System.nanoTime();
 
         List<Future<?>> futures = new ArrayList<Future<?>>();
         for (int t = 0; t < N_THREADS; t++) {
