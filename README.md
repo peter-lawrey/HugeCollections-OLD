@@ -19,7 +19,7 @@ HugeHashMap supports concurrent access to very large, off heap key/value pairs. 
     for (int i = 0; i < count; i++)
         map.put(users(user, i), value);
     for (int i = 0; i < count; i++)
-        assertNotNull(map.get(users(user, i), value));
+        assertNotNull(map.get(users(user, i), value)); // provide a value to set for recycling.
     for (int i = 0; i < count; i++)
         map.remove(users(user, i));
 
