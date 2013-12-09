@@ -63,10 +63,18 @@ public class HugeHashMapTest {
 
         final SampleValues value = new SampleValues();
         StringBuilder user = new StringBuilder();
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < count; i++) {
+            value.ee = i;
+            value.gg = i;
+            value.ii = i;
             map.put(users(user, i), value);
-        for (int i = 0; i < count; i++)
+        }
+        for (int i = 0; i < count; i++) {
             assertNotNull(map.get(users(user, i), value));
+            assertEquals(i, value.ee);
+            assertEquals(i, value.gg, 0.0);
+            assertEquals(i, value.ii);
+        }
         for (int i = 0; i < count; i++)
             assertNotNull(map.get(users(user, i), value));
         for (int i = 0; i < count; i++)
@@ -74,6 +82,16 @@ public class HugeHashMapTest {
         long time = System.nanoTime() - start;
         System.out.printf("Put/get %,d K operations per second%n",
                 (int) (count * 4 * 1e6 / time));
+    }
+
+    static void assertEquals(long a, long b) {
+        if (a != b)
+            org.junit.Assert.assertEquals(a, b);
+    }
+
+    static void assertEquals(double a, double b, double err) {
+        if (a != b)
+            org.junit.Assert.assertEquals(a, b, err);
     }
 
     @Test
@@ -101,10 +119,18 @@ public class HugeHashMapTest {
                 public void run() {
                     final SampleValues value = new SampleValues();
                     StringBuilder user = new StringBuilder();
-                    for (int i = finalT; i < COUNT; i += N_THREADS)
+                    for (int i = finalT; i < COUNT; i += N_THREADS) {
+                        value.ee = i;
+                        value.gg = i;
+                        value.ii = i;
                         map.put(users(user, i), value);
-                    for (int i = finalT; i < COUNT; i += N_THREADS)
+                    }
+                    for (int i = finalT; i < COUNT; i += N_THREADS) {
                         assertNotNull(map.get(users(user, i), value));
+                        assertEquals(i, value.ee);
+                        assertEquals(i, value.gg, 0.0);
+                        assertEquals(i, value.ii);
+                    }
                     for (int i = finalT; i < COUNT; i += N_THREADS)
                         assertNotNull(map.get(users(user, i), value));
                     for (int i = finalT; i < COUNT; i += N_THREADS)
