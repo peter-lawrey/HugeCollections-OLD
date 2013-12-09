@@ -23,7 +23,7 @@ HugeHashMap supports concurrent access to very large, off heap key/value pairs. 
     for (int i = 0; i < count; i++)
         map.remove(users(user, i));
 
-Running the HugeHashMapTest.testPutPerf() with the options "-ea -mx128m -Xmn64m -verbose:gc" prints on an Hex core i7 @ 3.5 GHz
+HugeHashMapTest.testPutPerf() with the options "-ea -mx128m -Xmn64m -verbose:gc" prints on an Hex core i7 @ 3.5 GHz
 
     Starting test
     Put/get 14,020 K operations per second
