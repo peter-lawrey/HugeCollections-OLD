@@ -35,48 +35,49 @@ import net.openhft.lang.io.serialization.BytesMarshallable;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Sample entry of 10 x 10 character strings.
+ * Sample entry of 10 fields with two String, Enum, int, double, long
  */
 public class SampleValues implements BytesMarshallable {
     String aa = "aaaaaaaaaa";
     String bb = "bbbbbbbbbb";
-    String cc = "cccccccccc";
-    String dd = "ddddddddddd";
-    String ee = "eeeeeeeeee";
-    String ff = "ffffffffff";
-    String gg = "gggggggggg";
-    String hh = "hhhhhhhhhh";
-    String ii = "iiiiiiiiii";
-    String jj = "jjjjjjjjjj";
-    String kk = "kkkkkkkkkk";
+    BuySell cc = BuySell.Buy;
+    BuySell dd = BuySell.Sell;
+    int ee = 123456;
+    int ff = 654321;
+    double gg = 1.23456789;
+    double hh = 9.87654321;
+    long ii = 987654321;
+    long jj = 123456789;
 
     @Override
     public void readMarshallable(@NotNull Bytes in) throws IllegalStateException {
-        aa = in.readUTFΔ();
-        bb = in.readUTFΔ();
-        cc = in.readUTFΔ();
-        dd = in.readUTFΔ();
-        ee = in.readUTFΔ();
-        ff = in.readUTFΔ();
-        gg = in.readUTFΔ();
-        hh = in.readUTFΔ();
-        ii = in.readUTFΔ();
-        jj = in.readUTFΔ();
-        kk = in.readUTFΔ();
+        aa = in.readEnum(String.class);
+        bb = in.readEnum(String.class);
+        cc = in.readEnum(BuySell.class);
+        dd = in.readEnum(BuySell.class);
+        ee = in.readInt();
+        ff = in.readInt();
+        gg = in.readDouble();
+        hh = in.readDouble();
+        ii = in.readLong();
+        jj = in.readLong();
     }
 
     @Override
     public void writeMarshallable(@NotNull Bytes out) {
         out.writeUTFΔ(aa);
         out.writeUTFΔ(bb);
-        out.writeUTFΔ(cc);
-        out.writeUTFΔ(dd);
-        out.writeUTFΔ(ee);
-        out.writeUTFΔ(ff);
-        out.writeUTFΔ(gg);
-        out.writeUTFΔ(hh);
-        out.writeUTFΔ(ii);
-        out.writeUTFΔ(jj);
-        out.writeUTFΔ(kk);
+        out.writeEnum(cc);
+        out.writeEnum(dd);
+        out.writeInt(ee);
+        out.writeInt(ff);
+        out.writeDouble(gg);
+        out.writeDouble(hh);
+        out.writeLong(ii);
+        out.writeLong(jj);
     }
+}
+
+enum BuySell {
+    Buy, Sell
 }

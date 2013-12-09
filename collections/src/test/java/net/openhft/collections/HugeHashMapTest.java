@@ -28,16 +28,14 @@ import java.util.concurrent.Future;
 import static junit.framework.Assert.assertNotNull;
 
 /**
- * User: plawrey
- * Date: 07/12/13
- * Time: 11:48
+ * User: plawrey Date: 07/12/13 Time: 11:48
  */
 public class HugeHashMapTest {
-    private static final int N_THREADS = 4;
+    private static final int N_THREADS = 128;
 
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
-        ExecutorService es = Executors.newFixedThreadPool(N_THREADS);
+        ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         long start = System.nanoTime();
         HugeConfig config = HugeConfig.DEFAULT.clone()
                 .setSmallEntrySize(128)
@@ -46,7 +44,7 @@ public class HugeHashMapTest {
         final HugeHashMap<String, SampleValues> map =
                 new HugeHashMap<String, SampleValues>(
                         config, String.class, SampleValues.class);
-        final int COUNT = 5000000;
+        final int COUNT = 20000000;
         final String[] users = new String[COUNT];
         for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
 
@@ -61,9 +59,9 @@ public class HugeHashMapTest {
                         map.put(users[i], value);
                     for (int i = finalT; i < COUNT; i += N_THREADS)
                         assertNotNull(map.get(users[i], value));
-                    for (int i = COUNT - 1 - finalT; i >= 0; i -= N_THREADS)
+                    for (int i = finalT; i < COUNT; i += N_THREADS)
                         assertNotNull(map.get(users[i], value));
-                    for (int i = COUNT - 1 - finalT; i >= 0; i -= N_THREADS)
+                    for (int i = finalT; i < COUNT; i += N_THREADS)
                         map.remove(users[i]);
                 }
             }));
