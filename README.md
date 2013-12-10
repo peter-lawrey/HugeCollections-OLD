@@ -1,7 +1,7 @@
 HugeCollections
 ===============
 
-Huge Collections for Java using efficient, persisted off heap storage
+Huge Collections for Java using efficient off heap storage
 
 HugeHashMap supports concurrent access to very large, off heap key/value pairs.  From HugeHashMapTest
 
