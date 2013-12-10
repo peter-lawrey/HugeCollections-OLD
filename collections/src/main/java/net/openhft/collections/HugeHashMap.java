@@ -170,6 +170,13 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         return total;
     }
 
+    @Override
+    public void clear() {
+        for (Segment<K, V> segment : segments) {
+            segment.clear();
+        }
+    }
+
     static class Segment<K, V> {
         final VanillaBytesMarshallerFactory bmf = new VanillaBytesMarshallerFactory();
         final IntIntMultiMap smallMap;
@@ -377,6 +384,15 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
         public synchronized long size() {
             return this.size;
+        }
+
+        public void clear() {
+            usedSet.clear();
+            smallMap.clear();
+            for (DirectStore directStore : map.values()) {
+                directStore.free();
+            }
+            map.clear();
         }
     }
 }

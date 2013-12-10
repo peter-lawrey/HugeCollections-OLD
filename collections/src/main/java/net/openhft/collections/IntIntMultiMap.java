@@ -39,8 +39,7 @@ public class IntIntMultiMap {
         capacityMask = size - 1;
         capacityMask2 = (size - 1) * ENTRY_SIZE;
         bytes = new DirectStore(null, size * ENTRY_SIZE, false).createSlice();
-        for (int pos = 0; pos < bytes.capacity(); pos += ENTRY_SIZE)
-            bytes.writeLong(pos, UNSET_ENTRY);
+        clear();
     }
 
     /**
@@ -182,5 +181,10 @@ public class IntIntMultiMap {
             return sb.append(" }").toString();
         }
         return "{ }";
+    }
+
+    public void clear() {
+        for (int pos = 0; pos < bytes.capacity(); pos += ENTRY_SIZE)
+            bytes.writeLong(pos, UNSET_ENTRY);
     }
 }
