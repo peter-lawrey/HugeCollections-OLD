@@ -28,18 +28,39 @@ import static org.junit.Assert.assertTrue;
  */
 public class SegmentTest {
     @Test
+    public void testPutReplace() {
+        HugeConfig config = HugeConfig.SMALL.clone();
+        config.setSegments(1);
+        config.setSmallEntrySize(32);
+        config.setCapacity(config.getSegments() * 32);
+        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
+        segment.put(1, 111, "one", true, true);
+        segment.put(1, 112, "two", true, true);
+        assertEquals(2, segment.size());
+        segment.put(1, 111, "one-one", false, true);
+        assertEquals("one", segment.get(1, 111, null));
+        segment.put(1, 111, "one-one", true, false);
+        assertEquals("one-one", segment.get(1, 111, null));
+        segment.put(1, 113, "four", true, false);
+        assertEquals(null, segment.get(1, 113, null));
+        segment.put(1, 113, "four", false, true);
+        assertEquals("four", segment.get(1, 113, null));
+
+    }
+
+    @Test
     public void testSegment() {
         HugeConfig config = HugeConfig.SMALL.clone();
         config.setSegments(1);
         config.setSmallEntrySize(32);
         config.setCapacity(config.getSegments() * 32);
         HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
-        segment.put(1, 111, "one");
-        segment.put(1, 112, "two");
-        segment.put(3, 301, "three");
-        segment.put(1, 113, "four");
-        segment.put(3, 302, "five");
-        segment.put(1, 114, "six");
+        segment.put(1, 111, "one", true, true);
+        segment.put(1, 112, "two", true, true);
+        segment.put(3, 301, "three", true, true);
+        segment.put(1, 113, "four", true, true);
+        segment.put(3, 302, "five", true, true);
+        segment.put(1, 114, "six", true, true);
         assertEquals(6, segment.size());
 
         assertEquals("one", segment.get(1, 111, null));

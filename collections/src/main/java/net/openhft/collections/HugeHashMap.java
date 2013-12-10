@@ -80,7 +80,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         int segment = (int) (h & segmentMask);
         // leave the remaining hashCode
         h >>>= segmentShift;
-        segments[segment].put(h, key, value);
+        segments[segment].put(h, key, value, true, true);
         return null;
     }
 
@@ -115,7 +115,12 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
     @Override
     public V putIfAbsent(K key, V value) {
-        throw new UnsupportedOperationException();
+        long h = hash(key);
+        int segment = (int) (h & segmentMask);
+        // leave the remaining hashCode
+        h >>>= segmentShift;
+        segments[segment].put(h, key, value, false, true);
+        return null;
     }
 
     @Override
@@ -130,7 +135,12 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
     @Override
     public V replace(K key, V value) {
-        throw new UnsupportedOperationException();
+        long h = hash(key);
+        int segment = (int) (h & segmentMask);
+        // leave the remaining hashCode
+        h >>>= segmentShift;
+        segments[segment].put(h, key, value, true, false);
+        return null;
     }
 
     @Override
@@ -168,7 +178,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         final MultiStoreBytes bytes = new MultiStoreBytes();
         final DirectStore store;
         final BitSet usedSet;
-        final int smallEntrySize, smallEntryBits;
+        final int smallEntrySize;
         final int entriesPerSegment;
         final boolean csKey;
         final StringBuilder sbKey;
@@ -181,8 +191,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             this.csKey = csKey;
             this.bytesMarshallable = bytesMarshallable;
             this.vClass = vClass;
-            smallEntrySize = Maths.nextPower2(config.getSmallEntrySize(), 32);
-            smallEntryBits = Maths.intLog2(smallEntrySize);
+            smallEntrySize = (config.getSmallEntrySize() + 7) & ~7; // round to next multiple of 8.
             entriesPerSegment = config.getEntriesPerSegment();
             store = new DirectStore(bmf, smallEntrySize * entriesPerSegment, false);
             usedSet = new BitSet(config.getEntriesPerSegment());
@@ -192,7 +201,37 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             sbKey = csKey ? new StringBuilder() : null;
         }
 
-        public synchronized void put(long h, K key, V value) {
+        public synchronized void put(long h, K key, V value, boolean ifPresent, boolean ifAbsent) {
+            // search for the previous entry
+            int hash = intHashFor(h);
+            smallMap.startSearch(hash);
+            boolean foundSmall = false, foundLarge = false;
+            while (true) {
+                int pos = smallMap.nextInt();
+                if (pos == IntIntMultiMap.UNSET) {
+                    final DirectStore store = map.get(key);
+                    if (store == null) {
+                        if (ifPresent && !ifAbsent)
+                            return;
+                        break;
+                    }
+                    if (ifAbsent)
+                        return;
+                    bytes.storePositionAndSize(store, 0, store.size());
+                    foundLarge = true;
+                    break;
+                } else {
+                    bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
+                    K key2 = getKey();
+                    if (equals(key, key2)) {
+                        if (ifAbsent)
+                            return;
+                        foundSmall = true;
+                        break;
+                    }
+                }
+            }
+
             tmpBytes.reset();
             if (csKey)
                 tmpBytes.writeUTFΔ((CharSequence) key);
@@ -205,22 +244,37 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 tmpBytes.writeObject(value);
             long size = tmpBytes.position();
             if (size <= smallEntrySize) {
-                // look for a free stop.
+                if (foundSmall) {
+                    bytes.position(0);
+                    bytes.write(tmpBytes, 0, size);
+                    return;
+                } else if (foundLarge) {
+                    remove(hash, key);
+                }
+                // look for a free spot.
                 int position = (int) (h & (entriesPerSegment - 1));
                 int free = usedSet.previousClearBit(position);
                 if (free < 0)
                     free = usedSet.nextClearBit(position + 1);
                 if (free < entriesPerSegment) {
-                    bytes.storePositionAndSize(store, free << smallEntryBits, smallEntrySize);
+                    bytes.storePositionAndSize(store, free * smallEntrySize, smallEntrySize);
                     bytes.write(tmpBytes, 0, size);
-                    int hash = intHashFor(h);
                     smallMap.put(hash, free);
                     usedSet.set(free);
                     this.size++;
                     return;
                 }
             }
-            System.out.println(".");
+            if (foundSmall) {
+                remove(hash, key);
+            } else if (foundLarge) {
+                // can it be reused.
+                if (bytes.capacity() <= size || bytes.capacity() - size < (size >> 3)) {
+                    bytes.write(tmpBytes, startOfValuePos, size);
+                    return;
+                }
+                remove(hash, key);
+            }
             size = size - startOfValuePos;
             DirectStore store = new DirectStore(bmf, size);
             bytes.storePositionAndSize(store, 0, size);
@@ -244,11 +298,12 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 int pos = smallMap.nextInt();
                 if (pos == IntIntMultiMap.UNSET) {
                     final DirectStore store = map.get(key);
-                    if (store == null) return null;
+                    if (store == null)
+                        return null;
                     bytes.storePositionAndSize(store, 0, store.size());
                     break;
                 } else {
-                    bytes.storePositionAndSize(store, pos << smallEntryBits, smallEntrySize);
+                    bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                     K key2 = getKey();
                     if (equals(key, key2))
                         break;
@@ -297,7 +352,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 if (pos == IntIntMultiMap.UNSET) {
                     break;
                 }
-                bytes.storePositionAndSize(store, pos << smallEntryBits, smallEntrySize);
+                bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
                 if (equals(key, key2)) {
                     usedSet.clear(pos);
