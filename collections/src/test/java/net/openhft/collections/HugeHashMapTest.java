@@ -36,7 +36,7 @@ public class HugeHashMapTest {
     // 64M needs 10 GB of memory
     // 128M needs 20 GB of memory
     // 256M needs 40 GB of memory
-    static final int COUNT = 32 * 1000000;
+    static final int COUNT = 8 * 1000000;
     static final long stride;
 
     static {
