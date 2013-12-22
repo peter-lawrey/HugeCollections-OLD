@@ -106,13 +106,14 @@ public class HugeHashMapTest {
                 .setSmallEntrySize(72)
                 .setCapacity(COUNT);
 
-        final HugeHashMap<String, SampleValues> map =
-                new HugeHashMap<String, SampleValues>(
-                        config, String.class, SampleValues.class);
-        final int COUNT = 50000000;
+        final HugeHashMap<CharSequence, SampleValues> map =
+                new HugeHashMap<CharSequence, SampleValues>(
+                        config, CharSequence.class, SampleValues.class);
+        final int COUNT = 500000;
         final String[] users = new String[COUNT];
         for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
 
+        long start = System.nanoTime();
         List<Future<?>> futures = new ArrayList<Future<?>>();
         for (int t = 0; t < N_THREADS; t++) {
             final int finalT = t;
