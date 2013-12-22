@@ -46,7 +46,7 @@ public class HugeHashMapTest {
         final HugeHashMap<String, SampleValues> map =
                 new HugeHashMap<String, SampleValues>(
                         config, String.class, SampleValues.class);
-        final int COUNT = 5000000;
+        final int COUNT = 50000000;
         final String[] users = new String[COUNT];
         for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
 
