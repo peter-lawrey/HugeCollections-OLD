@@ -19,40 +19,38 @@ package net.openhft.collections;
 import net.openhft.lang.Maths;
 
 /**
- * User: plawrey
- * Date: 07/12/13
- * Time: 10:39
+ * User: plawrey Date: 07/12/13 Time: 10:39
  */
 public class HugeConfig implements Cloneable {
     // reserve 4 MB
     public static final HugeConfig SMALL = new HugeConfig()
             .setSmallEntrySize(256)
-            .setEntriesPerSegment(256)
+            .setCapacity(4 * 1024)
             .setSegments(16);
     // reserve 32 MB
     public static final HugeConfig DEFAULT = new HugeConfig()
             .setSmallEntrySize(512)
-            .setEntriesPerSegment(1024)
+            .setCapacity(64 * 1024)
             .setSegments(64);
     // reserve 256 MB
     public static final HugeConfig BIG = new HugeConfig()
             .setSmallEntrySize(1024)
-            .setEntriesPerSegment(4 * 1024)
+            .setCapacity(256 * 1024)
             .setSegments(64);
     // reserve 2 GB
     public static final HugeConfig LARGE = new HugeConfig()
             .setSmallEntrySize(2 * 1024)
-            .setEntriesPerSegment(8 * 1024)
+            .setCapacity(1024 * 1024)
             .setSegments(128);
     // reserve 16 GB
     public static final HugeConfig HUGE = new HugeConfig()
             .setSmallEntrySize(4 * 1024)
-            .setEntriesPerSegment(16 * 1024)
+            .setCapacity(4 * 1024 * 1024)
             .setSegments(256);
 
     private int segments;
     private int smallEntrySize;
-    private int entriesPerSegment;
+    private int capacity;
 
     public HugeConfig clone() {
         try {
@@ -81,12 +79,15 @@ public class HugeConfig implements Cloneable {
     }
 
     public int getEntriesPerSegment() {
-        return entriesPerSegment;
+        return capacity / segments;
     }
 
-    public HugeConfig setEntriesPerSegment(int entriesPerSegment) {
-        this.entriesPerSegment = Maths.nextPower2(entriesPerSegment, 1);
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public HugeConfig setCapacity(int capacity) {
+        this.capacity = Maths.nextPower2(capacity, segments);
         return this;
     }
-
 }
