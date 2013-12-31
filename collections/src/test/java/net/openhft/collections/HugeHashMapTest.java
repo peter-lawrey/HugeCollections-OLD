@@ -155,4 +155,20 @@ public class HugeHashMapTest {
         user.append(i);
         return user;
     }
+
+    @Test
+    public void testPutLong() {
+        HugeConfig config = HugeConfig.DEFAULT.clone();
+
+        HugeHashMap<Long, Long> map1 =
+                new HugeHashMap<Long, Long>(config, Long.class, Long.class);
+
+        long key = 55;
+
+        map1.put(key, 10L);
+        assertEquals(10L, map1.get(key));
+        map1.put(key, 20L);
+        assertEquals(20L, map1.get(key));
+        map1.clear();
+    }
 }

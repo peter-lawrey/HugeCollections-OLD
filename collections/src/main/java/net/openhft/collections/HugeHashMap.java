@@ -231,7 +231,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                     bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                     K key2 = getKey();
                     if (equals(key, key2)) {
-                        if (ifAbsent)
+                        if (ifAbsent && !ifPresent)
                             return;
                         foundSmall = true;
                         break;
