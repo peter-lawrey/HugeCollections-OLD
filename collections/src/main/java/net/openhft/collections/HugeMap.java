@@ -24,7 +24,19 @@ import java.util.concurrent.ConcurrentMap;
  * Time: 11:44
  */
 public interface HugeMap<K, V> extends ConcurrentMap<K, V> {
+    /**
+     * Estimate how much off heap memory is used by this data structure (not based on how much of the map is used)
+     *
+     * @return the off heap used.
+     */
     long offHeapUsed();
 
+    /**
+     * Get a value, optionally populating a pre-allocated object.
+     *
+     * @param key   to search for
+     * @param value to set
+     * @return the value, populated, a new object, or null if not found.
+     */
     V get(K key, V value);
 }

@@ -109,6 +109,15 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
     }
 
     @Override
+    public boolean containsKey(Object key) {
+        long h = hash((K) key);
+        int segment = (int) (h & segmentMask);
+        // leave the remaining hashCode
+        h >>>= segmentShift;
+        return segments[segment].containsKey(h, (K) key);
+    }
+
+    @Override
     public Set<Entry<K, V>> entrySet() {
         throw new UnsupportedOperationException();
     }
@@ -125,12 +134,36 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
     @Override
     public boolean remove(Object key, Object value) {
-        throw new UnsupportedOperationException();
+        long h = hash((K) key);
+        int segment = (int) (h & segmentMask);
+        // leave the remaining hashCode
+        h >>>= segmentShift;
+        Segment<K, V> segment2 = segments[segment];
+        synchronized (segment2) {
+            V value2 = get(key);
+            if (value2 != null && value.equals(value2)) {
+                segment2.remove(h, (K) key);
+                return true;
+            }
+            return false;
+        }
     }
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
-        throw new UnsupportedOperationException();
+        long h = hash(key);
+        int segment = (int) (h & segmentMask);
+        // leave the remaining hashCode
+        h >>>= segmentShift;
+        Segment<K, V> segment2 = segments[segment];
+        synchronized (segment2) {
+            V value2 = get(key);
+            if (value2 != null && oldValue.equals(value2)) {
+                segment2.put(h, key, newValue, true, true);
+                return true;
+            }
+            return false;
+        }
     }
 
     @Override
@@ -348,6 +381,23 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 return (K) sbKey;
             }
             return (K) bytes.readObject();
+        }
+
+        public synchronized boolean containsKey(long h, K key) {
+            int hash = intHashFor(h);
+            smallMap.startSearch(hash);
+            boolean found = false;
+            while (true) {
+                int pos = smallMap.nextInt();
+                if (pos == IntIntMultiMap.UNSET) {
+                    return map.containsKey(key);
+                }
+                bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
+                K key2 = getKey();
+                if (equals(key, key2)) {
+                    return true;
+                }
+            }
         }
 
         public synchronized boolean remove(long h, K key) {
