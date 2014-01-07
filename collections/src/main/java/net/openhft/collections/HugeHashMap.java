@@ -293,9 +293,9 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 }
                 // look for a free spot.
                 int position = (int) (h & (entriesPerSegment - 1));
-                int free = usedSet.previousClearBit(position);
-                if (free < 0)
-                    free = usedSet.nextClearBit(position + 1);
+                int free = usedSet.nextClearBit(position);
+                if (free >= entriesPerSegment)
+                    free = usedSet.nextClearBit(0);
                 if (free < entriesPerSegment) {
                     bytes.storePositionAndSize(store, free * smallEntrySize, smallEntrySize);
                     bytes.write(tmpBytes, 0, size);
