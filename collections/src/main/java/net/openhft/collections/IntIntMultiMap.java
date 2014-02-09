@@ -42,6 +42,14 @@ public class IntIntMultiMap {
         clear();
     }
 
+    public IntIntMultiMap(DirectBytes bytes) {
+        size = (int) (bytes.capacity() / ENTRY_SIZE);
+        assert size == Maths.nextPower2(size, 16);
+        capacityMask = size - 1;
+        capacityMask2 = (size - 1) * ENTRY_SIZE;
+        this.bytes = bytes;
+    }
+
     /**
      * Add an entry as an int/int pair.  Allow duplicate keys, but not key/values.
      *
