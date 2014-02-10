@@ -31,12 +31,12 @@ import static org.junit.Assert.assertNotNull;
  * User: plawrey Date: 07/12/13 Time: 11:48
  */
 public class HugeHashMapTest {
-    static final int N_THREADS = 128;
+    static final int N_THREADS = 32;
     // 32M needs 5 GB of memory
     // 64M needs 10 GB of memory
     // 128M needs 20 GB of memory
     // 256M needs 40 GB of memory
-    static final int COUNT = 8 * 1000000;
+    static final int COUNT = 4 * 1000000;
     static final long stride;
 
     static {
@@ -46,12 +46,24 @@ public class HugeHashMapTest {
         stride = _stride;
     }
 
+    static void assertEquals(long a, long b) {
+        if (a != b)
+            org.junit.Assert.assertEquals(a, b);
+    }
+
+    static void assertEquals(double a, double b, double err) {
+        if (a != b)
+            org.junit.Assert.assertEquals(a, b, err);
+    }
+
+    /*
+    Put/get 1,339 K operations per second
+     */
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
-
         int count = 4000000;
         HugeConfig config = HugeConfig.DEFAULT.clone()
-                .setSegments(128)
+                .setSegments(256)
                 .setSmallEntrySize(72) // TODO 64 corrupts the values !!
                 .setCapacity(count);
 
@@ -59,8 +71,6 @@ public class HugeHashMapTest {
                 new HugeHashMap<CharSequence, SampleValues>(
                         config, CharSequence.class, SampleValues.class);
         long start = System.nanoTime();
-
-
         final SampleValues value = new SampleValues();
         StringBuilder user = new StringBuilder();
         for (int i = 0; i < count; i++) {
@@ -84,16 +94,6 @@ public class HugeHashMapTest {
                 (int) (count * 4 * 1e6 / time));
     }
 
-    static void assertEquals(long a, long b) {
-        if (a != b)
-            org.junit.Assert.assertEquals(a, b);
-    }
-
-    static void assertEquals(double a, double b, double err) {
-        if (a != b)
-            org.junit.Assert.assertEquals(a, b, err);
-    }
-
     @Test
     public void testPutPerf() throws ExecutionException, InterruptedException {
         ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
@@ -102,14 +102,14 @@ public class HugeHashMapTest {
         System.out.println("Starting test");
 
         HugeConfig config = HugeConfig.DEFAULT.clone()
-                .setSegments(64)
+                .setSegments(128)
                 .setSmallEntrySize(72)
                 .setCapacity(COUNT);
 
         final HugeHashMap<CharSequence, SampleValues> map =
                 new HugeHashMap<CharSequence, SampleValues>(
                         config, CharSequence.class, SampleValues.class);
-        final int COUNT = 500000;
+
         final String[] users = new String[COUNT];
         for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
 
