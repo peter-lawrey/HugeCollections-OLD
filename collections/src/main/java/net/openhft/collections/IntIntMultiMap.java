@@ -17,7 +17,7 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
-import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.DirectStore;
 
 /**
@@ -31,7 +31,7 @@ public class IntIntMultiMap {
     public static final int ENTRY_SIZE = 8;
     private final int capacityMask;
     private final int capacityMask2;
-    private final DirectBytes bytes;
+    private final Bytes bytes;
     private int size = 0;
 
     public IntIntMultiMap(int size) {
@@ -42,7 +42,7 @@ public class IntIntMultiMap {
         clear();
     }
 
-    public IntIntMultiMap(DirectBytes bytes) {
+    public IntIntMultiMap(Bytes bytes) {
         size = (int) (bytes.capacity() / ENTRY_SIZE);
         assert size == Maths.nextPower2(size, 16);
         capacityMask = size - 1;
