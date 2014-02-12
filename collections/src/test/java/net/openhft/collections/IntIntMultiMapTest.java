@@ -80,7 +80,7 @@ public class IntIntMultiMapTest {
     }
     
     @Test
-    public void testPutRemoveLoop() {
+    public void testRemoveSpecific() {
     	// Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
     	// 0 but the value is still present in the map.
     	IntIntMultiMap map = new IntIntMultiMap(10);
