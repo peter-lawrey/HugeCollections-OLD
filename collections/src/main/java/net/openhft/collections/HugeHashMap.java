@@ -30,41 +30,37 @@ import java.util.*;
 /**
  * User: plawrey Date: 07/12/13 Time: 10:38
  */
-public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V> {
+public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> implements HugeMap<K, V> {
+	public interface KeyFlyweighFactory<K> {
+		K create();
+	}
+	
     private final Segment<K, V>[] segments;
     private final int segmentMask;
     private final int segmentShift;
-    private final boolean csKey;
     private final boolean longHashable;
     private final boolean bytesMarshallable;
 //    private final Class<K> kClass;
 //    private final Class<V> vClass;
 
 
-    public HugeHashMap() {
-        this(HugeConfig.DEFAULT, (Class<K>) Object.class, (Class<V>) Object.class);
-    }
-
-    public HugeHashMap(HugeConfig config, Class<K> kClass, Class<V> vClass) {
+    public HugeHashMap(HugeConfig config, KeyFlyweighFactory<K> keyFlyweighFactory, Class<K> kClass, Class<V> vClass) {
 //        this.kClass = kClass;
 //        this.vClass = vClass;
         final int segmentCount = config.getSegments();
         segmentMask = segmentCount - 1;
         segmentShift = Maths.intLog2(segmentCount);
-        csKey = CharSequence.class.isAssignableFrom(kClass);
         longHashable = LongHashable.class.isAssignableFrom(kClass);
         bytesMarshallable = BytesMarshallable.class.isAssignableFrom(vClass);
         //noinspection unchecked
         segments = (Segment<K, V>[]) new Segment[segmentCount];
         for (int i = 0; i < segmentCount; i++)
-            segments[i] = new Segment<K, V>(config, csKey, bytesMarshallable, vClass);
+            segments[i] = new Segment<K, V>(config, keyFlyweighFactory.create(), bytesMarshallable, vClass);
     }
 
     protected long hash(K key) {
         long h;
-        if (csKey) {
-            h = Maths.hash((CharSequence) key);
-        } else if (longHashable) {
+        if (longHashable) {
             h = ((LongHashable) key).longHashCode();
         } else {
             h = (long) key.hashCode() << 31;
@@ -210,7 +206,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         }
     }
 
-    static class Segment<K, V> {
+    static class Segment<K extends HugeMapKey<K>, V> {
         final VanillaBytesMarshallerFactory bmf = new VanillaBytesMarshallerFactory();
         final IntIntMultiMap smallMap;
         final Map<K, DirectStore> map = new HashMap<K, DirectStore>();
@@ -220,15 +216,13 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         final BitSet usedSet;
         final int smallEntrySize;
         final int entriesPerSegment;
-        final boolean csKey;
-        final StringBuilder sbKey;
         final boolean bytesMarshallable;
         final Class<V> vClass;
+        final K keyFlyweigh;
         long offHeapUsed = 0;
         long size = 0;
 
-        Segment(HugeConfig config, boolean csKey, boolean bytesMarshallable, Class<V> vClass) {
-            this.csKey = csKey;
+        Segment(HugeConfig config, K keyFlyweigh, boolean bytesMarshallable, Class<V> vClass) {
             this.bytesMarshallable = bytesMarshallable;
             this.vClass = vClass;
             smallEntrySize = (config.getSmallEntrySize() + 7) & ~7; // round to next multiple of 8.
@@ -237,8 +231,8 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             usedSet = new BitSet(config.getEntriesPerSegment());
             smallMap = new IntIntMultiMap(entriesPerSegment * 2);
             tmpBytes = new DirectStore(bmf, 64 * smallEntrySize, false).createSlice();
-            offHeapUsed = tmpBytes.capacity() + store.size();
-            sbKey = csKey ? new StringBuilder() : null;
+            offHeapUsed = tmpBytes.capacity() + store.size();           
+            this.keyFlyweigh = keyFlyweigh; 
         }
 
         public synchronized void put(long h, K key, V value, boolean ifPresent, boolean ifAbsent) {
@@ -264,7 +258,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 } else {
                     bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                     K key2 = getKey();
-                    if (equals(key, key2)) {
+                    if (key.equals(key2)) {
                         if (ifAbsent && !ifPresent)
                             return;
                         foundSmall = true;
@@ -274,10 +268,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             }
 
             tmpBytes.reset();
-            if (csKey)
-                tmpBytes.writeUTFΔ((CharSequence) key);
-            else
-                tmpBytes.writeObject(key);
+            key.writeMarshallable(tmpBytes);
             long startOfValuePos = tmpBytes.position();
             if (bytesMarshallable)
                 ((BytesMarshallable) value).writeMarshallable(tmpBytes);
@@ -320,7 +311,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             DirectStore store = new DirectStore(bmf, size);
             bytes.storePositionAndSize(store, 0, size);
             bytes.write(tmpBytes, startOfValuePos, size);
-            K key2 = key instanceof CharSequence ? (K) key.toString() : key;
+            K key2 = key.createKeyForPut();
             map.put(key2, store);
             offHeapUsed += size;
             this.size++;
@@ -348,7 +339,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 } else {
                     bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                     K key2 = getKey();
-                    if (equals(key, key2))
+                    if (key.equals(key2))
                         break;
                 }
             }
@@ -364,10 +355,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return (V) bytes.readObject();
         }
 
-        private boolean equals(K key, K key2) {
-            return csKey ? equalsCS((CharSequence) key, (CharSequence) key2) : key.equals(key2);
-        }
-
         private static boolean equalsCS(CharSequence key, CharSequence key2) {
             if (key.length() != key2.length())
                 return false;
@@ -378,12 +365,8 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         }
 
         private K getKey() {
-            if (csKey) {
-                sbKey.setLength(0);
-                bytes.readUTFΔ(sbKey);
-                return (K) sbKey;
-            }
-            return (K) bytes.readObject();
+            keyFlyweigh.readMarshallable(bytes);
+            return keyFlyweigh;
         }
 
         public synchronized boolean containsKey(long h, K key) {
@@ -398,7 +381,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
-                if (equals(key, key2)) {
+                if (key.equals(key2)) {
                     return true;
                 }
             }
@@ -415,7 +398,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
-                if (equals(key, key2)) {
+                if (key.equals(key2)) {
                     usedSet.clear(pos);
                     smallMap.remove(hash, pos);
                     found = true;
