@@ -78,4 +78,16 @@ public class IntIntMultiMapTest {
         assertEquals(2, map.size());
         assertEquals("{ 3=33, 3=32 }", map.toString());
     }
+    
+    @Test
+    public void testPutRemoveLoop() {
+    	// Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
+    	// 0 but the value is still present in the map.
+    	IntIntMultiMap map = new IntIntMultiMap(10);
+    	
+    	map.put(15, 1);
+		map.remove(15, 1);
+		map.startSearch(15);    		
+		assertEquals(IntIntMultiMap.UNSET, map.nextInt());
+    }
 }
