@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 
-import static junit.framework.Assert.assertNotNull;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.ops4j.pax.exam.CoreOptions.*;
 
@@ -49,7 +49,7 @@ public class OSGiBundleTest extends OSGiTestBase {
         return options(
             systemProperty("org.osgi.framework.storage.clean").value("true"),
             systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
-            mavenBundle("net.openhft", "lang",System.getProperty("openhft.lang.version")),
+            mavenBundle("net.openhft","lang",System.getProperty("openhft.lang.version")),
             openhftBundle("HugeCollections","collections"),
             junitBundles(),
             systemPackage("sun.misc"),
