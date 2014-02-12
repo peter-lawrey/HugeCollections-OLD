@@ -33,6 +33,8 @@ public class SharedHashMapBuilder implements Cloneable {
     int entriesPerSegment = 8 << 10;
     private int replicas = 0;
     private boolean transactional = false;
+    private long lockTimeOutMS = 100;
+    private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
 
     public SharedHashMapBuilder segments(int segments) {
         this.segments = segments;
@@ -88,7 +90,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return transactional;
     }
 
-    public SharedHashMap create(File file) throws IOException {
+    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         SharedHashMapBuilder builder = null;
         for (int i = 0; i < 10; i++) {
             if (file.exists()) {
@@ -109,7 +111,7 @@ public class SharedHashMapBuilder implements Cloneable {
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
         MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, size());
-        return new SharedHashMap(builder, file, ms);
+        return new VanillaSharedHashMap<K, V>(builder, file, ms, kClass, vClass);
     }
 
     private SharedHashMapBuilder readFile(File file) throws IOException {
@@ -160,5 +162,23 @@ public class SharedHashMapBuilder implements Cloneable {
 
     int bitSetSize() {
         return (entriesPerSegment + 63) / 64 * 8;
+    }
+
+    public SharedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {
+        this.lockTimeOutMS = lockTimeOutMS;
+        return this;
+    }
+
+    public long lockTimeOutMS() {
+        return lockTimeOutMS;
+    }
+
+    public SharedHashMapBuilder errorListener(SharedMapErrorListener errorListener) {
+        this.errorListener = errorListener;
+        return this;
+    }
+
+    public SharedMapErrorListener errorListener() {
+        return errorListener;
     }
 }

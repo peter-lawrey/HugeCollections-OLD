@@ -30,12 +30,12 @@
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>lang</artifactId>
-            <version>6.1.5-SNAPSHOT</version>
+            <version>6.2-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>lang-sandbox</artifactId>
-            <version>6.1.5-SNAPSHOT</version>
+            <version>6.2-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

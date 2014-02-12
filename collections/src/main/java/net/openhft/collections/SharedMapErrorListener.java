@@ -16,8 +16,8 @@
 
 package net.openhft.collections;
 
-import java.util.concurrent.ConcurrentMap;
+public interface SharedMapErrorListener {
+    void onLockTimeout(int threadId) throws IllegalStateException;
 
-public interface SharedHashMap<K, V> extends ConcurrentMap<K, V> {
-    V get(Object key, V value);
+    void errorOnUnlock(IllegalMonitorStateException e);
 }
