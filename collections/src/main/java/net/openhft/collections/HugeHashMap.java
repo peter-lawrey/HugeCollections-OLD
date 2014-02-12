@@ -243,8 +243,7 @@ public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> i
             while (true) {
                 int pos = smallMap.nextInt();
                 if (pos == IntIntMultiMap.UNSET) {
-                    Object key2 = key instanceof CharSequence ? key.toString() : key;
-                    final DirectStore store = map.get(key2);
+                    final DirectStore store = map.get(key);
                     if (store == null) {
                         if (ifPresent && !ifAbsent)
                             return;
@@ -329,9 +328,8 @@ public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> i
             smallMap.startSearch(hash);
             while (true) {
                 int pos = smallMap.nextInt();
-                if (pos == IntIntMultiMap.UNSET) {
-                    Object key2 = key instanceof CharSequence ? key.toString() : key;
-                    final DirectStore store = map.get(key2);
+                if (pos == IntIntMultiMap.UNSET) {                    
+                    final DirectStore store = map.get(key);
                     if (store == null)
                         return null;
                     bytes.storePositionAndSize(store, 0, store.size());
@@ -355,15 +353,6 @@ public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> i
             return (V) bytes.readObject();
         }
 
-        private static boolean equalsCS(CharSequence key, CharSequence key2) {
-            if (key.length() != key2.length())
-                return false;
-            for (int i = 0; i < key.length(); i++)
-                if (key.charAt(i) != key2.charAt(i))
-                    return false;
-            return true;
-        }
-
         private K getKey() {
             keyFlyweigh.readMarshallable(bytes);
             return keyFlyweigh;
@@ -376,8 +365,7 @@ public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> i
             while (true) {
                 int pos = smallMap.nextInt();
                 if (pos == IntIntMultiMap.UNSET) {
-                    Object key2 = key instanceof CharSequence ? key.toString() : key;
-                    return map.containsKey(key2);
+                    return map.containsKey(key);
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
@@ -406,8 +394,7 @@ public class HugeHashMap<K extends HugeMapKey<K>, V> extends AbstractMap<K, V> i
                     break;
                 }
             }
-            Object key2 = key instanceof CharSequence ? key.toString() : key;
-            DirectStore remove = map.remove(key2);
+            DirectStore remove = map.remove(key);
             if (remove == null)
                 return found;
             offHeapUsed -= remove.size();
