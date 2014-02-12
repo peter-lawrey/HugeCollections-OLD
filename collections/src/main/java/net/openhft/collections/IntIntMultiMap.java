@@ -106,7 +106,8 @@ public class IntIntMultiMap {
         size--;
         int pos2 = pos;
         // now work back up the chain from pos to pos0;
-        while (pos >= pos0) {
+        // Note: because of the mask, the pos can be actually less than pos0, thus using != operator instead of >=
+        while (pos != pos0) {
             pos = (pos - ENTRY_SIZE) & capacityMask2;
             int key2 = bytes.readInt(pos + KEY);
             if (key2 == key) {
