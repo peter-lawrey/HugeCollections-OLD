@@ -178,12 +178,12 @@ public class HugeHashMapTest {
         HugeHashMap<IntKey, Long> map1 =
                 new HugeHashMap<IntKey, Long>(config, factory, IntKey.class, Long.class);
 
-        IntKey key = new IntKey();
+        IntKey key = new IntKey().set(55);
 
-        map1.put(key.set(11), 10L);
-        assertEquals(10L, map1.get(key.set(11)));
-        map1.put(key.set(11), 20L);
-        assertEquals(20L, map1.get(key.set(11)));
+        map1.put(key, 10L);
+        assertEquals(10L, map1.get(key));
+        map1.put(key, 20L);
+        assertEquals(20L, map1.get(key));
         map1.clear();
     }
 }
