@@ -122,7 +122,7 @@ public class IntIntMultiMap {
         }
         pos = (pos + ENTRY_SIZE) & capacityMask2;
         // re-inset any values in between pos and pos2.
-        while (pos < pos2) {
+        while (pos != pos2) {
             int key2 = bytes.readInt(pos + KEY);
             int value2 = bytes.readInt(pos + VALUE);
             // clear the entry

@@ -16,6 +16,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.collections.HugeHashMap.KeyFlyweighFactory;
+
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -66,13 +68,18 @@ public class HugeHashMapTest {
                 .setSegments(256)
                 .setSmallEntrySize(72) // TODO 64 corrupts the values !!
                 .setCapacity(count);
+        
+        KeyFlyweighFactory<CharSequenceKey> factory = new KeyFlyweighFactory<CharSequenceKey>() {
+			@Override
+			public CharSequenceKey create() { return CharSequenceKey.createRecyclableKey(); }
+		};
 
-        final HugeHashMap<CharSequence, SampleValues> map =
-                new HugeHashMap<CharSequence, SampleValues>(
-                        config, CharSequence.class, SampleValues.class);
+        final HugeHashMap<CharSequenceKey, SampleValues> map =
+                new HugeHashMap<CharSequenceKey, SampleValues>(
+                        config, factory, CharSequenceKey.class, SampleValues.class);
         long start = System.nanoTime();
         final SampleValues value = new SampleValues();
-        StringBuilder user = new StringBuilder();
+        CharSequenceKey user = CharSequenceKey.createRecyclableKey();
         for (int i = 0; i < count; i++) {
             value.ee = i;
             value.gg = i;
@@ -105,10 +112,15 @@ public class HugeHashMapTest {
                 .setSegments(128)
                 .setSmallEntrySize(72)
                 .setCapacity(COUNT);
+        
+        KeyFlyweighFactory<CharSequenceKey> factory = new KeyFlyweighFactory<CharSequenceKey>() {
+			@Override
+			public CharSequenceKey create() { return CharSequenceKey.createRecyclableKey(); }
+		};
 
-        final HugeHashMap<CharSequence, SampleValues> map =
-                new HugeHashMap<CharSequence, SampleValues>(
-                        config, CharSequence.class, SampleValues.class);
+        final HugeHashMap<CharSequenceKey, SampleValues> map =
+                new HugeHashMap<CharSequenceKey, SampleValues>(
+                        config, factory, CharSequenceKey.class, SampleValues.class);
 
         final String[] users = new String[COUNT];
         for (int i = 0; i < COUNT; i++) users[i] = "user:" + i;
@@ -121,7 +133,7 @@ public class HugeHashMapTest {
                 @Override
                 public void run() {
                     final SampleValues value = new SampleValues();
-                    StringBuilder user = new StringBuilder();
+                    CharSequenceKey user = CharSequenceKey.createRecyclableKey();
                     for (int i = finalT; i < COUNT; i += N_THREADS) {
                         value.ee = i;
                         value.gg = i;
@@ -149,10 +161,8 @@ public class HugeHashMapTest {
         es.shutdown();
     }
 
-    CharSequence users(StringBuilder user, int i) {
-        user.setLength(0);
-        user.append("user:");
-        user.append(i);
+    CharSequenceKey users(CharSequenceKey user, int i) {
+        user.set("user:", i);
         return user;
     }
 
@@ -160,10 +170,15 @@ public class HugeHashMapTest {
     public void testPutLong() {
         HugeConfig config = HugeConfig.DEFAULT.clone();
 
-        HugeHashMap<Long, Long> map1 =
-                new HugeHashMap<Long, Long>(config, Long.class, Long.class);
+        KeyFlyweighFactory<IntKey> factory = new KeyFlyweighFactory<IntKey>() {
+			@Override
+			public IntKey create() { return new IntKey(); }
+		};
+        
+        HugeHashMap<IntKey, Long> map1 =
+                new HugeHashMap<IntKey, Long>(config, factory, IntKey.class, Long.class);
 
-        long key = 55;
+        IntKey key = new IntKey().set(55);
 
         map1.put(key, 10L);
         assertEquals(10L, map1.get(key));

@@ -33,18 +33,19 @@ public class SegmentTest {
         config.setSegments(1);
         config.setSmallEntrySize(32);
         config.setCapacity(config.getSegments() * 32);
-        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
-        segment.put(1, 111, "one", true, true);
-        segment.put(1, 112, "two", true, true);
+        HugeHashMap.Segment<IntKey, String> segment = new HugeHashMap.Segment<IntKey, String>(config, new IntKey(), false, String.class);
+        IntKey key = new IntKey();
+        segment.put(1, key.set(111), "one", true, true);
+        segment.put(1, key.set(112), "two", true, true);
         assertEquals(2, segment.size());
-        segment.put(1, 111, "one-one", false, true);
-        assertEquals("one", segment.get(1, 111, null));
-        segment.put(1, 111, "one-one", true, false);
-        assertEquals("one-one", segment.get(1, 111, null));
-        segment.put(1, 113, "four", true, false);
-        assertEquals(null, segment.get(1, 113, null));
-        segment.put(1, 113, "four", false, true);
-        assertEquals("four", segment.get(1, 113, null));
+        segment.put(1, key.set(111), "one-one", false, true);
+        assertEquals("one", segment.get(1, key.set(111), null));
+        segment.put(1, key.set(111), "one-one", true, false);
+        assertEquals("one-one", segment.get(1, key.set(111), null));
+        segment.put(1, key.set(113), "four", true, false);
+        assertEquals(null, segment.get(1, key.set(113), null));
+        segment.put(1, key.set(113), "four", false, true);
+        assertEquals("four", segment.get(1, key.set(113), null));
 
     }
 
@@ -54,55 +55,56 @@ public class SegmentTest {
         config.setSegments(1);
         config.setSmallEntrySize(32);
         config.setCapacity(config.getSegments() * 32);
-        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
-        segment.put(1, 111, "one", true, true);
-        segment.put(1, 112, "two", true, true);
-        segment.put(3, 301, "three", true, true);
-        segment.put(1, 113, "four", true, true);
-        segment.put(3, 302, "five", true, true);
-        segment.put(1, 114, "six", true, true);
+        HugeHashMap.Segment<IntKey, String> segment = new HugeHashMap.Segment<IntKey, String>(config, new IntKey(), false, String.class);
+        IntKey key = new IntKey();
+        segment.put(1, key.set(111), "one", true, true);
+        segment.put(1, key.set(112), "two", true, true);
+        segment.put(3, key.set(301), "three", true, true);
+        segment.put(1, key.set(113), "four", true, true);
+        segment.put(3, key.set(302), "five", true, true);
+        segment.put(1, key.set(114), "six", true, true);
         assertEquals(6, segment.size());
 
-        assertEquals("one", segment.get(1, 111, null));
-        assertEquals("two", segment.get(1, 112, null));
-        assertEquals("three", segment.get(3, 301, null));
-        assertEquals("four", segment.get(1, 113, null));
-        assertEquals("five", segment.get(3, 302, null));
-        assertEquals("six", segment.get(1, 114, null));
+        assertEquals("one", segment.get(1, key.set(111), null));
+        assertEquals("two", segment.get(1, key.set(112), null));
+        assertEquals("three", segment.get(3, key.set(301), null));
+        assertEquals("four", segment.get(1, key.set(113), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
+        assertEquals("six", segment.get(1, key.set(114), null));
 
-        assertTrue(segment.remove(1, 111));
+        assertTrue(segment.remove(1, key.set(111)));
         assertEquals(5, segment.size());
-        assertEquals(null, segment.get(1, 111, null));
-        assertEquals("two", segment.get(1, 112, null));
-        assertEquals("three", segment.get(3, 301, null));
-        assertEquals("four", segment.get(1, 113, null));
-        assertEquals("five", segment.get(3, 302, null));
-        assertEquals("six", segment.get(1, 114, null));
+        assertEquals(null, segment.get(1, key.set(111), null));
+        assertEquals("two", segment.get(1, key.set(112), null));
+        assertEquals("three", segment.get(3, key.set(301), null));
+        assertEquals("four", segment.get(1, key.set(113), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
+        assertEquals("six", segment.get(1, key.set(114), null));
 
-        assertTrue(segment.remove(1, 112));
-        assertEquals(null, segment.get(1, 112, null));
-        assertEquals("three", segment.get(3, 301, null));
-        assertEquals("four", segment.get(1, 113, null));
-        assertEquals("five", segment.get(3, 302, null));
-        assertEquals("six", segment.get(1, 114, null));
+        assertTrue(segment.remove(1, key.set(112)));
+        assertEquals(null, segment.get(1, key.set(112), null));
+        assertEquals("three", segment.get(3, key.set(301), null));
+        assertEquals("four", segment.get(1, key.set(113), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
+        assertEquals("six", segment.get(1, key.set(114), null));
 
-        assertTrue(segment.remove(1, 113));
-        assertEquals(null, segment.get(1, 113, null));
-        assertEquals("three", segment.get(3, 301, null));
-        assertEquals("five", segment.get(3, 302, null));
-        assertEquals("six", segment.get(1, 114, null));
+        assertTrue(segment.remove(1, key.set(113)));
+        assertEquals(null, segment.get(1, key.set(113), null));
+        assertEquals("three", segment.get(3, key.set(301), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
+        assertEquals("six", segment.get(1, key.set(114), null));
 
-        assertTrue(segment.remove(1, 114));
-        assertEquals(null, segment.get(1, 114, null));
-        assertEquals("three", segment.get(3, 301, null));
-        assertEquals("five", segment.get(3, 302, null));
+        assertTrue(segment.remove(1, key.set(114)));
+        assertEquals(null, segment.get(1, key.set(114), null));
+        assertEquals("three", segment.get(3, key.set(301), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
 
-        assertTrue(segment.remove(3, 301));
-        assertEquals(null, segment.get(3, 301, null));
-        assertEquals("five", segment.get(3, 302, null));
+        assertTrue(segment.remove(3, key.set(301)));
+        assertEquals(null, segment.get(3, key.set(301), null));
+        assertEquals("five", segment.get(3, key.set(302), null));
 
-        assertTrue(segment.remove(3, 302));
-        assertEquals(null, segment.get(3, 302, null));
+        assertTrue(segment.remove(3, key.set(302)));
+        assertEquals(null, segment.get(3, key.set(302), null));
         assertEquals(0, segment.size());
     }
 }

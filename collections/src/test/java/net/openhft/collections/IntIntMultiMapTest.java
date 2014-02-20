@@ -90,4 +90,17 @@ public class IntIntMultiMapTest {
 		map.startSearch(15);    		
 		assertEquals(IntIntMultiMap.UNSET, map.nextInt());
     }
+    
+    @Test
+    public void testRemove2Specific() { 
+    	IntIntMultiMap map = new IntIntMultiMap(10); 
+    	map.put(6573, 1);
+    	map.put(6574, 1);
+    	map.put(6701, 1);
+    	
+    	map.remove(6573, 1);
+    	
+    	map.startSearch(6701);
+    	assertNotEquals(IntIntMultiMap.UNSET, map.nextInt());
+    }
 }
