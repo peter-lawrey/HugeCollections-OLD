@@ -17,21 +17,19 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
-import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.DirectStore;
 
 /**
  * Supports a simple interface for int -> int[] off heap.
  */
 public class IntIntMultiMap {
-    public static final int UNSET = Integer.MIN_VALUE;
-    private static final long UNSET_ENTRY = UNSET * 0x100000001L;
     public static final int KEY = 0;
     public static final int VALUE = 4;
     public static final int ENTRY_SIZE = 8;
     private final int capacityMask;
     private final int capacityMask2;
-    private final DirectBytes bytes;
+    private final Bytes bytes;
     private int size = 0;
 
     public IntIntMultiMap(int size) {
@@ -42,6 +40,22 @@ public class IntIntMultiMap {
         clear();
     }
 
+    public IntIntMultiMap(Bytes bytes) {
+        size = (int) (bytes.capacity() / ENTRY_SIZE);
+        assert size == Maths.nextPower2(size, 16);
+        capacityMask = size - 1;
+        capacityMask2 = (size - 1) * ENTRY_SIZE;
+        this.bytes = bytes;
+    }
+
+    public int unsetKey() {
+        return 0;
+    }
+
+    public int unsetValue() {
+        return Integer.MIN_VALUE;
+    }
+
     /**
      * Add an entry as an int/int pair.  Allow duplicate keys, but not key/values.
      *
@@ -49,10 +63,12 @@ public class IntIntMultiMap {
      * @param value to add
      */
     public void put(int key, int value) {
+        if (key == unsetKey())
+            throw new IllegalArgumentException("Cannot add a key with unset value " + unsetKey());
         int pos = (key & capacityMask) << 3; // 8 bytes per entry
         for (int i = 0; i <= capacityMask; i++) {
             int key2 = bytes.readInt(pos + KEY);
-            if (key2 == UNSET) {
+            if (key2 == unsetKey()) {
                 bytes.writeInt(pos + KEY, key);
                 bytes.writeInt(pos + VALUE, value);
                 size++;
@@ -76,6 +92,8 @@ public class IntIntMultiMap {
      * @return whether a match was found.
      */
     public boolean remove(int key, int value) {
+        if (key == unsetKey())
+            throw new IllegalArgumentException("Cannot remove a key with unset value " + unsetKey());
         int pos = (key & capacityMask) << 3; // 8 bytes per entry
         int pos0 = -1;
         // find the end of the chain.
@@ -88,7 +106,7 @@ public class IntIntMultiMap {
                     found = true;
                     pos0 = pos;
                 }
-            } else if (key2 == UNSET) {
+            } else if (key2 == unsetKey()) {
                 break;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
@@ -98,16 +116,18 @@ public class IntIntMultiMap {
         size--;
         int pos2 = pos;
         // now work back up the chain from pos to pos0;
-        while (pos >= pos0) {
+        // Note: because of the mask, the pos can be actually less than pos0, thus using != operator instead of >=
+        while (pos != pos0) {
             pos = (pos - ENTRY_SIZE) & capacityMask2;
             int key2 = bytes.readInt(pos + KEY);
             if (key2 == key) {
-                // swap values and clear
+                // swap values and zeroOut
                 if (pos != pos0) {
                     int value2 = bytes.readInt(pos + VALUE);
                     bytes.writeInt(pos0 + VALUE, value2);
                 }
-                bytes.writeLong(pos, UNSET_ENTRY);
+                bytes.writeInt(pos, unsetKey());
+                bytes.writeInt(pos + 4, unsetValue());
                 break;
             }
         }
@@ -116,8 +136,9 @@ public class IntIntMultiMap {
         while (pos < pos2) {
             int key2 = bytes.readInt(pos + KEY);
             int value2 = bytes.readInt(pos + VALUE);
-            // clear the entry
-            bytes.writeLong(pos, UNSET_ENTRY);
+            // zeroOut the entry
+            bytes.writeInt(pos, unsetKey());
+            bytes.writeInt(pos + 4, unsetValue());
             size--;
             // this might put it back in the same place or a different one.
             put(key2, value2);
@@ -136,18 +157,21 @@ public class IntIntMultiMap {
     private int searchPos = -1;
 
     public void startSearch(int key) {
+        if (key == unsetKey())
+            throw new IllegalArgumentException("Cannot startSearch a key with unset value " + unsetKey());
+
         searchPos = (key & capacityMask) << 3; // 8 bytes per entry
         searchKey = key;
     }
 
     /**
-     * @return the next int value for the last search or UNSET
+     * @return the next int value for the last search or unsetKey()
      */
     public int nextInt() {
         for (int i = 0; i <= capacityMask; i++) {
             int key2 = bytes.readInt(searchPos + KEY);
-            if (key2 == UNSET)
-                return UNSET;
+            if (key2 == unsetKey())
+                return unsetValue();
             int pos = searchPos;
             searchPos = (searchPos + ENTRY_SIZE) & capacityMask2;
             if (key2 == searchKey) {
@@ -155,7 +179,7 @@ public class IntIntMultiMap {
                 return value2;
             }
         }
-        return UNSET;
+        return unsetValue();
     }
 
     public int capacity() {
@@ -173,7 +197,7 @@ public class IntIntMultiMap {
         for (int i = 0, pos = 0; i <= capacityMask; i++, pos += ENTRY_SIZE) {
             int key = bytes.readInt(pos + KEY);
             int value = bytes.readInt(pos + VALUE);
-            if (key != UNSET)
+            if (key != unsetKey())
                 sb.append(key).append('=').append(value).append(", ");
         }
         if (sb.length() > 2) {
@@ -185,6 +209,6 @@ public class IntIntMultiMap {
 
     public void clear() {
         for (int pos = 0; pos < bytes.capacity(); pos += ENTRY_SIZE)
-            bytes.writeLong(pos, UNSET_ENTRY);
+            bytes.writeLong(pos, unsetKey() * 100000001L);
     }
 }

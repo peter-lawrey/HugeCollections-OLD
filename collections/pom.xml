@@ -31,7 +31,8 @@
         <pax.exam.version>3.4.0</pax.exam.version>
         <pax.url.version>1.6.0</pax.url.version>
         <logback.version>0.9.6</logback.version>
-        <openhft.lang.version>6.1.5-SNAPSHOT</openhft.lang.version>
+        <openhft.lang.version>6.2-SNAPSHOT</openhft.lang.version>
+        <openhft.compiler.version>2.1</openhft.compiler.version>
         <osgi.version>5.0.0</osgi.version>
     </properties>
 
@@ -40,6 +41,19 @@
             <groupId>net.openhft</groupId>
             <artifactId>lang</artifactId>
             <version>${openhft.lang.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.openhft</groupId>
+            <artifactId>lang-sandbox</artifactId>
+            <version>${openhft.lang.version}</version>
+        </dependency>
+
+        <!-- test dependencies -->
+        <dependency>
+            <groupId>net.openhft</groupId>
+            <artifactId>compiler</artifactId>
+            <version>${openhft.compiler.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

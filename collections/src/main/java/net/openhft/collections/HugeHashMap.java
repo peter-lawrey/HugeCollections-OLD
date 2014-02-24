@@ -248,8 +248,9 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             boolean foundSmall = false, foundLarge = false;
             while (true) {
                 int pos = smallMap.nextInt();
-                if (pos == IntIntMultiMap.UNSET) {
-                    final DirectStore store = map.get(key);
+                if (pos == smallMap.unsetValue()) {
+                    Object key2 = key instanceof CharSequence ? key.toString() : key;
+                    final DirectStore store = map.get(key2);
                     if (store == null) {
                         if (ifPresent && !ifAbsent)
                             return;
@@ -272,7 +273,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 }
             }
 
-            tmpBytes.reset();
+            tmpBytes.clear();
             if (csKey)
                 tmpBytes.writeUTFΔ((CharSequence) key);
             else
@@ -319,15 +320,16 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             DirectStore store = new DirectStore(bmf, size);
             bytes.storePositionAndSize(store, 0, size);
             bytes.write(tmpBytes, startOfValuePos, size);
-            map.put(key, store);
+            K key2 = key instanceof CharSequence ? (K) key.toString() : key;
+            map.put(key2, store);
             offHeapUsed += size;
             this.size++;
         }
 
         private int intHashFor(long h) {
             int hash = (int) h;
-            if (hash == IntIntMultiMap.UNSET)
-                hash = 0;
+            if (hash == smallMap.unsetKey())
+                hash = ~hash;
             return hash;
         }
 
@@ -336,8 +338,9 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             smallMap.startSearch(hash);
             while (true) {
                 int pos = smallMap.nextInt();
-                if (pos == IntIntMultiMap.UNSET) {
-                    final DirectStore store = map.get(key);
+                if (pos == smallMap.unsetValue()) {
+                    Object key2 = key instanceof CharSequence ? key.toString() : key;
+                    final DirectStore store = map.get(key2);
                     if (store == null)
                         return null;
                     bytes.storePositionAndSize(store, 0, store.size());
@@ -389,8 +392,9 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             boolean found = false;
             while (true) {
                 int pos = smallMap.nextInt();
-                if (pos == IntIntMultiMap.UNSET) {
-                    return map.containsKey(key);
+                if (pos == smallMap.unsetValue()) {
+                    Object key2 = key instanceof CharSequence ? key.toString() : key;
+                    return map.containsKey(key2);
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
@@ -406,7 +410,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             boolean found = false;
             while (true) {
                 int pos = smallMap.nextInt();
-                if (pos == IntIntMultiMap.UNSET) {
+                if (pos == smallMap.unsetValue()) {
                     break;
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
@@ -419,7 +423,8 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                     break;
                 }
             }
-            DirectStore remove = map.remove(key);
+            Object key2 = key instanceof CharSequence ? key.toString() : key;
+            DirectStore remove = map.remove(key2);
             if (remove == null)
                 return found;
             offHeapUsed -= remove.size();
