@@ -34,7 +34,7 @@ public class SharedHashMapBuilder implements Cloneable {
     private long entries = 1 << 20;
     private int replicas = 0;
     private boolean transactional = false;
-    private long lockTimeOutMS = 100;
+    private long lockTimeOutMS = 1000;
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
 
     public SharedHashMapBuilder segments(int segments) {

@@ -21,7 +21,9 @@ import net.openhft.lang.values.LongValue£native;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -80,11 +82,20 @@ public class SharedHashMapTest {
     }
 
     // i7-3970X CPU @ 3.50GHz, hex core: -verbose:gc -Xmx64m
+    // to tmpfs file system
     // 10M users, updated 12 times. Throughput 19.3 M ops/sec, no GC!
     // 50M users, updated 12 times. Throughput 19.8 M ops/sec, no GC!
     // 100M users, updated 12 times. Throughput 19.0M ops/sec, no GC!
     // 200M users, updated 12 times. Throughput 18.4 M ops/sec, no GC!
     // 400M users, updated 12 times. Throughput 18.4 M ops/sec, no GC!
+
+    // to ext4 file system.
+    // 10M users, updated 12 times. Throughput 17.7 M ops/sec, no GC!
+    // 50M users, updated 12 times. Throughput 16.5 M ops/sec, no GC!
+    // 100M users, updated 12 times. Throughput 15.9 M ops/sec, no GC!
+    // 200M users, updated 12 times. Throughput 15.4 M ops/sec, no GC!
+    // 400M users, updated 12 times. Throughput 7.8 M ops/sec, no GC!
+    // 600M users, updated 12 times. Throughput 5.8 M ops/sec, no GC!
 
     @Test
     @Ignore
@@ -93,12 +104,12 @@ public class SharedHashMapTest {
         File file = new File(TMP + "/shm-test");
         file.delete();
         file.deleteOnExit();
-        final long entries = 10 * 1000 * 1000L;
+        final long entries = 200 * 1000 * 1000L;
         final SharedHashMap<CharSequence, LongValue> map =
                 new SharedHashMapBuilder()
                         .entries(entries)
                         .segments(1024)
-                        .entrySize(32) // TODO not enough protection from over sized entries.
+                        .entrySize(24) // TODO not enough protection from over sized entries.
                         .create(file, CharSequence.class, LongValue.class);
 //        DataValueGenerator dvg = new DataValueGenerator();
 //        dvg.setDumpCode(true);
@@ -107,26 +118,44 @@ public class SharedHashMapTest {
         long start = System.currentTimeMillis();
         ExecutorService es = Executors.newFixedThreadPool(threads);
         for (int i = 0; i < threads; i++) {
+            final int t = i;
             es.submit(new Runnable() {
                 @Override
                 public void run() {
                     LongValue value = new LongValue£native();
                     StringBuilder sb = new StringBuilder();
+                    int next = 50 * 1000 * 1000;
                     for (int i = 0; i < entries; i++) {
                         sb.setLength(0);
                         sb.append("user:");
                         sb.append(i);
                         map.acquireUsing(sb, value);
                         long n = value.addAtomicValue(1);
+                        if (t == 0 && i == next) {
+                            System.out.println(i);
+                            next += 50 * 1000 * 1000;
+                        }
                     }
                 }
             });
         }
         es.shutdown();
-        es.awaitTermination(10, TimeUnit.MINUTES);
+        es.awaitTermination(30, TimeUnit.MINUTES);
         long time = System.currentTimeMillis() - start;
         System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
         map.close();
+        printStatus();
+    }
+
+    private void printStatus() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"));
+            for (String line; (line = br.readLine()) != null; )
+                System.out.println(line);
+            br.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     //  i7-3970X CPU @ 3.50GHz, hex core: -Xmx30g -verbose:gc
@@ -138,7 +167,7 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 10 * 1000 * 1000L;
+        final long entries = 200 * 1000 * 1000L;
         final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
@@ -168,5 +197,6 @@ public class SharedHashMapTest {
         es.awaitTermination(10, TimeUnit.MINUTES);
         long time = System.currentTimeMillis() - start;
         System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
+        printStatus();
     }
 }
