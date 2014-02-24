@@ -22,8 +22,8 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 /**
- * Created with IntelliJ IDEA. User: peter Date: 09/12/13 Time: 15:21 To change this template use File | Settings | File
- * Templates.
+ * User: peter
+ * Date: 09/12/13
  */
 public class IntIntMultiMapTest {
     @Test
@@ -53,14 +53,14 @@ public class IntIntMultiMapTest {
         map.startSearch(3);
         assertEquals(33, map.nextInt());
         assertEquals(32, map.nextInt());
-        assertEquals(IntIntMultiMap.UNSET, map.nextInt());
+        assertEquals(map.unsetValue(), map.nextInt());
 
         map.startSearch(1);
         assertEquals(15, map.nextInt());
         assertEquals(12, map.nextInt());
         assertEquals(13, map.nextInt());
         assertEquals(14, map.nextInt());
-        assertEquals(IntIntMultiMap.UNSET, map.nextInt());
+        assertEquals(map.unsetValue(), map.nextInt());
 
         map.remove(1, 12);
         assertEquals(5, map.size());
@@ -78,16 +78,16 @@ public class IntIntMultiMapTest {
         assertEquals(2, map.size());
         assertEquals("{ 3=33, 3=32 }", map.toString());
     }
-    
+
     @Test
     public void testRemoveSpecific() {
-    	// Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
-    	// 0 but the value is still present in the map.
-    	IntIntMultiMap map = new IntIntMultiMap(10);
-    	
-    	map.put(15, 1);
-		map.remove(15, 1);
-		map.startSearch(15);    		
-		assertEquals(IntIntMultiMap.UNSET, map.nextInt());
+        // Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
+        // 0 but the value is still present in the map.
+        IntIntMultiMap map = new IntIntMultiMap(10);
+
+        map.put(15, 1);
+        map.remove(15, 1);
+        map.startSearch(15);
+        assertEquals(map.unsetValue(), map.nextInt());
     }
 }

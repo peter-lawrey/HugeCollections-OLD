@@ -57,7 +57,7 @@ public class HugeHashMapTest {
     }
 
     /*
-    Put/get 1,339 K operations per second
+    Put/getUsing 1,339 K operations per second
      */
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
