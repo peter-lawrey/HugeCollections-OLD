@@ -79,6 +79,13 @@ public class SharedHashMapTest {
         map.close();
     }
 
+    // i7-3970X CPU @ 3.50GHz, hex core: -verbose:gc -Xmx64m
+    // 10M users, updated 12 times. Throughput 19.3 M ops/sec, no GC!
+    // 50M users, updated 12 times. Throughput 19.8 M ops/sec, no GC!
+    // 100M users, updated 12 times. Throughput 19.0M ops/sec, no GC!
+    // 200M users, updated 12 times. Throughput 18.4 M ops/sec, no GC!
+    // 400M users, updated 12 times. Throughput 18.4 M ops/sec, no GC!
+
     @Test
     @Ignore
     public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
@@ -86,12 +93,12 @@ public class SharedHashMapTest {
         File file = new File(TMP + "/shm-test");
         file.delete();
         file.deleteOnExit();
-        final int entries = 10 * 1000 * 1000;
+        final long entries = 10 * 1000 * 1000L;
         final SharedHashMap<CharSequence, LongValue> map =
                 new SharedHashMapBuilder()
                         .entries(entries)
-                        .segments(128)
-                        .entrySize(24) // TODO not enough protection from over sized entries.
+                        .segments(1024)
+                        .entrySize(32) // TODO not enough protection from over sized entries.
                         .create(file, CharSequence.class, LongValue.class);
 //        DataValueGenerator dvg = new DataValueGenerator();
 //        dvg.setDumpCode(true);
@@ -122,11 +129,17 @@ public class SharedHashMapTest {
         map.close();
     }
 
+    //  i7-3970X CPU @ 3.50GHz, hex core: -Xmx30g -verbose:gc
+    // 10M users, updated 12 times. Throughput 16.2 M ops/sec, longest [Full GC 853669K->852546K(3239936K), 0.8255960 secs]
+    // 50M users, updated 12 times. Throughput 13.3 M ops/sec,  longest [Full GC 5516214K->5511353K(13084544K), 3.5752970 secs]
+    // 100M users, updated 12 times. Throughput 11.8 M ops/sec, longest [Full GC 11240703K->11233711K(19170432K), 5.8783010 secs]
+    // 200M users, updated 12 times. Throughput 4.2 M ops/sec, longest [Full GC 25974721K->22897189K(27962048K), 21.7962600 secs]
+
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>();
-        final int entries = 10 * 1000 * 1000;
+        final long entries = 10 * 1000 * 1000L;
+        final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
         long start = System.currentTimeMillis();

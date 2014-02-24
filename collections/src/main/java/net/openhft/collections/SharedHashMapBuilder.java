@@ -127,7 +127,7 @@ public class SharedHashMapBuilder implements Cloneable {
         if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
         builder.segments(bb.getInt());
-        builder.entries((long) bb.getInt() * builder.segments());
+        builder.entries(bb.getLong() * builder.segments());
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
@@ -140,7 +140,7 @@ public class SharedHashMapBuilder implements Cloneable {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         bb.put(MAGIC);
         bb.putInt(segments);
-        bb.putInt(entriesPerSegment());
+        bb.putLong(entriesPerSegment());
         bb.putInt(entrySize);
         bb.putInt(replicas);
         bb.put((byte) (transactional ? 'Y' : 'N'));
@@ -150,24 +150,24 @@ public class SharedHashMapBuilder implements Cloneable {
         fos.close();
     }
 
-    public int entriesPerSegment() {
-        int epg1 = (int) ((entries * 3 / 2) / segments);
+    public long entriesPerSegment() {
+        long epg1 = ((entries * 3 / 2) / segments);
         return (Math.max(1, epg1) + 63) & ~63; // must be a multiple of 64 for the bit set to work;
     }
 
     long size() {
-        return HEADER_SIZE + (long) segments * segmentSize();
+        return HEADER_SIZE + segments * segmentSize();
     }
 
-    int segmentSize() {
+    long segmentSize() {
         return (SEGMENT_HEADER
-                + Maths.nextPower2(entriesPerSegment() * 2 * 8, 16 * 8) // the IntIntMultiMap
+                + Maths.nextPower2(entriesPerSegment() * 12, 16 * 8) // the IntIntMultiMap
                 + (1 + replicas) * bitSetSize() // the free list and 0+ dirty lists.
                 + entriesPerSegment() * entrySize); // the actual entries used.
     }
 
     int bitSetSize() {
-        return (entriesPerSegment() + 63) / 64 * 8;
+        return (int) ((entriesPerSegment() + 63) / 64 * 8);
     }
 
     public SharedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {

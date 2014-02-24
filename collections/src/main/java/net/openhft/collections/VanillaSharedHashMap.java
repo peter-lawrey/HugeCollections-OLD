@@ -46,7 +46,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.segments = segments;
 
         long offset = SharedHashMapBuilder.HEADER_SIZE;
-        int segmentSize = builder.segmentSize();
+        long segmentSize = builder.segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
             this.segments[i] = new Segment(ms.createSlice(offset, segmentSize));
             offset += segmentSize;
@@ -104,6 +104,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         int i = 0;
         for (; i < bytes.limit() - 7; i += 8)
             h = 10191 * h + bytes.readLong(i);
+//        for (; i < bytes.limit() - 3; i += 2)
+//            h = 10191 * h + bytes.readInt(i);
         for (; i < bytes.limit(); i++)
             h = 57 * h + bytes.readByte(i);
         h ^= (h >>> 31) + (h << 31);
@@ -156,11 +158,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         public Segment(NativeBytes bytes) {
             this.bytes = bytes;
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
-            int size = Maths.nextPower2(builder.entriesPerSegment() * 2 * 8, 16 * 8);
-            hashLookup = new IntIntMultiMap(new NativeBytes(start, start + size));
+            long size = Maths.nextPower2(builder.entriesPerSegment() * 12, 16 * 8);
+            hashLookup = new IntIntMultiMap(new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null));
             start += size;
             size = (builder.entriesPerSegment() + 63) / 64 * 8;
-            freeList = new ATSDirectBitSet(new NativeBytes(start, start + size));
+            freeList = new ATSDirectBitSet(new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null));
             start += size * (1 + builder.replicas());
             entriesOffset = start - bytes.startAddr();
             assert bytes.capacity() >= entriesOffset + builder.entriesPerSegment() * builder.entrySize();
