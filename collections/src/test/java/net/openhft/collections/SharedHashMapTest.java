@@ -23,9 +23,8 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -121,5 +120,40 @@ public class SharedHashMapTest {
         long time = System.currentTimeMillis() - start;
         System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
         map.close();
+    }
+
+    @Test
+    @Ignore
+    public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
+        final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>();
+        final int entries = 10 * 1000 * 1000;
+
+        int threads = Runtime.getRuntime().availableProcessors();
+        long start = System.currentTimeMillis();
+        ExecutorService es = Executors.newFixedThreadPool(threads);
+        for (int i = 0; i < threads; i++) {
+            es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < entries; i++) {
+                        sb.setLength(0);
+                        sb.append("user:");
+                        sb.append(i);
+                        String key = sb.toString();
+                        AtomicInteger count = map.get(key);
+                        if (count == null) {
+                            map.put(key, new AtomicInteger());
+                            count = map.get(key);
+                        }
+                        count.getAndIncrement();
+                    }
+                }
+            });
+        }
+        es.shutdown();
+        es.awaitTermination(10, TimeUnit.MINUTES);
+        long time = System.currentTimeMillis() - start;
+        System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
     }
 }
