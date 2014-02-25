@@ -18,6 +18,7 @@ package net.openhft.collections;
 
 import net.openhft.lang.values.LongValue;
 import net.openhft.lang.values.LongValue£native;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -32,49 +33,41 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 public class SharedHashMapTest {
+
+    private StringBuilder sb;
+
+    @Before
+    public void before() {
+        sb = new StringBuilder();
+    }
+
     @Test
     public void testAcquire() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test");
-        file.delete();
-        file.deleteOnExit();
-        int entries = /*100 **/ 1000 * 1000;
-        SharedHashMap<CharSequence, LongValue> map =
-                new SharedHashMapBuilder()
-                        .entries(entries)
-                        .segments(128)
-                        .entrySize(24) // TODO not enough protection from over sized entries.
-                        .create(file, CharSequence.class, LongValue.class);
-//        DataValueGenerator dvg = new DataValueGenerator();
-//        dvg.setDumpCode(true);
-//        LongValue value = (LongValue) dvg.acquireNativeClass(LongValue.class).newInstance();
+        int entries = 1000 * 1000;
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
+
         LongValue value = new LongValue£native();
         LongValue value2 = new LongValue£native();
         LongValue value3 = new LongValue£native();
-        StringBuilder sb = new StringBuilder();
+
         for (int j = 1; j <= 3; j++) {
             for (int i = 0; i < entries; i++) {
-                sb.setLength(0);
-                sb.append("user:");
-                sb.append(i);
-//                System.out.println(sb);
-//                if (i == 10)
-//                    Thread.yield();
-                if (j > 1)
-                    assertNotNull(map.getUsing(sb, value));
-                else
-                    map.acquireUsing(sb, value);
-                long n = value.addAtomicValue(1);
-                if (n != j)
-                    assertEquals(j, n);
-                map.acquireUsing(sb, value2);
-                long n2 = value2.getValue();
-                if (n2 != j)
-                    assertEquals(j, n2);
-                assertEquals(value3, map.getUsing(sb, value3));
-                long n3 = value3.getValue();
-                if (n3 != 1)
-                    assertEquals(j, n3);
+                CharSequence userCS = getUserCharSequence(i);
+
+                if (j > 1) {
+                    assertNotNull(map.getUsing(userCS, value));
+                } else {
+                    map.acquireUsing(userCS, value);
+                }
+                assertEquals(j - 1, value.getValue());
+
+                value.addAtomicValue(1);
+
+                assertEquals(value2, map.acquireUsing(userCS, value2));
+                assertEquals(j, value2.getValue());
+
+                assertEquals(value3, map.getUsing(userCS, value3));
+                assertEquals(j, value3.getValue());
             }
         }
 
@@ -100,17 +93,9 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test");
-        file.delete();
-        file.deleteOnExit();
-        final long entries = 10 * 1000 * 1000L;
-        final SharedHashMap<CharSequence, LongValue> map =
-                new SharedHashMapBuilder()
-                        .entries(entries)
-                        .segments(1024)
-                        .entrySize(24) // TODO not enough protection from over sized entries.
-                        .create(file, CharSequence.class, LongValue.class);
+        final long entries = 200 * 1000 * 1000L;
+        final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 1024, 24);
+
 //        DataValueGenerator dvg = new DataValueGenerator();
 //        dvg.setDumpCode(true);
 //        LongValue value = (LongValue) dvg.acquireNativeClass(LongValue.class).newInstance();
@@ -147,17 +132,6 @@ public class SharedHashMapTest {
         printStatus();
     }
 
-    private void printStatus() {
-        try {
-            BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"));
-            for (String line; (line = br.readLine()) != null; )
-                System.out.println(line);
-            br.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     //  i7-3970X CPU @ 3.50GHz, hex core: -Xmx30g -verbose:gc
     // 10M users, updated 12 times. Throughput 16.2 M ops/sec, longest [Full GC 853669K->852546K(3239936K), 0.8255960 secs]
     // 50M users, updated 12 times. Throughput 13.3 M ops/sec,  longest [Full GC 5516214K->5511353K(13084544K), 3.5752970 secs]
@@ -167,7 +141,7 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 10 * 1000 * 1000L;
+        final long entries = 200 * 1000 * 1000L;
         final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
@@ -198,5 +172,39 @@ public class SharedHashMapTest {
         long time = System.currentTimeMillis() - start;
         System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
         printStatus();
+    }
+
+    private CharSequence getUserCharSequence(int i) {
+        sb.setLength(0);
+        sb.append("user:");
+        sb.append(i);
+        return sb;
+    }
+
+    private static File getPersistenceFile() {
+        String TMP = System.getProperty("java.io.tmpdir");
+        File file = new File(TMP + "/shm-test");
+        file.delete();
+        file.deleteOnExit();
+        return file;
+    }
+
+    private static SharedHashMap<CharSequence, LongValue> getSharedMap(long entries, int segments, int entrySize) throws IOException {
+        return new SharedHashMapBuilder()
+                .entries(entries)
+                .segments(segments)
+                .entrySize(entrySize) // TODO not enough protection from over sized entries.
+                .create(getPersistenceFile(), CharSequence.class, LongValue.class);
+    }
+
+    private static void printStatus() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"));
+            for (String line; (line = br.readLine()) != null; )
+                System.out.println(line);
+            br.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
