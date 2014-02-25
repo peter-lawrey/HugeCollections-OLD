@@ -29,8 +29,7 @@ import java.io.IOException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 public class SharedHashMapTest {
 
@@ -93,7 +92,7 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 200 * 1000 * 1000L;
+        final long entries = 10 * 1000 * 1000L;
         final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 1024, 24);
 
 //        DataValueGenerator dvg = new DataValueGenerator();
@@ -141,7 +140,7 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 200 * 1000 * 1000L;
+        final long entries = 10 * 1000 * 1000L;
         final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
@@ -206,5 +205,42 @@ public class SharedHashMapTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testPutAndRemove() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+        String TMP = System.getProperty("java.io.tmpdir");
+        File file = new File(TMP + "/shm-remove-test");
+        file.delete();
+        file.deleteOnExit();
+        int entries = 100 * 1000;
+        SharedHashMap<CharSequence, CharSequence> map =
+                new SharedHashMapBuilder()
+                        .entries(entries)
+                        .segments(16)
+                        .entrySize(32)
+                        .putReturnsNull(true)
+                        .removeReturnsNull(true)
+                        .create(file, CharSequence.class, CharSequence.class);
+        StringBuilder key = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        StringBuilder value2 = new StringBuilder();
+        for (int j = 1; j <= 3; j++) {
+            for (int i = 0; i < entries; i++) {
+                key.setLength(0);
+                key.append("user:").append(i);
+                value.setLength(0);
+                value.append("value:").append(i);
+//                System.out.println(key);
+                assertNull(map.getUsing(key, value));
+                assertNull(map.put(key, value));
+                assertNotNull(map.getUsing(key, value2));
+                assertEquals(value.toString(), value2.toString());
+                assertNull(map.remove(key));
+                assertNull(map.getUsing(key, value));
+            }
+        }
+
+        map.close();
     }
 }
