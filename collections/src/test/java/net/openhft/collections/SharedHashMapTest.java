@@ -104,7 +104,7 @@ public class SharedHashMapTest {
         File file = new File(TMP + "/shm-test");
         file.delete();
         file.deleteOnExit();
-        final long entries = 200 * 1000 * 1000L;
+        final long entries = 10 * 1000 * 1000L;
         final SharedHashMap<CharSequence, LongValue> map =
                 new SharedHashMapBuilder()
                         .entries(entries)
@@ -167,7 +167,7 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 200 * 1000 * 1000L;
+        final long entries = 10 * 1000 * 1000L;
         final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
