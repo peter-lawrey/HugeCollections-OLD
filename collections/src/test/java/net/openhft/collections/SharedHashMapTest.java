@@ -30,6 +30,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class SharedHashMapTest {
 
@@ -41,7 +42,39 @@ public class SharedHashMapTest {
     }
 
     @Test
-    public void testAcquire() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+    public void testAcquireWithNullKey() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        assertNull(map.acquireUsing(null, new LongValue£native()));
+    }
+
+    @Test
+    public void testGetWithNullKey() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        assertNull(map.getUsing(null, new LongValue£native()));
+    }
+
+    @Test
+    public void testAcquireWithNullContainer() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        map.acquireUsing("key", new LongValue£native());
+        assertEquals(0, map.acquireUsing("key", null).getValue());
+    }
+
+    @Test
+    public void testGetWithNullContainer() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        map.acquireUsing("key", new LongValue£native());
+        assertEquals(0, map.getUsing("key", null).getValue());
+    }
+
+    @Test
+    public void testGetWithoutAcquireFirst() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        assertNull(map.getUsing("key", new LongValue£native()));
+    }
+
+    @Test
+    public void testAcquireAndGet() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         int entries = 1000 * 1000;
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
 
@@ -71,6 +104,63 @@ public class SharedHashMapTest {
         }
 
         map.close();
+    }
+
+    @Test
+    public void testAcquireFromMultipleThreads() throws Exception {
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+
+        CharSequence key = getUserCharSequence(0);
+        map.acquireUsing(key, new LongValue£native());
+
+        int iterations = 1000;
+        int noOfThreads = 10;
+        CyclicBarrier barrier = new CyclicBarrier(noOfThreads);
+
+        Thread[] threads = new Thread[noOfThreads];
+        for (int t = 0; t < noOfThreads; t++) {
+            threads[t] = new Thread(new IncrementRunnable(map, key, iterations, barrier));
+            threads[t].start();
+        }
+        for (int t = 0; t < noOfThreads; t++) {
+            threads[t].join();
+        }
+
+        assertEquals(noOfThreads * iterations, map.acquireUsing(key, new LongValue£native()).getValue());
+
+        map.close();
+    }
+
+    private static final class IncrementRunnable implements Runnable {
+
+        private final SharedHashMap<CharSequence, LongValue> map;
+
+        private final CharSequence key;
+
+        private final int iterations;
+
+        private final CyclicBarrier barrier;
+
+        private IncrementRunnable(SharedHashMap<CharSequence, LongValue> map, CharSequence key, int iterations, CyclicBarrier barrier) {
+            this.map = map;
+            this.key = key;
+            this.iterations = iterations;
+            this.barrier = barrier;
+        }
+
+        @Override
+        public void run() {
+            try {
+                LongValue value = new LongValue£native();
+                barrier.await();
+                for (int i = 0; i < iterations; i++) {
+                    map.acquireUsing(key, value);
+                    value.addAtomicValue(1);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     // i7-3970X CPU @ 3.50GHz, hex core: -verbose:gc -Xmx64m
