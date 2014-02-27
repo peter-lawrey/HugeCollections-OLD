@@ -142,11 +142,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private long longHashCode(DirectBytes bytes) {
         long h = 0;
         int i = 0;
-        for (; i < bytes.limit() - 7; i += 8)
+        long limit = bytes.limit(); // clustering.
+        for (; i < limit - 7; i += 8)
             h = 10191 * h + bytes.readLong(i);
 //        for (; i < bytes.limit() - 3; i += 2)
 //            h = 10191 * h + bytes.readInt(i);
-        for (; i < bytes.limit(); i++)
+        for (; i < limit; i++)
             h = 57 * h + bytes.readByte(i);
         h ^= (h >>> 31) + (h << 31);
         h += (h >>> 21) + (h >>> 11);
@@ -194,11 +195,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             this.bytes = bytes;
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             long size = Maths.nextPower2(builder.entriesPerSegment() * 12, 16 * 8);
-            hashLookup = new IntIntMultiMap(new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null));
+            NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
+            iimmapBytes.load();
+            hashLookup = new IntIntMultiMap(iimmapBytes);
             start += size;
-            size = (builder.entriesPerSegment() + 63) / 64 * 8;
-            freeList = new ATSDirectBitSet(new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null));
-            start += size * (1 + builder.replicas());
+            long bsSize = (builder.entriesPerSegment() + 63) / 64 * 8;
+            NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bsSize, null);
+//            bsBytes.load();
+            freeList = new ATSDirectBitSet(bsBytes);
+            start += bsSize * (1 + builder.replicas());
             entriesOffset = start - bytes.startAddr();
             assert bytes.capacity() >= entriesOffset + builder.entriesPerSegment() * builder.entrySize();
         }

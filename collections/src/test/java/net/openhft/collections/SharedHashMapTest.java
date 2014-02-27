@@ -30,7 +30,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertEquals;
 
 public class SharedHashMapTest {
 
@@ -179,46 +178,63 @@ public class SharedHashMapTest {
     // 400M users, updated 12 times. Throughput 7.8 M ops/sec, no GC!
     // 600M users, updated 12 times. Throughput 5.8 M ops/sec, no GC!
 
+    // dual E5-2650v2 @ 2.6 GHz, 128 GB: -verbose:gc -Xmx32m
+    // to tmpfs
+    // TODO small GC on startup should be tidied up, [GC 9216K->1886K(31744K), 0.0036750 secs]
+    // 10M users, updated 16 times. Throughput 33.0M ops/sec, VmPeak: 5373848 kB, VmRSS: 544252 kB
+    // 50M users, updated 16 times. Throughput 31.2 M ops/sec, VmPeak: 9091804 kB, VmRSS: 3324732 kB
+    // 250M users, updated 16 times. Throughput 30.0 M ops/sec, VmPeak:	24807836 kB, VmRSS: 14329112 kB
+    // 1000M users, updated 16 times, Throughput 24.1 M ops/sec, VmPeak: 85312732 kB, VmRSS: 57165952 kB
+    // 2500M users, updated 16 times, Throughput 23.5 M ops/sec, VmPeak: 189545308 kB, VmRSS: 126055868 kB
+
     @Test
     @Ignore
     public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 10 * 1000 * 1000L;
-        final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 1024, 24);
+//        int runs = Integer.getInteger("runs", 10);
+        for (int runs : new int[]{10 /*, 50, 250, 1000, 2500 */}) {
+            final long entries = runs * 1000 * 1000L;
+            final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries * 4 / 3, 1024, 24);
 
-//        DataValueGenerator dvg = new DataValueGenerator();
-//        dvg.setDumpCode(true);
-//        LongValue value = (LongValue) dvg.acquireNativeClass(LongValue.class).newInstance();
-        int threads = Runtime.getRuntime().availableProcessors();
-        long start = System.currentTimeMillis();
-        ExecutorService es = Executors.newFixedThreadPool(threads);
-        for (int i = 0; i < threads; i++) {
-            final int t = i;
-            es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    LongValue value = new LongValue£native();
-                    StringBuilder sb = new StringBuilder();
-                    int next = 50 * 1000 * 1000;
-                    for (int i = 0; i < entries; i++) {
-                        sb.setLength(0);
-                        sb.append("user:");
-                        sb.append(i);
-                        map.acquireUsing(sb, value);
-                        long n = value.addAtomicValue(1);
-                        if (t == 0 && i == next) {
-                            System.out.println(i);
-                            next += 50 * 1000 * 1000;
+            int procs = Runtime.getRuntime().availableProcessors();
+            int threads = procs * 2;
+            int count = runs > 500 ? runs > 1200 ? 1 : 2 : 3;
+            final int independence = Math.min(procs, runs > 500 ? 8 : 4);
+            for (int j = 0; j < count; j++) {
+                long start = System.currentTimeMillis();
+                ExecutorService es = Executors.newFixedThreadPool(procs);
+                for (int i = 0; i < threads; i++) {
+                    final int t = i;
+                    es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            LongValue value = nativeLongValue();
+                            StringBuilder sb = new StringBuilder();
+                            int next = 50 * 1000 * 1000;
+                            // use a factor to give up to 10 digit numbers.
+                            int factor = Math.max(1, (int) ((10 * 1000 * 1000 * 1000L - 1) / entries));
+                            for (long i = t % independence; i < entries; i += independence) {
+                                sb.setLength(0);
+                                sb.append("u:");
+                                sb.append(i * factor);
+                                map.acquireUsing(sb, value);
+                                long n = value.addAtomicValue(1);
+                                assert n >= 0 && n < 1000 : "Counter corrupted " + n;
+                                if (t == 0 && i == next) {
+                                    System.out.println(i);
+                                    next += 50 * 1000 * 1000;
+                                }
+                            }
                         }
-                    }
+                    });
                 }
-            });
+                es.shutdown();
+                es.awaitTermination(runs / 10 + 1, TimeUnit.MINUTES);
+                long time = System.currentTimeMillis() - start;
+                System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / independence / 1000.0 / time);
+            }
+            printStatus();
+            map.close();
         }
-        es.shutdown();
-        es.awaitTermination(30, TimeUnit.MINUTES);
-        long time = System.currentTimeMillis() - start;
-        System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
-        map.close();
-        printStatus();
     }
 
     //  i7-3970X CPU @ 3.50GHz, hex core: -Xmx30g -verbose:gc
@@ -230,21 +246,25 @@ public class SharedHashMapTest {
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 10 * 1000 * 1000L;
+        final long entries = 100 * 1000 * 1000L;
         final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
         int threads = Runtime.getRuntime().availableProcessors();
         long start = System.currentTimeMillis();
         ExecutorService es = Executors.newFixedThreadPool(threads);
         for (int i = 0; i < threads; i++) {
+            final int t = i;
             es.submit(new Runnable() {
                 @Override
                 public void run() {
                     StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < entries; i++) {
+                    int next = 50 * 1000 * 1000;
+                    // use a factor to give up to 10 digit numbers.
+                    int factor = Math.max(1, (int) ((10 * 1000 * 1000 * 1000L - 1) / entries));
+                    for (long i = 0; i < entries; i++) {
                         sb.setLength(0);
-                        sb.append("user:");
-                        sb.append(i);
+                        sb.append("u:");
+                        sb.append(i * factor);
                         String key = sb.toString();
                         AtomicInteger count = map.get(key);
                         if (count == null) {
@@ -252,6 +272,10 @@ public class SharedHashMapTest {
                             count = map.get(key);
                         }
                         count.getAndIncrement();
+                        if (t == 0 && i == next) {
+                            System.out.println(i);
+                            next += 50 * 1000 * 1000;
+                        }
                     }
                 }
             });
@@ -263,10 +287,35 @@ public class SharedHashMapTest {
         printStatus();
     }
 
+/*
+    // generates garbage
+    public static final Class<LongValue> nativeLongValueClass;
+
+    static {
+        DataValueGenerator dvg = new DataValueGenerator();
+//        dvg.setDumpCode(true);
+        try {
+            nativeLongValueClass = dvg.acquireNativeClass(LongValue.class);
+        } catch (ClassNotFoundException e) {
+            throw new AssertionError(e);
+        }
+    }*/
+
+    public static LongValue nativeLongValue() {
+/*
+        try {
+            return nativeLongValueClass.newInstance();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+*/
+        return new LongValue£native();
+    }
+
     private CharSequence getUserCharSequence(int i) {
         sb.setLength(0);
-        sb.append("user:");
-        sb.append(i);
+        sb.append("ur:");
+        sb.append(i * 9876); // test 10 digit user numbers.
         return sb;
     }
 
@@ -290,7 +339,9 @@ public class SharedHashMapTest {
         try {
             BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"));
             for (String line; (line = br.readLine()) != null; )
-                System.out.println(line);
+                if (line.startsWith("Vm"))
+                    System.out.print(line.replaceAll("  +", " ") + ", ");
+            System.out.println();
             br.close();
         } catch (IOException e) {
             e.printStackTrace();
