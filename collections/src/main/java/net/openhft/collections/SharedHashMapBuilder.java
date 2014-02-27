@@ -29,6 +29,7 @@ public class SharedHashMapBuilder implements Cloneable {
     static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
+    private static final double INCREASE_ENTRIES_PER_SECTOR = 1.5;
     private int segments = 128;
     private int entrySize = 128;
     private long entries = 1 << 20;
@@ -38,6 +39,7 @@ public class SharedHashMapBuilder implements Cloneable {
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
     private boolean putReturnsNull = false;
     private boolean removeReturnsNull = false;
+
 
     public SharedHashMapBuilder segments(int segments) {
         this.segments = segments;
@@ -129,7 +131,7 @@ public class SharedHashMapBuilder implements Cloneable {
         if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
         builder.segments(bb.getInt());
-        builder.entries(bb.getLong() * builder.segments());
+        builder.entries((long)(bb.getLong() * builder.segments() / INCREASE_ENTRIES_PER_SECTOR));
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
@@ -153,7 +155,7 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     public long entriesPerSegment() {
-        long epg1 = ((entries * 3 / 2) / segments);
+        long epg1 = (long)((entries * INCREASE_ENTRIES_PER_SECTOR) / segments);
         return (Math.max(1, epg1) + 63) & ~63; // must be a multiple of 64 for the bit set to work;
     }
 
