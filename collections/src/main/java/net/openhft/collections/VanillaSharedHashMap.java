@@ -247,7 +247,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     } else {
                         long offset = entriesOffset + pos * builder.entrySize();
                         tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
-                        if (!keyEquals(keyBytes, tmpBytes))
+                        long start0 = System.nanoTime();
+                        boolean miss = !keyEquals(keyBytes, tmpBytes);
+                        long time0 = System.nanoTime() - start0;
+                        if (time0 > 1e6)
+                            System.out.println("startsWith took " + time0 / 100000 / 10.0 + " ms.");
+                        if (miss)
                             continue;
                         long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
                         tmpBytes.position(keyLength);

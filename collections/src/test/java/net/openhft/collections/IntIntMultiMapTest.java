@@ -32,6 +32,12 @@ public class IntIntMultiMapTest {
         assertEquals("{ }", map.toString());
         assertEquals(0, map.size());
         map.put(1, 11);
+        map.startSearch(1);
+        int n1 = map.nextInt();
+        int n2 = map.nextInt();
+        assertEquals(11, n1);
+        assertEquals(map.unsetValue(), n2);
+
         assertEquals(1, map.size());
         assertEquals("{ 1=11 }", map.toString());
         map.put(3, 33);

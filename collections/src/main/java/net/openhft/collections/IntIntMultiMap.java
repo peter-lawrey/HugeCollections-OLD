@@ -24,8 +24,6 @@ import net.openhft.lang.io.DirectStore;
  * Supports a simple interface for int -> int[] off heap.
  */
 public class IntIntMultiMap {
-    public static final int KEY = 0;
-    public static final int VALUE = 4;
     public static final int ENTRY_SIZE = 8;
     private final int capacityMask;
     private final int capacityMask2;
@@ -67,15 +65,17 @@ public class IntIntMultiMap {
             throw new IllegalArgumentException("Cannot add a key with unset value " + unsetKey());
         int pos = (key & capacityMask) << 3; // 8 bytes per entry
         for (int i = 0; i <= capacityMask; i++) {
-            int key2 = bytes.readInt(pos + KEY);
+            long entry = bytes.readLong(pos);
+//            int key2 = bytes.readInt(pos + KEY);
+            int key2 = (int) (entry >> 32);
             if (key2 == unsetKey()) {
-                bytes.writeInt(pos + KEY, key);
-                bytes.writeInt(pos + VALUE, value);
+                bytes.writeLong(pos, ((long) key << 32) | (value & 0xFFFFFFFFL));
                 size++;
                 return;
             }
             if (key2 == key) {
-                int value2 = bytes.readInt(pos + VALUE);
+//                int value2 = bytes.readInt(pos + VALUE);
+                int value2 = (int) entry;
                 if (value2 == value)
                     return;
             }
@@ -99,9 +99,12 @@ public class IntIntMultiMap {
         // find the end of the chain.
         boolean found = false;
         for (int i = 0; i <= capacityMask; i++) {
-            int key2 = bytes.readInt(pos + KEY);
+            long entry = bytes.readLong(pos);
+//            int key2 = bytes.readInt(pos + KEY);
+            int key2 = (int) (entry >> 32);
             if (key2 == key) {
-                int value2 = bytes.readInt(pos + VALUE);
+//                int value2 = bytes.readInt(pos + VALUE);
+                int value2 = (int) entry;
                 if (value2 == value) {
                     found = true;
                     pos0 = pos;
@@ -119,26 +122,27 @@ public class IntIntMultiMap {
         // Note: because of the mask, the pos can be actually less than pos0, thus using != operator instead of >=
         while (pos != pos0) {
             pos = (pos - ENTRY_SIZE) & capacityMask2;
-            int key2 = bytes.readInt(pos + KEY);
+            long entry = bytes.readLong(pos);
+//            int key2 = bytes.readInt(pos + KEY);
+            int key2 = (int) (entry >> 32);
             if (key2 == key) {
                 // swap values and zeroOut
                 if (pos != pos0) {
-                    int value2 = bytes.readInt(pos + VALUE);
-                    bytes.writeInt(pos0 + VALUE, value2);
+                    long entry2 = bytes.readLong(pos);
+                    bytes.writeLong(pos0, entry2);
                 }
-                bytes.writeInt(pos, unsetKey());
-                bytes.writeInt(pos + 4, unsetValue());
+                bytes.writeLong(pos, ((long) unsetKey() << 32) | (unsetValue() & 0xFFFFFFFFL));
                 break;
             }
         }
         pos = (pos + ENTRY_SIZE) & capacityMask2;
         // re-inset any values in between pos and pos2.
         while (pos < pos2) {
-            int key2 = bytes.readInt(pos + KEY);
-            int value2 = bytes.readInt(pos + VALUE);
+            long entry2 = bytes.readLong(pos);
+            int key2 = (int) (entry2 >> 32);
+            int value2 = (int) entry2;
             // zeroOut the entry
-            bytes.writeInt(pos, unsetKey());
-            bytes.writeInt(pos + 4, unsetValue());
+            bytes.writeLong(pos, ((long) unsetKey() << 32) | (unsetValue() & 0xFFFFFFFFL));
             size--;
             // this might put it back in the same place or a different one.
             put(key2, value2);
@@ -169,13 +173,16 @@ public class IntIntMultiMap {
      */
     public int nextInt() {
         for (int i = 0; i <= capacityMask; i++) {
-            int key2 = bytes.readInt(searchPos + KEY);
+            long entry = bytes.readLong(searchPos);
+//            int key2 = bytes.readInt(searchPos + KEY);
+            int key2 = (int) (entry >> 32);
             if (key2 == unsetKey())
                 return unsetValue();
             int pos = searchPos;
             searchPos = (searchPos + ENTRY_SIZE) & capacityMask2;
             if (key2 == searchKey) {
-                int value2 = bytes.readInt(pos + VALUE);
+//                int value2 = bytes.readInt(pos + VALUE);
+                int value2 = (int) entry;
                 return value2;
             }
         }
@@ -195,8 +202,9 @@ public class IntIntMultiMap {
         StringBuilder sb = new StringBuilder();
         sb.append("{ ");
         for (int i = 0, pos = 0; i <= capacityMask; i++, pos += ENTRY_SIZE) {
-            int key = bytes.readInt(pos + KEY);
-            int value = bytes.readInt(pos + VALUE);
+            long entry = bytes.readLong(pos);
+            int key = (int) (entry >> 32); // bytes.readInt(pos + KEY);
+            int value = (int) entry; // bytes.readInt(pos + VALUE);
             if (key != unsetKey())
                 sb.append(key).append('=').append(value).append(", ");
         }
