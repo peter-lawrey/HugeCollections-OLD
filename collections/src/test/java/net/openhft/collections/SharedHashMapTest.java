@@ -187,11 +187,17 @@ public class SharedHashMapTest {
     // 1000M users, updated 16 times, Throughput 24.1 M ops/sec, VmPeak: 85312732 kB, VmRSS: 57165952 kB
     // 2500M users, updated 16 times, Throughput 23.5 M ops/sec, VmPeak: 189545308 kB, VmRSS: 126055868 kB
 
+    // to ext4
+    // 10M users, updated 16 times. Throughput 28.4 M ops/sec, VmPeak: 5438652 kB, VmRSS: 544624 kB
+    // 50M users, updated 16 times. Throughput 28.2 M ops/sec, VmPeak: 9091804 kB, VmRSS: 9091804 kB
+    // 250M users, updated 16 times. Throughput 26.1 M ops/sec, VmPeak:	24807836 kB, VmRSS: 24807836 kB
+    // 1000M users, updated 16 times, Throughput 1.3 M ops/sec, TODO FIX this
+
     @Test
     @Ignore
     public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
 //        int runs = Integer.getInteger("runs", 10);
-        for (int runs : new int[]{10 /*, 50, 250, 1000, 2500 */}) {
+        for (int runs : new int[]{10, 50, 250, 1000, 2500}) {
             final long entries = runs * 1000 * 1000L;
             final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries * 4 / 3, 1024, 24);
 
@@ -243,48 +249,61 @@ public class SharedHashMapTest {
     // 100M users, updated 12 times. Throughput 11.8 M ops/sec, longest [Full GC 11240703K->11233711K(19170432K), 5.8783010 secs]
     // 200M users, updated 12 times. Throughput 4.2 M ops/sec, longest [Full GC 25974721K->22897189K(27962048K), 21.7962600 secs]
 
+    // dual E5-2650v2 @ 2.6 GHz, 128 GB: -verbose:gc -Xmx100g
+    // 10M users, updated 16 times. Throughput 155.3 M ops/sec, VmPeak: 113291428 kB, VmRSS: 9272176 kB, [Full GC 1624336K->1616457K(7299072K), 2.5381610 secs]
+    // 50M users, updated 16 times. Throughput 120.4 M ops/sec, VmPeak: 113291428 kB, VmRSS: 28436248 kB [Full GC 6545332K->6529639K(18179584K), 6.9053810 secs]
+    // 250M users, updated 16 times. Throughput 114.1 M ops/sec, VmPeak: 113291428 kB, VmRSS: 76441464 kB  [Full GC 41349527K->41304543K(75585024K), 17.3217490 secs]
+    // 1000M users, OutOfMemoryError.
+
     @Test
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
-        final long entries = 100 * 1000 * 1000L;
-        final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
+        for (int runs : new int[]{10, 50, 250, 1000, 2500}) {
+            final long entries = runs * 1000 * 1000L;
+            final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
-        int threads = Runtime.getRuntime().availableProcessors();
-        long start = System.currentTimeMillis();
-        ExecutorService es = Executors.newFixedThreadPool(threads);
-        for (int i = 0; i < threads; i++) {
-            final int t = i;
-            es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    StringBuilder sb = new StringBuilder();
-                    int next = 50 * 1000 * 1000;
-                    // use a factor to give up to 10 digit numbers.
-                    int factor = Math.max(1, (int) ((10 * 1000 * 1000 * 1000L - 1) / entries));
-                    for (long i = 0; i < entries; i++) {
-                        sb.setLength(0);
-                        sb.append("u:");
-                        sb.append(i * factor);
-                        String key = sb.toString();
-                        AtomicInteger count = map.get(key);
-                        if (count == null) {
-                            map.put(key, new AtomicInteger());
-                            count = map.get(key);
+            int procs = Runtime.getRuntime().availableProcessors();
+            int threads = procs * 2;
+            int count = runs > 500 ? runs > 1200 ? 1 : 2 : 3;
+            final int independence = Math.min(procs, runs > 500 ? 8 : 4);
+            for (int j = 0; j < count; j++) {
+                long start = System.currentTimeMillis();
+                ExecutorService es = Executors.newFixedThreadPool(procs);
+                for (int i = 0; i < threads; i++) {
+                    final int t = i;
+                    es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            StringBuilder sb = new StringBuilder();
+                            int next = 50 * 1000 * 1000;
+                            // use a factor to give up to 10 digit numbers.
+                            int factor = Math.max(1, (int) ((10 * 1000 * 1000 * 1000L - 1) / entries));
+                            for (long i = t % independence; i < entries; i += independence) {
+                                sb.setLength(0);
+                                sb.append("u:");
+                                sb.append(i * factor);
+                                String key = sb.toString();
+                                AtomicInteger count = map.get(key);
+                                if (count == null) {
+                                    map.put(key, new AtomicInteger());
+                                    count = map.get(key);
+                                }
+                                count.getAndIncrement();
+                                if (t == 0 && i == next) {
+                                    System.out.println(i);
+                                    next += 50 * 1000 * 1000;
+                                }
+                            }
                         }
-                        count.getAndIncrement();
-                        if (t == 0 && i == next) {
-                            System.out.println(i);
-                            next += 50 * 1000 * 1000;
-                        }
-                    }
+                    });
                 }
-            });
+                es.shutdown();
+                es.awaitTermination(10, TimeUnit.MINUTES);
+                printStatus();
+                long time = System.currentTimeMillis() - start;
+                System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
+            }
         }
-        es.shutdown();
-        es.awaitTermination(10, TimeUnit.MINUTES);
-        long time = System.currentTimeMillis() - start;
-        System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / 1000.0 / time);
-        printStatus();
     }
 
 /*
