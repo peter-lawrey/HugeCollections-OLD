@@ -18,7 +18,6 @@ package net.openhft.collections;
 
 import net.openhft.lang.values.LongValue;
 import net.openhft.lang.values.LongValue£native;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -33,12 +32,7 @@ import static org.junit.Assert.*;
 
 public class SharedHashMapTest {
 
-    private StringBuilder sb;
-
-    @Before
-    public void before() {
-        sb = new StringBuilder();
-    }
+    private StringBuilder sb = new StringBuilder();
 
     @Test
     public void testAcquireWithNullKey() throws Exception {
@@ -350,7 +344,8 @@ public class SharedHashMapTest {
         return new SharedHashMapBuilder()
                 .entries(entries)
                 .segments(segments)
-                .entrySize(entrySize) // TODO not enough protection from over sized entries.
+                .entrySize(entrySize)
+                .generatedValueType(true)
                 .create(getPersistenceFile(), CharSequence.class, LongValue.class);
     }
 

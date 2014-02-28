@@ -20,6 +20,7 @@ import net.openhft.lang.Maths;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
+import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.sandbox.collection.ATSDirectBitSet;
 import net.openhft.lang.sandbox.collection.DirectBitSet;
 
@@ -311,6 +312,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private V readObjectUsing(V value, long offset) {
             if (value instanceof Byteable) {
                 ((Byteable) value).bytes(bytes, offset);
+                return value;
+            }
+            if (builder.generatedValueType()) {
+                if (value == null)
+                    value = DataValueClasses.newInstance(vClass);
+                ((BytesMarshallable) value).readMarshallable(tmpBytes);
                 return value;
             }
             return tmpBytes.readInstance(vClass, value);
