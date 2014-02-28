@@ -39,6 +39,8 @@ public class SharedHashMapBuilder implements Cloneable {
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
     private boolean putReturnsNull = false;
     private boolean removeReturnsNull = false;
+    private boolean generatedKeyType = false;
+    private boolean generatedValueType = false;
 
 
     public SharedHashMapBuilder segments(int segments) {
@@ -208,5 +210,23 @@ public class SharedHashMapBuilder implements Cloneable {
 
     public boolean removeReturnsNull() {
         return removeReturnsNull;
+    }
+
+    public boolean generatedKeyType() {
+        return generatedKeyType;
+    }
+
+    public SharedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
+        this.generatedKeyType = generatedKeyType;
+        return this;
+    }
+
+    public boolean generatedValueType() {
+        return generatedValueType;
+    }
+
+    public SharedHashMapBuilder generatedValueType(boolean generatedValueType) {
+        this.generatedValueType = generatedValueType;
+        return this;
     }
 }

@@ -30,7 +30,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class KeySizesTest {
     @Test
-    public void testDifferetKeySizes() throws IOException {
+    public void testDifferentKeySizes() throws IOException {
         File tempFile = File.createTempFile("delete", "me");
         Map<String, String> map = new SharedHashMapBuilder().create(tempFile, String.class, String.class);
 

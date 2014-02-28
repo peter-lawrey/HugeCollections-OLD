@@ -18,6 +18,7 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.io.*;
+import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.sandbox.collection.ATSDirectBitSet;
 import net.openhft.lang.sandbox.collection.DirectBitSet;
@@ -94,7 +95,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     private DirectBytes getKeyAsBytes(K key) {
         DirectBytes bytes = acquireBytes();
-        bytes.writeInstance(kClass, key);
+        if (builder.generatedKeyType())
+            ((BytesMarshallable) key).writeMarshallable(bytes);
+        else
+            bytes.writeInstance(kClass, key);
         bytes.flip();
         return bytes;
     }
@@ -391,7 +395,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private void appendInstance(DirectBytes bytes, V value) {
             bytes.clear();
-            bytes.writeInstance(vClass, value);
+            if (builder.generatedValueType())
+                ((BytesMarshallable) value).writeMarshallable(bytes);
+            else
+                bytes.writeInstance(vClass, value);
             bytes.flip();
             if (bytes.remaining() > tmpBytes.remaining())
                 throw new IllegalArgumentException("Value too large for entry was " + bytes.remaining() + ", remaining: " + tmpBytes.remaining());
