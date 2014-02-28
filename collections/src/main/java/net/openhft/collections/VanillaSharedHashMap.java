@@ -17,12 +17,12 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
+import net.openhft.lang.collection.DirectBitSet;
+import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import net.openhft.lang.sandbox.collection.ATSDirectBitSet;
-import net.openhft.lang.sandbox.collection.DirectBitSet;
 
 import java.util.AbstractMap;
 import java.util.Set;
@@ -192,7 +192,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
         private final IntIntMultiMap hashLookup;
-        private final ATSDirectBitSet freeList;
+        private final SingleThreadedDirectBitSet freeList;
         private final long entriesOffset;
         private int nextSet = 0;
 
@@ -207,7 +207,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long bsSize = (builder.entriesPerSegment() + 63) / 64 * 8;
             NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bsSize, null);
 //            bsBytes.load();
-            freeList = new ATSDirectBitSet(bsBytes);
+            freeList = new SingleThreadedDirectBitSet(bsBytes);
             start += bsSize * (1 + builder.replicas());
             entriesOffset = start - bytes.startAddr();
             assert bytes.capacity() >= entriesOffset + builder.entriesPerSegment() * builder.entrySize();
