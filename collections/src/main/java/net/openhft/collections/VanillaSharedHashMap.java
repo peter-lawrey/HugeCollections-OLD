@@ -282,7 +282,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
             tmpBytes.position(align(tmpBytes.position()));
-            tmpBytes.writeInstance(vClass, value);
+            appendInstance(keyBytes, value);
             // add to index if successful.
             hashLookup.put(hash2, pos);
         }
@@ -362,24 +362,24 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-
+                        long keyLength = keyBytes.remaining();
+                        tmpBytes.skip(keyLength);
+                        long alignPosition = align(tmpBytes.position());
+                        tmpBytes.position(alignPosition);
                         if (replaceIfPresent) {
-                            long keyLength = align(keyBytes.remaining());
-                            tmpBytes.skip(keyLength);
                             if (builder.putReturnsNull()) {
-                                tmpBytes.writeInstance(vClass, value);
+                                appendInstance(keyBytes, value);
                                 return null;
                             }
-                            V v = readObjectUsing(null, offset + keyLength);
-                            tmpBytes.writeInstance(vClass, value);
+                            V v = readObjectUsing(null, offset + alignPosition);
+                            tmpBytes.position(alignPosition);
+                            appendInstance(keyBytes, value);
                             return v;
 
                         } else {
                             if (builder.putReturnsNull()) {
                                 return null;
                             }
-                            long keyLength = align(keyBytes.remaining());
-                            tmpBytes.skip(keyLength);
                             return readObjectUsing(null, offset + keyLength);
                         }
                     }
@@ -387,6 +387,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             } finally {
                 unlock();
             }
+        }
+
+        private void appendInstance(DirectBytes bytes, V value) {
+            bytes.clear();
+            bytes.writeInstance(vClass, value);
+            bytes.flip();
+            if (bytes.remaining() > tmpBytes.remaining())
+                throw new IllegalArgumentException("Value too large for entry was " + bytes.remaining() + ", remaining: " + tmpBytes.remaining());
+            tmpBytes.write(bytes);
         }
     }
 }
