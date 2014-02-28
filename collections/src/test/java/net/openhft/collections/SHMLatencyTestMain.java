@@ -27,29 +27,38 @@ import static org.junit.Assert.assertNotNull;
 
 /**
  * Created by peter on 28/02/14.
+ * <pre>
  * For 1M entries
  * run 1 1000000 : 50/90/99/99.9/99.99/worst: 1.0/3.2/14/18/116/172
  * run 1 500000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/11/16/45/163
  * run 1 250000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/10/16/20/155
  * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.2/15/20/147
  * run 1 50000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.2/15/20/139
- * <p/>
+ * </pre><pre>
+ * For 1M entries to ext4
+ *     run 1 1000000 : 50/90/99/99.9/99.99/worst: 0.9/3.2/14/18/106/188
+ * run 1 500000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/11/16/46/172
+ * run 1 250000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/10/16/20/163
+ * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.9/15/20/163
+ * run 1 50000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.9/15/20/147
+ * </pre><pre>
  * For 10M entries
  * run 1 1000000 : 50/90/99/99.9/99.99/worst: 1.4/6.2/16/34/135/180
  * run 1 500000 : 50/90/99/99.9/99.99/worst: 0.3/3.1/11/17/54/159
  * run 1 250000 : 50/90/99/99.9/99.99/worst: 0.3/3.0/10/15/21/147
  * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.4/3.2/9.7/15/20/151
  * run 1 50000 : 50/90/99/99.9/99.99/worst: 0.4/3.2/9.4/15/20/147
- * <p/>
+ * </pre><pre>
  * For 100M entries
  * run 1 1000000 : 50/90/99/99.9/99.99/worst: 570425/2818572/3355443/3422552/3489660/3556769
  * run 1 500000 : 50/90/99/99.9/99.99/worst: 1.1/11/27/43/94/184
  * run 1 250000 : 50/90/99/99.9/99.99/worst: 0.7/3.3/12/19/40/167
  * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.7/3.3/10/16/21/151
  * run 1 50000 : 50/90/99/99.9/99.99/worst: 0.7/3.3/10/16/22/155
+ * </pre>
  */
 public class SHMLatencyTestMain {
-    static final int KEYS = 100 * 1000 * 1000;
+    static final int KEYS = 1000 * 1000;
     static final int RUN_TIME = 20;
     static final long START_TIME = System.currentTimeMillis();
 
@@ -57,6 +66,7 @@ public class SHMLatencyTestMain {
     public static void main(String... ignored) throws IOException {
         AffinityLock lock = AffinityLock.acquireCore();
         File file = File.createTempFile("testSHMLatency", "deleteme");
+//        File file = new File("/ocz/tmp/testSHMLatency.deleteme");
         SharedHashMap<LongValue, LongValue> countersMap = new SharedHashMapBuilder()
                 .entries(KEYS * 3 / 2)
                 .entrySize(24)
