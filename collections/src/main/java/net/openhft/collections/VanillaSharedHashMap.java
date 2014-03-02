@@ -164,9 +164,33 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         throw new UnsupportedOperationException();
     }
 
+
+    /**
+     * Removes the entry for a key only if currently mapped to a given value.
+     * This is equivalent to
+     * <pre>
+     *   if (map.containsKey(key) &amp;&amp; map.get(key).equals(value)) {
+     *       map.remove(key);
+     *       return true;
+     *   } else return false;</pre>
+     * except that the action is performed atomically.
+     *
+     * @param key   key with which the specified value is associated
+     * @param value value expected to be associated with the specified key
+     * @return <tt>true</tt> if the value was removed
+     * @throws UnsupportedOperationException if the <tt>remove</tt> operation
+     *                                       is not supported by this map
+     * @throws ClassCastException            if the key or value is of an inappropriate
+     *                                       type for this map
+     *                                       (<a href="../Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException          if the specified key or value is null,
+     *                                       and this map does not permit null keys or values
+     *                                       (<a href="../Collection.html#optional-restrictions">optional</a>)
+     */
     @Override
     public boolean remove(Object key, Object value) {
-        throw new UnsupportedOperationException();
+        final V v = removeUsing(key, (V) value);
+        return v != null;
     }
 
     @Override

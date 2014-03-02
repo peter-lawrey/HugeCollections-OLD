@@ -17,7 +17,7 @@
 package net.openhft.collections;
 
 import net.openhft.lang.values.LongValue;
-import net.openhft.lang.values.LongValue£native;
+import net.openhft.lang.values.LongValueNative;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -34,36 +34,98 @@ public class SharedHashMapTest {
 
     private StringBuilder sb = new StringBuilder();
 
+
+    @Test
+    public void testRemoveWithKey() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .segments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+
+        map.put("key1", "one");
+        map.put("key2", "two");
+
+        assertEquals(map.get("key1"), "one");
+        assertEquals(map.get("key2"), "two");
+
+
+        final CharSequence result = map.remove("key1");
+
+        assertEquals(result, "one");
+
+
+        assertEquals(map.get("key1"), null);
+        assertEquals(map.get("key2"), "two");
+
+    }
+
+
+    @Test
+    public void testRemoveWithKeyAndValue() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .segments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+
+        map.put("key1", "one");
+        map.put("key2", "two");
+
+        assertEquals(map.get("key1"), "one");
+        assertEquals(map.get("key2"), "two");
+
+
+        final boolean wasRemoved1 = map.remove("key1", "three");
+
+        assertTrue(wasRemoved1);
+
+
+        assertEquals(map.get("key1"), null);
+        assertEquals(map.get("key2"), "two");
+
+        map.put("key1", "one");
+
+
+        final boolean wasRemoved2 = map.remove("key1", "three");
+        assertFalse(wasRemoved2);
+
+        System.out.println("key1={}" + map.get("key1"));
+        System.out.println("key1={}" + map.get("key2"));
+
+    }
+
+
     @Test
     public void testAcquireWithNullKey() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
-        assertNull(map.acquireUsing(null, new LongValue£native()));
+        assertNull(map.acquireUsing(null, new LongValueNative()));
     }
 
     @Test
     public void testGetWithNullKey() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
-        assertNull(map.getUsing(null, new LongValue£native()));
+        assertNull(map.getUsing(null, new LongValueNative()));
     }
 
     @Test
     public void testAcquireWithNullContainer() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
-        map.acquireUsing("key", new LongValue£native());
+        map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.acquireUsing("key", null).getValue());
     }
 
     @Test
     public void testGetWithNullContainer() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
-        map.acquireUsing("key", new LongValue£native());
+        map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.getUsing("key", null).getValue());
     }
 
     @Test
     public void testGetWithoutAcquireFirst() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
-        assertNull(map.getUsing("key", new LongValue£native()));
+        assertNull(map.getUsing("key", new LongValueNative()));
     }
 
     @Test
@@ -71,9 +133,9 @@ public class SharedHashMapTest {
         int entries = 1000 * 1000;
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
 
-        LongValue value = new LongValue£native();
-        LongValue value2 = new LongValue£native();
-        LongValue value3 = new LongValue£native();
+        LongValue value = new LongValueNative();
+        LongValue value2 = new LongValueNative();
+        LongValue value3 = new LongValueNative();
 
         for (int j = 1; j <= 3; j++) {
             for (int i = 0; i < entries; i++) {
@@ -104,7 +166,7 @@ public class SharedHashMapTest {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
 
         CharSequence key = getUserCharSequence(0);
-        map.acquireUsing(key, new LongValue£native());
+        map.acquireUsing(key, new LongValueNative());
 
         int iterations = 1000;
         int noOfThreads = 10;
@@ -119,7 +181,7 @@ public class SharedHashMapTest {
             threads[t].join();
         }
 
-        assertEquals(noOfThreads * iterations, map.acquireUsing(key, new LongValue£native()).getValue());
+        assertEquals(noOfThreads * iterations, map.acquireUsing(key, new LongValueNative()).getValue());
 
         map.close();
     }
@@ -144,7 +206,7 @@ public class SharedHashMapTest {
         @Override
         public void run() {
             try {
-                LongValue value = new LongValue£native();
+                LongValue value = new LongValueNative();
                 barrier.await();
                 for (int i = 0; i < iterations; i++) {
                     map.acquireUsing(key, value);
@@ -322,7 +384,7 @@ public class SharedHashMapTest {
             throw new AssertionError(e);
         }
 */
-        return new LongValue£native();
+        return new LongValueNative();
     }
 
     private CharSequence getUserCharSequence(int i) {
