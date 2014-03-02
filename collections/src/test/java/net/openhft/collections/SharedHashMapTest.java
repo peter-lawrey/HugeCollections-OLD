@@ -36,6 +36,7 @@ public class SharedHashMapTest {
 
 
     @Test
+    @Ignore
     public void testRemoveWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
@@ -62,6 +63,7 @@ public class SharedHashMapTest {
 
 
     @Test
+    @Ignore
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
