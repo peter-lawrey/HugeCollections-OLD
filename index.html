@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Hugecollections by OpenHFT</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Hugecollections</h1>
+        <p>Huge Collections for Java using efficient off heap storage</p>
+
+        <p class="view"><a href="https://github.com/OpenHFT/HugeCollections">View the Project on GitHub <small>OpenHFT/HugeCollections</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/OpenHFT/HugeCollections/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/OpenHFT/HugeCollections/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/OpenHFT/HugeCollections">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a name="hugecollections" class="anchor" href="#hugecollections"><span class="octicon octicon-link"></span></a>HugeCollections</h1>
+
+<p>Huge Collections for Java using efficient off heap storage</p>
+
+<p>HugeHashMap supports concurrent access to very large, off heap key/value pairs.  From HugeHashMapTest</p>
+
+<pre><code>HugeConfig config = HugeConfig.DEFAULT.clone()
+        .setSegments(128)
+        .setSmallEntrySize(128)
+        .setCapacity(count);
+
+final HugeHashMap&lt;CharSequence, SampleValues&gt; map =
+        new HugeHashMap&lt;CharSequence, SampleValues&gt;(
+                config, CharSequence.class, SampleValues.class);
+
+final SampleValues value = new SampleValues();
+StringBuilder user = new StringBuilder();
+for (int i = 0; i &lt; count; i++) {
+    value.ee = i;
+    value.gg = i;
+    value.ii = i;
+    map.put(users(user, i), value);
+}
+for (int i = 0; i &lt; count; i++) {
+    assertNotNull(map.get(users(user, i), value));
+    // test we get back the values we stored.
+    assertEquals(i, value.ee);
+    assertEquals(i, value.gg, 0.0);
+    assertEquals(i, value.ii);
+}
+for (int i = 0; i &lt; count; i++)
+    map.remove(users(user, i));
+</code></pre>
+
+<p>HugeHashMapTest.testPutPerf() with the options "-ea -mx128m -Xmn64m -verbose:gc" prints on an Hex core i7 @ 3.5 GHz</p>
+
+<pre><code>Starting test
+Put/get 14,020 K operations per second
+</code></pre>
+
+<p>This test adds, gets twice and removes 100 million keys without triggering a GC with a young generation of 64 MB.</p>
+
+<p>The use of StringBuilder as the key allows the key to recycled efficiently.  String can be used but creating millions of Strings can trigger GCs.</p>
+
+<p>Also note that the value object can be recycled.  There is also a get(key) method which returns a new object each time, however this can trigger GCs.</p>
+
+<h3>
+<a name="javadoc" class="anchor" href="#javadoc"><span class="octicon octicon-link"></span></a>JavaDoc</h3>
+
+<p>Check out our documentation at <a href="http://openhft.github.io/HugeCollections/apidocs/">JavaDoc</a></p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/OpenHFT">OpenHFT</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
