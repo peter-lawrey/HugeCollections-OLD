@@ -43,3 +43,6 @@ This test adds, gets twice and removes 100 million keys without triggering a GC 
 The use of StringBuilder as the key allows the key to recycled efficiently.  String can be used but creating millions of Strings can trigger GCs.
 
 Also note that the value object can be recycled.  There is also a get(key) method which returns a new object each time, however this can trigger GCs.
+
+###  JavaDoc
+Check out our documentation at [JavaDoc] (http://openhft.github.io/HugeCollections/apidocs/)
