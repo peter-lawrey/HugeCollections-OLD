@@ -354,7 +354,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     && tmpBytes.startsWith(keyBytes);
         }
 
-        public V remove(DirectBytes keyBytes, V value, int hash2) {
+        /**
+         * @param keyBytes
+         * @param expectedValue if null no check if performed, otherwise, the remove will only occur if the value to be removed equals the expected value
+         * @param hash2
+         * @return
+         */
+        public V remove(DirectBytes keyBytes, V expectedValue, int hash2) {
             if (hash2 == hashLookup.unsetKey())
                 hash2 = ~hash2;
             lock();
@@ -370,14 +376,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-                        long keyLength = align(keyBytes.remaining());
-                        tmpBytes.skip(keyLength);
-                        V v = value == null && builder.removeReturnsNull() ? null : readObjectUsing(value, offset + keyLength);
+                        //          long keyLength = align(keyBytes.remaining());
+                        long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
+                        tmpBytes.position(keyLength);
+                        V valueRemoved = expectedValue == null && builder.removeReturnsNull() ? null : readObjectUsing(expectedValue, offset + keyLength);
+
+                        if (expectedValue != null && !expectedValue.equals(valueRemoved))
+                            return null;
+
                         hashLookup.remove(hash2, pos);
                         freeList.clear(pos);
                         if (pos < nextSet)
                             nextSet = pos;
-                        return v;
+                        return valueRemoved;
                     }
                 }
             } finally {

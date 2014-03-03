@@ -36,7 +36,6 @@ public class SharedHashMapTest {
 
 
     @Test
-    @Ignore
     public void testRemoveWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
@@ -47,23 +46,29 @@ public class SharedHashMapTest {
         map.put("key1", "one");
         map.put("key2", "two");
 
-        assertEquals(map.get("key1"), "one");
-        assertEquals(map.get("key2"), "two");
-
+        assertEquals("one", map.get("key1"));
+        assertEquals("two", map.get("key2"));
 
         final CharSequence result = map.remove("key1");
 
-        assertEquals(result, "one");
+        assertEquals("one", result);
+
+        assertEquals(null, map.get("key1"));
+        assertEquals("two", map.get("key2"));
 
 
-        assertEquals(map.get("key1"), null);
-        assertEquals(map.get("key2"), "two");
+        // let and one more item for luck !
+        map.put("key3", "three");
+        assertEquals("three", map.get("key3"));
 
+
+        // and just for kicks we'll overwrite what we have
+        map.put("key3", "overwritten");
+        assertEquals("overwritten", map.get("key3"));
     }
 
 
     @Test
-    @Ignore
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
@@ -74,17 +79,18 @@ public class SharedHashMapTest {
         map.put("key1", "one");
         map.put("key2", "two");
 
-        assertEquals(map.get("key1"), "one");
-        assertEquals(map.get("key2"), "two");
+        assertEquals("one", map.get("key1"));
+        assertEquals("two", map.get("key2"));
 
 
+        // a false remove
         final boolean wasRemoved1 = map.remove("key1", "three");
 
-        assertTrue(wasRemoved1);
+        assertFalse(wasRemoved1);
 
 
-        assertEquals(map.get("key1"), null);
-        assertEquals(map.get("key2"), "two");
+        assertEquals(null, map.get("key1"), "one");
+        assertEquals("two", map.get("key2"), "two");
 
         map.put("key1", "one");
 
@@ -94,6 +100,15 @@ public class SharedHashMapTest {
 
         System.out.println("key1={}" + map.get("key1"));
         System.out.println("key1={}" + map.get("key2"));
+
+        // let and one more item for luck !
+        map.put("key3", "three");
+        assertEquals("three", map.get("key3"));
+
+
+        // and just for kicks we'll overwrite what we have
+        map.put("key3", "overwritten");
+        assertEquals("overwritten", map.get("key3"));
 
     }
 
