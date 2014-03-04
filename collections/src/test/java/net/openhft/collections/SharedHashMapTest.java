@@ -69,6 +69,89 @@ public class SharedHashMapTest {
 
 
     @Test
+    public void testReplaceWithKey() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .segments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+
+        map.put("key1", "one");
+        map.put("key2", "two");
+
+        assertEquals("one", map.get("key1"));
+        assertEquals("two", map.get("key2"));
+
+        final CharSequence result = map.replace("key1", "newValue");
+
+        assertEquals("one", result);
+
+        assertEquals("newValue", map.get("key1"));
+        assertEquals("two", map.get("key2"));
+
+
+        // let and one more item for luck !
+        map.put("key3", "three");
+        assertEquals("three", map.get("key3"));
+
+
+        // and just for kicks we'll overwrite what we have
+        map.put("key3", "overwritten");
+        assertEquals("overwritten", map.get("key3"));
+
+        final CharSequence result2 = map.replace("key2", "newValue");
+
+        assertEquals("two", result2);
+        assertEquals("newValue", map.get("key2"));
+
+        final CharSequence result3 = map.replace("rublish", "newValue");
+        assertEquals(null, result3);
+    }
+
+
+    @Test
+    public void testReplaceWithKeyAnd2Params() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .segments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+        map.put("key1", "one");
+        map.put("key2", "two");
+
+        assertEquals("one", map.get("key1"));
+        assertEquals("two", map.get("key2"));
+
+        final boolean result = map.replace("key1", "one", "newValue");
+
+        assertEquals(true, result);
+
+        assertEquals("newValue", map.get("key1"));
+        assertEquals("two", map.get("key2"));
+
+        // let and one more item for luck !
+        map.put("key3", "three");
+        assertEquals("three", map.get("key3"));
+
+
+        // and just for kicks we'll overwrite what we have
+        map.put("key3", "overwritten");
+        assertEquals("overwritten", map.get("key3"));
+
+        final boolean result2 = map.replace("key2", "two", "newValue2");
+
+        assertEquals(true, result2);
+        assertEquals("newValue2", map.get("key2"));
+
+        final boolean result3 = map.replace("newKey", "", "newValue");
+        assertEquals(false, result3);
+
+        final boolean result4 = map.replace("key2", "newValue2", "newValue2");
+        assertEquals(true, result4);
+
+    }
+
+    @Test
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
