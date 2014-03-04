@@ -194,20 +194,50 @@ public class SharedHashMapBuilder implements Cloneable {
         return errorListener;
     }
 
+    /**
+     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
+     *
+     * @param putReturnsNull false if you want {@link this.put()} to not return the object that was replaced but instead return null
+     */
     public SharedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
         this.putReturnsNull = putReturnsNull;
         return this;
     }
 
+    /**
+     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
+     *
+     * @return true if {@link this.put()} is not going to return the object that was replaced but instead return null
+     */
     public boolean putReturnsNull() {
         return putReturnsNull;
     }
 
+    /**
+     * {@link this.remove()}  returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
+     *
+     * @param removeReturnsNull false if you want {@link this.remove()} to not return the object that was removed but instead return null
+     * @return
+     */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
         this.removeReturnsNull = removeReturnsNull;
         return this;
     }
 
+
+    /**
+     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
+     *
+     * @return true if {@link this.remove()} is not going to return the object that was removed but instead return null
+     */
     public boolean removeReturnsNull() {
         return removeReturnsNull;
     }
