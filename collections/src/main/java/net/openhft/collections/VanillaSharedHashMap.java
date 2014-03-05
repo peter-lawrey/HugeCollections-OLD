@@ -341,7 +341,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
-        private final IntIntMultiMap hashLookup;
+        private final HashPosMultiMap hashLookup;
         private final SingleThreadedDirectBitSet freeList;
         private final long entriesOffset;
         private int nextSet = 0;
@@ -394,19 +394,17 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @return
          */
         public V acquire(DirectBytes keyBytes, V value, int hash2, boolean create) {
-            if (hash2 == hashLookup.unsetKey())
-                hash2 = ~hash2;
             lock();
             try {
-                hashLookup.startSearch(hash2);
+                hash2 = hashLookup.startSearch(hash2);
                 while (true) {
-                    int pos = hashLookup.nextInt();
-                    if (pos == hashLookup.unsetValue()) {
+                    int pos = hashLookup.nextPos();
+                    if (pos < 0) {
                         return create ? acquireEntry(keyBytes, value, hash2) : null;
 
                     } else {
-                        long offset = entriesOffset + pos * builder.entrySize();
-                        tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+                        long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         long start0 = System.nanoTime();
                         boolean miss = !keyEquals(keyBytes, tmpBytes);
                         long time0 = System.nanoTime() - start0;
@@ -503,14 +501,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @return
          */
         public V remove(DirectBytes keyBytes, V expectedValue, int hash2) {
-            if (hash2 == hashLookup.unsetKey())
-                hash2 = ~hash2;
             lock();
             try {
-                hashLookup.startSearch(hash2);
+                hash2 = hashLookup.startSearch(hash2);
                 while (true) {
-                    int pos = hashLookup.nextInt();
-                    if (pos == hashLookup.unsetValue()) {
+                    int pos = hashLookup.nextPos();
+                    if (pos < 0) {
                         return null;
 
                     } else {
@@ -548,17 +544,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @return null if the value was not replaced, else the value that is replaced is returned
          */
         private V replace(DirectBytes keyBytes, V expectedValue, V newValue, int hash2) {
-            if (hash2 == hashLookup.unsetKey())
-                hash2 = ~hash2;
             lock();
             try {
 
                 hashLookup.startSearch(hash2);
                 while (true) {
 
-                    final int pos = hashLookup.nextInt();
+                    final int pos = hashLookup.nextPos();
 
-                    if (pos == hashLookup.unsetValue()) {
+                    if (pos < 0) {
                         return null;
 
                     } else {
@@ -592,14 +586,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
 
         public V put(DirectBytes keyBytes, V value, int hash2, boolean replaceIfPresent) {
-            if (hash2 == hashLookup.unsetKey())
-                hash2 = ~hash2;
             lock();
             try {
-                hashLookup.startSearch(hash2);
+                hash2 = hashLookup.startSearch(hash2);
                 while (true) {
-                    final int pos = hashLookup.nextInt();
-                    if (pos == hashLookup.unsetValue()) {
+                    final int pos = hashLookup.nextPos();
+                    if (pos < 0) {
                         putEntry(keyBytes, value, hash2);
                         return null;
 

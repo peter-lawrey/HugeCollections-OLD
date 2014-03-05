@@ -212,7 +212,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
     static class Segment<K, V> {
         final VanillaBytesMarshallerFactory bmf = new VanillaBytesMarshallerFactory();
-        final IntIntMultiMap smallMap;
+        final HashPosMultiMap smallMap;
         final Map<K, DirectStore> map = new HashMap<K, DirectStore>();
         final DirectBytes tmpBytes;
         final MultiStoreBytes bytes = new MultiStoreBytes();
@@ -241,14 +241,13 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             sbKey = csKey ? new StringBuilder() : null;
         }
 
-        public synchronized void put(long h, K key, V value, boolean ifPresent, boolean ifAbsent) {
+        public synchronized void put(long hash, K key, V value, boolean ifPresent, boolean ifAbsent) {
             // search for the previous entry
-            int hash = intHashFor(h);
-            smallMap.startSearch(hash);
+            int h = smallMap.startSearch(hash);
             boolean foundSmall = false, foundLarge = false;
             while (true) {
-                int pos = smallMap.nextInt();
-                if (pos == smallMap.unsetValue()) {
+                int pos = smallMap.nextPos();
+                if (pos < 0) {
                     Object key2 = key instanceof CharSequence ? key.toString() : key;
                     final DirectStore store = map.get(key2);
                     if (store == null) {
@@ -300,7 +299,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 if (free < entriesPerSegment) {
                     bytes.storePositionAndSize(store, free * smallEntrySize, smallEntrySize);
                     bytes.write(tmpBytes, 0, size);
-                    smallMap.put(hash, free);
+                    smallMap.put(h, free);
                     usedSet.set(free);
                     this.size++;
                     return;
@@ -326,19 +325,11 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             this.size++;
         }
 
-        private int intHashFor(long h) {
-            int hash = (int) h;
-            if (hash == smallMap.unsetKey())
-                hash = ~hash;
-            return hash;
-        }
-
-        public synchronized V get(long h, K key, V value) {
-            int hash = intHashFor(h);
+        public synchronized V get(long hash, K key, V value) {
             smallMap.startSearch(hash);
             while (true) {
-                int pos = smallMap.nextInt();
-                if (pos == smallMap.unsetValue()) {
+                int pos = smallMap.nextPos();
+                if (pos < 0) {
                     Object key2 = key instanceof CharSequence ? key.toString() : key;
                     final DirectStore store = map.get(key2);
                     if (store == null)
@@ -386,13 +377,11 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return (K) bytes.readObject();
         }
 
-        public synchronized boolean containsKey(long h, K key) {
-            int hash = intHashFor(h);
+        public synchronized boolean containsKey(long hash, K key) {
             smallMap.startSearch(hash);
-            boolean found = false;
             while (true) {
-                int pos = smallMap.nextInt();
-                if (pos == smallMap.unsetValue()) {
+                int pos = smallMap.nextPos();
+                if (pos < 0) {
                     Object key2 = key instanceof CharSequence ? key.toString() : key;
                     return map.containsKey(key2);
                 }
@@ -404,20 +393,19 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             }
         }
 
-        public synchronized boolean remove(long h, K key) {
-            int hash = intHashFor(h);
-            smallMap.startSearch(hash);
+        public synchronized boolean remove(long hash, K key) {
+            int h = smallMap.startSearch(hash);
             boolean found = false;
             while (true) {
-                int pos = smallMap.nextInt();
-                if (pos == smallMap.unsetValue()) {
+                int pos = smallMap.nextPos();
+                if (pos < 0) {
                     break;
                 }
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key2 = getKey();
                 if (equals(key, key2)) {
                     usedSet.clear(pos);
-                    smallMap.remove(hash, pos);
+                    smallMap.remove(h, pos);
                     found = true;
                     this.size--;
                     break;

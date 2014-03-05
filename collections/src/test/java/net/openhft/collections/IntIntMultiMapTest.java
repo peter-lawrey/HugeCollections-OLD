@@ -28,60 +28,51 @@ import static org.junit.Assert.*;
 public class IntIntMultiMapTest {
     @Test
     public void testPutRemoveSearch() {
-        IntIntMultiMap map = new IntIntMultiMap(16);
+        HashPosMultiMap map = new IntIntMultiMap(16);
         assertEquals("{ }", map.toString());
-        assertEquals(0, map.size());
         map.put(1, 11);
         map.startSearch(1);
-        int n1 = map.nextInt();
-        int n2 = map.nextInt();
+        int n1 = map.nextPos();
+        int n2 = map.nextPos();
         assertEquals(11, n1);
-        assertEquals(map.unsetValue(), n2);
+        assertTrue(n2 < 0);
 
-        assertEquals(1, map.size());
         assertEquals("{ 1=11 }", map.toString());
         map.put(3, 33);
-        assertEquals(2, map.size());
         assertEquals("{ 1=11, 3=33 }", map.toString());
         map.put(1, 12);
         map.put(1, 13);
         map.put(1, 14);
         map.put(3, 32);
         map.put(1, 15);
-        assertEquals(7, map.size());
         assertEquals("{ 1=11, 1=12, 3=33, 1=13, 1=14, 3=32, 1=15 }", map.toString());
 
         assertTrue(map.remove(1, 11));
-        assertEquals(6, map.size());
         assertEquals("{ 1=15, 1=12, 3=33, 1=13, 1=14, 3=32 }", map.toString());
         assertFalse(map.remove(1, 11));
 
         map.startSearch(3);
-        assertEquals(33, map.nextInt());
-        assertEquals(32, map.nextInt());
-        assertEquals(map.unsetValue(), map.nextInt());
+        assertEquals(33, map.nextPos());
+        assertEquals(32, map.nextPos());
+        assertTrue(map.nextPos() < 0);
 
         map.startSearch(1);
-        assertEquals(15, map.nextInt());
-        assertEquals(12, map.nextInt());
-        assertEquals(13, map.nextInt());
-        assertEquals(14, map.nextInt());
-        assertEquals(map.unsetValue(), map.nextInt());
+        assertEquals(15, map.nextPos());
+        assertEquals(12, map.nextPos());
+        assertEquals(13, map.nextPos());
+        assertEquals(14, map.nextPos());
+        assertTrue(map.nextPos() < 0);
 
         map.remove(1, 12);
-        assertEquals(5, map.size());
         assertEquals("{ 1=15, 1=14, 3=33, 1=13, 3=32 }", map.toString());
 
         map.remove(1, 15);
-        assertEquals(4, map.size());
         assertEquals("{ 1=13, 1=14, 3=33, 3=32 }", map.toString());
 
         map.remove(1, 13);
-        assertEquals(3, map.size());
         assertEquals("{ 1=14, 3=33, 3=32 }", map.toString());
 
         map.remove(1, 14);
-        assertEquals(2, map.size());
         assertEquals("{ 3=33, 3=32 }", map.toString());
     }
 
@@ -89,11 +80,11 @@ public class IntIntMultiMapTest {
     public void testRemoveSpecific() {
         // Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
         // 0 but the value is still present in the map.
-        IntIntMultiMap map = new IntIntMultiMap(10);
+        HashPosMultiMap map = new IntIntMultiMap(10);
 
         map.put(15, 1);
         map.remove(15, 1);
         map.startSearch(15);
-        assertEquals(map.unsetValue(), map.nextInt());
+        assertTrue(map.nextPos() < 0);
     }
 }
