@@ -60,7 +60,7 @@ public class SharedHashMapTest {
         assertEquals("two", map.get("key2"));
 
 
-        // let and one more item for luck !
+        // lets add one more item for luck !
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
 
@@ -187,7 +187,7 @@ public class SharedHashMapTest {
         System.out.println("key1={}" + map.get("key1"));
         System.out.println("key1={}" + map.get("key2"));
 
-        // let and one more item for luck !
+        // lets add one more item for luck !
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
 
