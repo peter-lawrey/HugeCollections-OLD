@@ -46,12 +46,6 @@
 
             <dependency>
                 <groupId>net.openhft</groupId>
-                <artifactId>lang-sandbox</artifactId>
-                <version>${openhft.lang.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>net.openhft</groupId>
                 <artifactId>affinity</artifactId>
                 <version>2.0.1</version>
             </dependency>
@@ -153,12 +147,6 @@
         </dependency>
 
         <!-- test dependencies -->
-        <dependency>
-            <groupId>net.openhft</groupId>
-            <artifactId>lang-sandbox</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>compiler</artifactId>
