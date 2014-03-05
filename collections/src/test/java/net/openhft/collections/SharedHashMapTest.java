@@ -233,7 +233,7 @@ public class SharedHashMapTest {
 
     @Test
     public void testAcquireAndGet() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        int entries = 100 * 1000 * 1000;
+        int entries = 1000 * 1000;
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
 
         LongValue value = new LongValueNative();
