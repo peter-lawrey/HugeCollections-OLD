@@ -92,6 +92,9 @@ public class SharedHashMapBuilder implements Cloneable {
         return replicas;
     }
 
+    /**
+     * Not supported yet.
+     */
     SharedHashMapBuilder transactional(boolean transactional) {
         this.transactional = transactional;
         return this;
