@@ -172,7 +172,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @param key           the key into the map
      * @param existingValue the expected existing value in the map ( could be null when we don't wish to do this check )
      * @param newValue      the new value you wish to store in the map
-     * @return
+     * @return the value that was replaced
      */
     private V replaceUsing(final Object key, final V existingValue, final V newValue) {
         if (!kClass.isInstance(key)) return null;

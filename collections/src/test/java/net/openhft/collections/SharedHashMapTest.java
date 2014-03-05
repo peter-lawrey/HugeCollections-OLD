@@ -53,6 +53,9 @@ public class SharedHashMapTest {
 
         assertEquals("one", result);
 
+
+        //  assertFalse(map.containsKey("key1"));
+
         assertEquals(null, map.get("key1"));
         assertEquals("two", map.get("key2"));
 
