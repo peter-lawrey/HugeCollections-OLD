@@ -201,33 +201,33 @@ public class SharedHashMapTest {
 
     @Test
     public void testAcquireWithNullKey() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.acquireUsing(null, new LongValueNative()));
     }
 
     @Test
     public void testGetWithNullKey() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.getUsing(null, new LongValueNative()));
     }
 
     @Test
     public void testAcquireWithNullContainer() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.acquireUsing("key", null).getValue());
     }
 
     @Test
     public void testGetWithNullContainer() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.getUsing("key", null).getValue());
     }
 
     @Test
     public void testGetWithoutAcquireFirst() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.getUsing("key", new LongValueNative()));
     }
 

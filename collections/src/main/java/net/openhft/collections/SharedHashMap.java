@@ -27,7 +27,7 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
      * @param value to reuse if possible. If null, a new object will be created.
      * @return value found or null if not.
      */
-    V getUsing(Object key, V value);
+    V getUsing(K key, V value);
 
     /**
      * Acquire a value for a key, creating if absent. If the value is Byteable, it will be assigned to reference the value, instead of copying the data.
@@ -36,5 +36,5 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
      * @param value to reuse if possible. If null, a new object will be created.
      * @return value created or found.
      */
-    V acquireUsing(Object key, V value);
+    V acquireUsing(K key, V value);
 }
