@@ -19,11 +19,7 @@ package net.openhft.collections;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
-import net.openhft.lang.io.DirectBytes;
-import net.openhft.lang.io.DirectStore;
-import net.openhft.lang.io.MappedStore;
-import net.openhft.lang.io.MultiStoreBytes;
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
@@ -41,7 +37,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final long lockTimeOutNS;
     private Segment[] segments;
     private MappedStore ms;
-    
+
     private final int replicas;
     private final int entrySize;
     private final long entriesPerSegment;
@@ -54,7 +50,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final boolean removeReturnsNull;
 
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
-            Class<K> kClass, Class<V> vClass) throws IOException {
+                                Class<K> kClass, Class<V> vClass) throws IOException {
         this.kClass = kClass;
         this.vClass = vClass;
 
@@ -90,7 +86,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
         if (segments > Integer.MAX_VALUE)
             throw new IllegalStateException();
-        
+
         entriesPerSegment = entriesPerSegment(entriesForReliability, segments);
         bitSetSizeInBytes = (int) (entriesPerSegment / 8);
 
@@ -109,7 +105,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             offset += segmentSize;
         }
     }
-    
+
     private static long entriesPerSegment(long entries, long segments) {
         long minEPS = (entries + segments - 1) / segments;
         // for bit set
@@ -172,7 +168,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash / segments.length);
-//        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
         return segments[segmentNum].put(bytes, value, hash2, replaceIfPresent);
     }
 
@@ -210,52 +205,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash / segments.length);
-//        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
         return segments[segmentNum].acquire(bytes, value, hash2, create);
     }
 
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public V remove(Object key) {
-        return removeWith(key, null);
-    }
-
-    /**
-     *
-     * @param key the key of the entry to remove
-     * @param expectedValue null if not required
-     * @return
-     */
-    private V removeWith(Object key, V expectedValue) {
-        if (!kClass.isInstance(key)) return null;
-        DirectBytes bytes = getKeyAsBytes((K) key);
-        long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash / segments.length);
-
-        return segments[segmentNum].remove(bytes, expectedValue, hash2);
-    }
-
-    /**
-     * replace the value in a map, only if the existing entry equals {@param existingValue}
-     *
-     * @param key           the key into the map
-     * @param existingValue the expected existing value in the map ( could be null when we don't wish to do this check )
-     * @param newValue      the new value you wish to store in the map
-     * @return the value that was replaced
-     */
-    private V replaceUsing(final Object key, final V existingValue, final V newValue) {
-        if (!kClass.isInstance(key)) return null;
-        final DirectBytes bytes = getKeyAsBytes((K) key);
-        final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (segments.length - 1));
-        final int hash2 = (int) (hash / segments.length);
-//        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
-        return segments[segmentNum].replace(bytes, existingValue, newValue, hash2);
-    }
 
     private long longHashCode(DirectBytes bytes) {
         long h = 0;
@@ -272,6 +224,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return h;
     }
 
+
+    /**
+     * {@inheritDoc}
+     *
+     */
     @Override
     public Set<Entry<K, V>> entrySet() {
         throw new UnsupportedOperationException();
@@ -284,11 +241,49 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
+    public V remove(Object key) {
+
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
+
+        return removeIfValueIs(key, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws NullPointerException if the specified key is null
+     */
+    @Override
     public boolean remove(Object key, Object value) {
-        final V v = removeWith(key, (V) value);
+
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
+
+        final V v = removeIfValueIs(key, (V) value);
         return v != null;
     }
 
+
+    /**
+     * removes ( if there exists ) an entry from the map, if the {@param key} and {@param expectedValue} match that of a maps.entry.
+     * If the {@param expectedValue} equals null then ( if there exists ) an entry whose key equals {@param key} this is removed.
+     *
+     * @param key           the key of the entry to remove
+     * @param expectedValue null if not required
+     * @return true if and entry was removed
+     */
+    private V removeIfValueIs(Object key, V expectedValue) {
+
+        if (!kClass.isInstance(key))
+            return null;
+
+        final DirectBytes bytes = getKeyAsBytes((K) key);
+        final long hash = longHashCode(bytes);
+        final int segmentNum = (int) (hash & (segments.length - 1));
+        final int hash2 = (int) (hash / segments.length);
+        return segments[segmentNum].remove(bytes, expectedValue, hash2);
+    }
     /**
      * {@inheritDoc}
      *
@@ -306,7 +301,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (newValue == null)
             throw new NullPointerException("'newValue' can not be null");
 
-        return oldValue.equals(replaceUsing(key, oldValue, newValue));
+        return oldValue.equals(replaceIfValueIs(key, oldValue, newValue));
     }
 
 
@@ -326,7 +321,28 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (value == null)
             throw new NullPointerException("'value' can not be null");
 
-        return replaceUsing(key, (V) null, value);
+        return replaceIfValueIs(key, (V) null, value);
+    }
+
+
+    /**
+     * replace the value in a map, only if the existing entry equals {@param existingValue}
+     *
+     * @param key           the key into the map
+     * @param existingValue the expected existing value in the map ( could be null when we don't wish to do this check )
+     * @param newValue      the new value you wish to store in the map
+     * @return the value that was replaced
+     */
+    private V replaceIfValueIs(final Object key, final V existingValue, final V newValue) {
+
+        if (!kClass.isInstance(key))
+            return null;
+
+        final DirectBytes bytes = getKeyAsBytes((K) key);
+        final long hash = longHashCode(bytes);
+        final int segmentNum = (int) (hash & (segments.length - 1));
+        final int hash2 = (int) (hash / segments.length);
+        return segments[segmentNum].replace(bytes, existingValue, newValue, hash2);
     }
 
     class Segment {
