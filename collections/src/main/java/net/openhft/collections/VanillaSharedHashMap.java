@@ -147,17 +147,23 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V remove(Object key) {
-        return removeUsing(key, null);
+        return removeWith(key, null);
     }
 
-    private V removeUsing(Object key, V value) {
+    /**
+     *
+     * @param key the key of the entry to remove
+     * @param expectedValue null if not required
+     * @return
+     */
+    private V removeWith(Object key, V expectedValue) {
         if (!kClass.isInstance(key)) return null;
         DirectBytes bytes = getKeyAsBytes((K) key);
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (builder.segments() - 1));
         int hash2 = (int) (hash / builder.segments());
-//        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
-        return segments[segmentNum].remove(bytes, value, hash2);
+
+        return segments[segmentNum].remove(bytes, expectedValue, hash2);
     }
 
     /**
@@ -206,7 +212,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public boolean remove(Object key, Object value) {
-        final V v = removeUsing(key, (V) value);
+        final V v = removeWith(key, (V) value);
         return v != null;
     }
 
