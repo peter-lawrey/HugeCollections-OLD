@@ -227,7 +227,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     /**
      * {@inheritDoc}
-     *
      */
     @Override
     public Set<Entry<K, V>> entrySet() {
@@ -241,7 +240,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public V remove(Object key) {
+    public V remove(final Object key) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -255,7 +254,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public boolean remove(Object key, Object value) {
+    public boolean remove(final Object key, final Object value) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -273,7 +272,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @param expectedValue null if not required
      * @return true if and entry was removed
      */
-    private V removeIfValueIs(Object key, V expectedValue) {
+    private V removeIfValueIs(final Object key, final V expectedValue) {
 
         if (!kClass.isInstance(key))
             return null;
@@ -284,13 +283,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final int hash2 = (int) (hash / segments.length);
         return segments[segmentNum].remove(bytes, expectedValue, hash2);
     }
+
     /**
      * {@inheritDoc}
      *
      * @throws NullPointerException if any of the arguments are null
      */
     @Override
-    public boolean replace(K key, V oldValue, V newValue) {
+    public boolean replace(final K key, final V oldValue, final V newValue) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -313,7 +313,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key or value is null
      */
     @Override
-    public V replace(K key, V value) {
+    public V replace(final K key, final V value) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -516,21 +516,22 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param hash2
          * @return
          */
-        public V remove(DirectBytes keyBytes, V expectedValue, int hash2) {
+        public V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
                 while (true) {
-                    int pos = hashLookup.nextPos();
+
+                    final int pos = hashLookup.nextPos();
                     if (pos < 0) {
                         return null;
 
                     } else {
-                        long offset = entriesOffset + pos * entrySize;
+                        final long offset = entriesOffset + pos * entrySize;
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-                        long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
+                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
                         tmpBytes.position(keyLength);
                         V valueRemoved = expectedValue == null && removeReturnsNull ? null : readObjectUsing(null, offset + keyLength);
 
@@ -559,7 +560,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param hash2         the hash code
          * @return null if the value was not replaced, else the value that is replaced is returned
          */
-        private V replace(DirectBytes keyBytes, V expectedValue, V newValue, int hash2) {
+        private V replace(final DirectBytes keyBytes, final V expectedValue, final V newValue, final int hash2) {
             lock();
             try {
 
@@ -578,10 +579,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
+
                         final long keyLength = keyBytes.remaining();
                         tmpBytes.skip(keyLength);
+
                         final long alignPosition = align(tmpBytes.position());
                         tmpBytes.position(alignPosition);
+
                         final V valueRead = readObjectUsing(null, offset + keyLength);
 
                         if (valueRead == null)
