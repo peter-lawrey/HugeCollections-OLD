@@ -233,7 +233,7 @@ public class SharedHashMapTest {
 
     @Test
     public void testAcquireAndGet() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        int entries = 1000 * 1000;
+        int entries = 100 * 1000 * 1000;
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
 
         LongValue value = new LongValueNative();
@@ -497,9 +497,11 @@ public class SharedHashMapTest {
         return sb;
     }
 
+    static int counter = 0;
+
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test");
+        File file = new File(TMP + "/shm-test" + counter++);
         file.delete();
         file.deleteOnExit();
         return file;
