@@ -121,7 +121,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return new VanillaSharedHashMap<K, V>(builder, ms, kClass, vClass);
     }
 
-    private SharedHashMapBuilder readFile(File file) throws IOException {
+    private static SharedHashMapBuilder readFile(File file) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         FileInputStream fis = new FileInputStream(file);
         fis.getChannel().read(bb);
@@ -137,7 +137,7 @@ public class SharedHashMapBuilder implements Cloneable {
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
-        if (segments() <= 0 || entries() <= 0 || entrySize() <= 0)
+        if (builder.segments() <= 0 || builder.entries() <= 0 || builder.entrySize() <= 0)
             throw new IOException("Corrupt header for " + file);
         return builder;
     }
