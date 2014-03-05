@@ -24,7 +24,7 @@ import net.openhft.lang.io.DirectStore;
  * Supports a simple interface for int -> int[] off heap.
  */
 class IntIntMultiMap implements HashPosMultiMap {
-    public static final int ENTRY_SIZE = 8;
+    private static final int ENTRY_SIZE = 8;
 
     private static final int UNSET_KEY = 0;
     private static final int HASH_INSTEAD_OF_UNSET_KEY = -1;
@@ -35,7 +35,7 @@ class IntIntMultiMap implements HashPosMultiMap {
      * in natural order: 4 bytes of k1, 4 bytes of v1, 4 bytes of k2, ...
      * and this is somehow compatible with previous version of this class,
      * where keys were written before values explicitly.
-     *
+     * <p/>
      * However, this layout increases latency of map operations
      * by 1 clock cycle :), because we always need to perform shift to obtain
      * the key between memory read and comparison with UNSET_KEY.

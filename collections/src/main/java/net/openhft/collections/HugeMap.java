@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentMap;
  * Date: 07/12/13
  * Time: 11:44
  */
-public interface HugeMap<K, V> extends ConcurrentMap<K, V> {
+interface HugeMap<K, V> extends ConcurrentMap<K, V> {
     /**
      * Estimate how much off heap memory is used by this data structure (not based on how much of the map is used)
      *

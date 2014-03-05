@@ -23,6 +23,7 @@ import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.util.AbstractMap;
 import java.util.Set;
 
 public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
-    final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
+    private final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
     private final Class<K> kClass;
     private final Class<V> vClass;
     private final long lockTimeOutNS;
@@ -136,7 +137,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         ms = null;
     }
 
-    protected DirectBytes acquireBytes() {
+    DirectBytes acquireBytes() {
         DirectBytes bytes = localBytes.get();
         if (bytes == null) {
             localBytes.set(bytes = new DirectStore(ms.bytesMarshallerFactory(), entrySize * 2, false).createSlice());
@@ -158,7 +159,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * {@inheritDoc}
      */
     @Override
-    public V putIfAbsent(K key, V value) {
+    public V putIfAbsent(@NotNull K key, V value) {
         return put0(key, value, false);
     }
 
@@ -228,6 +229,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     /**
      * {@inheritDoc}
      */
+    @NotNull
     @Override
     public Set<Entry<K, V>> entrySet() {
         throw new UnsupportedOperationException();
@@ -253,7 +255,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public boolean remove(final Object key, final Object value) {
+    public boolean remove(@NotNull final Object key, final Object value) {
         if (key == null)
             throw new NullPointerException("'key' can not be null");
 
@@ -288,7 +290,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if any of the arguments are null
      */
     @Override
-    public boolean replace(final K key, final V oldValue, final V newValue) {
+    public boolean replace(@NotNull final K key, @NotNull final V oldValue, @NotNull final V newValue) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -311,7 +313,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key or value is null
      */
     @Override
-    public V replace(final K key, final V value) {
+    public V replace(@NotNull final K key, @NotNull final V value) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -319,7 +321,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (value == null)
             throw new NullPointerException("'value' can not be null");
 
-        return replaceIfValueIs(key, (V) null, value);
+        return replaceIfValueIs(key, null, value);
     }
 
 
@@ -466,9 +468,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         int nextFree() {
-            int ret = (int) freeList.setOne(nextSet);
+            int ret = (int) freeList.setNFrom(nextSet, 1);
             if (ret == DirectBitSet.NOT_FOUND) {
-                ret = (int) freeList.setOne(0);
+                ret = (int) freeList.setNFrom(0, 1);
                 if (ret == DirectBitSet.NOT_FOUND)
                     throw new IllegalStateException("Segment is full, no free entries found");
             }
@@ -480,8 +482,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * readObjectUsing - the "using" part means, reuse this object if possible.
          *
          * @param value  null - creates an object on demand.  It shouldn't be null in most examples, otherwise it will reuse this object
-         * @param offset
-         * @return
          */
         @SuppressWarnings("unchecked")
         V readObjectUsing(V value, long offset) {
@@ -506,10 +506,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * @param keyBytes
          * @param expectedValue if null no check if performed, otherwise, the remove will only occur if the value to be removed equals the expected value
-         * @param hash2
-         * @return
          */
         V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
             lock();

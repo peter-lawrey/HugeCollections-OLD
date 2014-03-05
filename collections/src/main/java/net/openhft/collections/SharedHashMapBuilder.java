@@ -51,12 +51,12 @@ public class SharedHashMapBuilder implements Cloneable {
 
     /**
      * Set minimum number of segments.
-     *
+     * <p/>
      * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
      */
-    public SharedHashMapBuilder minSegments(int minSegments) {
+    SharedHashMapBuilder minSegments(int minSegments) {
         this.minSegments = minSegments;
         return this;
     }
@@ -65,7 +65,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return minSegments;
     }
 
-    public SharedHashMapBuilder entrySize(int entrySize) {
+    SharedHashMapBuilder entrySize(int entrySize) {
         this.entrySize = entrySize;
         return this;
     }
@@ -74,7 +74,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return entrySize;
     }
 
-    public SharedHashMapBuilder entries(long entries) {
+    SharedHashMapBuilder entries(long entries) {
         this.entries = entries;
         return this;
     }
@@ -83,7 +83,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return entries;
     }
 
-    public SharedHashMapBuilder replicas(int replicas) {
+    SharedHashMapBuilder replicas(int replicas) {
         this.replicas = replicas;
         return this;
     }
@@ -92,7 +92,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return replicas;
     }
 
-    public SharedHashMapBuilder transactional(boolean transactional) {
+    SharedHashMapBuilder transactional(boolean transactional) {
         this.transactional = transactional;
         return this;
     }
@@ -206,7 +206,6 @@ public class SharedHashMapBuilder implements Cloneable {
      * Either way it's expensive for something you probably don't use.
      *
      * @param removeReturnsNull false if you want {@link this.remove()} to not return the object that was removed but instead return null
-     * @return
      */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
         this.removeReturnsNull = removeReturnsNull;

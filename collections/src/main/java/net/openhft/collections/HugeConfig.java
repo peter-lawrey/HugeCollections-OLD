@@ -64,7 +64,7 @@ public class HugeConfig implements Cloneable {
         return smallEntrySize;
     }
 
-    public HugeConfig setSmallEntrySize(int smallEntrySize) {
+    HugeConfig setSmallEntrySize(int smallEntrySize) {
         this.smallEntrySize = Maths.nextPower2(smallEntrySize, 64);
         return this;
     }
@@ -73,7 +73,7 @@ public class HugeConfig implements Cloneable {
         return segments;
     }
 
-    public HugeConfig setSegments(int segments) {
+    HugeConfig setSegments(int segments) {
         this.segments = Maths.nextPower2(segments, 16);
         return this;
     }
@@ -86,7 +86,7 @@ public class HugeConfig implements Cloneable {
         return capacity;
     }
 
-    public HugeConfig setCapacity(int capacity) {
+    HugeConfig setCapacity(int capacity) {
         this.capacity = Maths.nextPower2(capacity, segments);
         return this;
     }
