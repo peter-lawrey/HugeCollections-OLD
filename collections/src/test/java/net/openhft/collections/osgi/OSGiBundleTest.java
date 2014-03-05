@@ -51,7 +51,7 @@ public class OSGiBundleTest extends OSGiTestBase {
             systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
             mavenBundle("net.openhft","lang",System.getProperty("openhft.lang.version")),
             wrappedBundle(mavenBundle("net.openhft","lang-sandbox",System.getProperty("openhft.lang.version"))),
-            openhftBundle("HugeCollections","collections"),
+            workspaceBundle("collections"),
             junitBundles(),
             systemPackage("sun.misc"),
             systemPackage("sun.nio.ch"),

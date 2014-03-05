@@ -352,6 +352,7 @@
                     <systemPropertyVariables>
                         <openhft.lang.version>${openhft.lang.version}</openhft.lang.version>
                         <logback.version>${logback.version}</logback.version>
+                        <main.basedir>${project.basedir}</main.basedir>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
