@@ -39,7 +39,7 @@ public class SharedHashMapTest {
     public void testRemoveWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .segments(2)
+                .minSegments(2)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
@@ -75,7 +75,7 @@ public class SharedHashMapTest {
     public void testReplaceWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .segments(2)
+                .minSegments(2)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
@@ -116,7 +116,7 @@ public class SharedHashMapTest {
     public void testReplaceWithKeyAnd2Params() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .segments(2)
+                .minSegments(2)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         map.put("key1", "one");
@@ -158,7 +158,7 @@ public class SharedHashMapTest {
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .segments(2)
+                .minSegments(2)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
@@ -508,7 +508,7 @@ public class SharedHashMapTest {
     private static SharedHashMap<CharSequence, LongValue> getSharedMap(long entries, int segments, int entrySize) throws IOException {
         return new SharedHashMapBuilder()
                 .entries(entries)
-                .segments(segments)
+                .minSegments(segments)
                 .entrySize(entrySize)
                 .generatedValueType(true)
                 .create(getPersistenceFile(), CharSequence.class, LongValue.class);
@@ -537,7 +537,7 @@ public class SharedHashMapTest {
         SharedHashMap<CharSequence, CharSequence> map =
                 new SharedHashMapBuilder()
                         .entries(entries)
-                        .segments(16)
+                        .minSegments(16)
                         .entrySize(32)
                         .putReturnsNull(true)
                         .removeReturnsNull(true)

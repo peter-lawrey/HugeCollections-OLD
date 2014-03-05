@@ -16,21 +16,18 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.Maths;
-import net.openhft.lang.io.MappedStore;
-
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
 public class SharedHashMapBuilder implements Cloneable {
+
     static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
-    private static final double INCREASE_ENTRIES_PER_SECTOR = 1.5;
-    private int segments = 128;
+
+    private int minSegments = 128;
     private int entrySize = 256;
     private long entries = 1 << 20;
     private int replicas = 0;
@@ -43,11 +40,6 @@ public class SharedHashMapBuilder implements Cloneable {
     private boolean generatedValueType = false;
 
 
-    public SharedHashMapBuilder segments(int segments) {
-        this.segments = segments;
-        return this;
-    }
-
     @Override
     public SharedHashMapBuilder clone() {
         try {
@@ -57,8 +49,20 @@ public class SharedHashMapBuilder implements Cloneable {
         }
     }
 
-    public int segments() {
-        return segments;
+    /**
+     * Set minimum number of segments.
+     *
+     * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
+     *
+     * @return this builder object back
+     */
+    public SharedHashMapBuilder minSegments(int minSegments) {
+        this.minSegments = minSegments;
+        return this;
+    }
+
+    public int minSegments() {
+        return minSegments;
     }
 
     public SharedHashMapBuilder entrySize(int entrySize) {
@@ -117,8 +121,7 @@ public class SharedHashMapBuilder implements Cloneable {
         }
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
-        MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, size());
-        return new VanillaSharedHashMap<K, V>(builder, ms, kClass, vClass);
+        return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
     }
 
     private static SharedHashMapBuilder readFile(File file) throws IOException {
@@ -132,12 +135,12 @@ public class SharedHashMapBuilder implements Cloneable {
         bb.get(bytes);
         if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
-        builder.segments(bb.getInt());
-        builder.entries((long)(bb.getLong() * builder.segments() / INCREASE_ENTRIES_PER_SECTOR));
+        builder.minSegments(bb.getInt());
+        builder.entries(bb.getLong());
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
-        if (builder.segments() <= 0 || builder.entries() <= 0 || builder.entrySize() <= 0)
+        if (builder.minSegments() <= 0 || builder.entries() <= 0 || builder.entrySize() <= 0)
             throw new IOException("Corrupt header for " + file);
         return builder;
     }
@@ -145,8 +148,8 @@ public class SharedHashMapBuilder implements Cloneable {
     private void newFile(File file) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         bb.put(MAGIC);
-        bb.putInt(segments);
-        bb.putLong(entriesPerSegment());
+        bb.putInt(minSegments);
+        bb.putLong(entries);
         bb.putInt(entrySize);
         bb.putInt(replicas);
         bb.put((byte) (transactional ? 'Y' : 'N'));
@@ -154,26 +157,6 @@ public class SharedHashMapBuilder implements Cloneable {
         FileOutputStream fos = new FileOutputStream(file);
         fos.getChannel().write(bb);
         fos.close();
-    }
-
-    public long entriesPerSegment() {
-        long epg1 = (long)((entries * INCREASE_ENTRIES_PER_SECTOR) / segments);
-        return (Math.max(1, epg1) + 63) & ~63; // must be a multiple of 64 for the bit set to work;
-    }
-
-    long size() {
-        return HEADER_SIZE + segments * segmentSize();
-    }
-
-    long segmentSize() {
-        return (SEGMENT_HEADER
-                + Maths.nextPower2(entriesPerSegment() * 12, 16 * 8) // the IntIntMultiMap
-                + (1 + replicas) * bitSetSize() // the free list and 0+ dirty lists.
-                + entriesPerSegment() * entrySize); // the actual entries used.
-    }
-
-    int bitSetSize() {
-        return (int) ((entriesPerSegment() + 63) / 64 * 8);
     }
 
     public SharedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {

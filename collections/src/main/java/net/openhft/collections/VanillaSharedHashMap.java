@@ -19,40 +19,113 @@ package net.openhft.collections;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
-import net.openhft.lang.io.*;
+import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.DirectStore;
+import net.openhft.lang.io.MappedStore;
+import net.openhft.lang.io.MultiStoreBytes;
+import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.AbstractMap;
 import java.util.Set;
 
 public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
     final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
-    private final SharedHashMapBuilder builder;
     private final Class<K> kClass;
     private final Class<V> vClass;
     private final long lockTimeOutNS;
     private Segment[] segments;
     private MappedStore ms;
+    
+    private final int replicas;
+    private final int entrySize;
+    private final long entriesPerSegment;
+    private final int bitSetSizeInBytes;
 
-    public VanillaSharedHashMap(SharedHashMapBuilder builder, MappedStore ms, Class<K> kClass, Class<V> vClass) {
-        this.builder = builder;
-        lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
-        this.ms = ms;
+    private final SharedMapErrorListener errorListener;
+    private final boolean generatedKeyType;
+    private final boolean generatedValueType;
+    private final boolean putReturnsNull;
+    private final boolean removeReturnsNull;
+
+    public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
+            Class<K> kClass, Class<V> vClass) throws IOException {
         this.kClass = kClass;
         this.vClass = vClass;
 
+        lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
+
+        this.replicas = builder.replicas();
+        this.entrySize = builder.entrySize();
+
+        this.errorListener = builder.errorListener();
+        this.generatedKeyType = builder.generatedKeyType();
+        this.generatedValueType = builder.generatedValueType();
+        this.putReturnsNull = builder.putReturnsNull();
+        this.removeReturnsNull = builder.removeReturnsNull();
+
+        long entries = builder.entries();
+        /**
+         * As the entries will not be spaced evenly across segments,
+         * one segment can fill while others are not.
+         * The simple work around for now is to give the SHM
+         * a capacity of entries * 3 / 2.
+         */
+        long entriesForReliability = (long) (entries * 1.5);
+
+        long segments = builder.minSegments();
+        if (entriesPerSegment(entriesForReliability, segments) >
+                Integer.MAX_VALUE) {
+            segments = (entriesForReliability + Integer.MAX_VALUE - 1) /
+                    Integer.MAX_VALUE;
+            while (entriesPerSegment(entriesForReliability, segments) >
+                    Integer.MAX_VALUE) {
+                segments++;
+            }
+        }
+        if (segments > Integer.MAX_VALUE)
+            throw new IllegalStateException();
+        
+        entriesPerSegment = entriesPerSegment(entriesForReliability, segments);
+        bitSetSizeInBytes = (int) (entriesPerSegment / 8);
+
         @SuppressWarnings("unchecked")
-        Segment[] segments = (VanillaSharedHashMap<K, V>.Segment[]) new VanillaSharedHashMap.Segment[builder.segments()];
-        this.segments = segments;
+        Segment[] ss = (VanillaSharedHashMap.Segment[])
+                new VanillaSharedHashMap.Segment[(int) segments];
+        this.segments = ss;
+
+        this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
+                sizeInBytes());
 
         long offset = SharedHashMapBuilder.HEADER_SIZE;
-        long segmentSize = builder.segmentSize();
+        long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
             this.segments[i] = new Segment(ms.createSlice(offset, segmentSize));
             offset += segmentSize;
         }
+    }
+    
+    private static long entriesPerSegment(long entries, long segments) {
+        long minEPS = (entries + segments - 1) / segments;
+        // for bit set
+        return (minEPS + 63) / 64 * 64;
+    }
+
+    long sizeInBytes() {
+        return SharedHashMapBuilder.HEADER_SIZE +
+                segments.length * segmentSize();
+    }
+
+    long segmentSize() {
+        return (SharedHashMapBuilder.SEGMENT_HEADER
+                + Maths.nextPower2(entriesPerSegment * 12, 16 * 8) // the IntIntMultiMap
+                + (1 + replicas) * bitSetSizeInBytes // the free list and 0+ dirty lists.
+                + entriesPerSegment * entrySize); // the actual entries used.
     }
 
     /**
@@ -70,7 +143,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     protected DirectBytes acquireBytes() {
         DirectBytes bytes = localBytes.get();
         if (bytes == null) {
-            localBytes.set(bytes = new DirectStore(ms.bytesMarshallerFactory(), builder.entrySize() * 2, false).createSlice());
+            localBytes.set(bytes = new DirectStore(ms.bytesMarshallerFactory(), entrySize * 2, false).createSlice());
         } else {
             bytes.clear();
         }
@@ -97,15 +170,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (!kClass.isInstance(key)) return null;
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (builder.segments() - 1));
-        int hash2 = (int) (hash / builder.segments());
+        int segmentNum = (int) (hash & (segments.length - 1));
+        int hash2 = (int) (hash / segments.length);
 //        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
         return segments[segmentNum].put(bytes, value, hash2, replaceIfPresent);
     }
 
     private DirectBytes getKeyAsBytes(K key) {
         DirectBytes bytes = acquireBytes();
-        if (builder.generatedKeyType())
+        if (generatedKeyType)
             ((BytesMarshallable) key).writeMarshallable(bytes);
         else
             bytes.writeInstance(kClass, key);
@@ -135,8 +208,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (!kClass.isInstance(key)) return null;
         DirectBytes bytes = getKeyAsBytes((K) key);
         long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (builder.segments() - 1));
-        int hash2 = (int) (hash / builder.segments());
+        int segmentNum = (int) (hash & (segments.length - 1));
+        int hash2 = (int) (hash / segments.length);
 //        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
         return segments[segmentNum].acquire(bytes, value, hash2, create);
     }
@@ -160,8 +233,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (!kClass.isInstance(key)) return null;
         DirectBytes bytes = getKeyAsBytes((K) key);
         long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (builder.segments() - 1));
-        int hash2 = (int) (hash / builder.segments());
+        int segmentNum = (int) (hash & (segments.length - 1));
+        int hash2 = (int) (hash / segments.length);
 
         return segments[segmentNum].remove(bytes, expectedValue, hash2);
     }
@@ -178,8 +251,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         if (!kClass.isInstance(key)) return null;
         final DirectBytes bytes = getKeyAsBytes((K) key);
         final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (builder.segments() - 1));
-        final int hash2 = (int) (hash / builder.segments());
+        final int segmentNum = (int) (hash & (segments.length - 1));
+        final int hash2 = (int) (hash / segments.length);
 //        System.out.println("[" + key + "] s: " + segmentNum + " h2: " + hash2);
         return segments[segmentNum].replace(bytes, existingValue, newValue, hash2);
     }
@@ -276,18 +349,17 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         public Segment(NativeBytes bytes) {
             this.bytes = bytes;
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
-            long size = Maths.nextPower2(builder.entriesPerSegment() * 12, 16 * 8);
+            long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
             NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
             iimmapBytes.load();
             hashLookup = new IntIntMultiMap(iimmapBytes);
             start += size;
-            long bsSize = (builder.entriesPerSegment() + 63) / 64 * 8;
-            NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bsSize, null);
+            NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bitSetSizeInBytes, null);
 //            bsBytes.load();
             freeList = new SingleThreadedDirectBitSet(bsBytes);
-            start += bsSize * (1 + builder.replicas());
+            start += bitSetSizeInBytes * (1 + replicas);
             entriesOffset = start - bytes.startAddr();
-            assert bytes.capacity() >= entriesOffset + builder.entriesPerSegment() * builder.entrySize();
+            assert bytes.capacity() >= entriesOffset + entriesPerSegment * entrySize;
         }
 
         public void lock() throws IllegalStateException {
@@ -297,7 +369,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 if (Thread.currentThread().isInterrupted()) {
                     throw new IllegalStateException(new InterruptedException("Unable to obtain lock, interrupted"));
                 } else {
-                    builder.errorListener().onLockTimeout(bytes.threadIdForLockInt(LOCK));
+                    errorListener.onLockTimeout(bytes.threadIdForLockInt(LOCK));
                     bytes.resetLockInt(LOCK);
                 }
             }
@@ -307,7 +379,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 bytes.unlockInt(LOCK);
             } catch (IllegalMonitorStateException e) {
-                builder.errorListener().errorOnUnlock(e);
+                errorListener.errorOnUnlock(e);
             }
         }
 
@@ -358,8 +430,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private V acquireEntry(DirectBytes keyBytes, V value, int hash2) {
             int pos = nextFree();
-            long offset = entriesOffset + pos * builder.entrySize();
-            tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+            long offset = entriesOffset + pos * entrySize;
+            tmpBytes.storePositionAndSize(bytes, offset, entrySize);
             long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
@@ -373,8 +445,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private void putEntry(DirectBytes keyBytes, V value, int hash2) {
             int pos = nextFree();
-            long offset = entriesOffset + pos * builder.entrySize();
-            tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+            long offset = entriesOffset + pos * entrySize;
+            tmpBytes.storePositionAndSize(bytes, offset, entrySize);
             long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
@@ -408,7 +480,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 ((Byteable) value).bytes(bytes, offset);
                 return value;
             }
-            if (builder.generatedValueType()) {
+            if (generatedValueType) {
                 if (value == null)
                     value = DataValueClasses.newInstance(vClass);
                 ((BytesMarshallable) value).readMarshallable(tmpBytes);
@@ -442,13 +514,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         return null;
 
                     } else {
-                        long offset = entriesOffset + pos * builder.entrySize();
-                        tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+                        long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
                         long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
                         tmpBytes.position(keyLength);
-                        V valueRemoved = expectedValue == null && builder.removeReturnsNull() ? null : readObjectUsing(null, offset + keyLength);
+                        V valueRemoved = expectedValue == null && removeReturnsNull ? null : readObjectUsing(null, offset + keyLength);
 
                         if (expectedValue != null && !expectedValue.equals(valueRemoved))
                             return null;
@@ -491,8 +563,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
                     } else {
 
-                        final long offset = entriesOffset + pos * builder.entrySize();
-                        tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+                        final long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
 
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
@@ -532,8 +604,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         return null;
 
                     } else {
-                        final long offset = entriesOffset + pos * builder.entrySize();
-                        tmpBytes.storePositionAndSize(bytes, offset, builder.entrySize());
+                        final long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
                         final long keyLength = keyBytes.remaining();
@@ -541,7 +613,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         final long alignPosition = align(tmpBytes.position());
                         tmpBytes.position(alignPosition);
                         if (replaceIfPresent) {
-                            if (builder.putReturnsNull()) {
+                            if (putReturnsNull) {
                                 appendInstance(keyBytes, value);
                                 return null;
                             }
@@ -551,7 +623,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             return v;
 
                         } else {
-                            if (builder.putReturnsNull()) {
+                            if (putReturnsNull) {
                                 return null;
                             }
                             return readObjectUsing(null, offset + keyLength);
@@ -565,7 +637,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private void appendInstance(DirectBytes bytes, V value) {
             bytes.clear();
-            if (builder.generatedValueType())
+            if (generatedValueType)
                 ((BytesMarshallable) value).writeMarshallable(bytes);
             else
                 bytes.writeInstance(vClass, value);
