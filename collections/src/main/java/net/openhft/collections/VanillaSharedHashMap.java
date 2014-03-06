@@ -528,7 +528,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * Reads from {@link this.tmpBytes} an object at {@param offset}, will reuse {@param value} if possible to reduce object creation.
+         * Reads from {@link this.tmpBytes} an object at {@param offset}, will reuse {@param value} if possible, to reduce object creation.
          *
          * @param offset the offset to read the data from
          * @param value  the object to reuse ( if possible ), if null a new object will be created an object and no reuse will occur.
