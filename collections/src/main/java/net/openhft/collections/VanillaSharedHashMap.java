@@ -31,6 +31,8 @@ import java.nio.channels.FileChannel;
 import java.util.AbstractMap;
 import java.util.Set;
 
+import static java.lang.Thread.currentThread;
+
 public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
     private final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
     private final Class<K> kClass;
@@ -340,6 +342,22 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
 
+    // TODO uncomment once tested -  HCOLL-16  implement map.size()
+    /**
+     * {@inheritDoc}
+     */
+   /* @Override
+    public int size() {
+        int result = 0;
+
+        for (Segment segment : this.segments) {
+            result += segment.numberOfEntries;
+        }
+
+        return result;
+
+    }*/
+
     /**
      * replace the value in a map, only if the existing entry equals {@param existingValue}
      *
@@ -378,16 +396,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private final long entriesOffset;
         private int nextSet = 0;
 
+
+        // todo later use this to implement map.size()
+        volatile int numberOfEntries;
+
         Segment(NativeBytes bytes) {
             this.bytes = bytes;
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
-            long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
-            NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
+            final long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
+            final NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
             iimmapBytes.load();
             hashLookup = new IntIntMultiMap(iimmapBytes);
             start += size;
-            NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bitSetSizeInBytes, null);
-//            bsBytes.load();
+            final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bitSetSizeInBytes, null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
             start += bitSetSizeInBytes * (1 + replicas);
             entriesOffset = start - bytes.startAddr();
@@ -396,9 +417,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         void lock() throws IllegalStateException {
             while (true) {
-                boolean success = bytes.tryLockNanosInt(LOCK, lockTimeOutNS);
+                final boolean success = bytes.tryLockNanosInt(LOCK, lockTimeOutNS);
                 if (success) return;
-                if (Thread.currentThread().isInterrupted()) {
+                if (currentThread().isInterrupted()) {
                     throw new IllegalStateException(new InterruptedException("Unable to obtain lock, interrupted"));
                 } else {
                     errorListener.onLockTimeout(bytes.threadIdForLockInt(LOCK));
@@ -419,7 +440,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         /**
          * used to acquire and object of type V from the map
          *
-         * @param hash2 the hash code of the object to acquire
+         * @param keyBytes the key of the entry
+         * @param value    an object to be reused, null creates a new object.
+         * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @param create   false - if the  {@keyBytes} can not be found null will be returned, true - if the  {@keyBytes} can not be found an value will be acquired
+         * @return an entry.value whose entry.key equals {@param keyBytes}
          */
         V acquire(DirectBytes keyBytes, V value, int hash2, boolean create) {
             lock();
@@ -431,16 +456,16 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         return create ? acquireEntry(keyBytes, value, hash2) : null;
 
                     } else {
-                        long offset = entriesOffset + pos * entrySize;
+                        final long offset = entriesOffset + pos * entrySize;
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                        long start0 = System.nanoTime();
-                        boolean miss = !keyEquals(keyBytes, tmpBytes);
-                        long time0 = System.nanoTime() - start0;
+                        final long start0 = System.nanoTime();
+                        final boolean miss = !keyEquals(keyBytes, tmpBytes);
+                        final long time0 = System.nanoTime() - start0;
                         if (time0 > 1e6)
                             System.out.println("startsWith took " + time0 / 100000 / 10.0 + " ms.");
                         if (miss)
                             continue;
-                        long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
+                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
                         tmpBytes.position(keyLength);
                         return readObjectUsing(value, offset + keyLength);
                     }
@@ -454,11 +479,18 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return (num + 3) & ~3;
         }
 
+        /**
+         * @param keyBytes
+         * @param value
+         * @param hash2
+         * @return
+         */
+
         V acquireEntry(DirectBytes keyBytes, V value, int hash2) {
-            int pos = nextFree();
-            long offset = entriesOffset + pos * entrySize;
+            final int pos = nextFree();
+            final long offset = entriesOffset + pos * entrySize;
             tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-            long keyLength = keyBytes.remaining();
+            final long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
             tmpBytes.position(align(tmpBytes.position()));
@@ -466,12 +498,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             V v = readObjectUsing(value, offset + tmpBytes.position());
             // add to index if successful.
             hashLookup.put(hash2, pos);
+            // numberOfEntries += 1;
             return v;
         }
 
         void putEntry(DirectBytes keyBytes, V value, int hash2) {
-            int pos = nextFree();
-            long offset = entriesOffset + pos * entrySize;
+            final int pos = nextFree();
+            final long offset = entriesOffset + pos * entrySize;
             tmpBytes.storePositionAndSize(bytes, offset, entrySize);
             long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
@@ -480,6 +513,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             appendInstance(keyBytes, value);
             // add to index if successful.
             hashLookup.put(hash2, pos);
+            numberOfEntries += 1;
         }
 
         int nextFree() {
@@ -494,12 +528,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * readObjectUsing - the "using" part means, reuse this object if possible.
+         * Reads from {@link this.tmpBytes} an object at {@param offset}, will reuse {@param value} if possible to reduce object creation.
          *
-         * @param value null - creates an object on demand.  It shouldn't be null in most examples, otherwise it will reuse this object
+         * @param offset the offset to read the data from
+         * @param value  the object to reuse ( if possible ), if null a new object will be created an object and no reuse will occur.
          */
         @SuppressWarnings("unchecked")
-        V readObjectUsing(V value, long offset) {
+        V readObjectUsing(V value, final long offset) {
             if (value instanceof Byteable) {
                 ((Byteable) value).bytes(bytes, offset);
                 return value;
@@ -520,8 +555,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     && tmpBytes.startsWith(keyBytes);
         }
 
+
         /**
-         * @param expectedValue if null no check if performed, otherwise, the remove will only occur if the value to be removed equals the expected value
+         * implementation for map.remove(Key,Value)
+         *
+         * @param keyBytes      the key of the entry to remove
+         * @param expectedValue the entry will only be removed if the {@param existingValue} equals null or the {@param existingValue} equals that of the entry.value
+         * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @return
          */
         V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
             lock();
@@ -546,9 +587,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             return null;
 
                         hashLookup.remove(hash2, pos);
+                        numberOfEntries -= 1;
+
                         freeList.clear(pos);
                         if (pos < nextSet)
                             nextSet = pos;
+
                         return valueRemoved;
                     }
                 }
@@ -562,7 +606,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * implementation for map.containsKey(Key)
          *
          * @param keyBytes the key of the entry
-         * @param hash2            a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
          * @return true if and entry for this key exists
          */
         boolean containsKey(final DirectBytes keyBytes, final int hash2) {
@@ -658,7 +702,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param replaceIfPresent
          * @return
          */
-        V put(final DirectBytes keyBytes, final V value,  int hash2, boolean replaceIfPresent) {
+        V put(final DirectBytes keyBytes, final V value, int hash2, boolean replaceIfPresent) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
@@ -666,6 +710,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     final int pos = hashLookup.nextPos();
                     if (pos < 0) {
                         putEntry(keyBytes, value, hash2);
+
                         return null;
 
                     } else {
@@ -691,6 +736,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             if (putReturnsNull) {
                                 return null;
                             }
+
                             return readObjectUsing(null, offset + keyLength);
                         }
                     }
@@ -700,7 +746,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
-        void appendInstance(final DirectBytes bytes,final V value) {
+        void appendInstance(final DirectBytes bytes, final V value) {
             bytes.clear();
             if (generatedValueType)
                 ((BytesMarshallable) value).writeMarshallable(bytes);
@@ -710,6 +756,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             if (bytes.remaining() > tmpBytes.remaining())
                 throw new IllegalArgumentException("Value too large for entry was " + bytes.remaining() + ", remaining: " + tmpBytes.remaining());
             tmpBytes.write(bytes);
+
         }
     }
 }
