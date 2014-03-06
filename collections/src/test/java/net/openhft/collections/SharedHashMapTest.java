@@ -42,9 +42,14 @@ public class SharedHashMapTest {
                 .minSegments(2)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
-
+        assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
         map.put("key2", "two");
+
+
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+        assertFalse(map.containsKey("key3"));
 
         assertEquals("one", map.get("key1"));
         assertEquals("two", map.get("key2"));
@@ -52,22 +57,21 @@ public class SharedHashMapTest {
         final CharSequence result = map.remove("key1");
 
         assertEquals("one", result);
-
-
-        //  assertFalse(map.containsKey("key1"));
+        assertFalse(map.containsKey("key1"));
 
         assertEquals(null, map.get("key1"));
         assertEquals("two", map.get("key2"));
-
+        assertFalse(map.containsKey("key3"));
 
         // lets add one more item for luck !
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
-
+        assertTrue(map.containsKey("key3"));
 
         // and just for kicks we'll overwrite what we have
         map.put("key3", "overwritten");
         assertEquals("overwritten", map.get("key3"));
+        assertTrue(map.containsKey("key3"));
     }
 
 
@@ -85,30 +89,50 @@ public class SharedHashMapTest {
         assertEquals("one", map.get("key1"));
         assertEquals("two", map.get("key2"));
 
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+
         final CharSequence result = map.replace("key1", "newValue");
 
         assertEquals("one", result);
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+
 
         assertEquals("newValue", map.get("key1"));
         assertEquals("two", map.get("key2"));
 
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+        assertFalse(map.containsKey("key3"));
 
         // let and one more item for luck !
         map.put("key3", "three");
-        assertEquals("three", map.get("key3"));
 
+
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+        assertTrue(map.containsKey("key3"));
+        assertEquals("three", map.get("key3"));
 
         // and just for kicks we'll overwrite what we have
         map.put("key3", "overwritten");
         assertEquals("overwritten", map.get("key3"));
+
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+        assertTrue(map.containsKey("key3"));
 
         final CharSequence result2 = map.replace("key2", "newValue");
 
         assertEquals("two", result2);
         assertEquals("newValue", map.get("key2"));
 
-        final CharSequence result3 = map.replace("rublish", "newValue");
+        final CharSequence result3 = map.replace("rubbish", "newValue");
         assertEquals(null, result3);
+
+        assertFalse(map.containsKey("rubbish"));
+
     }
 
 

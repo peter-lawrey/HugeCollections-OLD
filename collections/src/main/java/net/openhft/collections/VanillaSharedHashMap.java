@@ -225,6 +225,21 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return h;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean containsKey(final Object key) {
+        if (!kClass.isInstance(key))
+            return false;
+
+        final DirectBytes bytes = getKeyAsBytes((K) key);
+        final long hash = longHashCode(bytes);
+        final int segmentNum = (int) (hash & (segments.length - 1));
+        final int hash2 = (int) (hash / segments.length);
+
+        return segments[segmentNum].containsKey(bytes, hash2);
+    }
 
     /**
      * {@inheritDoc}
@@ -242,7 +257,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public V remove(final Object key) {
+    public V remove(@NotNull final Object key) {
         if (key == null)
             throw new NullPointerException("'key' can not be null");
 
@@ -333,12 +348,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @param newValue      the new value you wish to store in the map
      * @return the value that was replaced
      */
-    private V replaceIfValueIs(final Object key, final V existingValue, final V newValue) {
+    private V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
 
         if (!kClass.isInstance(key))
             return null;
 
-        final DirectBytes bytes = getKeyAsBytes((K) key);
+        final DirectBytes bytes = getKeyAsBytes(key);
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
         final int hash2 = (int) (hash / segments.length);
@@ -481,7 +496,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         /**
          * readObjectUsing - the "using" part means, reuse this object if possible.
          *
-         * @param value  null - creates an object on demand.  It shouldn't be null in most examples, otherwise it will reuse this object
+         * @param value null - creates an object on demand.  It shouldn't be null in most examples, otherwise it will reuse this object
          */
         @SuppressWarnings("unchecked")
         V readObjectUsing(V value, long offset) {
@@ -544,12 +559,49 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
 
         /**
+         * implementation for map.containsKey(Key)
+         *
+         * @param keyBytes the key of the entry
+         * @param hash2            a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @return true if and entry for this key exists
+         */
+        boolean containsKey(final DirectBytes keyBytes, final int hash2) {
+            lock();
+            try {
+
+                hashLookup.startSearch(hash2);
+                while (true) {
+
+                    final int pos = hashLookup.nextPos();
+
+                    if (pos < 0) {
+                        return false;
+
+                    } else {
+
+                        final long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+
+                        if (!keyEquals(keyBytes, tmpBytes))
+                            continue;
+
+                        return true;
+
+                    }
+                }
+            } finally {
+                unlock();
+            }
+
+        }
+
+        /**
          * implementation for map.replace(Key,Value) and map.replace(Key,Old,New)
          *
          * @param keyBytes      the key of the entry to be replaced
          * @param expectedValue the expected value to replaced
          * @param newValue      the new value that will only be set if the existing value in the map equals the {@param expectedValue} or  {@param expectedValue} is null
-         * @param hash2         the hash code
+         * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
          * @return null if the value was not replaced, else the value that is replaced is returned
          */
         V replace(final DirectBytes keyBytes, final V expectedValue, final V newValue, final int hash2) {
@@ -597,7 +649,16 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
 
-        V put(DirectBytes keyBytes, V value, int hash2, boolean replaceIfPresent) {
+        /**
+         * implementation for map.put(Key,Value)
+         *
+         * @param keyBytes
+         * @param value
+         * @param hash2            a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @param replaceIfPresent
+         * @return
+         */
+        V put(final DirectBytes keyBytes, final V value,  int hash2, boolean replaceIfPresent) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
@@ -639,7 +700,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
-        void appendInstance(DirectBytes bytes, V value) {
+        void appendInstance(final DirectBytes bytes,final V value) {
             bytes.clear();
             if (generatedValueType)
                 ((BytesMarshallable) value).writeMarshallable(bytes);
