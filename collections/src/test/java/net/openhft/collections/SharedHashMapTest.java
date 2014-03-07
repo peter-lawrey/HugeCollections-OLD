@@ -79,6 +79,52 @@ public class SharedHashMapTest {
     }
 
 
+
+    @Test
+    public void testRemoveWithKeyAndRemoveReturnsNull() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .minSegments(2)
+                .removeReturnsNull(true)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+        assertFalse(map.containsKey("key3"));
+        map.put("key1", "one");
+        map.put("key2", "two");
+        assertEquals(2, map.size());
+
+        assertTrue(map.containsKey("key1"));
+        assertTrue(map.containsKey("key2"));
+        assertFalse(map.containsKey("key3"));
+
+        assertEquals("one", map.get("key1"));
+        assertEquals("two", map.get("key2"));
+
+        final CharSequence result = map.remove("key1");
+        assertEquals(null, result);
+
+        assertEquals(1, map.size());
+
+        assertFalse(map.containsKey("key1"));
+
+        assertEquals(null, map.get("key1"));
+        assertEquals("two", map.get("key2"));
+        assertFalse(map.containsKey("key3"));
+
+        // lets add one more item for luck !
+        map.put("key3", "three");
+        assertEquals("three", map.get("key3"));
+        assertTrue(map.containsKey("key3"));
+        assertEquals(2, map.size());
+
+        // and just for kicks we'll overwrite what we have
+        map.put("key3", "overwritten");
+        assertEquals("overwritten", map.get("key3"));
+        assertTrue(map.containsKey("key3"));
+        assertEquals(2, map.size());
+    }
+
+
     @Test
     public void testReplaceWithKey() throws Exception {
 
@@ -167,7 +213,6 @@ public class SharedHashMapTest {
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
 
-
         // and just for kicks we'll overwrite what we have
         map.put("key3", "overwritten");
         assertEquals("overwritten", map.get("key3"));
@@ -215,13 +260,9 @@ public class SharedHashMapTest {
         final boolean wasRemoved2 = map.remove("key1", "three");
         assertFalse(wasRemoved2);
 
-        System.out.println("key1={}" + map.get("key1"));
-        System.out.println("key1={}" + map.get("key2"));
-
         // lets add one more item for luck !
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
-
 
         // and just for kicks we'll overwrite what we have
         map.put("key3", "overwritten");
