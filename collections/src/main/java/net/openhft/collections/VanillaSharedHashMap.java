@@ -343,20 +343,21 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
 
     // TODO uncomment once tested -  HCOLL-16  implement map.size()
+
     /**
      * {@inheritDoc}
      */
-   /* @Override
+
     public int size() {
         int result = 0;
 
-        for (Segment segment : this.segments) {
-            result += segment.numberOfEntries;
+        for (final Segment segment : this.segments) {
+            result += segment.getSize();
         }
 
         return result;
 
-    }*/
+    }
 
     /**
      * replace the value in a map, only if the existing entry equals {@param existingValue}
@@ -387,8 +388,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         - stop-bit encoded length of the value
         - bytes for the value.
          */
-        static final int LOCK = 0;
-
+        static final int LOCK_OFFSET = 0;
+        static final int SIZE_OFFSET = 8;
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
         private final HashPosMultiMap hashLookup;
@@ -396,12 +397,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private final long entriesOffset;
         private int nextSet = 0;
 
-
-        // todo later use this to implement map.size()
-        volatile int numberOfEntries;
-
         Segment(NativeBytes bytes) {
             this.bytes = bytes;
+
+            // sets the default size to zero
+            this.bytes.writeUnsignedShort(SIZE_OFFSET, 0);
+
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
             final NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
@@ -415,22 +416,45 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             assert bytes.capacity() >= entriesOffset + entriesPerSegment * entrySize;
         }
 
+        /**
+         * increments the size by one
+         */
+        private void incrementSize() {
+            this.bytes.addUnsignedShort(SIZE_OFFSET, 1);
+        }
+
+        /**
+         * decrements the size by one
+         */
+        private void decrementSize() {
+            this.bytes.addUnsignedShort(SIZE_OFFSET, -1);
+        }
+
+        /**
+         * reads the the number of entries in this segment
+         */
+        int getSize() {
+            //TODO : check - but I dont think we have to lock this.
+            return this.bytes.readUnsignedShort(SIZE_OFFSET);
+        }
+
+
         void lock() throws IllegalStateException {
             while (true) {
-                final boolean success = bytes.tryLockNanosInt(LOCK, lockTimeOutNS);
+                final boolean success = bytes.tryLockNanosInt(LOCK_OFFSET, lockTimeOutNS);
                 if (success) return;
                 if (currentThread().isInterrupted()) {
                     throw new IllegalStateException(new InterruptedException("Unable to obtain lock, interrupted"));
                 } else {
-                    errorListener.onLockTimeout(bytes.threadIdForLockInt(LOCK));
-                    bytes.resetLockInt(LOCK);
+                    errorListener.onLockTimeout(bytes.threadIdForLockInt(LOCK_OFFSET));
+                    bytes.resetLockInt(LOCK_OFFSET);
                 }
             }
         }
 
         void unlock() {
             try {
-                bytes.unlockInt(LOCK);
+                bytes.unlockInt(LOCK_OFFSET);
             } catch (IllegalMonitorStateException e) {
                 errorListener.errorOnUnlock(e);
             }
@@ -438,7 +462,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
 
         /**
-         * used to acquire and object of type V from the map
+         * used to acquire and object of type V from the map,
+         * <p/>
+         * when {@param create }== true, this method is equivalent to :
+         * <pre>
+         * Object value = map.get("Key");
+         *
+         * if ( counter == null ) {
+         *    value = new Object();
+         *    map.put("Key", value);
+         * }
+         *
+         * return value;
+         * </pre>
          *
          * @param keyBytes the key of the entry
          * @param value    an object to be reused, null creates a new object.
@@ -449,6 +485,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         V acquire(DirectBytes keyBytes, V value, int hash2, boolean create) {
             lock();
             try {
+
+
                 hash2 = hashLookup.startSearch(hash2);
                 while (true) {
                     int pos = hashLookup.nextPos();
@@ -498,7 +536,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             V v = readObjectUsing(value, offset + tmpBytes.position());
             // add to index if successful.
             hashLookup.put(hash2, pos);
-            // numberOfEntries += 1;
+            incrementSize();
             return v;
         }
 
@@ -513,7 +551,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             appendInstance(keyBytes, value);
             // add to index if successful.
             hashLookup.put(hash2, pos);
-            numberOfEntries += 1;
+            incrementSize();
         }
 
         int nextFree() {
@@ -587,7 +625,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             return null;
 
                         hashLookup.remove(hash2, pos);
-                        numberOfEntries -= 1;
+                        decrementSize();
 
                         freeList.clear(pos);
                         if (pos < nextSet)

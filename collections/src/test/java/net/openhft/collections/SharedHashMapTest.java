@@ -45,7 +45,7 @@ public class SharedHashMapTest {
         assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
         map.put("key2", "two");
-
+        assertEquals(2, map.size());
 
         assertTrue(map.containsKey("key1"));
         assertTrue(map.containsKey("key2"));
@@ -55,6 +55,8 @@ public class SharedHashMapTest {
         assertEquals("two", map.get("key2"));
 
         final CharSequence result = map.remove("key1");
+
+        assertEquals(1, map.size());
 
         assertEquals("one", result);
         assertFalse(map.containsKey("key1"));
@@ -67,11 +69,13 @@ public class SharedHashMapTest {
         map.put("key3", "three");
         assertEquals("three", map.get("key3"));
         assertTrue(map.containsKey("key3"));
+        assertEquals(2, map.size());
 
         // and just for kicks we'll overwrite what we have
         map.put("key3", "overwritten");
         assertEquals("overwritten", map.get("key3"));
         assertTrue(map.containsKey("key3"));
+        assertEquals(2, map.size());
     }
 
 
@@ -85,6 +89,7 @@ public class SharedHashMapTest {
 
         map.put("key1", "one");
         map.put("key2", "two");
+        assertEquals(2, map.size());
 
         assertEquals("one", map.get("key1"));
         assertEquals("two", map.get("key2"));
@@ -97,7 +102,7 @@ public class SharedHashMapTest {
         assertEquals("one", result);
         assertTrue(map.containsKey("key1"));
         assertTrue(map.containsKey("key2"));
-
+        assertEquals(2, map.size());
 
         assertEquals("newValue", map.get("key1"));
         assertEquals("two", map.get("key2"));
@@ -106,9 +111,11 @@ public class SharedHashMapTest {
         assertTrue(map.containsKey("key2"));
         assertFalse(map.containsKey("key3"));
 
+        assertEquals(2, map.size());
+
         // let and one more item for luck !
         map.put("key3", "three");
-
+        assertEquals(3, map.size());
 
         assertTrue(map.containsKey("key1"));
         assertTrue(map.containsKey("key2"));
@@ -132,7 +139,7 @@ public class SharedHashMapTest {
         assertEquals(null, result3);
 
         assertFalse(map.containsKey("rubbish"));
-
+        assertEquals(3, map.size());
     }
 
 
