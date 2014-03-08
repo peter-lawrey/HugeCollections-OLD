@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
+public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, DirectMap {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
     private final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
     private final Class<K> kClass;
@@ -196,6 +196,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return segments[segmentNum].put(bytes, value, hash2, replaceIfPresent);
     }
 
+    @Override
+    public void put(Bytes key, Bytes value) {
+        long hash = longHashCode(key);
+        int segmentNum = (int) (hash & (segments.length - 1));
+        int hash2 = (int) (hash / segments.length);
+        segments[segmentNum].directPut(key, value, hash2);
+    }
+
     private DirectBytes getKeyAsBytes(K key) {
         DirectBytes bytes = acquireBytes();
         if (generatedKeyType)
@@ -234,7 +242,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
 
-    private long longHashCode(DirectBytes bytes) {
+    private long longHashCode(Bytes bytes) {
         long h = 0;
         int i = 0;
         long limit = bytes.limit(); // clustering.
@@ -321,6 +329,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final int segmentNum = (int) (hash & (segments.length - 1));
         final int hash2 = (int) (hash / segments.length);
         return segments[segmentNum].remove(bytes, expectedValue, hash2);
+    }
+
+    @Override
+    public void remove(Bytes key) {
+        final DirectBytes bytes = getKeyAsBytes((K) key);
+        final long hash = longHashCode(bytes);
+        final int segmentNum = (int) (hash & (segments.length - 1));
+        final int hash2 = (int) (hash / segments.length);
+        segments[segmentNum].directRemove(bytes, hash2);
     }
 
     /**
@@ -598,14 +615,28 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         void putEntry(DirectBytes keyBytes, V value, int hash2) {
             final int pos = nextFree();
             final long offset = entriesOffset + pos * entrySize;
-            tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-            long keyLength = keyBytes.remaining();
-            tmpBytes.writeStopBit(keyLength);
-            tmpBytes.write(keyBytes);
+            writeKey(keyBytes, offset);
             appendInstance(keyBytes, value);
             // add to index if successful.
             hashLookup.put(hash2, pos);
             incrementSize();
+        }
+
+        void directPutEntry(Bytes keyBytes, Bytes value, int hash2) {
+            final int pos = nextFree();
+            final long offset = entriesOffset + pos * entrySize;
+            writeKey(keyBytes, offset);
+            appendValue(value);
+            // add to index if successful.
+            hashLookup.put(hash2, pos);
+            incrementSize();
+        }
+
+        private void writeKey(Bytes keyBytes, long offset) {
+            tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+            long keyLength = keyBytes.remaining();
+            tmpBytes.writeStopBit(keyLength);
+            tmpBytes.write(keyBytes);
         }
 
         int nextFree() {
@@ -640,7 +671,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return tmpBytes.readInstance(vClass, value);
         }
 
-        boolean keyEquals(DirectBytes keyBytes, MultiStoreBytes tmpBytes) {
+        boolean keyEquals(Bytes keyBytes, MultiStoreBytes tmpBytes) {
             // check the length is the same.
             long keyLength = tmpBytes.readStopBit();
             return keyLength == keyBytes.remaining()
@@ -686,6 +717,39 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             nextSet = pos;
 
                         return valueRemoved;
+                    }
+                }
+            } finally {
+                unlock();
+            }
+        }
+
+        void directRemove(final Bytes keyBytes, int hash2) {
+            lock();
+            try {
+                hash2 = hashLookup.startSearch(hash2);
+                while (true) {
+
+                    final int pos = hashLookup.nextPos();
+                    if (pos < 0) {
+                        return;
+
+                    } else {
+                        final long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+                        if (!keyEquals(keyBytes, tmpBytes))
+                            continue;
+                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
+                        tmpBytes.position(keyLength);
+
+                        hashLookup.remove(hash2, pos);
+                        decrementSize();
+
+                        freeList.clear(pos);
+                        if (pos < nextSet)
+                            nextSet = pos;
+
+                        return;
                     }
                 }
             } finally {
@@ -841,6 +905,33 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
+        void directPut(final Bytes key, final Bytes value, int hash2) {
+            lock();
+            try {
+                hash2 = hashLookup.startSearch(hash2);
+                while (true) {
+                    final int pos = hashLookup.nextPos();
+                    if (pos < 0) {
+                        directPutEntry(key, value, hash2);
+
+                        return;
+
+                    } else {
+                        final long offset = entriesOffset + pos * entrySize;
+                        tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+                        if (!keyEquals(key, tmpBytes))
+                            continue;
+                        final long keyLength = key.remaining();
+                        tmpBytes.skip(keyLength);
+                        appendValue(value);
+                        return;
+                    }
+                }
+            } finally {
+                unlock();
+            }
+        }
+
         void appendInstance(final DirectBytes bytes, final V value) {
             bytes.clear();
             if (generatedValueType)
@@ -848,12 +939,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             else
                 bytes.writeInstance(vClass, value);
             bytes.flip();
-            if (bytes.remaining() + 4 > tmpBytes.remaining())
-                throw new IllegalArgumentException("Value too large for entry was " + (bytes.remaining() + 4) + ", remaining: " + tmpBytes.remaining());
-            tmpBytes.writeStopBit(bytes.remaining());
+            appendValue(bytes);
+        }
+
+        void appendValue(final Bytes value) {
+            if (value.remaining() + 4 > tmpBytes.remaining())
+                throw new IllegalArgumentException("Value too large for entry was " + (value.remaining() + 4) + ", remaining: " + tmpBytes.remaining());
+            tmpBytes.writeStopBit(value.remaining());
             tmpBytes.position(align(tmpBytes.position()));
             tmpBytes.write(bytes);
-
         }
     }
 }
