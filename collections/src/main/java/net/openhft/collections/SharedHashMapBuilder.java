@@ -109,7 +109,8 @@ public class SharedHashMapBuilder implements Cloneable {
         if (actualEntriesPerSegment > 0)
             return actualEntriesPerSegment;
         // round up to the next multiple of 64.
-        int aeps = (int) (entries * 2L / actualSegments() + 63) & ~63;
+        int as = actualSegments();
+        int aeps = (int) (Math.max(1, entries * 2L / as) + 63) & ~63;
         return aeps;
     }
 

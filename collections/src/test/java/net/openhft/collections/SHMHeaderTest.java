@@ -15,7 +15,7 @@ public class SHMHeaderTest {
     @Test
     public void testDifferentHeaders() throws IOException {
         Random rand = new Random(1);
-        for (int i = 0; i < 100; i++) {
+        for (int i = 1; i <= 1000; i++) {
             rand.setSeed(i);
 //            System.out.println("i: " + i);
             File file = new File(System.getProperty("java.io.tmpdir"), "headers-" + i);
@@ -40,7 +40,7 @@ public class SHMHeaderTest {
 
     private static SharedHashMapBuilder createBuilder(Random rand) {
         return new SharedHashMapBuilder()
-                .entrySize(rand.nextInt(100) * 11 + 5)
+                .entrySize(rand.nextInt(100) * 3 + 1)
                 .entries(rand.nextInt(1000) * 1111 + 1)
                 .minSegments(rand.nextInt(200) + 1)
                 .replicas(rand.nextInt(3));
