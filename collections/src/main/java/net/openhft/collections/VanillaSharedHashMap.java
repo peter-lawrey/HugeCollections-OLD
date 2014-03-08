@@ -124,7 +124,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     int numberOfBitSets() {
         return 1 // for free list
-                + replicas;
+                + (replicas > 0 ? 1 : 0) // deleted set
+                + replicas; // to notify each replica of a change.
     }
 
     long segmentSize() {
@@ -409,9 +410,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         - stop-bit encoded length of the value
         - bytes for the value.
          */
-        static final int LOCK_OFFSET = 0;
-        static final int SIZE_OFFSET = LOCK_OFFSET + 8;
-        static final int HEADER_USED = SIZE_OFFSET + 4;
+        static final int LOCK_OFFSET = 0; // 64-bit
+        static final int SIZE_OFFSET = LOCK_OFFSET + 8; // 32-bit
+        static final int PAD1_OFFSET = SIZE_OFFSET + 4; // 32-bit
+        static final int REPLICA_OFFSET = PAD1_OFFSET + 4; // 64-bit
+        static final int HEADER_USED = REPLICA_OFFSET + 8;
 
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
