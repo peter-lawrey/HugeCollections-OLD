@@ -44,7 +44,7 @@ public class GettingStartedTest {
                 "  \"value\": \"File\",\n" +
                 "  \"popup\": {\n" +
                 "    \"menuitem\": [\n" +
-                "      {\"value\": \"New\", \"onclick\": \"CreateNewDoc()\"},\n" +
+                "      {\"value\": \"New\", \"onclick\": \"CreateNew()\"},\n" +
                 "      {\"value\": \"Open\", \"onclick\": \"OpenDoc()\"},\n" +
                 "      {\"value\": \"Close\", \"onclick\": \"CloseDoc()\"}\n" +
                 "    ]\n" +

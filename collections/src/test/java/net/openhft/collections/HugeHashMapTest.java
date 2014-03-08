@@ -16,6 +16,7 @@
 
 package net.openhft.collections;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -60,6 +61,7 @@ public class HugeHashMapTest {
     Put/getUsing 1,339 K operations per second
      */
     @Test
+    @Ignore
     public void testPut() throws ExecutionException, InterruptedException {
         int count = 4000000;
         HugeConfig config = HugeConfig.DEFAULT.clone()

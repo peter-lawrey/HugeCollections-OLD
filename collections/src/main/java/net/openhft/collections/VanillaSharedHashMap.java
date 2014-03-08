@@ -528,9 +528,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         }
                         if (miss)
                             continue;
-                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
-                        tmpBytes.position(keyLength);
-                        return readObjectUsing(value, offset + keyLength);
+                        long valueLengthOffset = keyBytes.remaining() + tmpBytes.position();
+                        tmpBytes.position(valueLengthOffset);
+                        // skip the value length
+                        // todo use the value length to limit reading below
+                        long valueLength = tmpBytes.readStopBit();
+                        final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
+                        tmpBytes.position(valueOffset);
+                        return readObjectUsing(value, offset + valueOffset);
                     }
                 }
             } finally {
@@ -550,19 +555,44 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          */
 
         V acquireEntry(DirectBytes keyBytes, V value, int hash2) {
+            value = createValueIfNull(value);
+
             final int pos = nextFree();
             final long offset = entriesOffset + pos * entrySize;
             tmpBytes.storePositionAndSize(bytes, offset, entrySize);
             final long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
-            tmpBytes.position(align(tmpBytes.position()));
-            tmpBytes.zeroOut(tmpBytes.position(), tmpBytes.limit());
-            V v = readObjectUsing(value, offset + tmpBytes.position());
+            if (value instanceof Byteable) {
+                Byteable byteable = (Byteable) value;
+                int length = byteable.maxSize();
+                tmpBytes.writeStopBit(length);
+                tmpBytes.position(align(tmpBytes.position()));
+                if (length > tmpBytes.remaining())
+                    throw new IllegalStateException("Not enough space left in entry for value, needs " + length + " but only " + tmpBytes.remaining() + " left");
+                tmpBytes.zeroOut(tmpBytes.position(), tmpBytes.position() + length);
+                byteable.bytes(bytes, offset + tmpBytes.position());
+            } else {
+                appendInstance(keyBytes, value);
+            }
             // add to index if successful.
             hashLookup.put(hash2, pos);
             incrementSize();
-            return v;
+            return value;
+        }
+
+        private V createValueIfNull(V value) {
+            if (value == null) {
+                if (generatedValueType)
+                    value = DataValueClasses.newDirectReference(vClass);
+                else
+                    try {
+                        value = vClass.newInstance();
+                    } catch (Exception e) {
+                        throw new AssertionError(e);
+                    }
+            }
+            return value;
         }
 
         void putEntry(DirectBytes keyBytes, V value, int hash2) {
@@ -572,7 +602,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long keyLength = keyBytes.remaining();
             tmpBytes.writeStopBit(keyLength);
             tmpBytes.write(keyBytes);
-            tmpBytes.position(align(tmpBytes.position()));
             appendInstance(keyBytes, value);
             // add to index if successful.
             hashLookup.put(hash2, pos);
@@ -733,7 +762,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
                         final long keyLength = keyBytes.remaining();
                         tmpBytes.skip(keyLength);
-
+                        long valuePosition = tmpBytes.position();
+                        tmpBytes.readStopBit();
                         final long alignPosition = align(tmpBytes.position());
                         tmpBytes.position(alignPosition);
 
@@ -743,7 +773,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             return null;
 
                         if (expectedValue == null || expectedValue.equals(valueRead)) {
-                            tmpBytes.position(alignPosition);
+                            tmpBytes.position(valuePosition);
                             appendInstance(keyBytes, newValue);
                         }
 
@@ -783,15 +813,17 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             continue;
                         final long keyLength = keyBytes.remaining();
                         tmpBytes.skip(keyLength);
-                        final long alignPosition = align(tmpBytes.position());
-                        tmpBytes.position(alignPosition);
                         if (replaceIfPresent) {
                             if (putReturnsNull) {
                                 appendInstance(keyBytes, value);
                                 return null;
                             }
-                            final V v = readObjectUsing(null, offset + alignPosition);
+                            long valuePosition = tmpBytes.position();
+                            tmpBytes.readStopBit();
+                            final long alignPosition = align(tmpBytes.position());
                             tmpBytes.position(alignPosition);
+                            final V v = readObjectUsing(null, offset + alignPosition);
+                            tmpBytes.position(valuePosition);
                             appendInstance(keyBytes, value);
                             return v;
 
@@ -816,8 +848,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             else
                 bytes.writeInstance(vClass, value);
             bytes.flip();
-            if (bytes.remaining() > tmpBytes.remaining())
-                throw new IllegalArgumentException("Value too large for entry was " + bytes.remaining() + ", remaining: " + tmpBytes.remaining());
+            if (bytes.remaining() + 4 > tmpBytes.remaining())
+                throw new IllegalArgumentException("Value too large for entry was " + (bytes.remaining() + 4) + ", remaining: " + tmpBytes.remaining());
+            tmpBytes.writeStopBit(bytes.remaining());
+            tmpBytes.position(align(tmpBytes.position()));
             tmpBytes.write(bytes);
 
         }

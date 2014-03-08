@@ -511,6 +511,7 @@ public class SharedHashMapTest {
     @Ignore
     public void testCHMAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
         for (int runs : new int[]{10, 50, 250, 1000, 2500}) {
+            System.out.println("Testing " + runs + " million entries");
             final long entries = runs * 1000 * 1000L;
             final ConcurrentMap<String, AtomicInteger> map = new ConcurrentHashMap<String, AtomicInteger>((int) (entries * 5 / 4), 1.0f, 1024);
 
@@ -585,7 +586,7 @@ public class SharedHashMapTest {
 
     private CharSequence getUserCharSequence(int i) {
         sb.setLength(0);
-        sb.append("ur:");
+        sb.append("u:");
         sb.append(i * 9876); // test 10 digit user numbers.
         return sb;
     }
@@ -610,6 +611,7 @@ public class SharedHashMapTest {
     }
 
     private static void printStatus() {
+        if (!new File("/proc/self/status").exists()) return;
         try {
             BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"));
             for (String line; (line = br.readLine()) != null; )
