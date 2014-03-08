@@ -349,13 +349,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
 
     public int size() {
-        int result = 0;
+        long result = 0;
 
         for (final Segment segment : this.segments) {
             result += segment.getSize();
         }
 
-        return result;
+        return (int) result;
 
     }
 
@@ -401,7 +401,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             this.bytes = bytes;
 
             // sets the default size to zero
-            this.bytes.writeUnsignedShort(SIZE_OFFSET, 0);
+            this.bytes.writeUnsignedInt(SIZE_OFFSET, 0);
 
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
@@ -420,22 +420,22 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * increments the size by one
          */
         private void incrementSize() {
-            this.bytes.addUnsignedShort(SIZE_OFFSET, 1);
+            this.bytes.addUnsignedInt(SIZE_OFFSET, 1);
         }
 
         /**
          * decrements the size by one
          */
         private void decrementSize() {
-            this.bytes.addUnsignedShort(SIZE_OFFSET, -1);
+            this.bytes.addUnsignedInt(SIZE_OFFSET, -1);
         }
 
         /**
          * reads the the number of entries in this segment
          */
-        int getSize() {
+        long getSize() {
             //TODO : check - but I dont think we have to lock this.
-            return this.bytes.readUnsignedShort(SIZE_OFFSET);
+            return this.bytes.readUnsignedInt(SIZE_OFFSET);
         }
 
 

@@ -79,6 +79,27 @@ public class SharedHashMapTest {
     }
 
 
+    @Test
+    public void testSize() throws Exception {
+
+        final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
+                .minSegments(1024)
+                .removeReturnsNull(true)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+
+        for (int i = 1; i < 1024; i++) {
+            map.put("key" + i, "value");
+            assertEquals(i, map.size());
+        }
+
+        for (int i = 1023; i >= 1; ) {
+            map.remove("key" + i);
+            i--;
+            assertEquals(i, map.size());
+        }
+
+    }
 
     @Test
     public void testRemoveWithKeyAndRemoveReturnsNull() throws Exception {
