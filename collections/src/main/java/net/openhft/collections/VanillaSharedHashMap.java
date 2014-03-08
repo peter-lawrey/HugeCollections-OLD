@@ -30,10 +30,13 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.AbstractMap;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
 public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
+    private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
     private final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
     private final Class<K> kClass;
     private final Class<V> vClass;
@@ -43,8 +46,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     private final int replicas;
     private final int entrySize;
-    private final long entriesPerSegment;
-    private final int bitSetSizeInBytes;
+    private final int entriesPerSegment;
 
     private final SharedMapErrorListener errorListener;
     private final boolean generatedKeyType;
@@ -68,34 +70,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
 
-        long entries = builder.entries();
-        /**
-         * As the entries will not be spaced evenly across segments,
-         * one segment can fill while others are not.
-         * The simple work around for now is to give the SHM
-         * a capacity of entries * 3 / 2.
-         */
-        long entriesForReliability = (long) (entries * 1.5);
-
-        long segments = builder.minSegments();
-        if (entriesPerSegment(entriesForReliability, segments) >
-                Integer.MAX_VALUE) {
-            segments = (entriesForReliability + Integer.MAX_VALUE - 1) /
-                    Integer.MAX_VALUE;
-            while (entriesPerSegment(entriesForReliability, segments) >
-                    Integer.MAX_VALUE) {
-                segments++;
-            }
-        }
-        if (segments > Integer.MAX_VALUE)
-            throw new IllegalStateException();
-
-        entriesPerSegment = entriesPerSegment(entriesForReliability, segments);
-        bitSetSizeInBytes = (int) (entriesPerSegment / 8);
+        int segments = builder.actualSegments();
+        int entriesPerSegment = builder.actualEntriesPerSegment();
+        this.entriesPerSegment = entriesPerSegment;
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedHashMap.Segment[])
-                new VanillaSharedHashMap.Segment[(int) segments];
+                new VanillaSharedHashMap.Segment[segments];
         this.segments = ss;
 
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
@@ -109,10 +90,23 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
     }
 
-    private static long entriesPerSegment(long entries, long segments) {
-        long minEPS = (entries + segments - 1) / segments;
-        // for bit set
-        return (minEPS + 63) / 64 * 64;
+    @Override
+    public SharedHashMapBuilder builder() {
+        return new SharedHashMapBuilder()
+                .actualSegments(segments.length)
+                .actualEntriesPerSegment(entriesPerSegment)
+                .entries((long) segments.length * entriesPerSegment / 2)
+                .entrySize(entrySize)
+                .errorListener(errorListener)
+                .generatedKeyType(generatedKeyType)
+                .generatedValueType(generatedValueType)
+                .lockTimeOutMS(lockTimeOutNS / 1000000)
+                .minSegments(segments.length)
+                .putReturnsNull(putReturnsNull)
+                .removeReturnsNull(removeReturnsNull)
+                .replicas(replicas)
+                .transactional(false);
+
     }
 
     long sizeInBytes() {
@@ -120,11 +114,38 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 segments.length * segmentSize();
     }
 
+    long sizeOfMultiMap() {
+        return align64(Maths.nextPower2(entriesPerSegment * 8L, 64));
+    }
+
+    long sizeOfBitSets() {
+        return align64(entriesPerSegment / 8);
+    }
+
+    int numberOfBitSets() {
+        return 1 // for free list
+                + replicas;
+    }
+
     long segmentSize() {
-        return (SharedHashMapBuilder.SEGMENT_HEADER
-                + Maths.nextPower2(entriesPerSegment * 12, 16 * 8) // the IntIntMultiMap
-                + (1 + replicas) * bitSetSizeInBytes // the free list and 0+ dirty lists.
-                + entriesPerSegment * entrySize); // the actual entries used.
+        long ss = SharedHashMapBuilder.SEGMENT_HEADER
+                + sizeOfMultiMap() // the IntIntMultiMap
+                + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
+                + sizeOfEntriesInSegment();
+        assert (ss & 63) == 0;
+        return ss; // the actual entries used.
+    }
+
+    private long sizeOfEntriesInSegment() {
+        return align64((long) entriesPerSegment * entrySize);
+    }
+
+    /**
+     * Cache line alignment, assuming 64-byte cache lines.
+     */
+    private long align64(long l) {
+        // 64-byte alignment.
+        return (l + 63) & ~63;
     }
 
     /**
@@ -389,7 +410,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         - bytes for the value.
          */
         static final int LOCK_OFFSET = 0;
-        static final int SIZE_OFFSET = 8;
+        static final int SIZE_OFFSET = LOCK_OFFSET + 8;
+        static final int HEADER_USED = SIZE_OFFSET + 4;
+
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
         private final HashPosMultiMap hashLookup;
@@ -400,18 +423,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         Segment(NativeBytes bytes) {
             this.bytes = bytes;
 
-            // sets the default size to zero
-            this.bytes.writeUnsignedInt(SIZE_OFFSET, 0);
-
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
-            final long size = Maths.nextPower2(entriesPerSegment * 12, 16 * 8);
-            final NativeBytes iimmapBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + size, null);
+            final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
             hashLookup = new IntIntMultiMap(iimmapBytes);
-            start += size;
-            final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + bitSetSizeInBytes, null);
+            start += sizeOfMultiMap();
+            final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
-            start += bitSetSizeInBytes * (1 + replicas);
+            start += numberOfBitSets() * sizeOfBitSets();
             entriesOffset = start - bytes.startAddr();
             assert bytes.capacity() >= entriesOffset + entriesPerSegment * entrySize;
         }
@@ -433,20 +452,20 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         /**
          * reads the the number of entries in this segment
          */
-        long getSize() {
-            //TODO : check - but I dont think we have to lock this.
-            return this.bytes.readUnsignedInt(SIZE_OFFSET);
+        int getSize() {
+            // any negative value is in error state.
+            return Math.max(0, this.bytes.readVolatileInt(SIZE_OFFSET));
         }
 
 
         void lock() throws IllegalStateException {
             while (true) {
-                final boolean success = bytes.tryLockNanosInt(LOCK_OFFSET, lockTimeOutNS);
+                final boolean success = bytes.tryLockNanosLong(LOCK_OFFSET, lockTimeOutNS);
                 if (success) return;
                 if (currentThread().isInterrupted()) {
                     throw new IllegalStateException(new InterruptedException("Unable to obtain lock, interrupted"));
                 } else {
-                    errorListener.onLockTimeout(bytes.threadIdForLockInt(LOCK_OFFSET));
+                    errorListener.onLockTimeout(bytes.threadIdForLockLong(LOCK_OFFSET));
                     bytes.resetLockInt(LOCK_OFFSET);
                 }
             }
@@ -454,7 +473,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         void unlock() {
             try {
-                bytes.unlockInt(LOCK_OFFSET);
+                bytes.unlockLong(LOCK_OFFSET);
             } catch (IllegalMonitorStateException e) {
                 errorListener.errorOnUnlock(e);
             }
@@ -485,8 +504,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         V acquire(DirectBytes keyBytes, V value, int hash2, boolean create) {
             lock();
             try {
-
-
                 hash2 = hashLookup.startSearch(hash2);
                 while (true) {
                     int pos = hashLookup.nextPos();
@@ -496,11 +513,16 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     } else {
                         final long offset = entriesOffset + pos * entrySize;
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                        final long start0 = System.nanoTime();
-                        final boolean miss = !keyEquals(keyBytes, tmpBytes);
-                        final long time0 = System.nanoTime() - start0;
-                        if (time0 > 1e6)
-                            System.out.println("startsWith took " + time0 / 100000 / 10.0 + " ms.");
+                        final boolean miss;
+                        if (LOGGER.isLoggable(Level.FINE)) {
+                            final long start0 = System.nanoTime();
+                            miss = !keyEquals(keyBytes, tmpBytes);
+                            final long time0 = System.nanoTime() - start0;
+                            if (time0 > 1e6)
+                                LOGGER.fine("startsWith took " + time0 / 100000 / 10.0 + " ms.");
+                        } else {
+                            miss = !keyEquals(keyBytes, tmpBytes);
+                        }
                         if (miss)
                             continue;
                         final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.

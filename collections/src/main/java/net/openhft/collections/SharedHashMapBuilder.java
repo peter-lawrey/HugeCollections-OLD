@@ -16,6 +16,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.Maths;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -27,7 +29,12 @@ public class SharedHashMapBuilder implements Cloneable {
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
 
+    // used when configuring the number of segments.
     private int minSegments = 128;
+    private int actualSegments = -1;
+    // used when reading the number of entries per
+    private int actualEntriesPerSegment = -1;
+
     private int entrySize = 256;
     private long entries = 1 << 20;
     private int replicas = 0;
@@ -56,7 +63,7 @@ public class SharedHashMapBuilder implements Cloneable {
      *
      * @return this builder object back
      */
-    SharedHashMapBuilder minSegments(int minSegments) {
+    public SharedHashMapBuilder minSegments(int minSegments) {
         this.minSegments = minSegments;
         return this;
     }
@@ -65,7 +72,8 @@ public class SharedHashMapBuilder implements Cloneable {
         return minSegments;
     }
 
-    SharedHashMapBuilder entrySize(int entrySize) {
+
+    public SharedHashMapBuilder entrySize(int entrySize) {
         this.entrySize = entrySize;
         return this;
     }
@@ -74,7 +82,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return entrySize;
     }
 
-    SharedHashMapBuilder entries(long entries) {
+    public SharedHashMapBuilder entries(long entries) {
         this.entries = entries;
         return this;
     }
@@ -83,7 +91,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return entries;
     }
 
-    SharedHashMapBuilder replicas(int replicas) {
+    public SharedHashMapBuilder replicas(int replicas) {
         this.replicas = replicas;
         return this;
     }
@@ -92,10 +100,34 @@ public class SharedHashMapBuilder implements Cloneable {
         return replicas;
     }
 
+    public SharedHashMapBuilder actualEntriesPerSegment(int actualEntriesPerSegment) {
+        this.actualEntriesPerSegment = actualEntriesPerSegment;
+        return this;
+    }
+
+    public int actualEntriesPerSegment() {
+        if (actualEntriesPerSegment > 0)
+            return actualEntriesPerSegment;
+        // round up to the next multiple of 64.
+        int aeps = (int) (entries * 2L / actualSegments() + 63) & ~63;
+        return aeps;
+    }
+
+    public SharedHashMapBuilder actualSegments(int actualSegments) {
+        this.actualSegments = actualSegments;
+        return this;
+    }
+
+    public int actualSegments() {
+        if (actualSegments > 0)
+            return actualSegments;
+        return (int) Maths.nextPower2(Math.max((entries >> 30) + 1, minSegments), 1);
+    }
+
     /**
      * Not supported yet.
      */
-    SharedHashMapBuilder transactional(boolean transactional) {
+    public SharedHashMapBuilder transactional(boolean transactional) {
         this.transactional = transactional;
         return this;
     }
@@ -105,15 +137,15 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
-        SharedHashMapBuilder builder = null;
+        SharedHashMapBuilder builder = clone();
+
         for (int i = 0; i < 10; i++) {
             if (file.exists() && file.length() > 0) {
-                builder = readFile(file);
+                readFile(file, builder);
                 break;
             }
             if (file.createNewFile() || file.length() == 0) {
                 newFile(file);
-                builder = clone();
                 break;
             }
             try {
@@ -127,7 +159,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
     }
 
-    private static SharedHashMapBuilder readFile(File file) throws IOException {
+    private static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         FileInputStream fis = new FileInputStream(file);
         fis.getChannel().read(bb);
@@ -137,24 +169,22 @@ public class SharedHashMapBuilder implements Cloneable {
         byte[] bytes = new byte[8];
         bb.get(bytes);
         if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
-        SharedHashMapBuilder builder = new SharedHashMapBuilder();
-        builder.minSegments(bb.getInt());
-        builder.entries(bb.getLong());
+        builder.actualSegments(bb.getInt());
+        builder.actualEntriesPerSegment(bb.getInt());
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
-        if (builder.minSegments() <= 0 || builder.entries() <= 0 || builder.entrySize() <= 0)
+        if (builder.actualSegments() <= 0 || builder.actualEntriesPerSegment() <= 0 || builder.entrySize() <= 0)
             throw new IOException("Corrupt header for " + file);
-        return builder;
     }
 
     private void newFile(File file) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         bb.put(MAGIC);
-        bb.putInt(minSegments);
-        bb.putLong(entries);
-        bb.putInt(entrySize);
-        bb.putInt(replicas);
+        bb.putInt(actualSegments());
+        bb.putInt(actualEntriesPerSegment());
+        bb.putInt(entrySize());
+        bb.putInt(replicas());
         bb.put((byte) (transactional ? 'Y' : 'N'));
         bb.flip();
         FileOutputStream fos = new FileOutputStream(file);
@@ -243,5 +273,47 @@ public class SharedHashMapBuilder implements Cloneable {
     public SharedHashMapBuilder generatedValueType(boolean generatedValueType) {
         this.generatedValueType = generatedValueType;
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return "SharedHashMapBuilder{" +
+                "actualSegments=" + actualSegments() +
+                ", minSegments=" + minSegments() +
+                ", actualEntriesPerSegment=" + actualEntriesPerSegment() +
+                ", entrySize=" + entrySize() +
+                ", entries=" + entries() +
+                ", replicas=" + replicas() +
+                ", transactional=" + transactional() +
+                ", lockTimeOutMS=" + lockTimeOutMS() +
+                ", errorListener=" + errorListener() +
+                ", putReturnsNull=" + putReturnsNull() +
+                ", removeReturnsNull=" + removeReturnsNull() +
+                ", generatedKeyType=" + generatedKeyType() +
+                ", generatedValueType=" + generatedValueType() +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        SharedHashMapBuilder that = (SharedHashMapBuilder) o;
+
+        if (actualEntriesPerSegment() != that.actualEntriesPerSegment()) return false;
+        if (actualSegments() != that.actualSegments()) return false;
+        if (entries() != that.entries()) return false;
+        if (entrySize() != that.entrySize()) return false;
+        if (generatedKeyType() != that.generatedKeyType()) return false;
+        if (generatedValueType() != that.generatedValueType()) return false;
+        if (lockTimeOutMS() != that.lockTimeOutMS()) return false;
+        if (minSegments() != that.minSegments()) return false;
+        if (putReturnsNull() != that.putReturnsNull()) return false;
+        if (removeReturnsNull() != that.removeReturnsNull()) return false;
+        if (replicas() != that.replicas()) return false;
+        if (transactional() != that.transactional()) return false;
+        return errorListener().equals(that.errorListener());
+
     }
 }

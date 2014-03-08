@@ -37,4 +37,11 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
      * @return value created or found.
      */
     V acquireUsing(K key, V value);
+
+    /**
+     * Obtain the builder settings for this SharedHashMap
+     *
+     * @return a builder which would configure a map the same as this one.
+     */
+    SharedHashMapBuilder builder();
 }

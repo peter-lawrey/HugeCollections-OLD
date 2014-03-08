@@ -17,7 +17,7 @@
 package net.openhft.collections;
 
 public interface SharedMapErrorListener {
-    void onLockTimeout(int threadId) throws IllegalStateException;
+    void onLockTimeout(long threadId) throws IllegalStateException;
 
     void errorOnUnlock(IllegalMonitorStateException e);
 }
