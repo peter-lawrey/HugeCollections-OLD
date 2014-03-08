@@ -17,7 +17,7 @@ public class SHMHeaderTest {
         Random rand = new Random(1);
         for (int i = 0; i < 100; i++) {
             rand.setSeed(i);
-            System.out.println("i: " + i);
+//            System.out.println("i: " + i);
             File file = new File(System.getProperty("java.io.tmpdir"), "headers-" + i);
             file.deleteOnExit();
             SharedHashMapBuilder builder1 = createBuilder(rand);
