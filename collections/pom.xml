@@ -22,8 +22,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.openhft</groupId>
     <artifactId>collections</artifactId>
-    <version>3.0b-SNAPSHOT</version>
+    <version>3.0a</version>
     <packaging>bundle</packaging>
+    <name>Huge Collections</name>
+    <description>Java Collections which are designed to be huge (may GB)</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -316,8 +318,8 @@
                     <nohelp>true</nohelp>
                 </configuration>
             </plugin>
-            <!-- plugin>
-                <groupId>org.apache.maven.plugins</groupId>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>1.4</version>
                 <configuration>
@@ -332,7 +334,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin -->
+            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.16</version>
@@ -371,4 +373,24 @@
         </plugins>
     </build>
 
+    <url>http://www.openhft.net</url>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Peter Lawrey</name>
+            <email>peter.lawrey@higherfrequencytrading.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>scm:git:https://github.com/OpenHFT/HugeCollections.git</url>
+    </scm>
 </project>
