@@ -687,7 +687,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param keyBytes      the key of the entry to remove
          * @param expectedValue the entry will only be removed if the {@param existingValue} equals null or the {@param existingValue} equals that of the entry.value
          * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @return (if found and removeReturnsNull==false) returns the value of the entry that was removed, otherwise null is returned
+         * @return if the entry corresponding to the {@param keyBytes} exists and removeReturnsNull==false, returns the value of the entry that was removed, otherwise null is returned
          */
         V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
             lock();
