@@ -19,8 +19,7 @@ package net.openhft.collections;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -57,11 +56,46 @@ public class HugeHashMapTest {
             org.junit.Assert.assertEquals(a, b, err);
     }
 
+    static void assertKeySet(Set<Integer> keySet, int[] expectedKeys) {
+        assertEquals(expectedKeys.length, keySet.size());
+
+        Iterator<Integer> keyIterator = keySet.iterator();
+        for (int i = 0; i < expectedKeys.length; i++) {
+            org.junit.Assert.assertEquals("On position " + i, new Integer(expectedKeys[i]), keyIterator.next());
+        }
+    }
+
+    static void assertValues(Collection<String> valueSet, String[] expectedValues) {
+        assertEquals(expectedValues.length, valueSet.size());
+
+        Iterator<String> valueIterator = valueSet.iterator();
+        for (int i = 0; i < expectedValues.length; i++) {
+            org.junit.Assert.assertEquals("On position " + i, expectedValues[i], valueIterator.next());
+        }
+    }
+
+    static void assertEntrySet(Set<Map.Entry<Integer, String>> entrySet, int[] expectedKeys, String[] expectedValues) {
+        assertEquals(expectedKeys.length, entrySet.size());
+
+        Iterator<Map.Entry<Integer, String>> entryIterator = entrySet.iterator();
+        for (int i = 0; i < expectedKeys.length; i++) {
+            Map.Entry<Integer, String> entry = entryIterator.next();
+            org.junit.Assert.assertEquals("On position " + i, new Integer(expectedKeys[i]), entry.getKey());
+            org.junit.Assert.assertEquals("On position " + i, expectedValues[i], entry.getValue());
+        }
+    }
+
+    static void assertMap(Map<Integer, String> map, int[] expectedKeys, String[] expectedValues) {
+        assertEquals(expectedKeys.length, map.size());
+        for (int i = 0; i < expectedKeys.length; i++) {
+            org.junit.Assert.assertEquals("On position " + i, expectedValues[i], map.get(expectedKeys[i]));
+        }
+    }
+
     /*
     Put/getUsing 1,339 K operations per second
      */
     @Test
-    @Ignore
     public void testPut() throws ExecutionException, InterruptedException {
         int count = 4000000;
         HugeConfig config = HugeConfig.DEFAULT.clone()
@@ -172,5 +206,217 @@ public class HugeHashMapTest {
         map1.put(key, 20L);
         assertEquals(20L, map1.get(key));
         map1.clear();
+    }
+
+    @Test
+    public void mapRemoveReflectedInViews() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        Set<Integer> keySet = map.keySet();
+        assertKeySet(keySet, new int[]{2, 3, 1});
+        Collection<String> values = map.values();
+        assertValues(values, new String[]{"2", "3", "1"});
+
+
+        map.remove(2);
+        assertMap(map, new int[]{3, 1}, new String[]{"3", "1"});
+        assertEntrySet(entrySet, new int[]{3, 1}, new String[]{"3", "1"});
+        assertEntrySet(map.entrySet(), new int[]{3, 1}, new String[]{"3", "1"});
+        assertKeySet(keySet, new int[]{3, 1});
+        assertKeySet(map.keySet(), new int[]{3, 1});
+        assertValues(values, new String[]{"3", "1"});
+        assertValues(map.values(), new String[]{"3", "1"});
+    }
+
+    @Test
+    public void mapPutReflectedInViews() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        Set<Integer> keySet = map.keySet();
+        assertKeySet(keySet, new int[]{2, 3, 1});
+        Collection<String> values = map.values();
+        assertValues(values, new String[]{"2", "3", "1"});
+
+        map.put(4, "4");
+        assertMap(map, new int[]{4, 2, 3, 1}, new String[]{"4", "2", "3", "1"});
+        assertEntrySet(entrySet, new int[]{4, 2, 3, 1}, new String[]{"4", "2", "3", "1"});
+        assertEntrySet(map.entrySet(), new int[]{4, 2, 3, 1}, new String[]{"4", "2", "3", "1"});
+        assertKeySet(keySet, new int[]{4, 2, 3, 1});
+        assertKeySet(map.keySet(), new int[]{4, 2, 3, 1});
+        assertValues(values, new String[]{"4", "2", "3", "1"});
+        assertValues(map.values(), new String[]{"4", "2", "3", "1"});
+    }
+
+    @Test
+    public void viewRemoveReflectedInMap() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        Set<Integer> keySet = map.keySet();
+        assertKeySet(keySet, new int[]{2, 3, 1});
+        Collection<String> values = map.values();
+        assertValues(values, new String[]{"2", "3", "1"});
+
+        entrySet.remove(new AbstractMap.SimpleEntry<Integer, String>(2, "2"));
+        assertMap(map, new int[]{3, 1}, new String[]{"3", "1"});
+        assertEntrySet(entrySet, new int[]{3, 1}, new String[]{"3", "1"});
+        assertKeySet(keySet, new int[]{3, 1});
+        assertValues(values, new String[]{"3", "1"});
+
+        map.put(2, "2");
+        assertMap(map, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertKeySet(keySet, new int[]{2, 3, 1});
+        assertValues(values, new String[]{"2", "3", "1"});
+
+        keySet.remove(2);
+        assertMap(map, new int[]{3, 1}, new String[]{"3", "1"});
+        assertEntrySet(entrySet, new int[]{3, 1}, new String[]{"3", "1"});
+        assertKeySet(keySet, new int[]{3, 1});
+        assertValues(values, new String[]{"3", "1"});
+
+        map.put(2, "2");
+        assertMap(map, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertKeySet(keySet, new int[]{2, 3, 1});
+        assertValues(values, new String[]{"2", "3", "1"});
+    }
+
+    @Test
+    public void setIteratorRemoveReflectedInMap() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        Set<Integer> keySet = map.keySet();
+        assertKeySet(keySet, new int[]{2, 3, 1});
+
+        Iterator<Map.Entry<Integer, String>> entryIterator = entrySet.iterator();
+        entryIterator.next();
+        entryIterator.next();
+        entryIterator.remove();
+        assertEntrySet(entrySet, new int[]{2, 1}, new String[]{"2", "1"});
+        assertMap(map, new int[]{2, 1}, new String[]{"2", "1"});
+        assertKeySet(keySet, new int[]{2, 1});
+
+        map.put(3, "3");
+        assertMap(map, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+        assertKeySet(keySet, new int[]{2, 3, 1});
+
+        Iterator<Integer> keyIterator = keySet.iterator();
+        keyIterator.next();
+        keyIterator.next();
+        keyIterator.remove();
+        assertEntrySet(entrySet, new int[]{2, 1}, new String[]{"2", "1"});
+        assertMap(map, new int[]{2, 1}, new String[]{"2", "1"});
+        assertKeySet(keySet, new int[]{2, 1});
+    }
+
+    @Test
+    public void entrySetRemoveAllReflectedInMap() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+
+        entrySet.removeAll(
+                Arrays.asList(
+                        new AbstractMap.SimpleEntry<Integer, String>(1, "1"),
+                        new AbstractMap.SimpleEntry<Integer, String>(2, "2")
+                )
+        );
+        assertEntrySet(entrySet, new int[]{3}, new String[]{"3"});
+
+        org.junit.Assert.assertEquals(1, map.size());
+        org.junit.Assert.assertNull(map.get(1));
+        org.junit.Assert.assertNull(map.get(2));
+        org.junit.Assert.assertEquals("3", map.get(3));
+    }
+
+    @Test
+    public void entrySetRetainAllReflectedInMap() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+
+        entrySet.retainAll(
+                Arrays.asList(
+                        new AbstractMap.SimpleEntry<Integer, String>(1, "1"),
+                        new AbstractMap.SimpleEntry<Integer, String>(2, "2")
+                )
+        );
+        assertEntrySet(entrySet, new int[]{2, 1}, new String[]{"2", "1"});
+
+        org.junit.Assert.assertEquals(2, map.size());
+        org.junit.Assert.assertEquals("1", map.get(1));
+        org.junit.Assert.assertEquals("2", map.get(2));
+        org.junit.Assert.assertNull(map.get(3));
+    }
+
+    @Test
+    public void entrySetClearReflectedInMap() {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+
+        map.put(1, "1");
+        map.put(2, "2");
+        map.put(3, "3");
+
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        assertEntrySet(entrySet, new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
+
+        entrySet.clear();
+        org.junit.Assert.assertTrue(entrySet.isEmpty());
+        org.junit.Assert.assertTrue(map.isEmpty());
     }
 }

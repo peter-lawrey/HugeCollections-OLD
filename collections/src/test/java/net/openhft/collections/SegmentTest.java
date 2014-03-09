@@ -33,7 +33,7 @@ public class SegmentTest {
         config.setSegments(1);
         config.setSmallEntrySize(32);
         config.setCapacity(config.getSegments() * 32);
-        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
+        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, null, false, false, String.class);
         segment.put(1, 111, "one", true, true);
         segment.put(1, 112, "two", true, true);
         assertEquals(2, segment.size());
@@ -54,7 +54,7 @@ public class SegmentTest {
         config.setSegments(1);
         config.setSmallEntrySize(32);
         config.setCapacity(config.getSegments() * 32);
-        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, false, false, String.class);
+        HugeHashMap.Segment<Integer, String> segment = new HugeHashMap.Segment<Integer, String>(config, null, false, false, String.class);
         segment.put(1, 111, "one", true, true);
         segment.put(1, 112, "two", true, true);
         segment.put(3, 301, "three", true, true);

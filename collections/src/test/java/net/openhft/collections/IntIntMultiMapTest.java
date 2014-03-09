@@ -77,6 +77,18 @@ public class IntIntMultiMapTest {
     }
 
     @Test
+    public void firstAndNextNonEmptyPos() {
+        HashPosMultiMap map = new IntIntMultiMap(16);
+        map.put(1, 11);
+        map.put(2, 22);
+        map.put(3, 33);
+        assertEquals(11, map.firstPos());
+        assertEquals(22, map.nextDifferentHashNonEmptyPosition(1));
+        assertEquals(33, map.nextDifferentHashNonEmptyPosition(2));
+        assertEquals(-1, map.nextDifferentHashNonEmptyPosition(3));
+    }
+
+    @Test
     public void testRemoveSpecific() {
         // Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
         // 0 but the value is still present in the map.
