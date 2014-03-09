@@ -31,11 +31,14 @@ import java.util.Arrays;
 public class OSResizesMain {
     public static void main(String[] args) throws IOException, InterruptedException {
         File file = File.createTempFile("over-sized", "deleteme");
-        SharedHashMap<String, String> map = new SharedHashMapBuilder().entrySize(64 * 1024).entries(1024 * 1024).create(file, String.class, String.class);
+        SharedHashMap<String, String> map = new SharedHashMapBuilder()
+                .entrySize(64 * 1024)
+                .entries(1024 * 1024)
+                .create(file, String.class, String.class);
         for (int i = 0; i < 1000; i++) {
             char[] chars = new char[i];
             Arrays.fill(chars, '+');
-            map.put("" + i, new String(chars));
+            map.put("key-" + i, new String(chars));
         }
         System.out.printf("System memory= %.1f GB, Size of map is %.1f GB, disk used= %sB%n",
                 Double.parseDouble(run("head", "-1", "/proc/meminfo").split("\\s+")[1]) / 1e6,
