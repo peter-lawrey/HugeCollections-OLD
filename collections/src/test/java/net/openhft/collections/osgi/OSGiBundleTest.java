@@ -47,16 +47,16 @@ public class OSGiBundleTest extends OSGiTestBase {
         root.setLevel(Level.INFO);
 
         return options(
-            systemProperty("org.osgi.framework.storage.clean").value("true"),
-            systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
-            mavenBundle("net.openhft","lang",System.getProperty("openhft.lang.version")),
-//            wrappedBundle(mavenBundle("net.openhft","lang-sandbox",System.getProperty("openhft.lang.version"))),
+                systemProperty("org.osgi.framework.storage.clean").value("true"),
+                systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
+                mavenBundle("net.openhft", "lang", System.getProperty("openhft.lang.version")),
+//              wrappedBundle(mavenBundle("net.openhft","lang-sandbox",System.getProperty("openhft.lang.version"))),
                 workspaceBundle("collections"),
-            junitBundles(),
-            systemPackage("sun.misc"),
-            systemPackage("sun.nio.ch"),
-            systemPackage("com.sun.tools.javac.api"),
-            cleanCaches()
+                junitBundles(),
+                systemPackage("sun.misc"),
+                systemPackage("sun.nio.ch"),
+                systemPackage("com.sun.tools.javac.api"),
+                cleanCaches()
         );
     }
 
