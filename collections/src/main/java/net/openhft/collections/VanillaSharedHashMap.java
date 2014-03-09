@@ -567,9 +567,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * @param keyBytes
+         * @param keyBytes the key of the entry
          * @param value
-         * @param hash2
+         * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
          * @return
          */
 
@@ -655,8 +655,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         /**
          * Reads from {@link this.tmpBytes} an object at {@param offset}, will reuse {@param value} if possible, to reduce object creation.
          *
-         * @param offset the offset to read the data from
          * @param value  the object to reuse ( if possible ), if null a new object will be created an object and no reuse will occur.
+         * @param offset the offset to read the data from
          */
         @SuppressWarnings("unchecked")
         V readObjectUsing(V value, final long offset) {
@@ -687,7 +687,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param keyBytes      the key of the entry to remove
          * @param expectedValue the entry will only be removed if the {@param existingValue} equals null or the {@param existingValue} equals that of the entry.value
          * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @return
+         * @return (if found and removeReturnsNull==false) returns the value of the entry that was removed, otherwise null is returned
          */
         V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
             lock();
