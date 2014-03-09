@@ -16,6 +16,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.Jvm;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,7 +27,7 @@ import java.util.Arrays;
 /**
  * This example shows that the OS resizes the usage of a SHM as needed.  It is not as critical to worry about this.
  * <p>
- * System memory= 7.7 GB, Size of map is 137.5 GB, disk used= 21MB
+ * System memory: 7.7 GB, Extents of map: 137.5 GB, disk used: 21MB, addressRange: 7eec7afbd000-7f0c7c000000
  * </p>
  */
 public class OSResizesMain {
@@ -40,10 +42,11 @@ public class OSResizesMain {
             Arrays.fill(chars, '+');
             map.put("key-" + i, new String(chars));
         }
-        System.out.printf("System memory= %.1f GB, Size of map is %.1f GB, disk used= %sB%n",
+        System.out.printf("System memory: %.1f GB, Extents of map: %.1f GB, disk used: %sB, addressRange: %s%n",
                 Double.parseDouble(run("head", "-1", "/proc/meminfo").split("\\s+")[1]) / 1e6,
                 file.length() / 1e9,
-                run("du", "-h", file.getAbsolutePath()).split("\\s")[0]);
+                run("du", "-h", file.getAbsolutePath()).split("\\s")[0],
+                run("grep", "over-sized", "/proc/" + Jvm.getProcessId() + "/maps").split("\\s")[0]);
 
         map.close();
         file.delete();
