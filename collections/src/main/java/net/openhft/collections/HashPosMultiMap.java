@@ -30,6 +30,16 @@ interface HashPosMultiMap {
     int startSearch(long hash);
 
     /**
+     * @return the first position in the map, -1 otherwise
+     */
+    int firstPos(); //todo: this method doesn't fit nicely in the picture
+
+    /**
+     * @return the next non-empty position
+     */
+    int nextDifferentHashNonEmptyPosition(long hash); //todo: this method doesn't fit nicely in the picture
+
+    /**
      * @return the next position for the last search or negative value
      */
     int nextPos();

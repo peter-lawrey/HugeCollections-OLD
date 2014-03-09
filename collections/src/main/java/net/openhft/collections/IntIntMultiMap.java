@@ -154,6 +154,34 @@ class IntIntMultiMap implements HashPosMultiMap {
     private int searchPos = -1;
 
     @Override
+    public int firstPos() {
+        int pos = 0;
+        while (pos < capacity * ENTRY_SIZE) {
+            long entry = bytes.readLong(pos);
+            int hash2 = (int) (entry >> 32);
+            if (hash2 != UNSET_KEY) {
+                return (int) entry;
+            }
+            pos = pos + ENTRY_SIZE;
+        }
+        return -1;
+    }
+
+    @Override
+    public int nextDifferentHashNonEmptyPosition(long hash) { //todo: merge implementation with first position method
+        startSearch(hash);
+        while (searchPos < capacity * ENTRY_SIZE) {
+            long entry = bytes.readLong(searchPos);
+            int hash2 = (int) (entry >> 32);
+            if (hash2 != UNSET_KEY && hash2 != searchHash) {
+                return (int) entry;
+            }
+            searchPos = searchPos + ENTRY_SIZE;
+        }
+        return -1;
+    }
+
+    @Override
     public int startSearch(int hash) {
         if (hash == UNSET_KEY)
             hash = HASH_INSTEAD_OF_UNSET_KEY;
@@ -172,8 +200,9 @@ class IntIntMultiMap implements HashPosMultiMap {
         for (int i = 0; i < capacity; i++) {
             long entry = bytes.readLong(searchPos);
             int hash2 = (int) (entry >> 32);
-            if (hash2 == UNSET_KEY)
+            if (hash2 == UNSET_KEY) {
                 return UNSET_VALUE;
+            }
             searchPos = (searchPos + ENTRY_SIZE) & capacityMask2;
             if (hash2 == searchHash) {
                 return (int) entry;
