@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package net.openhft.collections;
+package net.openhft.collections.fromdocs;
 
+import net.openhft.collections.SharedHashMapBuilder;
 import org.junit.Test;
 
 import java.io.Closeable;

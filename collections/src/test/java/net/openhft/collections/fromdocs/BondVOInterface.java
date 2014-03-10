@@ -1,0 +1,70 @@
+/*
+ * Copyright 2013 Peter Lawrey
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package net.openhft.collections.fromdocs;
+
+import net.openhft.lang.model.constraints.MaxSize;
+
+public interface BondVOInterface {
+    long getIssueDate();
+
+    void setIssueDate(long issueDate);  /*YYYYMMDD */
+
+    long getMaturityDate();
+
+    void setMaturityDate(long maturityDate);  /*YYYYMMDD */
+
+    double getCoupon();
+
+    void setCoupon(double coupon);
+
+    // OpenHFT Off-Heap array[ ] processing notice ‘At’ suffix
+    void setMarketPxIntraDayHistoryAt(@MaxSize(7) int tradingDayHour, MarketPx mPx);
+
+    /* 7 Hours in the Trading Day:
+     * index_0 = 9.30am,
+     * index_1 = 10.30am,
+     …,
+     * index_6 = 4.30pm
+     */
+
+    MarketPx getMarketPxIntraDayHistoryAt(int tradingDayHour);
+
+    /* nested interface - empowering an Off-Heap hierarchical “TIER of prices”
+    as array[ ] value */
+    interface MarketPx {
+        double getCallPx();
+
+        void setCallPx(double px);
+
+        double getParPx();
+
+        void setParPx(double px);
+
+        double getMaturityPx();
+
+        void setMaturityPx(double px);
+
+        double getBidPx();
+
+        void setBidPx(double px);
+
+        double getAskPx();
+
+        void setAskPx(double px);
+    }
+/* OpenHFT’s Atomic Ops and CAS */
+}
