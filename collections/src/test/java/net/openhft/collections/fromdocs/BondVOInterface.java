@@ -66,5 +66,4 @@ public interface BondVOInterface {
 
         void setAskPx(double px);
     }
-/* OpenHFT’s Atomic Ops and CAS */
 }

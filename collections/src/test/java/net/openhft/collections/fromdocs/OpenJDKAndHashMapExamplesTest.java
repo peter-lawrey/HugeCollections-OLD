@@ -43,6 +43,7 @@ public class OpenJDKAndHashMapExamplesTest {
                         String.class,
                         BondVOInterface.class
                 );
+
         BondVOInterface bondVO = DataValueClasses.newDirectReference(BondVOInterface.class);
         shm.acquireUsing("369604103", bondVO);
         bondVO.setIssueDate(parseYYYYMMDD("20130915"));
@@ -53,8 +54,14 @@ public class OpenJDKAndHashMapExamplesTest {
         mpx930.setAskPx(109.2);
         mpx930.setBidPx(106.9);
 
+        BondVOInterface.MarketPx mpx1030 = bondVO.getMarketPxIntraDayHistoryAt(0);
+        mpx1030.setAskPx(109.7);
+        mpx1030.setBidPx(107.6);
+
 
         ((Closeable) shm).close();
+        // cleanup.
+        new File("/dev/shm/myBondPortfolioSHM").delete();
 
     }
 
