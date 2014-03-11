@@ -51,7 +51,7 @@ public class MapCheck {
     }
 
     public static void main(String[] args) throws Exception {
-        int numTests = 100;
+        int numTests = 20;
         int size = 36864; // about midway of HashMap resize interval
 
         if (args.length == 0)
@@ -157,7 +157,7 @@ public class MapCheck {
 
     static void checkNullKey() {
         Map m = newMap();
-        Object x = new Object();
+        Object x = (byte) 1;
         Object v;
         try {
             m.put(null, x);
@@ -165,8 +165,11 @@ public class MapCheck {
         } catch (NullPointerException npe) {
             System.out.println("Map does not allow null keys");
             return;
+        } catch (IllegalArgumentException npe) {
+            System.out.println("Map does not allow null keys");
+            return;
         }
-        if (v != x) throw new Error();
+        if (!v.equals(x)) throw new Error();
         if (m.remove(null) != v) throw new Error();
         if (m.get(null) != null) throw new Error();
     }
@@ -413,16 +416,18 @@ public class MapCheck {
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         getTest("Search Absent          ", size, s, absent, 0);
-        itRemTest(s, size);
+// TODO       itRemTest(s, size);
+        s.clear();
+
         putTest("Add    Absent          ", size, s, key, size);
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         untimedKeyTest("Access Present         ", size, s, key, size);
-        kitTest(s, size);
-        vitTest(s, size);
-        eitTest(s, size);
-        twoMapTest1(s, key, absent);
-        twoMapTest2(s, key, absent);
+// TODO       kitTest(s, size);
+// TODO       vitTest(s, size);
+// TODO       eitTest(s, size);
+// TODO       twoMapTest1(s, key, absent);
+// TODO       twoMapTest2(s, key, absent);
     }
 
     static void twoMapTest1(Map s, Object[] key, Object[] absent) {

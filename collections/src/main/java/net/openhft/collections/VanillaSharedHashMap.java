@@ -190,7 +190,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
     private V put0(K key, V value, boolean replaceIfPresent) {
-        if (!kClass.isInstance(key)) return null;
+        if (!kClass.isInstance(key)) throw new IllegalArgumentException("Key must be a " + kClass.getName());
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
@@ -273,6 +273,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         int hash2 = (int) (hash >>> segmentBits);
 
         return segments[segmentNum].containsKey(bytes, hash2);
+    }
+
+    @Override
+    public void clear() {
+        for (Segment segment : segments)
+            segment.clear();
     }
 
     /**
@@ -462,6 +468,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          */
         private void incrementSize() {
             this.bytes.addUnsignedInt(SIZE_OFFSET, 1);
+        }
+
+        public void resetSize() {
+            this.bytes.writeUnsignedInt(SIZE_OFFSET, 0);
         }
 
         /**
@@ -951,6 +961,18 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             tmpBytes.writeStopBit(value.remaining());
             tmpBytes.position(align(tmpBytes.position()));
             tmpBytes.write(value);
+        }
+
+        public void clear() {
+            lock();
+            try {
+                hashLookup.clear();
+                freeList.clear();
+                resetSize();
+            } finally {
+                unlock();
+            }
+
         }
     }
 }
