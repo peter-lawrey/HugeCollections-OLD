@@ -67,24 +67,29 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
 
     @Override
     public void put(int key, int value) {
+        if (!putLimited(key, value, capacityMask + 1))
+            throw new IllegalStateException("VanillaIntIntMultiMap is full");
+    }
+
+    public boolean putLimited(int key, int value, int limit) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         int pos = (key & capacityMask) << 3; // 8 bytes per entry
-        for (int i = 0; i <= capacityMask; i++) {
+        for (int i = 0; i < limit; i++) {
             long entry = bytes.readLong(pos);
             int hash2 = (int) (entry >> 32);
             if (hash2 == UNSET_KEY) {
                 bytes.writeLong(pos, (((long) key) << 32) | (value & 0xFFFFFFFFL));
-                return;
+                return true;
             }
             if (hash2 == key) {
                 int value2 = (int) entry;
                 if (value2 == value)
-                    return;
+                    return true;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
         }
-        throw new IllegalStateException("VanillaIntIntMultiMap is full");
+        return false;
     }
 
     @Override

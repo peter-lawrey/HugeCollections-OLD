@@ -77,6 +77,20 @@ public class VanillaIntIntMultiMapTest {
     }
 
     @Test
+    public void testPutLimited() {
+        IntIntMultiMap map = new VanillaIntIntMultiMap(16);
+        assertTrue(map.putLimited(1, 11, 2));
+        assertTrue(map.putLimited(1, 12, 2));
+        assertFalse(map.putLimited(1, 13, 2));
+        assertTrue(map.putLimited(3, 31, 2));
+        assertTrue(map.putLimited(3, 32, 2));
+        assertFalse(map.putLimited(3, 33, 2));
+        // not enough space
+        assertFalse(map.putLimited(2, 22, 2));
+        assertTrue(map.putLimited(2, 22, 4));
+    }
+
+    @Test
     public void firstAndNextNonEmptyPos() {
         IntIntMultiMap map = new VanillaIntIntMultiMap(16);
         map.put(1, 11);
