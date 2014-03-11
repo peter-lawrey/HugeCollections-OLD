@@ -35,16 +35,22 @@ import static org.junit.Assert.assertEquals;
 public class OpenJDKAndHashMapExamplesTest {
     private static final SimpleDateFormat YYYYMMDD = new SimpleDateFormat("yyyyMMdd");
 
+
+    private static final String TMP = System.getProperty("java.io.tmpdir");
+
     @Test
     public void bondExample() throws IOException, InterruptedException {
+
+
         SharedHashMap<String, BondVOInterface> shm = new SharedHashMapBuilder()
                 .generatedValueType(true)
                 .entrySize(512)
                 .create(
-                        new File("/dev/shm/myBondPortfolioSHM"),
+                        new File(TMP + "/shm-myBondPortfolioSHM"),
                         String.class,
                         BondVOInterface.class
                 );
+
 
         BondVOInterface bondVO = DataValueClasses.newDirectReference(BondVOInterface.class);
         shm.acquireUsing("369604103", bondVO);
@@ -65,7 +71,7 @@ public class OpenJDKAndHashMapExamplesTest {
                 .generatedValueType(true)
                 .entrySize(320)
                 .create(
-                        new File("/dev/shm/myBondPortfolioSHM"),
+                        new File(TMP + "/shm-myBondPortfolioSHM"),
                         String.class,
                         BondVOInterface.class
                 );
