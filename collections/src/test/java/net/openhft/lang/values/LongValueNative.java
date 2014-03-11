@@ -76,7 +76,6 @@ public class LongValueNative implements LongValue, BytesMarshallable, Byteable, 
         return _bytes;
     }
 
-    @Override
     public long offset() {
         return _offset;
     }
