@@ -69,6 +69,7 @@ public class OpenJDKAndHashMapExamplesTest {
                         BondVOInterface.class
                 );
 
+        // ZERO Copy buy creates a new off heap reference each time
         BondVOInterface bondVOB = shmB.get("369604103");
         assertEquals(5.0 / 100, bondVOB.getCoupon(), 0.0);
 
@@ -79,6 +80,31 @@ public class OpenJDKAndHashMapExamplesTest {
         BondVOInterface.MarketPx mpx1030B = bondVOB.getMarketPxIntraDayHistoryAt(1);
         assertEquals(109.7, mpx1030B.getAskPx(), 0.0);
         assertEquals(107.6, mpx1030B.getBidPx(), 0.0);
+
+
+        //ZERO-COPY
+        // our reusable, mutable off heap reference, generated from the interface.
+        BondVOInterface bondZC = DataValueClasses.newDirectReference(BondVOInterface.class);
+
+        // lookup the key and give me a reference to the data.
+        if (shm.getUsing("369604103", bondZC) != null) {
+            // found a key and bondZC has been set
+            // get directly without touching the rest of the record.
+            long _matDate = bondZC.getMaturityDate();
+            // write just this field, again we need to assume we are the only writer.
+            bondZC.setMaturityDate(parseYYYYMMDD("20440315"));
+
+            //demo of how to do OpenHFT off-heap array[ ] processing
+            int tradingHour = 3;  //current trading hour intra-day
+            BondVOInterface.MarketPx mktPx = bondZC.getMarketPxIntraDayHistoryAt(tradingHour);
+            if (mktPx.getCallPx() < 103.50) {
+                mktPx.setParPx(100.50);
+                mktPx.setAskPx(102.00);
+                mktPx.setBidPx(99.00);
+                // setMarketPxIntraDayHistoryAt is not needed as we are using zero copy,
+                // the original has been changed.
+            }
+        }
 
         // cleanup.
         shm.close();
