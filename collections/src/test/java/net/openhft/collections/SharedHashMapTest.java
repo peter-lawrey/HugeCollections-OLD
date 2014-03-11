@@ -76,6 +76,8 @@ public class SharedHashMapTest {
         assertEquals("overwritten", map.get("key3"));
         assertTrue(map.containsKey("key3"));
         assertEquals(2, map.size());
+
+        map.close();
     }
 
 
@@ -98,7 +100,31 @@ public class SharedHashMapTest {
             i--;
             assertEquals(i, map.size());
         }
+        map.close();
+    }
 
+    @Test
+    public void testRemoveInteger() throws IOException {
+
+        final SharedHashMap<Object, Object> map = new SharedHashMapBuilder()
+                .create(getPersistenceFile(), Object.class, Object.class);
+
+
+        int count = 2345;
+        for (int i = 1; i < count; i++) {
+            map.put(i, i);
+            assertEquals(i, map.size());
+        }
+
+        for (int i = count - 1; i >= 1; ) {
+            Integer j = (Integer) map.put(i, i);
+            assertEquals(i, j.intValue());
+            Integer j2 = (Integer) map.remove(i);
+            assertEquals(i, j2.intValue());
+            i--;
+            assertEquals(i, map.size());
+        }
+        map.close();
     }
 
     @Test
@@ -143,6 +169,8 @@ public class SharedHashMapTest {
         assertEquals("overwritten", map.get("key3"));
         assertTrue(map.containsKey("key3"));
         assertEquals(2, map.size());
+
+        map.close();
     }
 
 
@@ -207,6 +235,8 @@ public class SharedHashMapTest {
 
         assertFalse(map.containsKey("rubbish"));
         assertEquals(3, map.size());
+
+        map.close();
     }
 
 
@@ -249,6 +279,7 @@ public class SharedHashMapTest {
         final boolean result4 = map.replace("key2", "newValue2", "newValue2");
         assertEquals(true, result4);
 
+        map.close();
     }
 
     @Test
@@ -289,6 +320,7 @@ public class SharedHashMapTest {
         map.put("key3", "overwritten");
         assertEquals("overwritten", map.get("key3"));
 
+        map.close();
     }
 
 
@@ -296,12 +328,16 @@ public class SharedHashMapTest {
     public void testAcquireWithNullKey() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.acquireUsing(null, new LongValueNative()));
+
+        map.close();
     }
 
     @Test
     public void testGetWithNullKey() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.getUsing(null, new LongValueNative()));
+
+        map.close();
     }
 
     @Test
@@ -309,6 +345,8 @@ public class SharedHashMapTest {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.acquireUsing("key", null).getValue());
+
+        map.close();
     }
 
     @Test
@@ -316,12 +354,16 @@ public class SharedHashMapTest {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         map.acquireUsing("key", new LongValueNative());
         assertEquals(0, map.getUsing("key", null).getValue());
+
+        map.close();
     }
 
     @Test
     public void testGetWithoutAcquireFirst() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
         assertNull(map.getUsing("key", new LongValueNative()));
+
+        map.close();
     }
 
     @Test
@@ -591,11 +633,9 @@ public class SharedHashMapTest {
         return sb;
     }
 
-    static int counter = 0;
-
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + counter++);
+        File file = new File(TMP + "/shm-test" + System.nanoTime());
         file.delete();
         file.deleteOnExit();
         return file;

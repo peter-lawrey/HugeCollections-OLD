@@ -703,8 +703,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
+                        final long keyLength = keyBytes.remaining() + tmpBytes.position(); // includes the stop bit length.
                         tmpBytes.position(keyLength);
+                        tmpBytes.readStopBit(); // read the length of the value.
+                        tmpBytes.alignPositionAddr(4);
                         V valueRemoved = expectedValue == null && removeReturnsNull ? null : readObjectUsing(null, offset + keyLength);
 
                         if (expectedValue != null && !expectedValue.equals(valueRemoved))
