@@ -19,17 +19,18 @@ package net.openhft.collections.fromdocs;
 import net.openhft.lang.model.constraints.MaxSize;
 
 public interface BondVOInterface {
+    /* add support for entry based locking */
     void busyLockEntry() throws InterruptedException;
 
     void unlockEntry();
 
     long getIssueDate();
 
-    void setIssueDate(long issueDate);  /*YYYYMMDD */
+    void setIssueDate(long issueDate);  /* time in millis */
 
     long getMaturityDate();
 
-    void setMaturityDate(long maturityDate);  /*YYYYMMDD */
+    void setMaturityDate(long maturityDate);  /* time in millis */
 
     long addAtomicMaturityDate(long toAdd);
 
