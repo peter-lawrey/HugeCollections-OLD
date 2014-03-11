@@ -25,10 +25,10 @@ import static org.junit.Assert.*;
  * User: peter
  * Date: 09/12/13
  */
-public class IntIntMultiMapTest {
+public class VanillaIntIntMultiMapTest {
     @Test
     public void testPutRemoveSearch() {
-        HashPosMultiMap map = new IntIntMultiMap(16);
+        IntIntMultiMap map = new VanillaIntIntMultiMap(16);
         assertEquals("{ }", map.toString());
         map.put(1, 11);
         map.startSearch(1);
@@ -78,21 +78,21 @@ public class IntIntMultiMapTest {
 
     @Test
     public void firstAndNextNonEmptyPos() {
-        HashPosMultiMap map = new IntIntMultiMap(16);
+        IntIntMultiMap map = new VanillaIntIntMultiMap(16);
         map.put(1, 11);
         map.put(2, 22);
         map.put(3, 33);
         assertEquals(11, map.firstPos());
-        assertEquals(22, map.nextDifferentHashNonEmptyPosition(1));
-        assertEquals(33, map.nextDifferentHashNonEmptyPosition(2));
-        assertEquals(-1, map.nextDifferentHashNonEmptyPosition(3));
+        assertEquals(22, map.nextKeyAfter(1));
+        assertEquals(33, map.nextKeyAfter(2));
+        assertEquals(-1, map.nextKeyAfter(3));
     }
 
     @Test
     public void testRemoveSpecific() {
         // Testing a specific case when the remove method on the map does (did) not work as expected. The size goes correctly to
         // 0 but the value is still present in the map.
-        HashPosMultiMap map = new IntIntMultiMap(10);
+        IntIntMultiMap map = new VanillaIntIntMultiMap(10);
 
         map.put(15, 1);
         map.remove(15, 1);

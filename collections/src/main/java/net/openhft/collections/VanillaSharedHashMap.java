@@ -132,7 +132,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     long segmentSize() {
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + sizeOfMultiMap() // the IntIntMultiMap
+                + sizeOfMultiMap() // the VanillaIntIntMultiMap
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         assert (ss & 63) == 0;
@@ -437,7 +437,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
-        private final HashPosMultiMap hashLookup;
+        private final IntIntMultiMap hashLookup;
         private final SingleThreadedDirectBitSet freeList;
         private final long entriesOffset;
         private int nextSet = 0;
@@ -448,7 +448,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
-            hashLookup = new IntIntMultiMap(iimmapBytes);
+            hashLookup = new VanillaIntIntMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
