@@ -16,6 +16,7 @@
 
 package net.openhft.collections.fromdocs;
 
+import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.lang.model.DataValueClasses;
@@ -117,6 +118,8 @@ public class OpenJDKAndHashMapExamplesTest {
         bondZC.addAtomicCoupon(-1 * bondZC.getCoupon()); //MT-safe! now a Zero Coupon Bond.
 
         // say I need to do something more complicated
+        // set the Threads getId() to match the process id of the thread.
+        AffinitySupport.setThreadId();
 
         bondZC.busyLockEntry();
         try {
