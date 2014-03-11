@@ -21,11 +21,12 @@ import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.lang.model.DataValueClasses;
 import org.junit.Test;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * These code fragments will appear in an article on OpenHFT.  These tests to ensure that the examples compile and behave as expected.
@@ -54,13 +55,34 @@ public class OpenJDKAndHashMapExamplesTest {
         mpx930.setAskPx(109.2);
         mpx930.setBidPx(106.9);
 
-        BondVOInterface.MarketPx mpx1030 = bondVO.getMarketPxIntraDayHistoryAt(0);
+        BondVOInterface.MarketPx mpx1030 = bondVO.getMarketPxIntraDayHistoryAt(1);
         mpx1030.setAskPx(109.7);
         mpx1030.setBidPx(107.6);
 
 
-        ((Closeable) shm).close();
+        SharedHashMap<String, BondVOInterface> shmB = new SharedHashMapBuilder()
+                .generatedValueType(true)
+                .entrySize(320)
+                .create(
+                        new File("/dev/shm/myBondPortfolioSHM"),
+                        String.class,
+                        BondVOInterface.class
+                );
+
+        BondVOInterface bondVOB = shmB.get("369604103");
+        assertEquals(5.0 / 100, bondVOB.getCoupon(), 0.0);
+
+        BondVOInterface.MarketPx mpx930B = bondVOB.getMarketPxIntraDayHistoryAt(0);
+        assertEquals(109.2, mpx930B.getAskPx(), 0.0);
+        assertEquals(106.9, mpx930B.getBidPx(), 0.0);
+
+        BondVOInterface.MarketPx mpx1030B = bondVOB.getMarketPxIntraDayHistoryAt(1);
+        assertEquals(109.7, mpx1030B.getAskPx(), 0.0);
+        assertEquals(107.6, mpx1030B.getBidPx(), 0.0);
+
         // cleanup.
+        shm.close();
+        shmB.close();
         new File("/dev/shm/myBondPortfolioSHM").delete();
 
     }

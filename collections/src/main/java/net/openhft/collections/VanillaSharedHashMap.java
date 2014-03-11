@@ -488,7 +488,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     throw new IllegalStateException(new InterruptedException("Unable to obtain lock, interrupted"));
                 } else {
                     errorListener.onLockTimeout(bytes.threadIdForLockLong(LOCK_OFFSET));
-                    bytes.resetLockInt(LOCK_OFFSET);
+                    bytes.resetLockLong(LOCK_OFFSET);
                 }
             }
         }
@@ -660,14 +660,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          */
         @SuppressWarnings("unchecked")
         V readObjectUsing(V value, final long offset) {
+            if (generatedValueType)
+                if (value == null)
+                    value = DataValueClasses.newDirectReference(vClass);
+                else
+                    assert value instanceof Byteable;
             if (value instanceof Byteable) {
                 ((Byteable) value).bytes(bytes, offset);
-                return value;
-            }
-            if (generatedValueType) {
-                if (value == null)
-                    value = DataValueClasses.newInstance(vClass);
-                ((BytesMarshallable) value).readMarshallable(tmpBytes);
                 return value;
             }
             return tmpBytes.readInstance(vClass, value);
