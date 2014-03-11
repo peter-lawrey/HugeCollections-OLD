@@ -35,10 +35,10 @@ public class OpenJDKAndHashMapExamplesTest {
     private static final SimpleDateFormat YYYYMMDD = new SimpleDateFormat("yyyyMMdd");
 
     @Test
-    public void bondExample() throws IOException {
+    public void bondExample() throws IOException, InterruptedException {
         SharedHashMap<String, BondVOInterface> shm = new SharedHashMapBuilder()
                 .generatedValueType(true)
-                .entrySize(320)
+                .entrySize(512)
                 .create(
                         new File("/dev/shm/myBondPortfolioSHM"),
                         String.class,
@@ -95,7 +95,7 @@ public class OpenJDKAndHashMapExamplesTest {
             bondZC.setMaturityDate(parseYYYYMMDD("20440315"));
 
             //demo of how to do OpenHFT off-heap array[ ] processing
-            int tradingHour = 3;  //current trading hour intra-day
+            int tradingHour = 2;  //current trading hour intra-day
             BondVOInterface.MarketPx mktPx = bondZC.getMarketPxIntraDayHistoryAt(tradingHour);
             if (mktPx.getCallPx() < 103.50) {
                 mktPx.setParPx(100.50);
@@ -104,6 +104,27 @@ public class OpenJDKAndHashMapExamplesTest {
                 // setMarketPxIntraDayHistoryAt is not needed as we are using zero copy,
                 // the original has been changed.
             }
+        }
+
+        // bondZC will be full of default values and zero length string the first time.
+
+        // from this point, all operations are completely record/entry local,
+        // no other resource is involved.
+        // now perform thread safe operations on my reference
+        bondZC.addAtomicMaturityDate(16 * 24 * 3600 * 1000L);  //20440331
+
+
+        bondZC.addAtomicCoupon(-1 * bondZC.getCoupon()); //MT-safe! now a Zero Coupon Bond.
+
+        // say I need to do something more complicated
+
+        bondZC.busyLockEntry();
+        try {
+            String str = bondZC.getSymbol();
+            if (str.equals("IBM_HY_2044"))
+                bondZC.setSymbol("OPENHFT_IG_2044");
+        } finally {
+            bondZC.unlockEntry();
         }
 
         // cleanup.

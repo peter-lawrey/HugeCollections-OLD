@@ -19,6 +19,10 @@ package net.openhft.collections.fromdocs;
 import net.openhft.lang.model.constraints.MaxSize;
 
 public interface BondVOInterface {
+    void busyLockEntry() throws InterruptedException;
+
+    void unlockEntry();
+
     long getIssueDate();
 
     void setIssueDate(long issueDate);  /*YYYYMMDD */
@@ -27,9 +31,17 @@ public interface BondVOInterface {
 
     void setMaturityDate(long maturityDate);  /*YYYYMMDD */
 
+    long addAtomicMaturityDate(long toAdd);
+
     double getCoupon();
 
     void setCoupon(double coupon);
+
+    double addAtomicCoupon(double toAdd);
+
+    void setSymbol(@MaxSize(20) String symbol);
+
+    String getSymbol();
 
     // OpenHFT Off-Heap array[ ] processing notice ‘At’ suffix
     void setMarketPxIntraDayHistoryAt(@MaxSize(7) int tradingDayHour, MarketPx mPx);
