@@ -42,6 +42,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final Class<V> vClass;
     private final long lockTimeOutNS;
     private final int segmentBits;
+    private final int metaDataBytes;
     private Segment[] segments; // non-final for close()
     private MappedStore ms;     // non-final for close()
 
@@ -50,6 +51,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final int entriesPerSegment;
 
     private final SharedMapErrorListener errorListener;
+    private final SharedMapEventListener<K, V> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
     private final boolean putReturnsNull;
@@ -75,6 +77,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.segmentBits = Maths.intLog2(segments);
         int entriesPerSegment = builder.actualEntriesPerSegment();
         this.entriesPerSegment = entriesPerSegment;
+        this.metaDataBytes = builder.metaDataBytes();
+        this.eventListener = builder.eventListener();
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedHashMap.Segment[])
@@ -93,6 +97,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
     @Override
+    public File file() {
+        return ms.file();
+    }
+
+    @Override
     public SharedHashMapBuilder builder() {
         return new SharedHashMapBuilder()
                 .actualSegments(segments.length)
@@ -107,7 +116,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 .putReturnsNull(putReturnsNull)
                 .removeReturnsNull(removeReturnsNull)
                 .replicas(replicas)
-                .transactional(false);
+                .transactional(false)
+                .metaDataBytes(metaDataBytes)
+                .eventListener(eventListener);
 
     }
 
@@ -195,7 +206,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash >>> segmentBits);
-        return segments[segmentNum].put(bytes, value, hash2, replaceIfPresent);
+        return segments[segmentNum].put(bytes, key, value, hash2, replaceIfPresent);
     }
 
     @Override
@@ -203,7 +214,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         long hash = longHashCode(key);
         int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash >>> segmentBits);
-        segments[segmentNum].directPut(key, value, hash2);
+        segments[segmentNum].directPut(key, value, hash2, null, null);
     }
 
     private DirectBytes getKeyAsBytes(K key) {
@@ -240,7 +251,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash >>> segmentBits);
-        return segments[segmentNum].acquire(bytes, value, hash2, create);
+        return segments[segmentNum].acquire(bytes, key, value, hash2, create);
     }
 
 
@@ -336,7 +347,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash >>> segmentBits);
-        return segments[segmentNum].remove(bytes, expectedValue, hash2);
+        return segments[segmentNum].remove(bytes, (K) key, expectedValue, hash2);
     }
 
     @Override
@@ -423,7 +434,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
         int hash2 = (int) (hash >>> segmentBits);
-        return segments[segmentNum].replace(bytes, existingValue, newValue, hash2);
+        return segments[segmentNum].replace(bytes, key, existingValue, newValue, hash2);
     }
 
     // these methods should be package local, not public or private.
@@ -528,19 +539,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * </pre>
          *
          * @param keyBytes the key of the entry
-         * @param value    an object to be reused, null creates a new object.
+         * @param usingValue    an object to be reused, null creates a new object.
          * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
          * @param create   false - if the  {@keyBytes} can not be found null will be returned, true - if the  {@keyBytes} can not be found an value will be acquired
          * @return an entry.value whose entry.key equals {@param keyBytes}
          */
-        V acquire(DirectBytes keyBytes, V value, int hash2, boolean create) {
+        V acquire(DirectBytes keyBytes, K key, V usingValue, int hash2, boolean create) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
                 while (true) {
                     int pos = hashLookup.nextPos();
                     if (pos < 0) {
-                        return create ? acquireEntry(keyBytes, value, hash2) : null;
+                        return create ? acquireEntry(keyBytes, key, usingValue, hash2) : notifyMissed(keyBytes, key, usingValue, hash2);
 
                     } else {
                         final long offset = entriesOffset + pos * entrySize;
@@ -564,7 +575,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         long valueLength = tmpBytes.readStopBit();
                         final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
                         tmpBytes.position(valueOffset);
-                        return readObjectUsing(value, offset + valueOffset);
+                        V v = readObjectUsing(usingValue, offset + valueOffset);
+                        notifyGet(offset, key, v);
+                        return v;
                     }
                 }
             } finally {
@@ -583,7 +596,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @return
          */
 
-        V acquireEntry(DirectBytes keyBytes, V value, int hash2) {
+        V acquireEntry(DirectBytes keyBytes, K key, V value, int hash2) {
             value = createValueIfNull(value);
 
             final int pos = nextFree();
@@ -607,6 +620,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             // add to index if successful.
             hashLookup.put(hash2, pos);
             incrementSize();
+            notifyPut(offset, true, key, value);
             return value;
         }
 
@@ -634,14 +648,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             incrementSize();
         }
 
-        void directPutEntry(Bytes keyBytes, Bytes value, int hash2) {
+        void directPutEntry(Bytes keyBytes, Bytes valueBytes, int hash2, K key, V value) {
             final int pos = nextFree();
             final long offset = entriesOffset + pos * entrySize;
             writeKey(keyBytes, offset);
-            appendValue(value);
+            appendValue(valueBytes);
             // add to index if successful.
             hashLookup.put(hash2, pos);
             incrementSize();
+            notifyPut(offset, false, key, value);
         }
 
         private void writeKey(Bytes keyBytes, long offset) {
@@ -689,7 +704,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     && tmpBytes.startsWith(keyBytes);
         }
 
-
         /**
          * implementation for map.remove(Key,Value)
          *
@@ -698,7 +712,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
          * @return if the entry corresponding to the {@param keyBytes} exists and removeReturnsNull==false, returns the value of the entry that was removed, otherwise null is returned
          */
-        V remove(final DirectBytes keyBytes, final V expectedValue, int hash2) {
+        V remove(final DirectBytes keyBytes, final K key, final V expectedValue, int hash2) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
@@ -724,11 +738,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
                         hashLookup.remove(hash2, pos);
                         decrementSize();
+                        notifyRemoved(offset, key, valueRemoved);
 
                         freeList.clear(pos);
                         if (pos < nextSet)
                             nextSet = pos;
-
                         return valueRemoved;
                     }
                 }
@@ -736,6 +750,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 unlock();
             }
         }
+
 
         void directRemove(final Bytes keyBytes, int hash2) {
             lock();
@@ -769,7 +784,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 unlock();
             }
         }
-
 
         /**
          * implementation for map.containsKey(Key)
@@ -814,10 +828,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param keyBytes      the key of the entry to be replaced
          * @param expectedValue the expected value to replaced
          * @param newValue      the new value that will only be set if the existing value in the map equals the {@param expectedValue} or  {@param expectedValue} is null
-         * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @param hash2         a hash code relating to the {keyBytes} ( not the natural hash of {keyBytes}  )
          * @return null if the value was not replaced, else the value that is replaced is returned
          */
-        V replace(final DirectBytes keyBytes, final V expectedValue, final V newValue, final int hash2) {
+        V replace(final DirectBytes keyBytes, final K key, final V expectedValue, final V newValue, final int hash2) {
             lock();
             try {
 
@@ -853,7 +867,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             tmpBytes.position(valuePosition);
                             appendInstance(keyBytes, newValue);
                         }
-
+                        notifyPut(offset, false, key, valueRead);
                         return valueRead;
                     }
                 }
@@ -872,7 +886,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * @param replaceIfPresent
          * @return
          */
-        V put(final DirectBytes keyBytes, final V value, int hash2, boolean replaceIfPresent) {
+        V put(final DirectBytes keyBytes, final K key, final V value, int hash2, boolean replaceIfPresent) {
             lock();
             try {
                 hash2 = hashLookup.startSearch(hash2);
@@ -888,29 +902,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                         if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-                        final long keyLength = keyBytes.remaining();
-                        tmpBytes.skip(keyLength);
-                        if (replaceIfPresent) {
-                            if (putReturnsNull) {
-                                appendInstance(keyBytes, value);
-                                return null;
-                            }
-                            long valuePosition = tmpBytes.position();
-                            tmpBytes.readStopBit();
-                            final long alignPosition = align(tmpBytes.position());
-                            tmpBytes.position(alignPosition);
-                            final V v = readObjectUsing(null, offset + alignPosition);
-                            tmpBytes.position(valuePosition);
-                            appendInstance(keyBytes, value);
-                            return v;
-
-                        } else {
-                            if (putReturnsNull) {
-                                return null;
-                            }
-
-                            return readObjectUsing(null, offset + keyLength);
-                        }
+                        V v = addForPut(keyBytes, value, replaceIfPresent, offset);
+                        notifyPut(offset, true, key, v);
+                        return v;
                     }
                 }
             } finally {
@@ -918,25 +912,82 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
-        void directPut(final Bytes key, final Bytes value, int hash2) {
+        private void notifyPut(long offset, boolean added, K key, V value) {
+            if (eventListener != SharedMapEventListeners.NOP) {
+                tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+                eventListener.onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, added, key, value);
+            }
+        }
+
+        private void notifyGet(long offset, K key, V value) {
+            if (eventListener != SharedMapEventListeners.NOP) {
+                tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+                eventListener.onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, key, value);
+            }
+        }
+
+        private V notifyMissed(DirectBytes keyBytes, K key, V usingValue, int hash2) {
+            if (eventListener != SharedMapEventListeners.NOP) {
+                V value2 = eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes, key, usingValue);
+                if (value2 != null)
+                    put(keyBytes, key, value2, hash2, false);
+                return value2;
+            }
+            return null;
+        }
+
+        private void notifyRemoved(long offset, K key, V value) {
+            if (eventListener != SharedMapEventListeners.NOP) {
+                tmpBytes.storePositionAndSize(bytes, offset, entrySize);
+                eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, key, value);
+            }
+
+        }
+
+        private V addForPut(DirectBytes keyBytes, V value, boolean replaceIfPresent, long offset) {
+            final long keyLength = keyBytes.remaining();
+            tmpBytes.skip(keyLength);
+            if (replaceIfPresent) {
+                if (putReturnsNull) {
+                    appendInstance(keyBytes, value);
+                    return null;
+                }
+                long valuePosition = tmpBytes.position();
+                tmpBytes.readStopBit();
+                final long alignPosition = align(tmpBytes.position());
+                tmpBytes.position(alignPosition);
+                final V v = readObjectUsing(null, offset + alignPosition);
+                tmpBytes.position(valuePosition);
+                appendInstance(keyBytes, value);
+
+                return v;
+
+            } else {
+                if (putReturnsNull) {
+                    return null;
+                }
+
+                return readObjectUsing(null, offset + keyLength);
+            }
+        }
+
+        void directPut(final Bytes keyBytes, final Bytes valueBytes, final int hash2, final K key, final V value) {
             lock();
             try {
-                hash2 = hashLookup.startSearch(hash2);
-                while (true) {
-                    final int pos = hashLookup.nextPos();
+                for (int pos = hashLookup.startSearch(hash2); ; pos = hashLookup.nextPos()) {
                     if (pos < 0) {
-                        directPutEntry(key, value, hash2);
+                        directPutEntry(keyBytes, valueBytes, hash2, key, value);
 
                         return;
 
                     } else {
                         final long offset = entriesOffset + pos * entrySize;
                         tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                        if (!keyEquals(key, tmpBytes))
+                        if (!keyEquals(keyBytes, tmpBytes))
                             continue;
-                        final long keyLength = key.remaining();
+                        final long keyLength = keyBytes.remaining();
                         tmpBytes.skip(keyLength);
-                        appendValue(value);
+                        appendValue(valueBytes);
                         return;
                     }
                 }

@@ -40,6 +40,8 @@ public class SharedHashMapBuilder implements Cloneable {
     private int replicas = 0;
     private boolean transactional = false;
     private long lockTimeOutMS = 1000;
+    private int metaDataBytes = 0;
+    private SharedMapEventListener eventListener = SharedMapEventListeners.NOP;
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
     private boolean putReturnsNull = false;
     private boolean removeReturnsNull = false;
@@ -166,7 +168,7 @@ public class SharedHashMapBuilder implements Cloneable {
         fis.getChannel().read(bb);
         fis.close();
         bb.flip();
-        if (bb.remaining() <= 20) throw new IOException("File too small, corrupted? " + file);
+        if (bb.remaining() < 22) throw new IOException("File too small, corrupted? " + file);
         byte[] bytes = new byte[8];
         bb.get(bytes);
         if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
@@ -175,6 +177,7 @@ public class SharedHashMapBuilder implements Cloneable {
         builder.entrySize(bb.getInt());
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
+        builder.metaDataBytes(bb.get() & 0xFF);
         if (builder.actualSegments() <= 0 || builder.actualEntriesPerSegment() <= 0 || builder.entrySize() <= 0)
             throw new IOException("Corrupt header for " + file);
     }
@@ -187,6 +190,7 @@ public class SharedHashMapBuilder implements Cloneable {
         bb.putInt(entrySize());
         bb.putInt(replicas());
         bb.put((byte) (transactional ? 'Y' : 'N'));
+        bb.put((byte) metaDataBytes);
         bb.flip();
         FileOutputStream fos = new FileOutputStream(file);
         fos.getChannel().write(bb);
@@ -276,6 +280,27 @@ public class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
+
+    public SharedHashMapBuilder metaDataBytes(int metaDataBytes) {
+        if ((metaDataBytes & 0xFF) != metaDataBytes)
+            throw new IllegalArgumentException("MetaDataBytes must be [0..255] was " + metaDataBytes);
+        this.metaDataBytes = metaDataBytes;
+        return this;
+    }
+
+    public int metaDataBytes() {
+        return metaDataBytes;
+    }
+
+    public SharedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
+        this.eventListener = eventListener;
+        return this;
+    }
+
+    public SharedMapEventListener eventListener() {
+        return eventListener;
+    }
+
     @Override
     public String toString() {
         return "SharedHashMapBuilder{" +
@@ -292,6 +317,8 @@ public class SharedHashMapBuilder implements Cloneable {
                 ", removeReturnsNull=" + removeReturnsNull() +
                 ", generatedKeyType=" + generatedKeyType() +
                 ", generatedValueType=" + generatedValueType() +
+                ", metaDataBytes=" + metaDataBytes() +
+                ", eventListener=" + eventListener() +
                 '}';
     }
 
@@ -314,6 +341,7 @@ public class SharedHashMapBuilder implements Cloneable {
         if (removeReturnsNull() != that.removeReturnsNull()) return false;
         if (replicas() != that.replicas()) return false;
         if (transactional() != that.transactional()) return false;
+        if (metaDataBytes() != that.metaDataBytes()) return false;
         return errorListener().equals(that.errorListener());
 
     }

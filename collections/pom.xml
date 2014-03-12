@@ -33,7 +33,7 @@
         <pax.exam.version>3.4.0</pax.exam.version>
         <pax.url.version>1.6.0</pax.url.version>
         <logback.version>0.9.6</logback.version>
-        <openhft.lang.version>6.3.2</openhft.lang.version>
+        <openhft.lang.version>6.3.3-SNAPSHOT</openhft.lang.version>
         <osgi.version>5.0.0</osgi.version>
     </properties>
 
@@ -163,7 +163,7 @@
         </dependency>
 
         <dependency>
-        <groupId>net.openhft</groupId>
+            <groupId>net.openhft</groupId>
             <artifactId>affinity</artifactId>
             <scope>test</scope>
         </dependency>
@@ -328,7 +328,7 @@
             <!--plugin>
             <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.4</version>
+                <version>1.5</version>
                 <configuration>
                     <passphrase>${gpg.passphrase}</passphrase>
                 </configuration>
