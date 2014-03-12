@@ -667,9 +667,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         int nextFree() {
-            int ret = (int) freeList.setNFrom(nextSet, 1);
+            int ret = (int) freeList.setNextClearBit(nextSet);
             if (ret == DirectBitSet.NOT_FOUND) {
-                ret = (int) freeList.setNFrom(0, 1);
+                ret = (int) freeList.setNextClearBit(0);
                 if (ret == DirectBitSet.NOT_FOUND)
                     throw new IllegalStateException("Segment is full, no free entries found");
             }
