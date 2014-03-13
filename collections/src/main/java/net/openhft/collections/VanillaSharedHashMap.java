@@ -478,18 +478,18 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          * increments the size by one
          */
         private void incrementSize() {
-            this.bytes.addUnsignedInt(SIZE_OFFSET, 1);
+            this.bytes.addInt(SIZE_OFFSET, 1);
         }
 
         public void resetSize() {
-            this.bytes.writeUnsignedInt(SIZE_OFFSET, 0);
+            this.bytes.writeInt(SIZE_OFFSET, 0);
         }
 
         /**
          * decrements the size by one
          */
         private void decrementSize() {
-            this.bytes.addUnsignedInt(SIZE_OFFSET, -1);
+            this.bytes.addInt(SIZE_OFFSET, -1);
         }
 
         /**
