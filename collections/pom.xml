@@ -118,7 +118,6 @@
                 <version>${logback.version}</version>
             </dependency>
 
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>compiler</artifactId>
@@ -131,6 +130,11 @@
                 <version>4.0.0</version>
             </dependency>
 
+            <dependency>
+                <groupId>com.intellij</groupId>
+                <artifactId>annotations</artifactId>
+                <version>12.0</version>
+            </dependency>
 
             <dependency>
                 <groupId>com.sun.java</groupId>
@@ -144,6 +148,11 @@
     </dependencyManagement>
 
     <dependencies>
+
+        <dependency>
+            <groupId>com.intellij</groupId>
+            <artifactId>annotations</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.sun.java</groupId>
@@ -276,7 +285,6 @@
             </plugins>
         </pluginManagement>
         <plugins>
-
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
