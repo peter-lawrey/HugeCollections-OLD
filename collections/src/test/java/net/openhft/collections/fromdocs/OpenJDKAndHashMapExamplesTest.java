@@ -76,7 +76,9 @@ public class OpenJDKAndHashMapExamplesTest {
                         BondVOInterface.class
                 );
 
-        // ZERO Copy buy creates a new off heap reference each time
+        // ZERO Copy but creates a new off heap reference each time
+
+
         BondVOInterface bondVOB = shmB.get("369604103");
         assertEquals(5.0 / 100, bondVOB.getCoupon(), 0.0);
 
