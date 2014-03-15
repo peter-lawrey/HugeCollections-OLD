@@ -373,6 +373,8 @@
                         <logback.version>${logback.version}</logback.version>
                         <main.basedir>${project.basedir}</main.basedir>
                     </systemPropertyVariables>
+                    <!-- For debugging in IntelliJ IDEA -->
+                    <forkMode>never</forkMode>
                 </configuration>
             </plugin>
             <plugin>
