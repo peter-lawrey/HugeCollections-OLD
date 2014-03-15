@@ -195,6 +195,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V put(K key, V value) {
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
+
+        if (value == null)
+            throw new NullPointerException("'value' can not be null");
         return put0(key, value, true);
     }
 
@@ -202,12 +207,17 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * {@inheritDoc}
      */
     @Override
-    public V putIfAbsent(@NotNull K key, V value) {
+    public V putIfAbsent(K key, V value) {
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
+        if (value == null)
+            throw new NullPointerException("'value' can not be null");
         return put0(key, value, false);
     }
 
     private V put0(K key, V value, boolean replaceIfPresent) {
-        if (!kClass.isInstance(key)) throw new IllegalArgumentException("Key must be a " + kClass.getName());
+        if (!kClass.isInstance(key))
+            throw new IllegalArgumentException("Key must be a " + kClass.getName() + " but was a " + key.getClass());
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -238,6 +248,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V get(Object key) {
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
         return lookupUsing((K) key, null, false);
     }
 
@@ -265,6 +277,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public boolean containsKey(final Object key) {
+
+        if (key == null)
+            throw new NullPointerException("'key' can not be null");
+
         if (!kClass.isInstance(key))
             return false;
 
@@ -298,7 +314,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public V remove(@NotNull final Object key) {
+    public V remove(final Object key) {
         if (key == null)
             throw new NullPointerException("'key' can not be null");
 
@@ -311,9 +327,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key is null
      */
     @Override
-    public boolean remove(@NotNull final Object key, final Object value) {
+    public boolean remove(final Object key, final Object value) {
         if (key == null)
             throw new NullPointerException("'key' can not be null");
+
+        if (value == null)
+            return false;
 
         final V v = removeIfValueIs(key, (V) value);
         return v != null;
@@ -355,7 +374,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if any of the arguments are null
      */
     @Override
-    public boolean replace(@NotNull final K key, @NotNull final V oldValue, @NotNull final V newValue) {
+    public boolean replace(final K key, final V oldValue, final V newValue) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -378,7 +397,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @throws NullPointerException if the specified key or value is null
      */
     @Override
-    public V replace(@NotNull final K key, @NotNull final V value) {
+    public V replace(final K key, final V value) {
 
         if (key == null)
             throw new NullPointerException("'key' can not be null");
@@ -1174,18 +1193,23 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         public Iterator<K> iterator() {
             return new KeyIterator();
         }
+
         public int size() {
             return VanillaSharedHashMap.this.size();
         }
+
         public boolean isEmpty() {
             return VanillaSharedHashMap.this.isEmpty();
         }
+
         public boolean contains(Object o) {
             return VanillaSharedHashMap.this.containsKey(o);
         }
+
         public boolean remove(Object o) {
             return VanillaSharedHashMap.this.remove(o) != null;
         }
+
         public void clear() {
             VanillaSharedHashMap.this.clear();
         }
@@ -1195,15 +1219,21 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         public Iterator<V> iterator() {
             return new ValueIterator();
         }
+
         public int size() {
             return VanillaSharedHashMap.this.size();
         }
+
         public boolean isEmpty() {
             return VanillaSharedHashMap.this.isEmpty();
         }
+
         public boolean contains(Object o) {
+            if (o == null)
+                throw new NullPointerException("'value' can not be null");
             return VanillaSharedHashMap.this.containsValue(o);
         }
+
         public void clear() {
             VanillaSharedHashMap.this.clear();
         }
