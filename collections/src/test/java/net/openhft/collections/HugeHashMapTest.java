@@ -97,7 +97,7 @@ public class HugeHashMapTest {
      */
     @Test
     public void testPut() throws ExecutionException, InterruptedException {
-        int count = 4000000;
+        int count = 1000000;
         HugeConfig config = HugeConfig.DEFAULT.clone()
                 .setSegments(256)
                 .setSmallEntrySize(72) // TODO 64 corrupts the values !!

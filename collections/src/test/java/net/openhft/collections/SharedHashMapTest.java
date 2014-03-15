@@ -106,11 +106,13 @@ public class SharedHashMapTest {
     @Test
     public void testRemoveInteger() throws IOException {
 
+        int count = 3000;
         final SharedHashMap<Object, Object> map = new SharedHashMapBuilder()
+                .entrySize(count)
+                .minSegments(2)
                 .create(getPersistenceFile(), Object.class, Object.class);
 
 
-        int count = 2345;
         for (int i = 1; i < count; i++) {
             map.put(i, i);
             assertEquals(i, map.size());

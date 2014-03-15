@@ -49,6 +49,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final int replicas;
     private final int entrySize;
     private final int entriesPerSegment;
+    private final int hashMask;
 
     private final SharedMapErrorListener errorListener;
     private final SharedMapEventListener<K, V> eventListener;
@@ -79,6 +80,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.entriesPerSegment = entriesPerSegment;
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
+        this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedHashMap.Segment[])
@@ -119,7 +121,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 .transactional(false)
                 .metaDataBytes(metaDataBytes)
                 .eventListener(eventListener);
-
     }
 
     long sizeInBytes() {
@@ -128,7 +129,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
     long sizeOfMultiMap() {
-        return align64(Maths.nextPower2(entriesPerSegment * 8L, 64));
+        int np2 = Maths.nextPower2(entriesPerSegment, 8);
+        return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
     }
 
     long sizeOfBitSets() {
@@ -205,7 +207,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         return segments[segmentNum].put(bytes, key, value, hash2, replaceIfPresent);
     }
 
@@ -213,7 +215,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     public void put(Bytes key, Bytes value) {
         long hash = longHashCode(key);
         int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         segments[segmentNum].directPut(key, value, hash2, null, null);
     }
 
@@ -250,7 +252,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = longHashCode(bytes);
         int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         return segments[segmentNum].acquire(bytes, key, value, hash2, create);
     }
 
@@ -282,7 +284,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final DirectBytes bytes = getKeyAsBytes((K) key);
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
 
         return segments[segmentNum].containsKey(bytes, hash2);
     }
@@ -347,7 +349,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final DirectBytes bytes = getKeyAsBytes((K) key);
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         return segments[segmentNum].remove(bytes, (K) key, expectedValue, hash2);
     }
 
@@ -356,7 +358,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final DirectBytes bytes = getKeyAsBytes((K) key);
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         segments[segmentNum].directRemove(bytes, hash2);
     }
 
@@ -434,7 +436,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         final DirectBytes bytes = getKeyAsBytes(key);
         final long hash = longHashCode(bytes);
         final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits);
+        int hash2 = (int) (hash >>> segmentBits) & hashMask;
         return segments[segmentNum].replace(bytes, key, existingValue, newValue, hash2);
     }
 
@@ -466,7 +468,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
-            hashLookup = new VanillaIntIntMultiMap(iimmapBytes);
+            hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
