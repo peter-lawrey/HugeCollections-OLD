@@ -58,8 +58,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final boolean removeReturnsNull;
 
     transient Set<Map.Entry<K, V>> entrySet;
-    transient Set<K> keySet; //todo
-    transient Collection<V> values; //todo
 
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
@@ -478,7 +476,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         final int segmentHash(long hash) {
-            return (int) (hash >>> bits) /*& mask*/; //todo: merge
+            return (int) (hash >>> bits) & mask;
         }
 
         public final int getSegment(long hash) {
@@ -513,8 +511,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
-            //hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes); //todo: merge
-            hashLookup = new VanillaIntIntMultiMap(iimmapBytes);
+            hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -1117,7 +1114,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
     }
 
-    class AbstractIterator {
+    final class EntryIterator implements Iterator<Entry<K, V>> {
 
         int segmentIndex = segments.length - 1;
 
@@ -1125,7 +1122,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         Bytes lastSegmentKeyBytes;
 
-        AbstractIterator() {
+        EntryIterator() {
             nextEntry = nextSegmentEntry();
         }
 
@@ -1139,7 +1136,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             lastReturned = null;
         }
 
-        Map.Entry<K, V> nextEntry() {
+        public Map.Entry<K, V> next() {
             Entry<K, V> e = nextEntry;
             if (e == null)
                 throw new NoSuchElementException();
@@ -1163,80 +1160,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return null;
         }
 
-    }
-
-    final class KeyIterator extends AbstractIterator implements Iterator<K> {
-
-        public K next() {
-            return nextEntry().getKey();
-        }
-
-    }
-
-    final class ValueIterator extends AbstractIterator implements Iterator<V> {
-
-        public V next() {
-            return nextEntry().getValue();
-        }
-
-    }
-
-    final class EntryIterator extends AbstractIterator implements Iterator<Entry<K, V>> {
-
-        public Map.Entry<K, V> next() {
-            return nextEntry();
-        }
-
-    }
-
-    final class KeySet extends AbstractSet<K> {
-        public Iterator<K> iterator() {
-            return new KeyIterator();
-        }
-
-        public int size() {
-            return VanillaSharedHashMap.this.size();
-        }
-
-        public boolean isEmpty() {
-            return VanillaSharedHashMap.this.isEmpty();
-        }
-
-        public boolean contains(Object o) {
-            return VanillaSharedHashMap.this.containsKey(o);
-        }
-
-        public boolean remove(Object o) {
-            return VanillaSharedHashMap.this.remove(o) != null;
-        }
-
-        public void clear() {
-            VanillaSharedHashMap.this.clear();
-        }
-    }
-
-    final class Values extends AbstractCollection<V> {
-        public Iterator<V> iterator() {
-            return new ValueIterator();
-        }
-
-        public int size() {
-            return VanillaSharedHashMap.this.size();
-        }
-
-        public boolean isEmpty() {
-            return VanillaSharedHashMap.this.isEmpty();
-        }
-
-        public boolean contains(Object o) {
-            if (o == null)
-                throw new NullPointerException("'value' can not be null");
-            return VanillaSharedHashMap.this.containsValue(o);
-        }
-
-        public void clear() {
-            VanillaSharedHashMap.this.clear();
-        }
     }
 
     final class EntrySet extends AbstractSet<Map.Entry<K, V>> {

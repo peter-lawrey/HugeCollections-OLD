@@ -39,8 +39,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 //    private final Class<V> vClass;
 
     transient Set<Map.Entry<K, V>> entrySet;
-    transient Set<K> keySet;
-    transient Collection<V> values;
 
 
 
@@ -103,18 +101,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
     @Override
     public Set<Entry<K, V>> entrySet() {
         return (entrySet != null) ? entrySet : (entrySet = new EntrySet());
-    }
-
-    @NotNull
-    @Override
-    public Set<K> keySet() {
-        return (keySet != null) ? keySet : (keySet = new KeySet());
-    }
-
-    @NotNull
-    @Override
-    public Collection<V> values() {
-        return (values != null) ? values : (values = new Values());
     }
 
     @Override
@@ -507,7 +493,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         }
     }
 
-    class AbstractIterator {
+    final class EntryIterator implements Iterator<Entry<K, V>> {
 
         int segmentIndex = segments.length - 1;
 
@@ -515,7 +501,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
         K lastSegmentKey;
 
-        AbstractIterator() {
+        EntryIterator() {
             nextEntry = nextSegmentEntry();
         }
 
@@ -529,7 +515,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             lastReturned = null;
         }
 
-        Map.Entry<K, V> nextEntry() {
+        public Map.Entry<K, V> next() {
             Entry<K, V> e = nextEntry;
             if (e == null)
                 throw new NoSuchElementException();
@@ -553,69 +539,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return null;
         }
 
-    }
-
-    final class KeyIterator extends AbstractIterator implements Iterator<K> {
-
-        public K next() {
-            return nextEntry().getKey();
-        }
-
-    }
-
-    final class ValueIterator extends AbstractIterator implements Iterator<V> {
-
-        public V next() {
-            return nextEntry().getValue();
-        }
-
-    }
-
-    final class EntryIterator extends AbstractIterator implements Iterator<Entry<K, V>> {
-
-        public Map.Entry<K, V> next() {
-            return nextEntry();
-        }
-
-    }
-
-    final class KeySet extends AbstractSet<K> {
-        public Iterator<K> iterator() {
-            return new KeyIterator();
-        }
-        public int size() {
-            return HugeHashMap.this.size();
-        }
-        public boolean isEmpty() {
-            return HugeHashMap.this.isEmpty();
-        }
-        public boolean contains(Object o) {
-            return HugeHashMap.this.containsKey(o);
-        }
-        public boolean remove(Object o) {
-            return HugeHashMap.this.remove(o) != null;
-        }
-        public void clear() {
-            HugeHashMap.this.clear();
-        }
-    }
-
-    final class Values extends AbstractCollection<V> {
-        public Iterator<V> iterator() {
-            return new ValueIterator();
-        }
-        public int size() {
-            return HugeHashMap.this.size();
-        }
-        public boolean isEmpty() {
-            return HugeHashMap.this.isEmpty();
-        }
-        public boolean contains(Object o) {
-            return HugeHashMap.this.containsValue(o);
-        }
-        public void clear() {
-            HugeHashMap.this.clear();
-        }
     }
 
     final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
