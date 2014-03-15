@@ -359,12 +359,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
     @Override
-    public void remove(Bytes key) {
-        final DirectBytes bytes = getKeyAsBytes((K) key);
-        long hash = hasher.hash(bytes);
+    public void remove(Bytes keyBytes) {
+        long hash = hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        segments[segmentNum].directRemove(bytes, segmentHash);
+        segments[segmentNum].directRemove(keyBytes, segmentHash);
     }
 
     /**
