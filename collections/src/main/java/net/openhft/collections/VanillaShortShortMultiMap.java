@@ -29,17 +29,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     private static final int UNSET_KEY = 0;
     private static final int HASH_INSTEAD_OF_UNSET_KEY = 0xFFFF;
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
-    /**
-     * hash is in 32 higher order bits, because in Intel's little-endian
-     * they are written first in memory, and in memory we have keys and values
-     * in natural order: 4 bytes of k1, 4 bytes of v1, 4 bytes of k2, ...
-     * and this is somehow compatible with previous version of this class,
-     * where keys were written before values explicitly.
-     * <p/>
-     * However, this layout increases latency of map operations
-     * by 1 clock cycle :), because we always need to perform shift to obtain
-     * the key between memory read and comparison with UNSET_KEY.
-     */
+
     private static final int UNSET_ENTRY = 0xFFFF;
 
     private final int capacity;
@@ -195,7 +185,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
 
-        searchPos = (key & capacityMask) << 2; // 8 bytes per entry
+        searchPos = (key & capacityMask) << 2; // 4 bytes per entry
         return searchHash = key;
     }
 
