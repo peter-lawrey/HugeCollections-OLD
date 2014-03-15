@@ -59,6 +59,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     transient Set<Map.Entry<K, V>> entrySet;
 
+
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
         this.kClass = kClass;
