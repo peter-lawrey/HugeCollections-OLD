@@ -26,10 +26,20 @@ import net.openhft.lang.io.DirectStore;
 class VanillaShortShortMultiMap implements IntIntMultiMap {
     private static final int ENTRY_SIZE = 4;
 
-    private static final int UNSET_KEY = 0;
+    private static final short UNSET_KEY = 0;
     private static final int HASH_INSTEAD_OF_UNSET_KEY = 0xFFFF;
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
-
+    /**
+     * hash is in 32 higher order bits, because in Intel's little-endian
+     * they are written first in memory, and in memory we have keys and values
+     * in natural order: 4 bytes of k1, 4 bytes of v1, 4 bytes of k2, ...
+     * and this is somehow compatible with previous version of this class,
+     * where keys were written before values explicitly.
+     * <p/>
+     * However, this layout increases latency of map operations
+     * by 1 clock cycle :), because we always need to perform shift to obtain
+     * the key between memory read and comparison with UNSET_KEY.
+     */
     private static final int UNSET_ENTRY = 0xFFFF;
 
     private final int capacity;
@@ -64,20 +74,20 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public boolean putLimited(int key, int value, int limit) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
-        else if ((key & ~0xFFFF) != 0)
+        else if ((key & 0xFFFF) != key)
             throw new IllegalArgumentException("Key out of range, was " + key);
-        if ((value & ~0xFFFF) != 0)
+        if ((value & 0xFFFF) != value)
             throw new IllegalArgumentException("Value out of range, was " + value);
         int pos = (key & capacityMask) << 2; // 4 bytes per entry
         for (int i = 0; i < limit; i++) {
             int entry = bytes.readInt(pos);
             int hash2 = entry >>> 16;
             if (hash2 == UNSET_KEY) {
-                bytes.writeInt(pos, ((key << 16) | value));
+                bytes.writeInt(pos, ((key << 16) | (value & 0xFFFF)));
                 return true;
             }
             if (hash2 == key) {
-                int value2 = entry & 0xFFFF;
+                int value2 = entry;
                 if (value2 == value)
                     return true;
             }
@@ -171,7 +181,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         startSearch(key);
         while (searchPos < capacity * ENTRY_SIZE) {
             int entry = bytes.readInt(searchPos);
-            int hash2 = entry >>> 16;
+            int hash2 = (entry >> 16) & 0xFFFF;
             if (hash2 != UNSET_KEY && hash2 != searchHash) {
                 return entry & 0xFFFF;
             }
@@ -185,7 +195,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
 
-        searchPos = (key & capacityMask) << 2; // 4 bytes per entry
+        searchPos = (key & capacityMask) << 2; // 8 bytes per entry
         return searchHash = key;
     }
 
