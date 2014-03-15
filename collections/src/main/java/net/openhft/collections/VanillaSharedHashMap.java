@@ -28,8 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.AbstractMap;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,10 +40,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final Class<K> kClass;
     private final Class<V> vClass;
     private final long lockTimeOutNS;
-    private final int segmentBits;
     private final int metaDataBytes;
     private Segment[] segments; // non-final for close()
     private MappedStore ms;     // non-final for close()
+    private final Hasher hasher;
 
     private final int replicas;
     private final int entrySize;
@@ -57,6 +56,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final boolean generatedValueType;
     private final boolean putReturnsNull;
     private final boolean removeReturnsNull;
+
+    transient Set<Map.Entry<K, V>> entrySet;
+    transient Set<K> keySet; //todo
+    transient Collection<V> values; //todo
 
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
@@ -75,12 +78,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.removeReturnsNull = builder.removeReturnsNull();
 
         int segments = builder.actualSegments();
-        this.segmentBits = Maths.intLog2(segments);
         int entriesPerSegment = builder.actualEntriesPerSegment();
         this.entriesPerSegment = entriesPerSegment;
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
         this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
+
+        this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedHashMap.Segment[])
@@ -205,18 +209,18 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private V put0(K key, V value, boolean replaceIfPresent) {
         if (!kClass.isInstance(key)) throw new IllegalArgumentException("Key must be a " + kClass.getName());
         DirectBytes bytes = getKeyAsBytes(key);
-        long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        return segments[segmentNum].put(bytes, key, value, hash2, replaceIfPresent);
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        return segments[segmentNum].put(bytes, key, value, segmentHash, replaceIfPresent);
     }
 
     @Override
     public void put(Bytes key, Bytes value) {
-        long hash = longHashCode(key);
-        int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        segments[segmentNum].directPut(key, value, hash2, null, null);
+        long hash = hasher.hash(value);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        segments[segmentNum].directPut(key, value, segmentHash, null, null);
     }
 
     private DirectBytes getKeyAsBytes(K key) {
@@ -250,27 +254,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private V lookupUsing(K key, V value, boolean create) {
         if (!kClass.isInstance(key)) return null;
         DirectBytes bytes = getKeyAsBytes(key);
-        long hash = longHashCode(bytes);
-        int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        return segments[segmentNum].acquire(bytes, key, value, hash2, create);
-    }
-
-
-    private long longHashCode(Bytes bytes) {
-        long h = 0;
-        int i = 0;
-        long limit = bytes.limit(); // clustering.
-        for (; i < limit - 7; i += 8)
-            h = 1011001110001111L * h + bytes.readLong(i);
-        for (; i < limit - 1; i += 2)
-            h = 101111 * h + bytes.readShort(i);
-        if (i < limit)
-            h = 2111 * h + bytes.readByte(i);
-        h *= 11018881818881011L;
-        h ^= (h >>> 41) ^ (h >>> 21);
-//        System.out.println(bytes + " => " + Long.toHexString(h));
-        return h;
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        return segments[segmentNum].acquire(bytes, key, value, segmentHash, create);
     }
 
     /**
@@ -282,11 +269,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return false;
 
         final DirectBytes bytes = getKeyAsBytes((K) key);
-        final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
 
-        return segments[segmentNum].containsKey(bytes, hash2);
+        return segments[segmentNum].containsKey(bytes, segmentHash);
     }
 
     @Override
@@ -301,7 +288,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     @NotNull
     @Override
     public Set<Entry<K, V>> entrySet() {
-        throw new UnsupportedOperationException();
+        return (entrySet != null) ? entrySet : (entrySet = new EntrySet());
     }
 
 
@@ -347,19 +334,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return null;
 
         final DirectBytes bytes = getKeyAsBytes((K) key);
-        final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        return segments[segmentNum].remove(bytes, (K) key, expectedValue, hash2);
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        return segments[segmentNum].remove(bytes, (K) key, expectedValue, segmentHash);
     }
 
     @Override
     public void remove(Bytes key) {
         final DirectBytes bytes = getKeyAsBytes((K) key);
-        final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        segments[segmentNum].directRemove(bytes, hash2);
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        segments[segmentNum].directRemove(bytes, segmentHash);
     }
 
     /**
@@ -434,10 +421,50 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return null;
 
         final DirectBytes bytes = getKeyAsBytes(key);
-        final long hash = longHashCode(bytes);
-        final int segmentNum = (int) (hash & (segments.length - 1));
-        int hash2 = (int) (hash >>> segmentBits) & hashMask;
-        return segments[segmentNum].replace(bytes, key, existingValue, newValue, hash2);
+        long hash = hasher.hash(bytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+        return segments[segmentNum].replace(bytes, key, existingValue, newValue, segmentHash);
+    }
+
+
+    static final class Hasher<K> {
+
+        private final int segments;
+
+        private final int bits;
+
+        private final int mask;
+
+        Hasher(int segments, int mask) {
+            this.segments = segments;
+            this.bits = Maths.intLog2(segments);
+            this.mask = mask;
+        }
+
+        final long hash(Bytes bytes) {
+            long h = 0;
+            int i = 0;
+            long limit = bytes.limit(); // clustering.
+            for (; i < limit - 7; i += 8)
+                h = 1011001110001111L * h + bytes.readLong(i);
+            for (; i < limit - 1; i += 2)
+                h = 101111 * h + bytes.readShort(i);
+            if (i < limit)
+                h = 2111 * h + bytes.readByte(i);
+            h *= 11018881818881011L;
+            h ^= (h >>> 41) ^ (h >>> 21);
+            //System.out.println(bytes + " => " + Long.toHexString(h));
+            return h;
+        }
+
+        final int segmentHash(long hash) {
+            return (int) (hash >>> bits) /*& mask*/; //todo: merge
+        }
+
+        public final int getSegment(long hash) {
+            return (int) (hash & (segments - 1));
+        }
     }
 
     // these methods should be package local, not public or private.
@@ -453,7 +480,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         static final int SIZE_OFFSET = LOCK_OFFSET + 8; // 32-bit
         static final int PAD1_OFFSET = SIZE_OFFSET + 4; // 32-bit
         static final int REPLICA_OFFSET = PAD1_OFFSET + 4; // 64-bit
-        static final int HEADER_USED = REPLICA_OFFSET + 8;
 
         private final NativeBytes bytes;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
@@ -468,7 +494,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
-            hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
+            //hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes); //todo: merge
+            hashLookup = new VanillaIntIntMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -543,7 +570,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
          *
          * @param keyBytes   the key of the entry
          * @param usingValue an object to be reused, null creates a new object.
-         * @param hash2      a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
+         * @param hash2      a hash code relating to the @keyBytes ( not the natural hash of {@keyBytes}  )
          * @param create     false - if the  {@keyBytes} can not be found null will be returned, true - if the  {@keyBytes} can not be found an value will be acquired
          * @return an entry.value whose entry.key equals {@param keyBytes}
          */
@@ -1039,6 +1066,179 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 unlock();
             }
 
+        }
+
+        Entry<K, V> getNextEntry(Bytes prevKeyBytes) {
+            int pos;
+            if (prevKeyBytes == null) {
+                pos = hashLookup.firstPos();
+            } else {
+                int hash = hasher.segmentHash(hasher.hash(prevKeyBytes));
+                pos = hashLookup.nextKeyAfter(hash);
+            }
+
+            if (pos >= 0) {
+                final long offset = entriesOffset + pos * entrySize + metaDataBytes;
+                int length = entrySize - metaDataBytes;
+                tmpBytes.storePositionAndSize(bytes, offset, length);
+                tmpBytes.readStopBit();
+                K key = tmpBytes.readInstance(kClass, null); //todo: readUsing?
+
+                tmpBytes.readStopBit();
+                final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
+                tmpBytes.position(valueOffset);
+                V value = readObjectUsing(null, offset + valueOffset); //todo: reusable container
+
+                //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
+
+                return new SimpleEntry<K, V>(key, value);
+            } else {
+                return null;
+            }
+        }
+    }
+
+    class AbstractIterator {
+
+        int segmentIndex = segments.length - 1;
+
+        Entry<K, V> nextEntry, lastReturned;
+
+        Bytes lastSegmentKeyBytes;
+
+        AbstractIterator() {
+            nextEntry = nextSegmentEntry();
+        }
+
+        public boolean hasNext() {
+            return nextEntry != null;
+        }
+
+        public void remove() {
+            if (lastReturned == null) throw new IllegalStateException();
+            VanillaSharedHashMap.this.remove(lastReturned.getKey());
+            lastReturned = null;
+        }
+
+        Map.Entry<K, V> nextEntry() {
+            Entry<K, V> e = nextEntry;
+            if (e == null)
+                throw new NoSuchElementException();
+            lastReturned = e; // cannot assign until after null check
+            nextEntry = nextSegmentEntry();
+            return e;
+        }
+
+        Entry<K, V> nextSegmentEntry() {
+            while (segmentIndex >= 0) {
+                Segment segment = segments[segmentIndex];
+                Entry<K, V> entry = segment.getNextEntry(lastSegmentKeyBytes);
+                if (entry == null) {
+                    segmentIndex--;
+                    lastSegmentKeyBytes = null;
+                } else {
+                    lastSegmentKeyBytes = getKeyAsBytes(entry.getKey());
+                    return entry;
+                }
+            }
+            return null;
+        }
+
+    }
+
+    final class KeyIterator extends AbstractIterator implements Iterator<K> {
+
+        public K next() {
+            return nextEntry().getKey();
+        }
+
+    }
+
+    final class ValueIterator extends AbstractIterator implements Iterator<V> {
+
+        public V next() {
+            return nextEntry().getValue();
+        }
+
+    }
+
+    final class EntryIterator extends AbstractIterator implements Iterator<Entry<K, V>> {
+
+        public Map.Entry<K, V> next() {
+            return nextEntry();
+        }
+
+    }
+
+    final class KeySet extends AbstractSet<K> {
+        public Iterator<K> iterator() {
+            return new KeyIterator();
+        }
+        public int size() {
+            return VanillaSharedHashMap.this.size();
+        }
+        public boolean isEmpty() {
+            return VanillaSharedHashMap.this.isEmpty();
+        }
+        public boolean contains(Object o) {
+            return VanillaSharedHashMap.this.containsKey(o);
+        }
+        public boolean remove(Object o) {
+            return VanillaSharedHashMap.this.remove(o) != null;
+        }
+        public void clear() {
+            VanillaSharedHashMap.this.clear();
+        }
+    }
+
+    final class Values extends AbstractCollection<V> {
+        public Iterator<V> iterator() {
+            return new ValueIterator();
+        }
+        public int size() {
+            return VanillaSharedHashMap.this.size();
+        }
+        public boolean isEmpty() {
+            return VanillaSharedHashMap.this.isEmpty();
+        }
+        public boolean contains(Object o) {
+            return VanillaSharedHashMap.this.containsValue(o);
+        }
+        public void clear() {
+            VanillaSharedHashMap.this.clear();
+        }
+    }
+
+    final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+        public Iterator<Map.Entry<K, V>> iterator() {
+            return new EntryIterator();
+        }
+
+        public boolean contains(Object o) {
+            if (!(o instanceof Map.Entry))
+                return false;
+            Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            V v = VanillaSharedHashMap.this.get(e.getKey());
+            return v != null && v.equals(e.getValue());
+        }
+
+        public boolean remove(Object o) {
+            if (!(o instanceof Map.Entry))
+                return false;
+            Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            return VanillaSharedHashMap.this.remove(e.getKey(), e.getValue());
+        }
+
+        public int size() {
+            return VanillaSharedHashMap.this.size();
+        }
+
+        public boolean isEmpty() {
+            return VanillaSharedHashMap.this.isEmpty();
+        }
+
+        public void clear() {
+            VanillaSharedHashMap.this.clear();
         }
     }
 }

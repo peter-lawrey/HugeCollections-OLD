@@ -389,28 +389,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return (V) bytes.readObject();
         }
 
-        synchronized K getNextKey(K prevKey) {
-            int pos;
-            if (prevKey == null) {
-                pos = smallMap.firstPos();
-            } else {
-                int hash = hasher.segmentHash(hasher.hash(prevKey));
-                pos = smallMap.nextKeyAfter(hash);
-            }
-            while (true) {
-                if (pos < 0) {
-                    return null;
-                } else {
-                    bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
-                    K key = getKey();
-                    if (prevKey == null || !equals(key, prevKey)) {
-                        return key;
-                    }
-                }
-                pos = smallMap.nextPos();
-            }
-        }
-
         synchronized Entry<K, V> getNextEntry(K prevKey) {
             try {
                 int pos;
@@ -529,105 +507,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
         }
     }
 
-    final class KeyIterator implements Iterator<K> {
-
-        int segmentIndex = segments.length - 1;
-
-        K nextKey, lastReturned;
-
-        K lastSegmentKey;
-
-        KeyIterator() {
-            nextKey = nextSegmentKey();
-        }
-
-        public K next() {
-            K e = nextKey;
-            if (e == null)
-                throw new NoSuchElementException();
-            lastReturned = e; // cannot assign until after null check
-            nextKey = nextSegmentKey();
-            return e;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return nextKey != null;
-        }
-
-        @Override
-        public void remove() {
-            if (lastReturned == null) throw new IllegalStateException();
-            HugeHashMap.this.remove(lastReturned);
-            lastReturned = null;
-        }
-
-        private K nextSegmentKey() {
-            while (segmentIndex >= 0) {
-                Segment<K, V> segment = segments[segmentIndex];
-                K key = segment.getNextKey(lastSegmentKey);
-                if (key == null) {
-                    segmentIndex--;
-                    lastSegmentKey = null;
-                } else {
-                    lastSegmentKey = key;
-                    return key;
-                }
-            }
-            return null;
-        }
-    }
-
-    final class ValueIterator implements Iterator<V> {
-
-        int segmentIndex = segments.length - 1;
-
-        Map.Entry<K, V> nextEntry, lastReturned;
-
-        K lastSegmentKey;
-
-        ValueIterator() {
-            nextEntry = nextSegmentEntry();
-        }
-
-        public V next() {
-            Entry<K, V> e = nextEntry;
-            if (e == null)
-                throw new NoSuchElementException();
-            lastReturned = e; // cannot assign until after null check
-            nextEntry = nextSegmentEntry();
-            return e.getValue();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return nextEntry != null;
-        }
-
-        @Override
-        public void remove() {
-            if (lastReturned == null) throw new IllegalStateException();
-            HugeHashMap.this.remove(lastReturned.getKey(), lastReturned.getValue());
-            lastReturned = null;
-        }
-
-        private Entry<K, V> nextSegmentEntry() {
-            while (segmentIndex >= 0) {
-                Segment<K, V> segment = segments[segmentIndex];
-                Entry<K, V> entry = segment.getNextEntry(lastSegmentKey);
-                if (entry == null) {
-                    segmentIndex--;
-                    lastSegmentKey = null;
-                } else {
-                    lastSegmentKey = entry.getKey();
-                    return entry;
-                }
-            }
-            return null;
-        }
-    }
-
-    final class EntryIterator implements Iterator<Entry<K, V>> {
+    class AbstractIterator {
 
         int segmentIndex = segments.length - 1;
 
@@ -635,11 +515,21 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
         K lastSegmentKey;
 
-        EntryIterator() {
+        AbstractIterator() {
             nextEntry = nextSegmentEntry();
         }
 
-        public Map.Entry<K, V> next() {
+        public boolean hasNext() {
+            return nextEntry != null;
+        }
+
+        public void remove() {
+            if (lastReturned == null) throw new IllegalStateException();
+            HugeHashMap.this.remove(lastReturned.getKey());
+            lastReturned = null;
+        }
+
+        Map.Entry<K, V> nextEntry() {
             Entry<K, V> e = nextEntry;
             if (e == null)
                 throw new NoSuchElementException();
@@ -648,19 +538,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return e;
         }
 
-        @Override
-        public boolean hasNext() {
-            return nextEntry != null;
-        }
-
-        @Override
-        public void remove() {
-            if (lastReturned == null) throw new IllegalStateException();
-            HugeHashMap.this.remove(lastReturned.getKey());
-            lastReturned = null;
-        }
-
-        private Entry<K, V> nextSegmentEntry() {
+        Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
                 Segment<K, V> segment = segments[segmentIndex];
                 Entry<K, V> entry = segment.getNextEntry(lastSegmentKey);
@@ -674,6 +552,31 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             }
             return null;
         }
+
+    }
+
+    final class KeyIterator extends AbstractIterator implements Iterator<K> {
+
+        public K next() {
+            return nextEntry().getKey();
+        }
+
+    }
+
+    final class ValueIterator extends AbstractIterator implements Iterator<V> {
+
+        public V next() {
+            return nextEntry().getValue();
+        }
+
+    }
+
+    final class EntryIterator extends AbstractIterator implements Iterator<Entry<K, V>> {
+
+        public Map.Entry<K, V> next() {
+            return nextEntry();
+        }
+
     }
 
     final class KeySet extends AbstractSet<K> {
