@@ -490,6 +490,7 @@ public class JSR166TestCase extends TestCase {
     public static final Integer m6 = new Integer(-6);
     public static final Integer m10 = new Integer(-10);
 
+    public static final Integer notPresent = 42;
 
     /**
      * android-changed

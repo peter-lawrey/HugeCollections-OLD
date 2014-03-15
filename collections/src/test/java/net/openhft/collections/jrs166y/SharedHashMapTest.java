@@ -313,7 +313,7 @@ public class SharedHashMapTest extends JSR166TestCase {
         SharedHashMap map = map5();
         assertEquals("A", (String) map.get(one));
         SharedHashMap empty = newShmIntString();
-        assertNull(map.get("anything"));
+        assertNull(map.get(notPresent));
     }
 
     /**
@@ -647,7 +647,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testPut2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.put("whatever", null);
+            c.put(notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -683,7 +683,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testReplaceValue_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace(null, one, "whatever");
+            c.replace(null, "A", "whatever");
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -695,7 +695,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testPutIfAbsent2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.putIfAbsent("whatever", null);
+            c.putIfAbsent(notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -707,7 +707,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testReplace2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace("whatever", null);
+            c.replace(notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -719,7 +719,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testReplaceValue2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace("whatever", null, "A");
+            c.replace(notPresent, null, "A");
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -731,7 +731,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     public void testReplaceValue3_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace("whatever", one, null);
+            c.replace(notPresent, "A", null);
             shouldThrow();
         } catch (NullPointerException success) {
         }

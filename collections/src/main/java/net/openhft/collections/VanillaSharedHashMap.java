@@ -189,16 +189,26 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return bytes;
     }
 
+    private void checkKey(Object key) {
+        if (!kClass.isInstance(key)) {
+            // key.getClass will cause NPE exactly as needed
+            throw new ClassCastException("Key must be a " + kClass.getName() +
+                    " but was a " + key.getClass());
+        }
+    }
+
+    private void checkValue(Object value) {
+        if (!vClass.isInstance(value)) {
+            throw new ClassCastException("Value must be a " + vClass.getName() +
+                    " but was a " + value.getClass());
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public V put(K key, V value) {
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
-        if (value == null)
-            throw new NullPointerException("'value' can not be null");
         return put0(key, value, true);
     }
 
@@ -207,16 +217,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V putIfAbsent(K key, V value) {
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-        if (value == null)
-            throw new NullPointerException("'value' can not be null");
         return put0(key, value, false);
     }
 
     private V put0(K key, V value, boolean replaceIfPresent) {
-        if (!kClass.isInstance(key))
-            throw new IllegalArgumentException("Key must be a " + kClass.getName() + " but was a " + key.getClass());
+        checkKey(key);
+        checkValue(value);
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -247,8 +253,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V get(Object key) {
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
         return lookupUsing((K) key, null, false);
     }
 
@@ -263,7 +267,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     }
 
     private V lookupUsing(K key, V value, boolean create) {
-        if (!kClass.isInstance(key)) return null;
+        checkKey(key);
         DirectBytes bytes = getKeyAsBytes(key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -276,13 +280,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public boolean containsKey(final Object key) {
-
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
-        if (!kClass.isInstance(key))
-            return false;
-
+        checkKey(key);
         final DirectBytes bytes = getKeyAsBytes((K) key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -314,9 +312,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V remove(final Object key) {
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
         return removeIfValueIs(key, null);
     }
 
@@ -327,14 +322,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public boolean remove(final Object key, final Object value) {
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
         if (value == null)
-            return false;
-
-        final V v = removeIfValueIs(key, (V) value);
-        return v != null;
+            return false; // CHM compatibility; I would throw NPE
+        return removeIfValueIs(key, (V) value) != null;
     }
 
 
@@ -347,10 +337,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @return true if and entry was removed
      */
     private V removeIfValueIs(final Object key, final V expectedValue) {
-
-        if (!kClass.isInstance(key))
-            return null;
-
+        checkKey(key);
         final DirectBytes bytes = getKeyAsBytes((K) key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -373,16 +360,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public boolean replace(final K key, final V oldValue, final V newValue) {
-
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
-        if (oldValue == null)
-            throw new NullPointerException("'oldValue' can not be null");
-
-        if (newValue == null)
-            throw new NullPointerException("'newValue' can not be null");
-
+        checkValue(oldValue);
         return oldValue.equals(replaceIfValueIs(key, oldValue, newValue));
     }
 
@@ -396,13 +374,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public V replace(final K key, final V value) {
-
-        if (key == null)
-            throw new NullPointerException("'key' can not be null");
-
-        if (value == null)
-            throw new NullPointerException("'value' can not be null");
-
         return replaceIfValueIs(key, null, value);
     }
 
@@ -433,10 +404,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * @return the value that was replaced
      */
     private V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
-
-        if (!kClass.isInstance(key))
-            return null;
-
+        checkKey(key);
+        checkValue(newValue);
         final DirectBytes bytes = getKeyAsBytes(key);
         long hash = hasher.hash(bytes);
         int segmentNum = hasher.getSegment(hash);
@@ -1171,15 +1140,29 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             if (!(o instanceof Map.Entry))
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            V v = VanillaSharedHashMap.this.get(e.getKey());
-            return v != null && v.equals(e.getValue());
+            try {
+                V v = VanillaSharedHashMap.this.get(e.getKey());
+                return v != null && v.equals(e.getValue());
+            } catch (ClassCastException ex) {
+                return false;
+            } catch (NullPointerException ex) {
+                return false;
+            }
         }
 
         public boolean remove(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            return VanillaSharedHashMap.this.remove(e.getKey(), e.getValue());
+            try {
+                Object key = e.getKey();
+                Object value = e.getValue();
+                return VanillaSharedHashMap.this.remove(key, value);
+            } catch (ClassCastException ex) {
+                return false;
+            } catch (NullPointerException ex) {
+                return false;
+            }
         }
 
         public int size() {

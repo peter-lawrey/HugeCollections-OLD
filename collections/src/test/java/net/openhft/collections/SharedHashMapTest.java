@@ -366,23 +366,6 @@ public class SharedHashMapTest {
         map.close();
     }
 
-
-    @Test
-    public void testAcquireWithNullKey() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
-        assertNull(map.acquireUsing(null, new LongValueNative()));
-
-        map.close();
-    }
-
-    @Test
-    public void testGetWithNullKey() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
-        assertNull(map.getUsing(null, new LongValueNative()));
-
-        map.close();
-    }
-
     @Test
     public void testAcquireWithNullContainer() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
