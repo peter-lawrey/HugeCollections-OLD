@@ -190,6 +190,13 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava-testlib</artifactId>
+            <version>16.0.1</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- for OSGi testing -->
         <dependency>
             <groupId>org.osgi</groupId>

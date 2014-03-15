@@ -20,6 +20,11 @@ package net.openhft.collections;
  * This is only used to store keys and positions, but it could store int/int key/values for another purpose.
  */
 interface IntIntMultiMap {
+
+    static interface EntryConsumer {
+        void accept(int key, int value);
+    }
+
     /**
      * Add an entry.  Allow duplicate hashes, but not key/position pairs.
      *
@@ -77,4 +82,6 @@ interface IntIntMultiMap {
     int nextKeyAfter(int key); //todo: this method doesn't fit nicely in the picture
 
     void clear();
+
+    void forEach(EntryConsumer action);
 }
