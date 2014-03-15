@@ -87,7 +87,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
                 return true;
             }
             if (hash2 == key) {
-                int value2 = entry;
+                int value2 = entry & 0xFFFF;
                 if (value2 == value)
                     return true;
             }
@@ -181,7 +181,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         startSearch(key);
         while (searchPos < capacity * ENTRY_SIZE) {
             int entry = bytes.readInt(searchPos);
-            int hash2 = entry >> 16;
+            int hash2 = entry >>> 16;
             if (hash2 != UNSET_KEY && hash2 != searchHash) {
                 return entry & 0xFFFF;
             }
