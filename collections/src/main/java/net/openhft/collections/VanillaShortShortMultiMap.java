@@ -26,7 +26,7 @@ import net.openhft.lang.io.DirectStore;
 class VanillaShortShortMultiMap implements IntIntMultiMap {
     private static final int ENTRY_SIZE = 4;
 
-    private static final short UNSET_KEY = 0;
+    private static final int UNSET_KEY = 0;
     private static final int HASH_INSTEAD_OF_UNSET_KEY = 0xFFFF;
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
     /**
@@ -74,16 +74,16 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public boolean putLimited(int key, int value, int limit) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
-        else if ((key & 0xFFFF) != key)
+        else if ((key & ~0xFFFF) != 0)
             throw new IllegalArgumentException("Key out of range, was " + key);
-        if ((value & 0xFFFF) != value)
+        if ((value & ~0xFFFF) != 0)
             throw new IllegalArgumentException("Value out of range, was " + value);
         int pos = (key & capacityMask) << 2; // 4 bytes per entry
         for (int i = 0; i < limit; i++) {
             int entry = bytes.readInt(pos);
             int hash2 = entry >>> 16;
             if (hash2 == UNSET_KEY) {
-                bytes.writeInt(pos, ((key << 16) | (value & 0xFFFF)));
+                bytes.writeInt(pos, ((key << 16) | value));
                 return true;
             }
             if (hash2 == key) {
