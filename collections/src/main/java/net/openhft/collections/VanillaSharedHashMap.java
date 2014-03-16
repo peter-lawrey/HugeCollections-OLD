@@ -34,7 +34,7 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, DirectMap {
+public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
     private final ThreadLocal<DirectBytes> localBytes = new ThreadLocal<DirectBytes>();
     private final Class<K> kClass;
@@ -230,14 +230,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return segments[segmentNum].put(bytes, key, value, segmentHash, replaceIfPresent);
     }
 
-    @Override
-    public void put(Bytes key, Bytes value) {
-        long hash = hasher.hash(value);
-        int segmentNum = hasher.getSegment(hash);
-        int segmentHash = hasher.segmentHash(hash);
-        segments[segmentNum].directPut(key, value, segmentHash, null, null);
-    }
-
     private DirectBytes getKeyAsBytes(K key) {
         DirectBytes bytes = acquireBytes();
         if (generatedKeyType)
@@ -343,14 +335,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
         return segments[segmentNum].remove(bytes, (K) key, expectedValue, segmentHash);
-    }
-
-    @Override
-    public void remove(Bytes keyBytes) {
-        long hash = hasher.hash(keyBytes);
-        int segmentNum = hasher.getSegment(hash);
-        int segmentHash = hasher.segmentHash(hash);
-        segments[segmentNum].directRemove(keyBytes, segmentHash);
     }
 
     /**
