@@ -983,9 +983,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 }
                 long valuePosition = tmpBytes.position();
                 tmpBytes.readStopBit();
-                final long alignPosition = align(tmpBytes.position());
-                tmpBytes.position(alignPosition);
-                final V v = readObjectUsing(null, offset + alignPosition);
+                tmpBytes.alignPositionAddr(4);
+                final V v = readObjectUsing(null, offset + tmpBytes.position());
                 tmpBytes.position(valuePosition);
                 appendInstance(keyBytes, value);
 
@@ -996,7 +995,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     return null;
                 }
 
-                return readObjectUsing(null, offset + keyLength);
+                tmpBytes.readStopBit();
+                tmpBytes.alignPositionAddr(4);
+                return readObjectUsing(null, offset + tmpBytes.position());
             }
         }
 

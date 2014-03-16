@@ -18,6 +18,7 @@ package net.openhft.collections.osgi;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.Configuration;
@@ -66,6 +67,7 @@ public class OSGiBundleTest extends OSGiTestBase {
     }
 
     @Test
+    @Ignore
     public void checkHelloBundle() {
         Boolean bundleFound = false;
         Boolean bundleActive = false;
