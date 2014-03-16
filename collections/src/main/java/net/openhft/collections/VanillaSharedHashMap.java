@@ -23,7 +23,7 @@ import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -954,6 +954,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         private V notifyMissed(DirectBytes keyBytes, K key, V usingValue, int hash2) {
+            if (usingValue instanceof Byteable)
+                ((Byteable) usingValue).bytes(null, 0);
             if (eventListener != SharedMapEventListeners.NOP) {
                 V value2 = eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes, key, usingValue);
                 if (value2 != null)

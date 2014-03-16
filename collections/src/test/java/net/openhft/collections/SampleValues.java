@@ -32,7 +32,7 @@ package net.openhft.collections;/*
 
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.serialization.BytesMarshallable;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 /**
  * Sample entry of 10 fields with two String, Enum, int, double, long

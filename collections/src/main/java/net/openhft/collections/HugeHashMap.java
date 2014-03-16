@@ -24,7 +24,7 @@ import net.openhft.lang.io.MultiStoreBytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.util.*;
 
@@ -39,7 +39,6 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 //    private final Class<V> vClass;
 
     transient Set<Map.Entry<K, V>> entrySet;
-
 
 
     public HugeHashMap() {

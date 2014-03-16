@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Peter Lawrey
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.openhft.collections.jrs166y;
 
 import net.openhft.collections.SharedHashMap;
@@ -27,55 +43,49 @@ public class SharedHashMapTest extends JSR166TestCase {
         return file;
     }
 
-    static SharedHashMap newShmIntString(int size) throws IOException {
+    static SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2).
-                        entries(size)
+                .entries(size)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
-    static SharedHashMap newShmListBoolean(int size) throws IOException {
+    static SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2).
-                        entries(size)
+                .entries(size)
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
 
-    static SharedHashMap newShmListBoolean() throws IOException {
+    static SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2)
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
-    static SharedHashMap newShmStringString(int size) throws IOException {
+    static SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2).
-                        entries(size)
+                .entries(size)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
     }
 
 
-    static SharedHashMap newShmIntString() throws IOException {
+    static SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
-    static SharedHashMap newShmBiBoolean() throws IOException {
+    static SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
 
         return new SharedHashMapBuilder()
-                .minSegments(2)
                 .create(getPersistenceFile(), BI.class, Boolean.class);
 
     }
@@ -84,7 +94,7 @@ public class SharedHashMapTest extends JSR166TestCase {
      * Returns a new map from Integers 1-5 to Strings "A"-"E".
      */
     private static SharedHashMap map5() throws IOException {
-        SharedHashMap map = newShmIntString(5);
+        SharedHashMap<Integer, CharSequence> map = newShmIntString(5);
         assertTrue(map.isEmpty());
         map.put(one, "A");
         map.put(two, "B");
@@ -240,6 +250,7 @@ public class SharedHashMapTest extends JSR166TestCase {
         }
     }
 */
+
     /**
      * clear removes all pairs
      */
