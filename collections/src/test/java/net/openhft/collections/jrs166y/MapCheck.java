@@ -403,9 +403,9 @@ public class MapCheck {
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         getTest("Search Absent          ", size, s, absent, 0);
-//       kitTest(s, size);
-//      vitTest(s, size);
-//      eitTest(s, size);
+        kitTest(s, size);
+        vitTest(s, size);
+        eitTest(s, size);
         putTest("Modify Present         ", size, s, key, 0);
         reallyAssert(s.size() == size);
         untimedKeyTest("Access Present         ", size, s, key, size);
@@ -420,18 +420,18 @@ public class MapCheck {
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         getTest("Search Absent          ", size, s, absent, 0);
-//       itRemTest(s, size);
+        itRemTest(s, size);
         s.clear();
 
         putTest("Add    Absent          ", size, s, key, size);
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         untimedKeyTest("Access Present         ", size, s, key, size);
-//      kitTest(s, size);
-//       vitTest(s, size);
-//       eitTest(s, size);
-//       twoMapTest1(s, key, absent);
-//       twoMapTest2(s, key, absent);
+        kitTest(s, size);
+        vitTest(s, size);
+        eitTest(s, size);
+        twoMapTest1(s, key, absent);
+        twoMapTest2(s, key, absent);
     }
 
     static void twoMapTest1(Map s, Object[] key, Object[] absent) {
