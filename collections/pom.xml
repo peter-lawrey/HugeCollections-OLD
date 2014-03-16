@@ -22,7 +22,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.openhft</groupId>
     <artifactId>collections</artifactId>
-    <version>3.0d-SNAPSHOT</version>
+    <version>3.0e-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>Huge Collections</name>
     <description>Java Collections which are designed to be huge (may GB)</description>
@@ -33,7 +33,7 @@
         <pax.exam.version>3.4.0</pax.exam.version>
         <pax.url.version>1.6.0</pax.url.version>
         <logback.version>0.9.6</logback.version>
-        <openhft.lang.version>6.3.3-SNAPSHOT</openhft.lang.version>
+        <openhft.lang.version>6.3.3</openhft.lang.version>
         <osgi.version>5.0.0</osgi.version>
     </properties>
 
@@ -49,7 +49,7 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>affinity</artifactId>
-                <version>2.0.2-SNAPSHOT</version>
+                <version>2.0.1</version>
             </dependency>
 
             <dependency>
