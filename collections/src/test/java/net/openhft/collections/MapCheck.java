@@ -140,6 +140,8 @@ public class MapCheck {
             Object k = key[i];
             if (k == null) throw new Error("Null key at" + i);
             ck += System.identityHashCode(k);
+            if (i == 409)
+                Thread.yield();
             Object v = s.put(k, k);
             if (v != null)
                 throw new Error("Duplicate " + k + " / " + v);
@@ -399,9 +401,9 @@ public class MapCheck {
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         getTest("Search Absent          ", size, s, absent, 0);
-// TODO       kitTest(s, size);
-// TODO       vitTest(s, size);
-// TODO       eitTest(s, size);
+//       kitTest(s, size);
+//      vitTest(s, size);
+//      eitTest(s, size);
         putTest("Modify Present         ", size, s, key, 0);
         reallyAssert(s.size() == size);
         untimedKeyTest("Access Present         ", size, s, key, size);
@@ -416,18 +418,18 @@ public class MapCheck {
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         getTest("Search Absent          ", size, s, absent, 0);
-// TODO       itRemTest(s, size);
+//       itRemTest(s, size);
         s.clear();
 
         putTest("Add    Absent          ", size, s, key, size);
         reallyAssert(s.size() == size);
         getTest("Access Present         ", size, s, key, size);
         untimedKeyTest("Access Present         ", size, s, key, size);
-// TODO       kitTest(s, size);
-// TODO       vitTest(s, size);
-// TODO       eitTest(s, size);
-// TODO       twoMapTest1(s, key, absent);
-// TODO       twoMapTest2(s, key, absent);
+//      kitTest(s, size);
+//       vitTest(s, size);
+//       eitTest(s, size);
+//       twoMapTest1(s, key, absent);
+//       twoMapTest2(s, key, absent);
     }
 
     static void twoMapTest1(Map s, Object[] key, Object[] absent) {
@@ -460,7 +462,6 @@ public class MapCheck {
 
         int sh1 = s.hashCode() - s2.hashCode();
         reallyAssert(sh1 == 0);
-
         boolean eq1 = s2.equals(s);
         boolean eq2 = s.equals(s2);
         reallyAssert(eq1 && eq2);
