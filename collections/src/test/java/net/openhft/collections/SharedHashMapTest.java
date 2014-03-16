@@ -1024,6 +1024,51 @@ public class SharedHashMapTest {
         map.close();
     }
 
+    @Test
+    public void clearMapViaEntryIteratorRemoves() throws IOException {
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.entrySet().iterator(); it.hasNext(); ) {
+            Object next = it.next();
+            it.remove();
+            ++sum;
+        }
+        map.close();
+
+        assertEquals(3, sum);
+    }
+
+    @Test
+    public void clearMapViaKeyIteratorRemoves() throws IOException {
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.keySet().iterator(); it.hasNext(); ) {
+            it.next();
+            it.remove();
+            ++sum;
+        }
+        map.close();
+
+        assertEquals(3, sum);
+    }
+
+    @Test
+    public void clearMapViaValueIteratorRemoves() throws IOException {
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.values().iterator(); it.hasNext(); ) {
+            it.next();
+            it.remove();
+            ++sum;
+        }
+        map.close();
+
+        assertEquals(3, sum);
+    }
+
     private SharedHashMap<Integer, CharSequence> getViewTestMap() throws IOException {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-remove-test");

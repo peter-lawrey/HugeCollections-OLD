@@ -1056,12 +1056,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         }
 
-        Entry<K, V> getNextEntry(Bytes prevKeyBytes) {
+        Entry<K, V> getNextEntry(K prevKey) {
             int pos;
-            if (prevKeyBytes == null) {
+            if (prevKey == null) {
                 pos = hashLookup.firstPos();
             } else {
-                int hash = hasher.segmentHash(hasher.hash(prevKeyBytes));
+                int hash = hasher.segmentHash(hasher.hash(getKeyAsBytes(prevKey)));
                 pos = hashLookup.nextKeyAfter(hash);
             }
 
@@ -1092,7 +1092,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         Entry<K, V> nextEntry, lastReturned;
 
-        Bytes lastSegmentKeyBytes;
+        K lastSegmentKey;
 
         EntryIterator() {
             nextEntry = nextSegmentEntry();
@@ -1120,12 +1120,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
                 Segment segment = segments[segmentIndex];
-                Entry<K, V> entry = segment.getNextEntry(lastSegmentKeyBytes);
+                Entry<K, V> entry = segment.getNextEntry(lastSegmentKey);
                 if (entry == null) {
                     segmentIndex--;
-                    lastSegmentKeyBytes = null;
+                    lastSegmentKey = null;
                 } else {
-                    lastSegmentKeyBytes = getKeyAsBytes(entry.getKey());
+                    lastSegmentKey = entry.getKey();
                     return entry;
                 }
             }

@@ -469,6 +469,46 @@ public class HugeHashMapTest {
         org.junit.Assert.assertTrue(entrySet.isEmpty());
         org.junit.Assert.assertTrue(keySet.isEmpty());
         org.junit.Assert.assertTrue(values.isEmpty());
+    }@Test
+     public void clearMapViaEntryIteratorRemoves() {
+        HugeHashMap<Integer, String> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.entrySet().iterator(); it.hasNext(); ) {
+            it.next();
+            it.remove();
+            ++sum;
+        }
+
+        assertEquals(3, sum);
+    }
+
+    @Test
+    public void clearMapViaKeyIteratorRemoves() {
+        HugeHashMap<Integer, String> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.keySet().iterator(); it.hasNext(); ) {
+            it.next();
+            it.remove();
+            ++sum;
+        }
+
+        assertEquals(3, sum);
+    }
+
+    @Test
+    public void clearMapViaValueIteratorRemoves() {
+        HugeHashMap<Integer, String> map = getViewTestMap();
+
+        int sum = 0;
+        for (Iterator it = map.values().iterator(); it.hasNext(); ) {
+            it.next();
+            it.remove();
+            ++sum;
+        }
+
+        assertEquals(3, sum);
     }
 
     private HugeHashMap<Integer, String> getViewTestMap() {
