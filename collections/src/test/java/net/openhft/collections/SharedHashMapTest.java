@@ -659,7 +659,7 @@ public class SharedHashMapTest {
         return sb;
     }
 
-    private static File getPersistenceFile() {
+    static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-test" + System.nanoTime());
         file.delete();
