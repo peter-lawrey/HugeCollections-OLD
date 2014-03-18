@@ -171,7 +171,8 @@ public class SharedHashMapBuilder implements Cloneable {
         if (bb.remaining() < 22) throw new IOException("File too small, corrupted? " + file);
         byte[] bytes = new byte[8];
         bb.get(bytes);
-        if (!Arrays.equals(bytes, MAGIC)) throw new IOException("Unknown magic number, was " + new String(bytes, 0));
+        if (!Arrays.equals(bytes, MAGIC))
+            throw new IOException("Unknown magic number, was " + new String(bytes, "ISO-8859-1"));
         builder.actualSegments(bb.getInt());
         builder.actualEntriesPerSegment(bb.getInt());
         builder.entrySize(bb.getInt());
