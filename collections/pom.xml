@@ -44,7 +44,7 @@
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
                 <type>pom</type>
-                <version>3.0e-SNAPSHOT</version>
+                <version>${project.version}</version>
                 <scope>import</scope>
             </dependency>
 
