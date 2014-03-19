@@ -140,36 +140,6 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     private int searchPos = -1;
 
     @Override
-    public int firstPos() {
-        int pos = 0;
-        int capacityPos = capacity << ENTRY_SIZE_SHIFT;
-        while (pos < capacityPos) {
-            int entry = bytes.readInt(pos);
-            int hash2 = entry >>> 16;
-            if (hash2 != UNSET_KEY) {
-                return entry & 0xFFFF;
-            }
-            pos = pos + ENTRY_SIZE;
-        }
-        return -1;
-    }
-
-    @Override
-    public int nextKeyAfter(int key) { //todo: merge implementation with first position method
-        startSearch(key);
-        int capacityPos = capacity << ENTRY_SIZE_SHIFT;
-        while (searchPos < capacityPos) {
-            int entry = bytes.readInt(searchPos);
-            int hash2 = entry >>> 16;
-            if (hash2 != UNSET_KEY && hash2 != searchHash) {
-                return entry & 0xFFFF;
-            }
-            searchPos = searchPos + ENTRY_SIZE;
-        }
-        return -1;
-    }
-
-    @Override
     public int startSearch(int key) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;

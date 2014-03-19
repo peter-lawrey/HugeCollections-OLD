@@ -19,6 +19,8 @@ package net.openhft.collections;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -210,7 +212,7 @@ public class HugeHashMapTest {
 
     @Test
     public void mapRemoveReflectedInViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -227,7 +229,7 @@ public class HugeHashMapTest {
 
     @Test
     public void mapPutReflectedInViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -244,7 +246,7 @@ public class HugeHashMapTest {
 
     @Test
     public void entrySetRemoveReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -258,7 +260,7 @@ public class HugeHashMapTest {
 
     @Test
     public void keySetRemoveReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -272,7 +274,7 @@ public class HugeHashMapTest {
 
     @Test
     public void valuesRemoveReflectedInMap() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -286,7 +288,7 @@ public class HugeHashMapTest {
 
     @Test
     public void entrySetIteratorRemoveReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -303,7 +305,7 @@ public class HugeHashMapTest {
 
     @Test
     public void keySetIteratorRemoveReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -320,7 +322,7 @@ public class HugeHashMapTest {
 
     @Test
     public void valuesIteratorRemoveReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -337,7 +339,7 @@ public class HugeHashMapTest {
 
     @Test
     public void entrySetRemoveAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -356,7 +358,7 @@ public class HugeHashMapTest {
 
     @Test
     public void keySetRemoveAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -370,7 +372,7 @@ public class HugeHashMapTest {
 
     @Test
     public void valuesRemoveAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -384,7 +386,7 @@ public class HugeHashMapTest {
 
     @Test
     public void entrySetRetainAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -403,7 +405,7 @@ public class HugeHashMapTest {
 
     @Test
     public void keySetRetainAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -417,7 +419,7 @@ public class HugeHashMapTest {
 
     @Test
     public void valuesRetainAllReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -431,7 +433,7 @@ public class HugeHashMapTest {
 
     @Test
     public void entrySetClearReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -445,7 +447,7 @@ public class HugeHashMapTest {
 
     @Test
     public void keySetClearReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -459,7 +461,7 @@ public class HugeHashMapTest {
 
     @Test
     public void valuesClearReflectedInMapAndOtherViews() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        HugeHashMap<Integer, String> map = getViewTestMap(3);
         Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
@@ -471,7 +473,8 @@ public class HugeHashMapTest {
         org.junit.Assert.assertTrue(values.isEmpty());
     }@Test
      public void clearMapViaEntryIteratorRemoves() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        int noOfElements = 16 * 1024;
+        HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
 
         int sum = 0;
         for (Iterator it = map.entrySet().iterator(); it.hasNext(); ) {
@@ -480,12 +483,13 @@ public class HugeHashMapTest {
             ++sum;
         }
 
-        assertEquals(3, sum);
+        assertEquals(noOfElements, sum);
     }
 
     @Test
     public void clearMapViaKeyIteratorRemoves() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        int noOfElements = 16 * 1024;
+        HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
 
         int sum = 0;
         for (Iterator it = map.keySet().iterator(); it.hasNext(); ) {
@@ -494,12 +498,13 @@ public class HugeHashMapTest {
             ++sum;
         }
 
-        assertEquals(3, sum);
+        assertEquals(noOfElements, sum);
     }
 
     @Test
     public void clearMapViaValueIteratorRemoves() {
-        HugeHashMap<Integer, String> map = getViewTestMap();
+        int noOfElements = 16 * 1024;
+        HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
 
         int sum = 0;
         for (Iterator it = map.values().iterator(); it.hasNext(); ) {
@@ -508,22 +513,56 @@ public class HugeHashMapTest {
             ++sum;
         }
 
-        assertEquals(3, sum);
+        assertEquals(noOfElements, sum);
     }
 
-    private HugeHashMap<Integer, String> getViewTestMap() {
+    @Test
+    public void entrySetValueReflectedInMapAndOtherViews() throws IOException {
         HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
                 HugeConfig.DEFAULT.clone().setSegments(16),
                 Integer.class,
                 String.class
         );
-        map.put(1, "1");
-        map.put(2, "2");
-        map.put(3, "3");
 
-        assertEntrySet(map.entrySet(), new int[]{2, 3, 1}, new String[]{"2", "3", "1"});
-        assertKeySet(map.keySet(), new int[]{2, 3, 1});
-        assertValues(map.values(), new String[]{"2", "3", "1"});
+        map.put(1, "A");
+        Set<Map.Entry<Integer, String>> entrySet = map.entrySet();
+        Set<Integer> keySet = map.keySet();
+        Collection<String> values = map.values();
+
+        assertMap(map, new int[] {1}, new String[] {"A"});
+        assertEntrySet(entrySet, new int[]{1}, new String[]{"A"});
+        assertKeySet(keySet, new int[]{1});
+        assertValues(values, new String[]{"A"});
+
+        entrySet.iterator().next().setValue("B");
+        assertMap(map, new int[]{1}, new String[]{"B"});
+        assertEntrySet(entrySet, new int[]{1}, new String[]{"B"});
+        assertEntrySet(map.entrySet(), new int[]{1}, new String[]{"B"});
+        assertKeySet(keySet, new int[]{1});
+        assertKeySet(map.keySet(), new int[]{1});
+        assertValues(values, new String[]{"B"});
+        assertValues(map.values(), new String[]{"B"});
+    }
+
+    private HugeHashMap<Integer, String> getViewTestMap(int noOfElements) {
+        HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                Integer.class,
+                String.class
+        );
+
+        int[] expectedKeys = new int[noOfElements];
+        String[] expectedValues = new String[noOfElements];
+        for (int i = 1; i <= noOfElements; i++) {
+            String value = "" + i;
+            map.put(i, value);
+            expectedKeys[i - 1] = i;
+            expectedValues[i - 1] = value;
+        }
+
+//        assertEntrySet(map.entrySet(), expectedKeys, expectedValues); //todo
+//        assertKeySet(map.keySet(), expectedKeys);
+        assertValues(map.values(), expectedValues);
 
         return map;
     }

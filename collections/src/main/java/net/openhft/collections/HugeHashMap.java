@@ -374,33 +374,21 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             return (V) bytes.readObject();
         }
 
-        synchronized Entry<K, V> getNextEntry(K prevKey) {
+        synchronized void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
+            smallMap.forEach(entryConsumer);
+        }
+
+        synchronized Entry<K, V> getEntry(int pos) {
             try {
-                int pos;
-                if (prevKey == null) {
-                    pos = smallMap.firstPos();
+                bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
+                K key = getKey();
+                if (bytesMarshallable) {
+                    V value = (V) NativeBytes.UNSAFE.allocateInstance(vClass);
+                    ((BytesMarshallable) value).readMarshallable(bytes);
+                    return new WriteThroughEntry(key, value);
                 } else {
-                    int hash = hasher.segmentHash(hasher.hash(prevKey));
-                    pos = smallMap.nextKeyAfter(hash);
-                }
-                while (true) {
-                    if (pos < 0) {
-                        return null;
-                    } else {
-                        bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
-                        K key = getKey();
-                        if (prevKey == null || !equals(key, prevKey)) {
-                            if (bytesMarshallable) {
-                                V value = (V) NativeBytes.UNSAFE.allocateInstance(vClass);
-                                ((BytesMarshallable) value).readMarshallable(bytes);
-                                return new SimpleEntry<K, V>(key, value);
-                            } else {
-                                V value = (V) bytes.readObject();
-                                return new SimpleEntry<K, V>(key, value);
-                            }
-                        }
-                    }
-                    pos = smallMap.nextPos();
+                    V value = (V) bytes.readObject();
+                    return new WriteThroughEntry(key, value);
                 }
             } catch (InstantiationException e) {
                 throw new AssertionError(e);
@@ -490,15 +478,36 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             map.clear();
             size = 0;
         }
+
+        final class WriteThroughEntry extends SimpleEntry<K, V> {
+
+            WriteThroughEntry(K key, V value) {
+                super(key, value);
+            }
+
+            WriteThroughEntry(Entry<? extends K, ? extends V> entry) {
+                super(entry);
+            }
+
+            @Override
+            public V setValue(V value) {
+                K key = getKey();
+                long hash = hasher.hash(key);
+                int segment = hasher.getSegment(hash);
+                int segmentHash = hasher.segmentHash(hash);
+                put(segmentHash, key, value, true, true);
+                return super.setValue(value);
+            }
+        }
     }
 
-    final class EntryIterator implements Iterator<Entry<K, V>> {
+    final class EntryIterator implements Iterator<Entry<K, V>>, IntIntMultiMap.EntryConsumer {
 
-        int segmentIndex = segments.length - 1;
+        int segmentIndex = segments.length;
 
         Entry<K, V> nextEntry, lastReturned;
 
-        K lastSegmentKey;
+        Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
 
         EntryIterator() {
             nextEntry = nextSegmentEntry();
@@ -525,17 +534,32 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
 
         Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
-                Segment<K, V> segment = segments[segmentIndex];
-                Entry<K, V> entry = segment.getNextEntry(lastSegmentKey);
-                if (entry == null) {
-                    segmentIndex--;
-                    lastSegmentKey = null;
+                if (segmentPositions.isEmpty()) {
+                    switchToNextSegment();
                 } else {
-                    lastSegmentKey = entry.getKey();
-                    return entry;
+                    Segment segment = segments[segmentIndex];
+                    while (!segmentPositions.isEmpty()) {
+                        Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
+                        if (entry != null) {
+                            return entry;
+                        }
+                    }
                 }
             }
             return null;
+        }
+
+        private void switchToNextSegment() {
+            segmentPositions.clear();
+            segmentIndex--;
+            if (segmentIndex >= 0) {
+                segments[segmentIndex].visit(this);
+            }
+        }
+
+        @Override
+        public void accept(int key, int value) {
+            segmentPositions.add(value);
         }
 
     }

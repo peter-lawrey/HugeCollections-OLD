@@ -18,6 +18,7 @@ package net.openhft.collections;
 
 
 import com.google.common.collect.*;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -141,18 +142,6 @@ public class IntIntMultiMapTest {
         // not enough space
         assertFalse(map.putLimited(2, 22, 2));
         assertTrue(map.putLimited(2, 22, 4));
-    }
-
-    @Test
-    public void firstAndNextNonEmptyPos() {
-        initMap(16);
-        map.put(1, 11);
-        map.put(2, 22);
-        map.put(3, 33);
-        assertEquals(11, map.firstPos());
-        assertEquals(22, map.nextKeyAfter(1));
-        assertEquals(33, map.nextKeyAfter(2));
-        assertEquals(-1, map.nextKeyAfter(3));
     }
 
     @Test
