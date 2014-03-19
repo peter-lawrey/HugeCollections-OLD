@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166y;
+package net.openhft.collections.jrs166;
 
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;

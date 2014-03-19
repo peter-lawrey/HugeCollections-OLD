@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166y;
+package net.openhft.collections.jrs166;
 
 /*
  * Written by Doug Lea with assistance from members of JCP JSR-166

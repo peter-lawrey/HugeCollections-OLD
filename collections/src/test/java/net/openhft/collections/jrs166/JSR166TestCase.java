@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166y;
+package net.openhft.collections.jrs166;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
