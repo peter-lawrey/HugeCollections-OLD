@@ -16,6 +16,7 @@
 
 package net.openhft.collections.jrs166y;
 
+import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 
 import java.io.*;
@@ -38,7 +39,7 @@ import java.util.*;
  */
 
 public class MapCheck {
-    static final Object MISSING = new Object();
+    static final String MISSING = "MISSING";
     static TestTimer timer = new TestTimer();
     static Class eclass;
 
@@ -97,7 +98,7 @@ public class MapCheck {
         precheck(size, key, absent);
 
         for (int rep = 0; rep < numTests; ++rep) {
-            mainTest(newMap(), key, absent);
+            mainTest(key, absent);
             if ((rep & 3) == 3 && rep < numTests - 1) {
                 shuffle(key);
                 //                Thread.sleep(10);
@@ -109,7 +110,7 @@ public class MapCheck {
         checkNullKey();
 
         if (doSerializeTest)
-            serTest(newMap(), size);
+            serTest(size);
     }
 
     static int counter = 0;
@@ -135,6 +136,17 @@ public class MapCheck {
         }
     }
 
+    static void closeMap(Map map) {
+        if (map instanceof SharedHashMap) {
+            SharedHashMap shm = (SharedHashMap) map;
+            try {
+                shm.close();
+            } catch (IOException e) {
+                throw new RuntimeException("Can't close SHM : " + e);
+            }
+        }
+    }
+
     static void precheck(int n, Object[] key, Object[] abs) {
         int ck = 0;
         Map s = newMap();
@@ -157,6 +169,7 @@ public class MapCheck {
                 throw new Error("Duplicate " + k + " / " + v);
         }
         checkSum += ck;
+        closeMap(s);
     }
 
     static void checkNullKey() {
@@ -176,6 +189,7 @@ public class MapCheck {
         if (!v.equals(x)) throw new Error();
         if (m.remove(null) != v) throw new Error();
         if (m.get(null) != null) throw new Error();
+        closeMap(m);
     }
 
 
@@ -367,7 +381,8 @@ public class MapCheck {
         reallyAssert(src.size() == dst.size());
     }
 
-    static void serTest(Map s, int size) throws Exception {
+    static void serTest(int size) throws Exception {
+        Map s = newMap();
         if (!(s instanceof Serializable))
             return;
         System.out.print("Serialize              : ");
@@ -394,9 +409,11 @@ public class MapCheck {
 
         if (s instanceof IdentityHashMap) return;
         reallyAssert(s.equals(m));
+        closeMap(s);
     }
 
-    static void mainTest(Map s, Object[] key, Object[] absent) {
+    static void mainTest(Object[] key, Object[] absent) {
+        Map s = newMap();
         int size = key.length;
 
         putTest("Add    Absent          ", size, s, key, size);
@@ -432,6 +449,7 @@ public class MapCheck {
         eitTest(s, size);
         twoMapTest1(s, key, absent);
         twoMapTest2(s, key, absent);
+        closeMap(s);
     }
 
     static void twoMapTest1(Map s, Object[] key, Object[] absent) {
@@ -447,6 +465,7 @@ public class MapCheck {
         putTest("Add    Absent          ", size, s2, key, size * 3 / 4);
         reallyAssert(s2.size() == size * 2);
         clrTest(size, s2);
+        closeMap(s2);
     }
 
     static void twoMapTest2(Map s, Object[] key, Object[] absent) {
@@ -510,6 +529,7 @@ public class MapCheck {
 
         clrTest(size, s2);
         reallyAssert(s2.isEmpty() && s.isEmpty());
+        closeMap(s2);
     }
 
     static void itTest4(Map s, int size, int pos) {
@@ -525,7 +545,7 @@ public class MapCheck {
             k = x.getKey();
             v = x.getValue();
             seen.put(k, k);
-            if (x != MISSING)
+            if (!x.equals(MISSING))
                 ++sum;
         }
         reallyAssert(s.containsKey(k));
@@ -535,7 +555,7 @@ public class MapCheck {
             Map.Entry x = (Map.Entry) (it.next());
             Object k2 = x.getKey();
             seen.put(k2, k2);
-            if (x != MISSING)
+            if (!x.equals(MISSING))
                 ++sum;
         }
 
@@ -575,6 +595,7 @@ public class MapCheck {
                     absent[k++] = ir;
             }
         }
+        closeMap(m);
     }
 
     static void initFloats(Object[] key, Object[] absent, int size) {
@@ -591,6 +612,7 @@ public class MapCheck {
             if (m.put(ir, ir) == null)
                 absent[k++] = ir;
         }
+        closeMap(m);
     }
 
     static void initDoubles(Object[] key, Object[] absent, int size) {
@@ -607,6 +629,7 @@ public class MapCheck {
             if (m.put(ir, ir) == null)
                 absent[k++] = ir;
         }
+        closeMap(m);
     }
 
     // Use as many real words as possible, then use fake random words

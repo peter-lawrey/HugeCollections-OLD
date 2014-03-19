@@ -159,36 +159,6 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     private long searchPos = -1;
 
     @Override
-    public int firstPos() {
-        int pos = 0;
-        long capacityPos = indexToPos(capacity);
-        while (pos < capacityPos) {
-            long entry = bytes.readLong(pos);
-            int hash2 = (int) (entry >> 32);
-            if (hash2 != UNSET_KEY) {
-                return (int) entry;
-            }
-            pos = pos + ENTRY_SIZE;
-        }
-        return -1;
-    }
-
-    @Override
-    public int nextKeyAfter(int key) { //todo: merge implementation with first position method
-        startSearch(key);
-        long capacityPos = indexToPos(capacity);
-        while (searchPos < capacityPos) {
-            long entry = bytes.readLong(searchPos);
-            int hash2 = (int) (entry >> 32);
-            if (hash2 != UNSET_KEY && hash2 != searchHash) {
-                return (int) entry;
-            }
-            searchPos = searchPos + ENTRY_SIZE;
-        }
-        return -1;
-    }
-
-    @Override
     public int startSearch(int key) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
@@ -237,8 +207,9 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
             long entry = bytes.readLong(pos);
             int key = (int) (entry >> 32);
             int value = (int) entry;
-            if (key != UNSET_KEY)
+            if (key != UNSET_KEY) {
                 action.accept(key, value);
+            }
         }
     }
 

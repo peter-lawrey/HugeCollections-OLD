@@ -66,21 +66,6 @@ interface IntIntMultiMap {
      */
     int nextPos();
 
-    /**
-     * Used for finding the first entry
-     *
-     * @return the first position in the map, -1 otherwise
-     */
-    int firstPos(); //todo: this method doesn't fit nicely in the picture
-
-    /**
-     * Used for finding the next key after a given key.
-     *
-     * @param key to find a next key after.
-     * @return the next non-empty position
-     */
-    int nextKeyAfter(int key); //todo: this method doesn't fit nicely in the picture
-
     void clear();
 
     void forEach(EntryConsumer action);

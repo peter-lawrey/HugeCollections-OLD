@@ -743,7 +743,7 @@ public class SharedHashMapTest {
 
     @Test
     public void mapRemoveReflectedInViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -762,7 +762,7 @@ public class SharedHashMapTest {
 
     @Test
     public void mapPutReflectedInViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -781,7 +781,7 @@ public class SharedHashMapTest {
 
     @Test
     public void entrySetRemoveReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -797,7 +797,7 @@ public class SharedHashMapTest {
 
     @Test
     public void keySetRemoveReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -813,7 +813,7 @@ public class SharedHashMapTest {
 
     @Test
     public void valuesRemoveReflectedInMap() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -829,7 +829,7 @@ public class SharedHashMapTest {
 
     @Test
     public void entrySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -848,7 +848,7 @@ public class SharedHashMapTest {
 
     @Test
     public void keySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -867,7 +867,7 @@ public class SharedHashMapTest {
 
     @Test
     public void valuesIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -886,7 +886,7 @@ public class SharedHashMapTest {
 
     @Test
     public void entrySetRemoveAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -907,7 +907,7 @@ public class SharedHashMapTest {
 
     @Test
     public void keySetRemoveAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -923,7 +923,7 @@ public class SharedHashMapTest {
 
     @Test
     public void valuesRemoveAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -939,7 +939,7 @@ public class SharedHashMapTest {
 
     @Test
     public void entrySetRetainAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -960,7 +960,7 @@ public class SharedHashMapTest {
 
     @Test
     public void keySetRetainAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -976,7 +976,7 @@ public class SharedHashMapTest {
 
     @Test
     public void valuesRetainAllReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -992,7 +992,7 @@ public class SharedHashMapTest {
 
     @Test
     public void entrySetClearReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -1008,7 +1008,7 @@ public class SharedHashMapTest {
 
     @Test
     public void keySetClearReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -1024,7 +1024,7 @@ public class SharedHashMapTest {
 
     @Test
     public void valuesClearReflectedInMapAndOtherViews() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
@@ -1040,37 +1040,46 @@ public class SharedHashMapTest {
 
     @Test
     public void clearMapViaEntryIteratorRemoves() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        int noOfElements = 16 * 1024;
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(noOfElements);
 
         int sum = 0;
         for (Iterator it = map.entrySet().iterator(); it.hasNext(); ) {
-            Object next = it.next();
-            it.remove();
-            ++sum;
-        }
-        map.close();
-
-        assertEquals(3, sum);
-    }
-
-    @Test
-    public void clearMapViaKeyIteratorRemoves() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
-
-        int sum = 0;
-        for (Iterator it = map.keySet().iterator(); it.hasNext(); ) {
             it.next();
             it.remove();
             ++sum;
         }
         map.close();
 
-        assertEquals(3, sum);
+        assertEquals(noOfElements, sum);
+    }
+
+    @Test
+    public void clearMapViaKeyIteratorRemoves() throws IOException {
+        int noOfElements = 16 * 1024;
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(noOfElements);
+
+        Set<Integer> keys = new HashSet<Integer>();
+        for (int i = 1; i <= noOfElements; i++) {
+            keys.add(i);
+        }
+
+        int sum = 0;
+        for (Iterator it = map.keySet().iterator(); it.hasNext(); ) {
+            Object key = it.next();
+            keys.remove(key);
+            it.remove();
+            ++sum;
+        }
+        map.close();
+
+        assertEquals(noOfElements, sum);
     }
 
     @Test
     public void clearMapViaValueIteratorRemoves() throws IOException {
-        SharedHashMap<Integer, CharSequence> map = getViewTestMap();
+        int noOfElements = 16 * 1024;
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(noOfElements);
 
         int sum = 0;
         for (Iterator it = map.values().iterator(); it.hasNext(); ) {
@@ -1080,10 +1089,36 @@ public class SharedHashMapTest {
         }
         map.close();
 
-        assertEquals(3, sum);
+        assertEquals(noOfElements, sum);
     }
 
-    private SharedHashMap<Integer, CharSequence> getViewTestMap() throws IOException {
+    @Test
+    public void entrySetValueReflectedInMapAndOtherViews() throws IOException {
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(0);
+
+        map.put(1, "A");
+        Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
+        Set<Integer> keySet = map.keySet();
+        Collection<CharSequence> values = map.values();
+
+        assertMap(map, new int[] {1}, new CharSequence[] {"A"});
+        assertEntrySet(entrySet, new int[]{1}, new CharSequence[]{"A"});
+        assertKeySet(keySet, new int[]{1});
+        assertValues(values, new String[]{"A"});
+
+        entrySet.iterator().next().setValue("B");
+        assertMap(map, new int[]{1}, new CharSequence[]{"B"});
+        assertEntrySet(entrySet, new int[]{1}, new CharSequence[]{"B"});
+        assertEntrySet(map.entrySet(), new int[]{1}, new CharSequence[]{"B"});
+        assertKeySet(keySet, new int[]{1});
+        assertKeySet(map.keySet(), new int[]{1});
+        assertValues(values, new String[]{"B"});
+        assertValues(map.values(), new String[]{"B"});
+
+        map.close();
+    }
+
+    private SharedHashMap<Integer, CharSequence> getViewTestMap(int noOfElements) throws IOException {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-remove-test");
         file.delete();
@@ -1098,13 +1133,14 @@ public class SharedHashMapTest {
                         .removeReturnsNull(true)
                         .create(file, Integer.class, CharSequence.class);
 
-        map.put(1, "1");
-        map.put(2, "2");
-        map.put(3, "3");
-
-        assertEntrySet(map.entrySet(), new int[]{2, 1, 3}, new String[]{"2", "1", "3"});
-        assertKeySet(map.keySet(), new int[]{2, 1, 3});
-        assertValues(map.values(), new String[]{"2", "1", "3"});
+        int[] expectedKeys = new int[noOfElements];
+        String[] expectedValues = new String[noOfElements];
+        for (int i = 1; i <= noOfElements; i++) {
+            String value = "" + i;
+            map.put(i, value);
+            expectedKeys[i - 1] = i;
+            expectedValues[i - 1] = value;
+        }
 
         return map;
     }

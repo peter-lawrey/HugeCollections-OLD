@@ -1047,43 +1047,35 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         }
 
-        Entry<K, V> getNextEntry(K prevKey) {
-            int pos;
-            if (prevKey == null) {
-                pos = hashLookup.firstPos();
-            } else {
-                int hash = hasher.segmentHash(hasher.hash(getKeyAsBytes(prevKey)));
-                pos = hashLookup.nextKeyAfter(hash);
-            }
+        void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
+            hashLookup.forEach(entryConsumer);
+        }
 
-            if (pos >= 0) {
-                final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                int length = entrySize - metaDataBytes;
-                tmpBytes.storePositionAndSize(bytes, offset, length);
-                tmpBytes.readStopBit();
-                K key = tmpBytes.readInstance(kClass, null); //todo: readUsing?
+        Entry<K, V> getEntry(int pos) {
+            final long offset = entriesOffset + pos * entrySize + metaDataBytes;
+            int length = entrySize - metaDataBytes;
+            tmpBytes.storePositionAndSize(bytes, offset, length);
+            tmpBytes.readStopBit();
+            K key = tmpBytes.readInstance(kClass, null); //todo: readUsing?
 
-                tmpBytes.readStopBit();
-                final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
-                tmpBytes.position(valueOffset);
-                V value = readObjectUsing(null, offset + valueOffset); //todo: reusable container
+            tmpBytes.readStopBit();
+            final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
+            tmpBytes.position(valueOffset);
+            V value = readObjectUsing(null, offset + valueOffset); //todo: reusable container
 
-                //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
+            //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
 
-                return new SimpleEntry<K, V>(key, value);
-            } else {
-                return null;
-            }
+            return new WriteThroughEntry(key, value);
         }
     }
 
-    final class EntryIterator implements Iterator<Entry<K, V>> {
+    final class EntryIterator implements Iterator<Entry<K, V>>, IntIntMultiMap.EntryConsumer {
 
-        int segmentIndex = segments.length - 1;
+        int segmentIndex = segments.length;
 
         Entry<K, V> nextEntry, lastReturned;
 
-        K lastSegmentKey;
+        Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
 
         EntryIterator() {
             nextEntry = nextSegmentEntry();
@@ -1110,19 +1102,33 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
-                Segment segment = segments[segmentIndex];
-                Entry<K, V> entry = segment.getNextEntry(lastSegmentKey);
-                if (entry == null) {
-                    segmentIndex--;
-                    lastSegmentKey = null;
+                if (segmentPositions.isEmpty()) {
+                    switchToNextSegment();
                 } else {
-                    lastSegmentKey = entry.getKey();
-                    return entry;
+                    Segment segment = segments[segmentIndex];
+                    while (!segmentPositions.isEmpty()) {
+                        Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
+                        if (entry != null) {
+                            return entry;
+                        }
+                    }
                 }
             }
             return null;
         }
 
+        private void switchToNextSegment() {
+            segmentPositions.clear();
+            segmentIndex--;
+            if (segmentIndex >= 0) {
+                segments[segmentIndex].visit(this);
+            }
+        }
+
+        @Override
+        public void accept(int key, int value) {
+            segmentPositions.add(value);
+        }
     }
 
     final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
@@ -1169,6 +1175,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         public void clear() {
             VanillaSharedHashMap.this.clear();
+        }
+    }
+
+    final class WriteThroughEntry extends SimpleEntry<K, V> {
+
+        WriteThroughEntry(K key, V value) {
+            super(key, value);
+        }
+
+        @Override
+        public V setValue(V value) {
+            put(getKey(), value);
+            return super.setValue(value);
         }
     }
 }
