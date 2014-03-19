@@ -25,6 +25,7 @@
     <version>3.0c</version>
     <modules>
         <module>collections</module>
+        <module>third-party-bom</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -24,7 +24,7 @@ import net.openhft.lang.model.Copyable;
 import static net.openhft.lang.Compare.calcLongHashCode;
 import static net.openhft.lang.Compare.isEqual;
 
-public class IntValue£native implements IntValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.IntValue> {
+public class IntValueNative implements IntValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.IntValue> {
     private static final int VALUE = 0;
 
 
