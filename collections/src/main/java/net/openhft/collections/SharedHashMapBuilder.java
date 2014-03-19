@@ -47,7 +47,7 @@ public class SharedHashMapBuilder implements Cloneable {
     private boolean removeReturnsNull = false;
     private boolean generatedKeyType = false;
     private boolean generatedValueType = false;
-
+    private boolean largeSegments = false;
 
     @Override
     public SharedHashMapBuilder clone() {
@@ -112,8 +112,12 @@ public class SharedHashMapBuilder implements Cloneable {
             return actualEntriesPerSegment;
         // round up to the next multiple of 64.
         int as = actualSegments();
-        int aeps = (int) (Math.max(1, entries * 2L / as) + 63) & ~63;
+        int aeps = segmentsForEntries(as);
         return aeps;
+    }
+
+    private int segmentsForEntries(int as) {
+        return (int) (Math.max(1, entries * 2L / as) + 63) & ~63;
     }
 
     public SharedHashMapBuilder actualSegments(int actualSegments) {
@@ -124,6 +128,12 @@ public class SharedHashMapBuilder implements Cloneable {
     public int actualSegments() {
         if (actualSegments > 0)
             return actualSegments;
+        if (!largeSegments && entries > (long) minSegments << 15) {
+            long segments = Maths.nextPower2(entries >> 15, 128);
+            if (segments < 1 << 20)
+                return (int) segments;
+        }
+        // try to keep it 16-bit sizes segments
         return (int) Maths.nextPower2(Math.max((entries >> 30) + 1, minSegments), 1);
     }
 
@@ -281,6 +291,15 @@ public class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
+    public boolean largeSegments() {
+        return entries > 1L << (20 + 15) || largeSegments;
+    }
+
+    public SharedHashMapBuilder largeSegments(boolean largeSegments) {
+        this.largeSegments = largeSegments;
+        return this;
+    }
+
 
     public SharedHashMapBuilder metaDataBytes(int metaDataBytes) {
         if ((metaDataBytes & 0xFF) != metaDataBytes)
@@ -306,7 +325,7 @@ public class SharedHashMapBuilder implements Cloneable {
     public String toString() {
         return "SharedHashMapBuilder{" +
                 "actualSegments=" + actualSegments() +
-                ", minSegments=" + minSegments() +
+                (actualSegments > 0 ? ", actualSegments=" + actualSegments() : ", minSegments=" + minSegments()) +
                 ", actualEntriesPerSegment=" + actualEntriesPerSegment() +
                 ", entrySize=" + entrySize() +
                 ", entries=" + entries() +
@@ -318,6 +337,7 @@ public class SharedHashMapBuilder implements Cloneable {
                 ", removeReturnsNull=" + removeReturnsNull() +
                 ", generatedKeyType=" + generatedKeyType() +
                 ", generatedValueType=" + generatedValueType() +
+                ", largeSegments=" + largeSegments() +
                 ", metaDataBytes=" + metaDataBytes() +
                 ", eventListener=" + eventListener() +
                 '}';

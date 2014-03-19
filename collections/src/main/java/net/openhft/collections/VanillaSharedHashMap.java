@@ -118,6 +118,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 .generatedValueType(generatedValueType)
                 .lockTimeOutMS(lockTimeOutNS / 1000000)
                 .minSegments(segments.length)
+                .actualSegments(segments.length)
+                .actualEntriesPerSegment(entriesPerSegment)
                 .putReturnsNull(putReturnsNull)
                 .removeReturnsNull(removeReturnsNull)
                 .replicas(replicas)
@@ -368,15 +370,20 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * {@inheritDoc}
      */
 
-    public int size() {
+    public long longSize() {
         long result = 0;
 
         for (final Segment segment : this.segments) {
             result += segment.getSize();
         }
 
-        return (int) result;
+        return result;
+    }
 
+    @Override
+    public int size() {
+        long size = longSize();
+        return size > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) size;
     }
 
     /**

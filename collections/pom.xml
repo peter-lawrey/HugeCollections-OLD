@@ -33,7 +33,7 @@
         <pax.exam.version>3.4.0</pax.exam.version>
         <pax.url.version>1.6.0</pax.url.version>
         <logback.version>0.9.6</logback.version>
-        <openhft.lang.version>6.3.3</openhft.lang.version>
+        <openhft.lang.version>6.3.4-SNAPSHOT</openhft.lang.version>
         <osgi.version>5.0.0</osgi.version>
     </properties>
 

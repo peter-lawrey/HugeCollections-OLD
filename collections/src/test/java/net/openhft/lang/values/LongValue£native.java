@@ -24,62 +24,65 @@ import net.openhft.lang.model.Copyable;
 import static net.openhft.lang.Compare.calcLongHashCode;
 import static net.openhft.lang.Compare.isEqual;
 
-public class LongValueNative implements LongValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.LongValue> {
+public class LongValue£native implements LongValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.LongValue> {
     private static final int VALUE = 0;
 
 
     private Bytes _bytes;
     private long _offset;
 
-    public void setValue(long _) {
-        _bytes.writeLong(_offset + VALUE, _);
+    public void setValue(long $) {
+        _bytes.writeLong(_offset + VALUE, $);
     }
 
     public long getValue() {
         return _bytes.readLong(_offset + VALUE);
     }
 
-    public long addValue(long _) {
-        return _bytes.addLong(_offset + VALUE, _);
+    public long addValue(long $) {
+        return _bytes.addLong(_offset + VALUE, $);
     }
 
-    public long addAtomicValue(long _) {
-        return _bytes.addAtomicLong(_offset + VALUE, _);
+    public long addAtomicValue(long $) {
+        return _bytes.addAtomicLong(_offset + VALUE, $);
     }
 
     public boolean compareAndSwapValue(long _1, long _2) {
         return _bytes.compareAndSwapLong(_offset + VALUE, _1, _2);
     }
 
+    @Override
     public void copyFrom(net.openhft.lang.values.LongValue from) {
         setValue(from.getValue());
     }
 
+    @Override
     public void writeMarshallable(Bytes out) {
         out.writeLong(getValue());
     }
 
+    @Override
     public void readMarshallable(Bytes in) {
         setValue(in.readLong());
     }
 
-    public void bytes(Bytes bytes) {
-        bytes(bytes, 0L);
-    }
-
+    @Override
     public void bytes(Bytes bytes, long offset) {
         this._bytes = bytes;
         this._offset = offset;
     }
 
+    @Override
     public Bytes bytes() {
         return _bytes;
     }
 
+    @Override
     public long offset() {
         return _offset;
     }
 
+    @Override
     public int maxSize() {
         return 8;
     }
@@ -103,7 +106,11 @@ public class LongValueNative implements LongValue, BytesMarshallable, Byteable, 
     }
 
     public String toString() {
-        return "LongValue {" +
-                ", value= " + getValue() + " }";
+        if (_bytes == null) return "bytes is null";
+        StringBuilder sb = new StringBuilder();
+        sb.append("LongValue{ ");
+        sb.append("value= ").append(getValue());
+        sb.append(" }");
+        return sb.toString();
     }
 }

@@ -16,8 +16,11 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.model.DataValueClasses;
+import net.openhft.lang.model.DataValueGenerator;
+import net.openhft.lang.values.IntValue;
 import net.openhft.lang.values.LongValue;
-import net.openhft.lang.values.LongValueNative;
+import net.openhft.lang.values.LongValue£native;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -369,7 +372,7 @@ public class SharedHashMapTest {
     @Test
     public void testAcquireWithNullContainer() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
-        map.acquireUsing("key", new LongValueNative());
+        map.acquireUsing("key", new LongValue£native());
         assertEquals(0, map.acquireUsing("key", null).getValue());
 
         map.close();
@@ -378,7 +381,7 @@ public class SharedHashMapTest {
     @Test
     public void testGetWithNullContainer() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
-        map.acquireUsing("key", new LongValueNative());
+        map.acquireUsing("key", new LongValue£native());
         assertEquals(0, map.getUsing("key", null).getValue());
 
         map.close();
@@ -387,7 +390,7 @@ public class SharedHashMapTest {
     @Test
     public void testGetWithoutAcquireFirst() throws Exception {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(10 * 1000, 128, 24);
-        assertNull(map.getUsing("key", new LongValueNative()));
+        assertNull(map.getUsing("key", new LongValue£native()));
 
         map.close();
     }
@@ -397,9 +400,9 @@ public class SharedHashMapTest {
         int entries = 1000 * 1000;
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
 
-        LongValue value = new LongValueNative();
-        LongValue value2 = new LongValueNative();
-        LongValue value3 = new LongValueNative();
+        LongValue value = new LongValue£native();
+        LongValue value2 = new LongValue£native();
+        LongValue value3 = new LongValue£native();
 
         for (int j = 1; j <= 3; j++) {
             for (int i = 0; i < entries; i++) {
@@ -430,7 +433,7 @@ public class SharedHashMapTest {
         SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
 
         CharSequence key = getUserCharSequence(0);
-        map.acquireUsing(key, new LongValueNative());
+        map.acquireUsing(key, new LongValue£native());
 
         int iterations = 1000;
         int noOfThreads = 10;
@@ -445,7 +448,7 @@ public class SharedHashMapTest {
             threads[t].join();
         }
 
-        assertEquals(noOfThreads * iterations, map.acquireUsing(key, new LongValueNative()).getValue());
+        assertEquals(noOfThreads * iterations, map.acquireUsing(key, new LongValue£native()).getValue());
 
         map.close();
     }
@@ -470,7 +473,7 @@ public class SharedHashMapTest {
         @Override
         public void run() {
             try {
-                LongValue value = new LongValueNative();
+                LongValue value = new LongValue£native();
                 barrier.await();
                 for (int i = 0; i < iterations; i++) {
                     map.acquireUsing(key, value);
@@ -514,44 +517,59 @@ public class SharedHashMapTest {
     // 1000M users, updated 16 times, Throughput 1.3 M ops/sec, TODO FIX this
 
     @Test
+    public void testIntValue() {
+        DataValueGenerator dvg = new DataValueGenerator();
+        dvg.setDumpCode(true);
+        dvg.acquireNativeClass(IntValue.class);
+        dvg.acquireNativeClass(LongValue.class);
+    }
+
+    @Test
     @Ignore
-    public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
+    public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException, ExecutionException {
 //        int runs = Integer.getInteger("runs", 10);
-        for (int runs : new int[]{10, 50, 250, 1000, 2500}) {
+        for (int runs : new int[]{10, 50, 250, 500, 1000, 2500}) {
             final long entries = runs * 1000 * 1000L;
-            final SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries * 4 / 3, 1024, 24);
+            final SharedHashMap<CharSequence, IntValue> map = getSharedStringIntMap(entries, 1024, 20);
 
             int procs = Runtime.getRuntime().availableProcessors();
-            int threads = procs * 2;
-            int count = runs > 500 ? runs > 1200 ? 1 : 2 : 3;
-            final int independence = Math.min(procs, runs > 500 ? 8 : 4);
+            int threads = procs * 2; // runs > 100 ? procs / 2 : procs;
+            int count = runs > 500 ? runs > 1200 ? 1 : 3 : 5;
+            final int independence = 8; // Math.min(procs, runs > 500 ? 8 : 4);
+            System.out.println("\nKey size: " + runs + " Million entries. " + map.builder());
             for (int j = 0; j < count; j++) {
                 long start = System.currentTimeMillis();
                 ExecutorService es = Executors.newFixedThreadPool(procs);
+                List<Future> futures = new ArrayList<Future>();
                 for (int i = 0; i < threads; i++) {
                     final int t = i;
-                    es.submit(new Runnable() {
+                    futures.add(es.submit(new Runnable() {
                         @Override
                         public void run() {
-                            LongValue value = nativeLongValue();
+                            IntValue value = nativeIntValue();
                             StringBuilder sb = new StringBuilder();
-                            int next = 50 * 1000 * 1000;
+                            long next = 50 * 1000 * 1000;
                             // use a factor to give up to 10 digit numbers.
                             int factor = Math.max(1, (int) ((10 * 1000 * 1000 * 1000L - 1) / entries));
-                            for (long i = t % independence; i < entries; i += independence) {
+                            for (long j = t % independence; j < entries + independence - 1; j += independence) {
                                 sb.setLength(0);
-                                sb.append("u:");
-                                sb.append(i * factor);
+                                sb.append("us:");
+                                sb.append(j * factor);
                                 map.acquireUsing(sb, value);
                                 long n = value.addAtomicValue(1);
-                                assert n >= 0 && n < 1000 : "Counter corrupted " + n;
-                                if (t == 0 && i == next) {
-                                    System.out.println(i);
+                                assert n > 0 && n < 1000 : "Counter corrupted " + n;
+                                if (t == 0 && j >= next) {
+                                    long size = map.longSize();
+                                    if (size < 0) throw new AssertionError("size: " + size);
+                                    System.out.println(j + ", size: " + size);
                                     next += 50 * 1000 * 1000;
                                 }
                             }
                         }
-                    });
+                    }));
+                }
+                for (Future future : futures) {
+                    future.get();
                 }
                 es.shutdown();
                 es.awaitTermination(runs / 10 + 1, TimeUnit.MINUTES);
@@ -559,7 +577,9 @@ public class SharedHashMapTest {
                 System.out.printf("Throughput %.1f M ops/sec%n", threads * entries / independence / 1000.0 / time);
             }
             printStatus();
+            File file = map.file();
             map.close();
+            file.delete();
         }
     }
 
@@ -627,29 +647,13 @@ public class SharedHashMapTest {
         }
     }
 
-/*
-    // generates garbage
-    public static final Class<LongValue> nativeLongValueClass;
-
-    static {
-        DataValueGenerator dvg = new DataValueGenerator();
-//        dvg.setDumpCode(true);
-        try {
-            nativeLongValueClass = dvg.acquireNativeClass(LongValue.class);
-        } catch (ClassNotFoundException e) {
-            throw new AssertionError(e);
-        }
-    }*/
-
     public static LongValue nativeLongValue() {
-/*
-        try {
-            return nativeLongValueClass.newInstance();
-        } catch (Exception e) {
-            throw new AssertionError(e);
-        }
-*/
-        return new LongValueNative();
+        return new LongValue£native();
+    }
+
+    public static IntValue nativeIntValue() {
+        return DataValueClasses.newDirectReference(IntValue.class);
+//        return new LongValue£native();
     }
 
     private CharSequence getUserCharSequence(int i) {
@@ -674,6 +678,16 @@ public class SharedHashMapTest {
                 .entrySize(entrySize)
                 .generatedValueType(true)
                 .create(getPersistenceFile(), CharSequence.class, LongValue.class);
+    }
+
+    private static SharedHashMap<CharSequence, IntValue> getSharedStringIntMap(long entries, int segments, int entrySize) throws IOException {
+        return new SharedHashMapBuilder()
+                .entries(entries)
+                .minSegments(segments)
+                .entrySize(entrySize)
+                .generatedValueType(true)
+                .putReturnsNull(true)
+                .create(getPersistenceFile(), CharSequence.class, IntValue.class);
     }
 
     private static void printStatus() {

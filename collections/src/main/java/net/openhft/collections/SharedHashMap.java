@@ -22,6 +22,12 @@ import java.util.concurrent.ConcurrentMap;
 
 public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
     /**
+     * @see java.util.Map::size()
+     * @return size as a long.
+     */
+    long longSize();
+
+    /**
      * Get a value for a key if available.  If the value is Byteable, it will be assigned to reference the value, instead of copying the data for zero copy access to the collection.
      *
      * @param key   to lookup.
