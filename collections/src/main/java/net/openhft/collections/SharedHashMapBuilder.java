@@ -60,7 +60,7 @@ public class SharedHashMapBuilder implements Cloneable {
 
     /**
      * Set minimum number of segments.
-     * <p/>
+     * <p></p>
      * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
@@ -227,11 +227,11 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @param putReturnsNull false if you want {@link this.put()} to not return the object that was replaced but instead return null
+     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
      */
     public SharedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
         this.putReturnsNull = putReturnsNull;
@@ -239,22 +239,22 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @return true if {@link this.put()} is not going to return the object that was replaced but instead return null
+     * @return true if SharedHashMap.put() is not going to return the object that was replaced but instead return null
      */
     public boolean putReturnsNull() {
         return putReturnsNull;
     }
 
     /**
-     * {@link this.remove()}  returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * Map.remove()  returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @param removeReturnsNull false if you want {@link this.remove()} to not return the object that was removed but instead return null
+     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
      */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
         this.removeReturnsNull = removeReturnsNull;
@@ -263,11 +263,11 @@ public class SharedHashMapBuilder implements Cloneable {
 
 
     /**
-     * {@link this.put()} returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * Map.remove() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @return true if {@link this.remove()} is not going to return the object that was removed but instead return null
+     * @return true if SharedHashMap.remove() is not going to return the object that was removed but instead return null
      */
     public boolean removeReturnsNull() {
         return removeReturnsNull;

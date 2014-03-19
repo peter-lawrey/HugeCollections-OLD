@@ -44,7 +44,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
      * in natural order: 4 bytes of k1, 4 bytes of v1, 4 bytes of k2, ...
      * and this is somehow compatible with previous version of this class,
      * where keys were written before values explicitly.
-     * <p/>
+     * <p></p>
      * However, this layout increases latency of map operations
      * by 1 clock cycle :), because we always need to perform shift to obtain
      * the key between memory read and comparison with UNSET_KEY.

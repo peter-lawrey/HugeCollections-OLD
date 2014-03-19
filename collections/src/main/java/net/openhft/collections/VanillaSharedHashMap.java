@@ -531,7 +531,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         /**
          * used to acquire and object of type V from the map,
-         * <p/>
+         * <p></p>
          * when {@param create }== true, this method is equivalent to :
          * <pre>
          * Object value = map.get("Key");
