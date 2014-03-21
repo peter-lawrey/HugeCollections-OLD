@@ -24,46 +24,62 @@ import net.openhft.lang.model.Copyable;
 import static net.openhft.lang.Compare.calcLongHashCode;
 import static net.openhft.lang.Compare.isEqual;
 
-public class LongValue£native implements LongValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.LongValue> {
+public class IntValue$$Native implements IntValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.IntValue> {
     private static final int VALUE = 0;
 
 
     private Bytes _bytes;
     private long _offset;
 
-    public void setValue(long $) {
-        _bytes.writeLong(_offset + VALUE, $);
+    public void setValue(int $) {
+        _bytes.writeInt(_offset + VALUE, $);
     }
 
-    public long getValue() {
-        return _bytes.readLong(_offset + VALUE);
+    public int getValue() {
+        return _bytes.readInt(_offset + VALUE);
     }
 
-    public long addValue(long $) {
-        return _bytes.addLong(_offset + VALUE, $);
+    public int addValue(int $) {
+        return _bytes.addInt(_offset + VALUE, $);
     }
 
-    public long addAtomicValue(long $) {
-        return _bytes.addAtomicLong(_offset + VALUE, $);
+    public int addAtomicValue(int $) {
+        return _bytes.addAtomicInt(_offset + VALUE, $);
     }
 
-    public boolean compareAndSwapValue(long _1, long _2) {
-        return _bytes.compareAndSwapLong(_offset + VALUE, _1, _2);
+    public boolean compareAndSwapValue(int _1, int _2) {
+        return _bytes.compareAndSwapInt(_offset + VALUE, _1, _2);
+    }
+
+    public boolean tryLockNanosValue(long nanos) {
+        return _bytes.tryLockNanosInt(_offset + VALUE, nanos);
+    }
+
+    public boolean tryLockValue() {
+        return _bytes.tryLockInt(_offset + VALUE);
+    }
+
+    public void unlockValue() {
+        _bytes.unlockInt(_offset + VALUE);
+    }
+
+    public void busyLockValue() throws InterruptedException {
+        _bytes.busyLockInt(_offset + VALUE);
     }
 
     @Override
-    public void copyFrom(net.openhft.lang.values.LongValue from) {
+    public void copyFrom(net.openhft.lang.values.IntValue from) {
         setValue(from.getValue());
     }
 
     @Override
     public void writeMarshallable(Bytes out) {
-        out.writeLong(getValue());
+        out.writeInt(getValue());
     }
 
     @Override
     public void readMarshallable(Bytes in) {
-        setValue(in.readLong());
+        setValue(in.readInt());
     }
 
     @Override
@@ -84,7 +100,7 @@ public class LongValue£native implements LongValue, BytesMarshallable, Byteable
 
     @Override
     public int maxSize() {
-        return 8;
+        return 4;
     }
 
     public int hashCode() {
@@ -98,8 +114,8 @@ public class LongValue£native implements LongValue, BytesMarshallable, Byteable
 
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof LongValue)) return false;
-        LongValue that = (LongValue) o;
+        if (!(o instanceof IntValue)) return false;
+        IntValue that = (IntValue) o;
 
         if (!isEqual(getValue(), that.getValue())) return false;
         return true;
@@ -108,7 +124,7 @@ public class LongValue£native implements LongValue, BytesMarshallable, Byteable
     public String toString() {
         if (_bytes == null) return "bytes is null";
         StringBuilder sb = new StringBuilder();
-        sb.append("LongValue{ ");
+        sb.append("IntValue{ ");
         sb.append("value= ").append(getValue());
         sb.append(" }");
         return sb.toString();

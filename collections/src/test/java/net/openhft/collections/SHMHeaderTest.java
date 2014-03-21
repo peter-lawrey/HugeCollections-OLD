@@ -1,5 +1,6 @@
 package net.openhft.collections;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -12,7 +13,11 @@ import static org.junit.Assert.assertEquals;
  * Created by win7 on 08/03/14.
  */
 public class SHMHeaderTest {
+
+
+    // added added an @Ignore as it take 5 mins to run
     @Test
+    @Ignore
     public void testDifferentHeaders() throws IOException {
         Random rand = new Random(1);
         for (int i = 1; i <= 1000; i++) {
