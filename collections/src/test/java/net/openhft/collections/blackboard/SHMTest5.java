@@ -23,6 +23,9 @@ import net.openhft.lang.model.constraints.MaxSize;
 
 import java.io.File;
 
+/**
+ * @author jack shirazi
+ */
 public class SHMTest5 {
     public static final String TEST_KEY = "whatever";
     public static int NUMBER_OF_PROCESSES_ALLOWED = 2;
