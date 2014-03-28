@@ -36,10 +36,12 @@ public class StateMachineTutorial {
         SharedHashMap<Integer, StateMachineData> map = null;
 
         try {
+            File dataFile = new File(System.getProperty("java.io.tmpdir"),"hft-state-machine");
+
             map = new SharedHashMapBuilder()
                 .entries(8)
                 .create(
-                    new File(System.getProperty("java.io.tmpdir"),"hft-state-machine"),
+                    dataFile,
                     Integer.class,
                     StateMachineData.class);
 
@@ -50,9 +52,19 @@ public class StateMachineTutorial {
 
                     StateMachineState st = smd.getState();
                     if(st == StateMachineState.STATE_0) {
+                        long start = System.nanoTime();
+
                         //fire the first state change
                         smd.setStateData(0);
                         smd.setState(StateMachineState.STATE_0, StateMachineState.STATE_1);
+
+                        while(!smd.done()) {
+                            // busy wait
+                        }
+
+                        long end = System.nanoTime();
+
+                        LOGGER.info("Took {} us for 100 transiction",(end - start) / 1E3);
                     }
                 } else if("1".equalsIgnoreCase(args[0])) {
                     StateMachineProcessor.runProcessor(
@@ -72,6 +84,9 @@ public class StateMachineTutorial {
                         StateMachineState.STATE_3,
                         StateMachineState.STATE_3_WORKING,
                         StateMachineState.STATE_1);
+                } else if("clean".equalsIgnoreCase(args[0])){
+                    LOGGER.info("deleting {}",dataFile.getAbsolutePath());
+                    dataFile.delete();
                 }
             }
         } finally {
