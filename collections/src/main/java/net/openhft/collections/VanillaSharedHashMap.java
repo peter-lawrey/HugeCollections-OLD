@@ -54,6 +54,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final SharedMapEventListener<K, V> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
+
+
+    // if set the ReturnsNull fields will cause some functions to return NULL
+    // rather than as returning the Object can be expensive for something you probably don't use.
     private final boolean putReturnsNull;
     private final boolean removeReturnsNull;
 
