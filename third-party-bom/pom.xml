@@ -32,13 +32,25 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <pax.exam.version>3.4.0</pax.exam.version>
         <pax.url.version>1.6.0</pax.url.version>
-        <logback.version>0.9.6</logback.version>
+        <!--<logback.version>0.9.6</logback.version>-->
         <openhft.lang.version>6.3.4-SNAPSHOT</openhft.lang.version>
         <osgi.version>5.0.0</osgi.version>
+        <slf4j.version>1.7.6</slf4j.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
 
             <dependency>
                 <groupId>junit</groupId>
@@ -94,6 +106,7 @@
                 <version>4.2.1</version>
             </dependency>
 
+            <!--
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-core</artifactId>
@@ -105,6 +118,7 @@
                 <artifactId>logback-classic</artifactId>
                 <version>${logback.version}</version>
             </dependency>
+            -->
 
             <dependency>
                 <groupId>net.java.dev.jna</groupId>

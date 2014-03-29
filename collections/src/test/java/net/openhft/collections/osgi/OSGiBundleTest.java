@@ -16,8 +16,6 @@
 
 package net.openhft.collections.osgi;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,20 +42,19 @@ public class OSGiBundleTest extends OSGiTestBase {
 
     @Configuration
     public Option[] config() {
-        Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-        root.setLevel(Level.INFO);
-
         return options(
-                systemProperty("org.osgi.framework.storage.clean").value("true"),
-                systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
-                mavenBundle("net.openhft", "lang", System.getProperty("openhft.lang.version")),
-//              wrappedBundle(mavenBundle("net.openhft","lang-sandbox",System.getProperty("openhft.lang.version"))),
-                workspaceBundle("collections"),
-                junitBundles(),
-                systemPackage("sun.misc"),
-                systemPackage("sun.nio.ch"),
-                systemPackage("com.sun.tools.javac.api"),
-                cleanCaches()
+            systemProperty("org.osgi.framework.storage.clean").value("true"),
+            systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
+            mavenBundle("net.openhft", "lang", System.getProperty("openhft.lang.version")),
+            mavenBundle("net.openhft", "compiler", System.getProperty("openhft.compiler.version")),
+            mavenBundle("org.slf4j", "slf4j-api", System.getProperty("slf4j.version")),
+            mavenBundle("org.slf4j", "slf4j-simple", System.getProperty("slf4j.version")).noStart(),
+            workspaceBundle("collections"),
+            junitBundles(),
+            systemPackage("sun.misc"),
+            systemPackage("sun.nio.ch"),
+            systemPackage("com.sun.tools.javac.api"),
+            cleanCaches()
         );
     }
 
