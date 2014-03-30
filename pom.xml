@@ -22,7 +22,7 @@
 
     <groupId>net.openhft</groupId>
     <artifactId>HugeCollections</artifactId>
-    <version>3.0e</version>
+    <version>3.0f-SNAPSHOT</version>
     <modules>
         <module>collections</module>
     </modules>
