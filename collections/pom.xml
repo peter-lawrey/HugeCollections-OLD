@@ -22,7 +22,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.openhft</groupId>
     <artifactId>collections</artifactId>
-    <version>3.0e-SNAPSHOT</version>
+    <version>3.0e</version>
     <packaging>bundle</packaging>
     <name>Huge Collections</name>
     <description>Java Collections which are designed to be huge (may GB)</description>
@@ -30,18 +30,17 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <openhft.lang.version>6.3.4</openhft.lang.version>
-        <openhft.compiler.version>2.1.1-SNAPSHOT</openhft.compiler.version>
+        <openhft.compiler.version>2.1</openhft.compiler.version>
         <slf4j.version>1.7.6</slf4j.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
                 <type>pom</type>
-                <version>${project.version}</version>
+                <version>3.0</version>
                 <scope>import</scope>
             </dependency>
 
@@ -263,7 +262,7 @@
                     <nohelp>true</nohelp>
                 </configuration>
             </plugin>
-            <!--plugin>
+            <plugin>
             <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>1.5</version>
@@ -279,7 +278,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin-->
+            </plugin>
 
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>

@@ -22,10 +22,9 @@
 
     <groupId>net.openhft</groupId>
     <artifactId>HugeCollections</artifactId>
-    <version>3.0c</version>
+    <version>3.0e</version>
     <modules>
         <module>collections</module>
-        <module>third-party-bom</module>
     </modules>
     <packaging>pom</packaging>
 
