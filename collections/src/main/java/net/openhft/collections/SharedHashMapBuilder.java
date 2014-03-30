@@ -30,7 +30,7 @@ public class SharedHashMapBuilder implements Cloneable {
     private static final byte[] MAGIC = "SharedHM".getBytes();
 
     // used when configuring the number of segments.
-    private int minSegments = 128;
+    private int minSegments = -1;
     private int actualSegments = -1;
     // used when reading the number of entries per
     private int actualEntriesPerSegment = -1;
@@ -71,7 +71,15 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     public int minSegments() {
-        return minSegments;
+        return minSegments < 1 ? tryMinSegments(4, 65536) : minSegments;
+    }
+
+    private int tryMinSegments(int min, int max) {
+        for (int i = min; i < max; i <<= 1) {
+            if (i * i * i >= entrySize() * 2)
+                return i;
+        }
+        return max;
     }
 
 
@@ -128,13 +136,13 @@ public class SharedHashMapBuilder implements Cloneable {
     public int actualSegments() {
         if (actualSegments > 0)
             return actualSegments;
-        if (!largeSegments && entries > (long) minSegments << 15) {
+        if (!largeSegments && entries > (long) minSegments() << 15) {
             long segments = Maths.nextPower2(entries >> 15, 128);
             if (segments < 1 << 20)
                 return (int) segments;
         }
         // try to keep it 16-bit sizes segments
-        return (int) Maths.nextPower2(Math.max((entries >> 30) + 1, minSegments), 1);
+        return (int) Maths.nextPower2(Math.max((entries >> 30) + 1, minSegments()), 1);
     }
 
     /**

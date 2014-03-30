@@ -23,6 +23,8 @@ import net.openhft.lang.model.constraints.MaxSize;
 
 import java.io.File;
 
+import static org.junit.Assert.assertEquals;
+
 /**
  * @author jack shirazi
  */
@@ -34,6 +36,11 @@ public class SHMTest5 {
         //First create (or access if already created) the shared map
         SharedHashMapBuilder builder = new SharedHashMapBuilder()
                 .entries(1000);
+
+        //// don't include this, just to check it is as expected.
+        assertEquals(8, builder.minSegments());
+        //// end of test
+
         String shmPath = System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "SHMTest5";
         SharedHashMap<String, SHMTest5Data> theSharedMap = builder.create(new File(shmPath), String.class, SHMTest5Data.class);
 
