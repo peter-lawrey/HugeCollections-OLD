@@ -29,6 +29,9 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <openhft.lang.version>6.3.4</openhft.lang.version>
+        <openhft.compiler.version>2.1</openhft.compiler.version>
+        <slf4j.version>1.7.6</slf4j.version>
     </properties>
 
     <dependencyManagement>
@@ -44,7 +47,7 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>lang</artifactId>
-                <version>6.3.4</version>
+                <version>${openhft.lang.version}</version>
             </dependency>
 
             <dependency>
@@ -56,7 +59,7 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>compiler</artifactId>
-                <version>2.1</version>
+                <version>${openhft.compiler.version}</version>
             </dependency>
 
         </dependencies>
@@ -73,7 +76,6 @@
             <groupId>com.sun.java</groupId>
             <artifactId>tools</artifactId>
         </dependency>
-
 
         <dependency>
             <groupId>net.openhft</groupId>
