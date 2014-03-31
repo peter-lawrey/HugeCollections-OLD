@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166;
+package net.openhft.collections.jrs166.map;
 
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
-import net.openhft.collections.queue.JSR166TestCase;
+import net.openhft.collections.jrs166.JSR166TestCase;
 import org.junit.Test;
 
 import java.io.File;

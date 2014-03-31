@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166;
+package net.openhft.collections.jrs166.map;
 
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
@@ -40,14 +40,12 @@ import java.util.*;
 
 public class MapCheck {
     static final String MISSING = "MISSING";
-    static TestTimer timer = new TestTimer();
-    static Class eclass;
-
-
     static final LoopHelpers.SimpleRandom srng = new LoopHelpers.SimpleRandom();
     static final Random rng = new Random(3152688);
-
+    static TestTimer timer = new TestTimer();
+    static Class eclass;
     static volatile int checkSum;
+    static int counter = 0;
 
     static void reallyAssert(boolean b) {
         if (!b) throw new Error("Failed Assertion");
@@ -112,8 +110,6 @@ public class MapCheck {
         if (doSerializeTest)
             serTest(size);
     }
-
-    static int counter = 0;
 
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
@@ -692,12 +688,31 @@ public class MapCheck {
         }
     }
 
+    static void shuffle(Object[] keys) {
+        int size = keys.length;
+        for (int i = size; i > 1; i--) {
+            int r = rng.nextInt(i);
+            Object t = keys[i - 1];
+            keys[i - 1] = keys[r];
+            keys[r] = t;
+        }
+    }
+
+    static void shuffle(ArrayList keys) {
+        int size = keys.size();
+        for (int i = size; i > 1; i--) {
+            int r = rng.nextInt(i);
+            Object t = keys.get(i - 1);
+            keys.set(i - 1, keys.get(r));
+            keys.set(r, t);
+        }
+    }
+
     static final class TestTimer {
+        static final java.util.TreeMap accum = new java.util.TreeMap();
         private String name;
         private long numOps;
         private long startTime;
-
-        static final java.util.TreeMap accum = new java.util.TreeMap();
 
         static void printStats() {
             for (Iterator it = accum.entrySet().iterator(); it.hasNext(); ) {
@@ -750,27 +765,6 @@ public class MapCheck {
         void addTime(long t, long n) {
             sum += t;
             number += n;
-        }
-    }
-
-
-    static void shuffle(Object[] keys) {
-        int size = keys.length;
-        for (int i = size; i > 1; i--) {
-            int r = rng.nextInt(i);
-            Object t = keys[i - 1];
-            keys[i - 1] = keys[r];
-            keys[r] = t;
-        }
-    }
-
-    static void shuffle(ArrayList keys) {
-        int size = keys.size();
-        for (int i = size; i > 1; i--) {
-            int r = rng.nextInt(i);
-            Object t = keys.get(i - 1);
-            keys.set(i - 1, keys.get(r));
-            keys.set(r, t);
         }
     }
 

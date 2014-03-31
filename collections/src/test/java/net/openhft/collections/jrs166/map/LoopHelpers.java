@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.jrs166;
+package net.openhft.collections.jrs166.map;
 
 /*
  * Written by Doug Lea with assistance from members of JCP JSR-166
@@ -121,6 +121,17 @@ class LoopHelpers {
         return x;
     }
 
+    public static String rightJustify(long n) {
+        // There's probably a better way to do this...
+        String field = "         ";
+        String num = Long.toString(n);
+        if (num.length() >= field.length())
+            return num;
+        StringBuffer b = new StringBuffer(field);
+        b.replace(b.length() - num.length(), b.length(), num);
+        return b.toString();
+    }
+
     public static final class XorShift32Random {
         static final AtomicInteger seq = new AtomicInteger(8862213);
         int x = -1831433054;
@@ -140,7 +151,6 @@ class LoopHelpers {
             return x;
         }
     }
-
 
     /**
      * Multiplication-free RNG from Marsaglia "Xorshift RNGs" paper
@@ -173,10 +183,10 @@ class LoopHelpers {
      * Unsynchronized version of java.util.Random algorithm.
      */
     public static final class SimpleRandom {
+        static final AtomicLong seq = new AtomicLong(-715159705);
         private static final long multiplier = 0x5DEECE66DL;
         private static final long addend = 0xBL;
         private static final long mask = (1L << 48) - 1;
-        static final AtomicLong seq = new AtomicLong(-715159705);
         private long seed;
 
         SimpleRandom(long s) {
@@ -219,17 +229,6 @@ class LoopHelpers {
         public long getTime() {
             return endTime - startTime;
         }
-    }
-
-    public static String rightJustify(long n) {
-        // There's probably a better way to do this...
-        String field = "         ";
-        String num = Long.toString(n);
-        if (num.length() >= field.length())
-            return num;
-        StringBuffer b = new StringBuffer(field);
-        b.replace(b.length() - num.length(), b.length(), num);
-        return b.toString();
     }
 
 }

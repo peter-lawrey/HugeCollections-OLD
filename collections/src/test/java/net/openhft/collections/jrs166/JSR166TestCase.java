@@ -1,4 +1,4 @@
-package net.openhft.collections.queue;
+package net.openhft.collections.jrs166;
 
 import junit.framework.AssertionFailedError;
 import org.junit.After;
@@ -206,7 +206,7 @@ public class JSR166TestCase {
      * Returns a timeout in milliseconds to be used in tests that
      * verify that operations block or time out.
      */
-    long timeoutMillis() {
+    protected long timeoutMillis() {
         return SHORT_DELAY_MS / 4;
     }
 
@@ -426,7 +426,7 @@ public class JSR166TestCase {
     /**
      * Waits out termination of a thread pool or Assert.fails doing so.
      */
-    void joinPool(ExecutorService exec) {
+    protected void joinPool(ExecutorService exec) {
         try {
             exec.shutdown();
             Assert.assertTrue("ExecutorService did not terminate in a timely manner",
@@ -442,7 +442,7 @@ public class JSR166TestCase {
      * Checks that thread does not terminate within the default
      * millisecond delay of {@code timeoutMillis()}.
      */
-    void assertThreadStaysAlive(Thread thread) {
+    protected void assertThreadStaysAlive(Thread thread) {
         assertThreadStaysAlive(thread, timeoutMillis());
     }
 
@@ -565,7 +565,7 @@ public class JSR166TestCase {
      * Spin-waits up to the specified number of milliseconds for the given
      * thread to enter a wait state: BLOCKED, WAITING, or TIMED_WAITING.
      */
-    void waitForThreadToEnterWaitState(Thread thread, long timeoutMillis) {
+    protected void waitForThreadToEnterWaitState(Thread thread, long timeoutMillis) {
         long startTime = System.nanoTime();
         for (; ; ) {
             Thread.State s = thread.getState();
@@ -596,14 +596,14 @@ public class JSR166TestCase {
      * startNanoTime, which must have been previously returned from a
      * call to.
      */
-    long millisElapsedSince(long startNanoTime) {
+    protected long millisElapsedSince(long startNanoTime) {
         return NANOSECONDS.toMillis(System.nanoTime() - startNanoTime);
     }
 
     /**
      * Returns a new started daemon Thread running the given runnable.
      */
-    Thread newStartedThread(Runnable runnable) {
+    protected Thread newStartedThread(Runnable runnable) {
         Thread t = new Thread(runnable);
         t.setDaemon(true);
         t.start();
@@ -615,7 +615,7 @@ public class JSR166TestCase {
      * to terminate (using {@link Thread#join(long)}), else interrupts
      * the thread (in the hope that it may terminate later) and Assert.fails.
      */
-    void awaitTermination(Thread t, long timeoutMillis) {
+    protected void awaitTermination(Thread t, long timeoutMillis) {
         try {
             t.join(timeoutMillis);
         } catch (InterruptedException ie) {
@@ -635,7 +635,7 @@ public class JSR166TestCase {
      * terminate (using {@link Thread#join(long)}), else interrupts
      * the thread (in the hope that it may terminate later) and Assert.fails.
      */
-    void awaitTermination(Thread t) {
+    protected void awaitTermination(Thread t) {
         awaitTermination(t, LONG_DELAY_MS);
     }
 
@@ -686,7 +686,7 @@ public class JSR166TestCase {
         };
     }
 
-    void checkEmpty(BlockingQueue q) {
+    protected void checkEmpty(BlockingQueue q) {
         try {
             Assert.assertTrue(q.isEmpty());
             Assert.assertEquals(0, q.size());
@@ -739,7 +739,7 @@ public class JSR166TestCase {
     }
 
     @SuppressWarnings("unchecked")
-    <T> T serialClone(T o) {
+    protected <T> T serialClone(T o) {
         try {
             ObjectInputStream ois = new ObjectInputStream
                     (new ByteArrayInputStream(serialBytes(o)));
