@@ -24,7 +24,6 @@ import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.junit.PaxExam;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 
@@ -59,6 +58,7 @@ public class OSGiBundleTest extends OSGiTestBase {
     }
 
     @Test
+    @Ignore
     public void checkInject() {
         assertNotNull(context);
     }
