@@ -40,35 +40,6 @@ abstract class AbstractBlockingQueue {
 
     static {
         try {
-         /*   final Field field = Unsafe.class.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
-            unsafe = (Unsafe) field.get(null);
-            READ_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (AbstractBlockingQueue.class.getDeclaredField("readLocation"));
-            WRITE_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (AbstractBlockingQueue.class.getDeclaredField("writeLocation"));*/
-
-
-            //      File file = new File("");
-
-
-
-           /* this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                    sizeInBytes());
-
-
-            this.bytes = bytes;
-
-            long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
-            final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
-            iimmapBytes.load();
-            hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
-            start += sizeOfMultiMap();
-            final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
-            freeList = new SingleThreadedDirectBitSet(bsBytes);
-            start += numberOfBitSets() * sizeOfBitSets();
-            entriesOffset = start - bytes.startAddr();
-            assert bytes.capacity() >= entriesOffset + entriesPerSegment * entrySize;*/
 
 
         } catch (Exception e) {
@@ -110,7 +81,7 @@ abstract class AbstractBlockingQueue {
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
 
         // write back the next write location
-        locator.lazySetWriteLocation(nextWriteLocation);
+        locator.setWriteLocation(nextWriteLocation);
     }
 
     void setReadLocation(int nextReadLocation) {
@@ -119,7 +90,7 @@ abstract class AbstractBlockingQueue {
         this.consumerReadLocation = nextReadLocation;
 
         // the write memory barrier will occur here, as we are storing the nextReadLocation
-        locator.lazySetReadLocation(nextReadLocation);
+        locator.setReadLocation(nextReadLocation);
 
     }
 

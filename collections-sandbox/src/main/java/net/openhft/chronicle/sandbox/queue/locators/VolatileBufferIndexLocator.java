@@ -36,20 +36,18 @@ public class VolatileBufferIndexLocator implements BufferIndexLocator {
         return writeLocation;
     }
 
+    @Override
+    public void setWriteLocation(int nextWriteLocation) {
+        unsafe.putOrderedInt(this, WRITE_LOCATION_OFFSET, nextWriteLocation);
+    }
 
     @Override
     public int getReadLocation() {
         return readLocation;
     }
 
-
     @Override
-    public void lazySetReadLocation(int nextReadLocation) {
+    public void setReadLocation(int nextReadLocation) {
         unsafe.putOrderedInt(this, READ_LOCATION_OFFSET, nextReadLocation);
-    }
-
-    @Override
-    public void lazySetWriteLocation(int nextWriteLocation) {
-        unsafe.putOrderedInt(this, WRITE_LOCATION_OFFSET, nextWriteLocation);
     }
 }

@@ -7,10 +7,10 @@ public interface BufferIndexLocator {
 
     int getWriteLocation();
 
+    void setWriteLocation(int nextWriteLocation);
+
     int getReadLocation();
 
-    void lazySetReadLocation(int nextReadLocation);
-
-    void lazySetWriteLocation(int nextWriteLocation);
+    void setReadLocation(int nextReadLocation);
 
 }

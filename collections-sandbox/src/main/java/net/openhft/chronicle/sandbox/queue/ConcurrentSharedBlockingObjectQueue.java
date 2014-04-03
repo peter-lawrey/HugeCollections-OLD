@@ -452,8 +452,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicl
         if (!hasRemovedItem)
             return false;
 
-        this.locator.lazySetReadLocation(0);
-        this.locator.lazySetWriteLocation(i);
+        this.locator.setReadLocation(0);
+        this.locator.setWriteLocation(i);
         System.arraycopy(newData, 0, data, 0, i);
 
         return true;
@@ -566,8 +566,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicl
         if (!hasRemovedItem)
             return false;
 
-        this.locator.lazySetReadLocation(0);
-        this.locator.lazySetWriteLocation(i);
+        this.locator.setReadLocation(0);
+        this.locator.setWriteLocation(i);
         System.arraycopy(newData, 0, data, 0, i);
 
         return true;
@@ -622,8 +622,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicl
 
         if (changed) {
 
-            this.locator.lazySetReadLocation(0);
-            this.locator.lazySetWriteLocation(i);
+            this.locator.setReadLocation(0);
+            this.locator.setWriteLocation(i);
             System.arraycopy(newData, 0, data, 0, i);
 
             return true;
