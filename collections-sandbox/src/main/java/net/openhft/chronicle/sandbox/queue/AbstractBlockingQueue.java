@@ -1,6 +1,8 @@
 package net.openhft.chronicle.sandbox.queue;
 
 import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
+import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
@@ -24,50 +26,35 @@ import java.util.concurrent.TimeoutException;
  * @author Rob Austin
  * @since 1.1
  */
-abstract class AbstractBlockingQueue {
+abstract class AbstractBlockingQueue<E> {
 
    /* private static final long READ_LOCATION_OFFSET;
     private static final long WRITE_LOCATION_OFFSET;
     private static final Unsafe unsafe;*/
 
 
-    final int capacity;
     final BufferIndexLocator locator;
+    private final DataLocator<E> dataLocator;
     // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
     int producerWriteLocation;
     // only set and read by the consumer thread, ( that the thread that's calling get(), poll() or peek() )
     int consumerReadLocation;
 
-    static {
-        try {
-
-
-        } catch (Exception e) {
-            throw new AssertionError(e);
-        }
-    }
 
     // we set volatiles here, for the writes we use putOrderedInt ( as this is quicker ),
     // but for the read of a volatile there is no performance benefit un using getOrderedInt.
 
 
     /**
-     * @param capacity Creates an BlockingQueue with the given (fixed) capacity
+     * @param dataLocator
      */
-    public AbstractBlockingQueue(int capacity, BufferIndexLocator locator) {
+    public AbstractBlockingQueue(@NotNull final BufferIndexLocator locator, @NotNull final DataLocator<E> dataLocator) {
         this.locator = locator;
-        if (capacity == 0)
+        this.dataLocator = dataLocator;
+        if (dataLocator.getCapacity() == 1)
             throw new IllegalArgumentException();
-        this.capacity = capacity + 1;
-    }
 
 
-    /**
-     * Creates an BlockingQueue with the default capacity of 1024
-     */
-    public AbstractBlockingQueue(BufferIndexLocator locator) {
-        this.locator = locator;
-        this.capacity = 1024;
     }
 
 
@@ -136,7 +123,7 @@ abstract class AbstractBlockingQueue {
         int write = locator.getWriteLocation();
 
         if (write < read)
-            write += capacity;
+            write += dataLocator.getCapacity();
 
         return write - read;
 
@@ -172,9 +159,9 @@ abstract class AbstractBlockingQueue {
         // we want to minimize the number of volatile reads, so we read the writeLocation just once.
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextWriteLocation = (writeLocation + 1 == capacity) ? 0 : writeLocation + 1;
+        final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
-        if (nextWriteLocation == capacity) {
+        if (nextWriteLocation == dataLocator.getCapacity()) {
 
             if (locator.getReadLocation() == 0)
                 throw new IllegalStateException("queue is full");
@@ -197,9 +184,9 @@ abstract class AbstractBlockingQueue {
         // we want to minimize the number of volatile reads, so we read the writeLocation just once.
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextWriteLocation = (writeLocation + 1 == capacity) ? 0 : writeLocation + 1;
+        final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
-        if (nextWriteLocation == capacity)
+        if (nextWriteLocation == dataLocator.getCapacity())
 
             while (locator.getReadLocation() == 0) {
 
@@ -237,9 +224,9 @@ abstract class AbstractBlockingQueue {
         // we want to minimize the number of volatile reads, so we read the writeLocation just once.
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextWriteLocation = (writeLocation + 1 == capacity) ? 0 : writeLocation + 1;
+        final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
-        if (nextWriteLocation == capacity)
+        if (nextWriteLocation == dataLocator.getCapacity())
 
             while (locator.getReadLocation() == 0)
                 // // this condition handles the case where writer has caught up with the read,
@@ -269,7 +256,7 @@ abstract class AbstractBlockingQueue {
     int blockForReadSpace(long timeout, TimeUnit unit, int readLocation) throws TimeoutException {
 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+        final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
         final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
@@ -293,7 +280,7 @@ abstract class AbstractBlockingQueue {
     int blockForReadSpace(int readLocation) {
 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+        final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
@@ -313,7 +300,7 @@ abstract class AbstractBlockingQueue {
     int blockForReadSpaceThrowNoSuchElementException(int readLocation) {
 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+        final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
@@ -331,7 +318,7 @@ abstract class AbstractBlockingQueue {
      * limit.
      * <p/>
      * <p>Note that you <em>cannot</em> always tell if an attempt to insert
-     * an element will succeed by inspecting <tt>remainingCapacity</tt>
+     * an element will succeed by inspecting <tt>remainingdataLocator.getCapacity()</tt>
      * because it may be the case that another thread is about to
      * insert or remove an element.
      *
@@ -343,13 +330,10 @@ abstract class AbstractBlockingQueue {
         int writeLocation = locator.getWriteLocation();
 
         if (writeLocation < readLocation)
-            writeLocation += capacity;
+            writeLocation += dataLocator.getCapacity();
 
 
-        return (capacity - 1) - (writeLocation - readLocation);
+        return (dataLocator.getCapacity() - 1) - (writeLocation - readLocation);
     }
 
-
 }
-
-

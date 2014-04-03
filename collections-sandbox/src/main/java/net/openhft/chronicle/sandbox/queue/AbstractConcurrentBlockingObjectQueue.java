@@ -1,6 +1,8 @@
 package net.openhft.chronicle.sandbox.queue;
 
 import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
+import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -144,22 +146,12 @@ import java.util.concurrent.TimeoutException;
  */
 abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements BlockingQueue<E> {
 
-    // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
-    private final E[] data = (E[]) new Object[capacity];
+    private final DataLocator<E> dataLocator;
 
-
-    /**
-     * Creates an BlockingQueue with the default capacity of 1024
-     */
-    public AbstractConcurrentBlockingObjectQueue(BufferIndexLocator locator) {
-        super(locator);
-    }
-
-    /**
-     * @param capacity Creates an BlockingQueue with the given (fixed) capacity
-     */
-    public AbstractConcurrentBlockingObjectQueue(int capacity, BufferIndexLocator locator) {
-        super(capacity, locator);
+    public AbstractConcurrentBlockingObjectQueue(@NotNull final BufferIndexLocator locator,
+                                                 @NotNull final DataLocator dataLocator) {
+        super(locator, dataLocator);
+        this.dataLocator = dataLocator;
     }
 
 
@@ -174,7 +166,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int nextWriteLocation = getNextWriteLocationThrowIfFull(writeLocation);
 
         // purposely not volatile
-        data[writeLocation] = value;
+        dataLocator.setData(writeLocation, value);
 
         setWriteLocation(nextWriteLocation);
         return true;
@@ -198,7 +190,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int nextReadLocation = blockForReadSpace(readLocation);
 
         // purposely not volatile as the read memory barrier occurred above when we read 'writeLocation'
-        final E value = data[readLocation];
+        final E value = dataLocator.getData(readLocation);
 
         setReadLocation(nextReadLocation);
 
@@ -225,7 +217,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         blockForReadSpace(timeout, unit, readLocation);
 
-        return data[readLocation];
+        return dataLocator.getData(readLocation);
 
     }
 
@@ -238,9 +230,9 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int writeLocation = this.producerWriteLocation;
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextWriteLocation = (writeLocation + 1 == capacity) ? 0 : writeLocation + 1;
+        final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
-        if (nextWriteLocation == capacity) {
+        if (nextWriteLocation == dataLocator.getCapacity()) {
 
             if (locator.getReadLocation() == 0)
                 return false;
@@ -249,7 +241,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             return false;
 
         // purposely not volatile see the comment below
-        data[writeLocation] = value;
+        dataLocator.setData(writeLocation, value);
 
         setWriteLocation(nextWriteLocation);
         return true;
@@ -271,7 +263,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int nextWriteLocation = blockForWriteSpaceInterruptibly(writeLocation1);
 
         // purposely not volatile see the comment below
-        data[writeLocation1] = value;
+        dataLocator.setData(writeLocation1, value);
 
         setWriteLocation(nextWriteLocation);
     }
@@ -301,10 +293,10 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int writeLocation = this.producerWriteLocation;
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextWriteLocation = (writeLocation + 1 == capacity) ? 0 : writeLocation + 1;
+        final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
 
-        if (nextWriteLocation == capacity) {
+        if (nextWriteLocation == dataLocator.getCapacity()) {
 
             final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
@@ -330,7 +322,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         }
 
         // purposely not volatile see the comment below
-        data[writeLocation] = value;
+        dataLocator.setData(writeLocation, value);
 
         // the line below, is where the write memory barrier occurs,
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
@@ -364,7 +356,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         }
 
         // purposely non volatile as the read memory barrier occurred when we read 'writeLocation'
-        final E value = data[readLocation];
+        final E value = dataLocator.getData(readLocation);
         setReadLocation(nextReadLocation);
 
         return value;
@@ -383,13 +375,13 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int readLocation = this.consumerReadLocation;
 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+        final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
         if (locator.getWriteLocation() == readLocation)
             return null;
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
-        final E value = data[readLocation];
+        final E value = dataLocator.getData(readLocation);
         setReadLocation(nextReadLocation);
 
         return value;
@@ -399,7 +391,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     @Override
     public boolean remove(Object o) {
 
-        final E[] newData = (E[]) new Object[capacity];
+        final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean hasRemovedItem = false;
         int read = this.locator.getReadLocation();
@@ -412,32 +404,32 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (read < write) {
 
             for (int location = read; location <= write; location++) {
-                if (o.equals(data[location])) {
+                if (o.equals(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
             }
 
 
         } else {
 
-            for (int location = read; location < capacity; location++) {
+            for (int location = read; location < dataLocator.getCapacity(); location++) {
 
-                if (!o.equals(data[location])) {
+                if (!o.equals(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
 
             }
 
             for (int location = 0; location <= write; location++) {
 
-                if (!o.equals(data[location])) {
+                if (!o.equals(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
             }
         }
@@ -447,7 +439,9 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         this.locator.setReadLocation(0);
         this.locator.setWriteLocation(i);
-        System.arraycopy(newData, 0, data, 0, i);
+
+
+        dataLocator.writeAll(newData, i);
 
         return true;
 
@@ -479,7 +473,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     @Override
     public boolean addAll(Collection<? extends E> c) {
 
-        if (this.capacity <= 1)
+        if (this.dataLocator.getCapacity() <= 1)
             throw new NullPointerException("You can not add to a queue of Zero Size.");
 
         if (this.equals(c))
@@ -498,7 +492,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             nextWriteLocation = getNextWriteLocationThrowIfFull(writeLocation0);
 
             // purposely not volatile
-            data[writeLocation0] = e;
+            dataLocator.setData(writeLocation0, e);
             writeLocation0 = nextWriteLocation;
         }
 
@@ -514,7 +508,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        final E[] newData = (E[]) new Object[capacity];
+        final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean hasRemovedItem = false;
         int read = this.locator.getReadLocation();
@@ -527,31 +521,31 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (read < write) {
 
             for (int location = read; location < write; location++) {
-                if (c.contains(data[location])) {
+                if (c.contains(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
             }
 
         } else {
 
-            for (int location = read; location < capacity; location++) {
+            for (int location = read; location < dataLocator.getCapacity(); location++) {
 
-                if (!c.contains(data[location])) {
+                if (!c.contains(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
 
             }
 
             for (int location = 0; location <= write; location++) {
 
-                if (!c.contains(data[location])) {
+                if (!c.contains(dataLocator.getData(location))) {
                     hasRemovedItem = true;
                 } else {
-                    newData[i++] = data[location];
+                    newData[i++] = dataLocator.getData(location);
                 }
             }
         }
@@ -561,7 +555,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         this.locator.setReadLocation(0);
         this.locator.setWriteLocation(i);
-        System.arraycopy(newData, 0, data, 0, i);
+        dataLocator.writeAll(newData, i);
 
         return true;
 
@@ -570,7 +564,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     @Override
     public boolean retainAll(Collection<?> c) {
 
-        final E[] newData = (E[]) new Object[capacity];
+        final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean changed = false;
         int read = this.locator.getReadLocation();
@@ -583,8 +577,8 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (read < write) {
 
             for (int location = read; location < write; location++) {
-                if (c.contains(data[location])) {
-                    newData[i++] = data[location];
+                if (c.contains(dataLocator.getData(location))) {
+                    newData[i++] = dataLocator.getData(location);
                 } else {
                     changed = true;
                 }
@@ -592,10 +586,10 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         } else {
 
-            for (int location = read; location < capacity; location++) {
+            for (int location = read; location < dataLocator.getCapacity(); location++) {
 
-                if (c.contains(data[location])) {
-                    newData[i++] = data[location];
+                if (c.contains(dataLocator.getData(location))) {
+                    newData[i++] = dataLocator.getData(location);
                 } else {
                     changed = true;
                 }
@@ -605,8 +599,8 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
             for (int location = 0; location <= write; location++) {
 
-                if (c.contains(data[location])) {
-                    newData[i++] = data[location];
+                if (c.contains(dataLocator.getData(location))) {
+                    newData[i++] = dataLocator.getData(location);
                 } else {
                     changed = true;
                 }
@@ -617,7 +611,8 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
             this.locator.setReadLocation(0);
             this.locator.setWriteLocation(i);
-            System.arraycopy(newData, 0, data, 0, i);
+            dataLocator.writeAll(newData, i);
+
 
             return true;
         }
@@ -670,21 +665,21 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (read < write) {
             final Object[] objects = new Object[write - read];
             for (int location = read; location < write; location++) {
-                objects[i++] = data[location];
+                objects[i++] = dataLocator.getData(location);
             }
 
             return objects;
         }
 
 
-        final Object[] objects = new Object[(capacity - read) + write];
+        final Object[] objects = new Object[(dataLocator.getCapacity() - read) + write];
 
-        for (int location = read; location < capacity; location++) {
-            objects[i++] = data[location];
+        for (int location = read; location < dataLocator.getCapacity(); location++) {
+            objects[i++] = dataLocator.getData(location);
         }
 
         for (int location = 0; location < write; location++) {
-            objects[i++] = data[location];
+            objects[i++] = dataLocator.getData(location);
         }
 
         return objects;
@@ -701,7 +696,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             return result;
 
         if (read > write)
-            write += capacity;
+            write += dataLocator.getCapacity();
 
         int size = write - read;
 
@@ -712,7 +707,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         int i = 0;
 
         for (int location = read; location < write; location++) {
-            result[i++] = (T) data[location];
+            result[i++] = (T) dataLocator.getData(location);
         }
 
         if (i < result.length - 1) {
@@ -747,7 +742,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int nextReadLocation = blockForReadSpaceThrowNoSuchElementException(readLocation);
 
         // purposely not volatile as the read memory barrier occurred above when we read 'writeLocation'
-        final E value = data[readLocation];
+        final E value = dataLocator.getData(readLocation);
 
         setReadLocation(nextReadLocation);
 
@@ -762,13 +757,13 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         final int readLocation = this.consumerReadLocation;
 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-        final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+        final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
         if (locator.getWriteLocation() == readLocation)
             throw new NoSuchElementException();
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
-        final E value = data[readLocation];
+        final E value = dataLocator.getData(readLocation);
         setReadLocation(nextReadLocation);
 
         return value;
@@ -779,7 +774,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     public E peek() {
         if (size() == 0)
             return null;
-        return data[this.consumerReadLocation];
+        return dataLocator.getData(this.consumerReadLocation);
     }
 
     /**
@@ -811,22 +806,22 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (read < write) {
 
             for (int location = read; location < write; location++) {
-                if (o.equals(data[location]))
+                if (o.equals(dataLocator.getData(location)))
                     return true;
             }
 
             return false;
         }
 
-        for (int location = read; location < capacity; location++) {
+        for (int location = read; location < dataLocator.getCapacity(); location++) {
 
-            if (o.equals(data[location]))
+            if (o.equals(dataLocator.getData(location)))
                 return true;
         }
 
         for (int location = 0; location < write; location++) {
 
-            if (o.equals(data[location]))
+            if (o.equals(dataLocator.getData(location)))
                 return true;
         }
 
@@ -912,10 +907,10 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
 
             // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
-            readLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
+            readLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
             // purposely not volatile as the read memory barrier occurred above when we read 'writeLocation'
-            target[i] = data[readLocation];
+            target[i] = dataLocator.getData(readLocation);
 
 
         } while (i <= maxElements);
@@ -938,7 +933,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         }
 
         if (read > write)
-            write += capacity;
+            write += dataLocator.getCapacity();
 
         int size = write - read;
 
@@ -947,7 +942,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         int i = 0;
 
         for (int location = read; location < write; location++) {
-            builder.append(data[location]).append(',');
+            builder.append(dataLocator.getData(location)).append(',');
         }
 
 

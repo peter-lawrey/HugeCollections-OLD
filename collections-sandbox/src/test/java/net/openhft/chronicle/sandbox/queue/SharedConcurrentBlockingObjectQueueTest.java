@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Rob Austin
  */
 
-public class AbstractConcurrentBlockingObjectQueueTest {
+public class SharedConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testTake() throws Exception {
@@ -109,6 +109,7 @@ public class AbstractConcurrentBlockingObjectQueueTest {
      * @throws Exception
      */
     @Test
+    @Ignore
     public void testWithFasterReader() throws Exception {
 
         final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
