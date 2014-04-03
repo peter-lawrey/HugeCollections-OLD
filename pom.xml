@@ -25,7 +25,9 @@
     <version>3.0f-SNAPSHOT</version>
     <modules>
         <module>collections</module>
+        <module>collections-sandbox</module>
     </modules>
+
     <packaging>pom</packaging>
 
     <name>OpenHFT/HugeCollections</name>
