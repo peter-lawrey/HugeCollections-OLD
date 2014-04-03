@@ -192,7 +192,6 @@
                     <version>2.9.1</version>
                 </plugin>
 
-
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
@@ -367,7 +366,19 @@
         </developer>
     </developers>
 
+    <repositories>
+        <repository>
+            <id>Snapshot Repository</id>
+            <name>Snapshot Repository</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <scm>
         <url>scm:git:https://github.com/OpenHFT/HugeCollections.git</url>
     </scm>
+
 </project>
