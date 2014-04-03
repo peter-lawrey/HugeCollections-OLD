@@ -1,9 +1,7 @@
 package net.openhft.chronicle.sandbox.queue;
 
-import sun.misc.Unsafe;
+import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 
-import java.io.File;
-import java.lang.reflect.Field;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -26,25 +24,32 @@ import java.util.concurrent.TimeoutException;
  * @author Rob Austin
  * @since 1.1
  */
-class AbstractBlockingQueue {
+abstract class AbstractBlockingQueue {
 
-    private static final long READ_LOCATION_OFFSET;
+   /* private static final long READ_LOCATION_OFFSET;
     private static final long WRITE_LOCATION_OFFSET;
-    private static final Unsafe unsafe;
+    private static final Unsafe unsafe;*/
 
+
+    final int capacity;
+    final BufferIndexLocator locator;
+    // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
+    int producerWriteLocation;
+    // only set and read by the consumer thread, ( that the thread that's calling get(), poll() or peek() )
+    int consumerReadLocation;
 
     static {
         try {
-            final Field field = Unsafe.class.getDeclaredField("theUnsafe");
+         /*   final Field field = Unsafe.class.getDeclaredField("theUnsafe");
             field.setAccessible(true);
             unsafe = (Unsafe) field.get(null);
             READ_LOCATION_OFFSET = unsafe.objectFieldOffset
                     (AbstractBlockingQueue.class.getDeclaredField("readLocation"));
             WRITE_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (AbstractBlockingQueue.class.getDeclaredField("writeLocation"));
+                    (AbstractBlockingQueue.class.getDeclaredField("writeLocation"));*/
 
 
-            File file = new File("");
+            //      File file = new File("");
 
 
 
@@ -71,23 +76,15 @@ class AbstractBlockingQueue {
         }
     }
 
-    final int capacity;
-
-    // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
-    int producerWriteLocation;
-
-    // only set and read by the consumer thread, ( that the thread that's calling get(), poll() or peek() )
-    int consumerReadLocation;
-
     // we set volatiles here, for the writes we use putOrderedInt ( as this is quicker ),
     // but for the read of a volatile there is no performance benefit un using getOrderedInt.
-    volatile int readLocation;
-    volatile int writeLocation;
+
 
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
      */
-    public AbstractBlockingQueue(int capacity) {
+    public AbstractBlockingQueue(int capacity, BufferIndexLocator locator) {
+        this.locator = locator;
         if (capacity == 0)
             throw new IllegalArgumentException();
         this.capacity = capacity + 1;
@@ -97,7 +94,8 @@ class AbstractBlockingQueue {
     /**
      * Creates an BlockingQueue with the default capacity of 1024
      */
-    public AbstractBlockingQueue() {
+    public AbstractBlockingQueue(BufferIndexLocator locator) {
+        this.locator = locator;
         this.capacity = 1024;
     }
 
@@ -112,7 +110,7 @@ class AbstractBlockingQueue {
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
 
         // write back the next write location
-        unsafe.putOrderedInt(this, WRITE_LOCATION_OFFSET, nextWriteLocation);
+        locator.lazySetWriteLocation(nextWriteLocation);
     }
 
     void setReadLocation(int nextReadLocation) {
@@ -121,7 +119,8 @@ class AbstractBlockingQueue {
         this.consumerReadLocation = nextReadLocation;
 
         // the write memory barrier will occur here, as we are storing the nextReadLocation
-        unsafe.putOrderedInt(this, READ_LOCATION_OFFSET, nextReadLocation);
+        locator.lazySetReadLocation(nextReadLocation);
+
     }
 
     /**
@@ -162,8 +161,8 @@ class AbstractBlockingQueue {
      * @return an approximation of the size
      */
     public int size() {
-        int read = readLocation;
-        int write = writeLocation;
+        int read = locator.getReadLocation();
+        int write = locator.getWriteLocation();
 
         if (write < read)
             write += capacity;
@@ -179,7 +178,7 @@ class AbstractBlockingQueue {
      * @return an approximation of the size
      */
     public void clear() {
-        readLocation = writeLocation;
+        setReadLocation(locator.getWriteLocation());
     }
 
 
@@ -190,7 +189,7 @@ class AbstractBlockingQueue {
      * @return an approximation of isEmpty()
      */
     public boolean isEmpty() {
-        return readLocation == writeLocation;
+        return locator.getReadLocation() == locator.getWriteLocation();
     }
 
     /**
@@ -206,10 +205,10 @@ class AbstractBlockingQueue {
 
         if (nextWriteLocation == capacity) {
 
-            if (readLocation == 0)
+            if (locator.getReadLocation() == 0)
                 throw new IllegalStateException("queue is full");
 
-        } else if (nextWriteLocation == readLocation)
+        } else if (nextWriteLocation == locator.getReadLocation())
             // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
             // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
             throw new IllegalStateException("queue is full");
@@ -231,7 +230,7 @@ class AbstractBlockingQueue {
 
         if (nextWriteLocation == capacity)
 
-            while (readLocation == 0) {
+            while (locator.getReadLocation() == 0) {
 
                 if (Thread.interrupted())
                     throw new InterruptedException();
@@ -245,7 +244,7 @@ class AbstractBlockingQueue {
         else
 
 
-            while (nextWriteLocation == readLocation) {
+            while (nextWriteLocation == locator.getReadLocation()) {
 
                 if (Thread.interrupted())
                     throw new InterruptedException();
@@ -271,7 +270,7 @@ class AbstractBlockingQueue {
 
         if (nextWriteLocation == capacity)
 
-            while (readLocation == 0)
+            while (locator.getReadLocation() == 0)
                 // // this condition handles the case where writer has caught up with the read,
                 // we will wait for a read, ( which will cause a change on the read location )
                 blockAtAdd();
@@ -279,7 +278,7 @@ class AbstractBlockingQueue {
         else
 
 
-            while (nextWriteLocation == readLocation)
+            while (nextWriteLocation == locator.getReadLocation())
                 // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
                 // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
                 blockAtAdd();
@@ -306,7 +305,7 @@ class AbstractBlockingQueue {
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
 
-        while (writeLocation == readLocation)
+        while (locator.getWriteLocation() == readLocation)
             if (!blockAtTake(timeoutAt))
                 throw new TimeoutException();
 
@@ -327,7 +326,7 @@ class AbstractBlockingQueue {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (writeLocation == readLocation)
+        while (locator.getWriteLocation() == readLocation)
             blockAtTake();
 
         return nextReadLocation;
@@ -347,7 +346,7 @@ class AbstractBlockingQueue {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (writeLocation == readLocation)
+        while (locator.getWriteLocation() == readLocation)
             throw new NoSuchElementException();
 
         return nextReadLocation;
@@ -369,8 +368,8 @@ class AbstractBlockingQueue {
      */
     public int remainingCapacity() {
 
-        int readLocation = this.readLocation;
-        int writeLocation = this.writeLocation;
+        int readLocation = locator.getReadLocation();
+        int writeLocation = locator.getWriteLocation();
 
         if (writeLocation < readLocation)
             writeLocation += capacity;

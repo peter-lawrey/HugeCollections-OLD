@@ -1,5 +1,7 @@
 package net.openhft.chronicle.sandbox.queue;
 
+import net.openhft.chronicle.sandbox.queue.locators.VolatileBufferIndexLocator;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -140,7 +142,7 @@ import java.util.concurrent.TimeoutException;
  * @author Rob Austin
  * @since 1.1
  */
-public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueue implements BlockingQueue<E> {
+public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicle.sandbox.queue.AbstractBlockingQueue implements BlockingQueue<E> {
 
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final E[] data = (E[]) new Object[capacity];
@@ -150,22 +152,22 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
      * Creates an BlockingQueue with the default capacity of 1024
      */
     public ConcurrentSharedBlockingObjectQueue() {
-
+        super(new VolatileBufferIndexLocator());
     }
 
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
      */
     public ConcurrentSharedBlockingObjectQueue(int capacity) {
-        super(capacity);
+        super(capacity, new VolatileBufferIndexLocator());
     }
 
     public ConcurrentSharedBlockingObjectQueue(int capacity, boolean b) {
-        super(capacity);
+        super(capacity, new VolatileBufferIndexLocator());
     }
 
     public ConcurrentSharedBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements) {
-        super(capacity);
+        super(capacity, new VolatileBufferIndexLocator());
     }
 
     /**
@@ -230,7 +232,6 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
         blockForReadSpace(timeout, unit, readLocation);
 
-        // purposely not volatile as the read memory barrier occurred above when we read ' this.readLocation'
         return data[readLocation];
 
     }
@@ -248,10 +249,10 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
         if (nextWriteLocation == capacity) {
 
-            if (readLocation == 0)
+            if (locator.getReadLocation() == 0)
                 return false;
 
-        } else if (nextWriteLocation == readLocation)
+        } else if (nextWriteLocation == locator.getReadLocation())
             return false;
 
         // purposely not volatile see the comment below
@@ -314,7 +315,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
             final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
-            while (readLocation == 0)
+            while (locator.getReadLocation() == 0)
             // this condition handles the case where writer has caught up with the read,
             // we will wait for a read, ( which will cause a change on the read location )
             {
@@ -326,7 +327,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
             final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
-            while (nextWriteLocation == readLocation)
+            while (nextWriteLocation == locator.getReadLocation())
             // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
             // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
             {
@@ -391,7 +392,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
 
-        if (writeLocation == readLocation)
+        if (locator.getWriteLocation() == readLocation)
             return null;
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -408,8 +409,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         final E[] newData = (E[]) new Object[capacity];
 
         boolean hasRemovedItem = false;
-        int read = this.readLocation;
-        int write = this.writeLocation;
+        int read = this.locator.getReadLocation();
+        int write = this.locator.getWriteLocation();
 
         if (read == write)
             return false;
@@ -451,8 +452,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         if (!hasRemovedItem)
             return false;
 
-        this.readLocation = 0;
-        this.writeLocation = i;
+        this.locator.setReadLocation(0);
+        this.locator.setWriteLocation(i);
         System.arraycopy(newData, 0, data, 0, i);
 
         return true;
@@ -463,8 +464,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
     @Override
     public boolean containsAll(Collection<?> items) {
 
-        final int read = readLocation;
-        final int write = writeLocation;
+        final int read = locator.getReadLocation();
+        final int write = locator.getWriteLocation();
 
         if (items.size() == 0)
             return true;
@@ -523,8 +524,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         final E[] newData = (E[]) new Object[capacity];
 
         boolean hasRemovedItem = false;
-        int read = this.readLocation;
-        int write = this.writeLocation;
+        int read = this.locator.getReadLocation();
+        int write = this.locator.getWriteLocation();
 
         if (read == write)
             return false;
@@ -565,8 +566,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         if (!hasRemovedItem)
             return false;
 
-        this.readLocation = 0;
-        this.writeLocation = i;
+        this.locator.setReadLocation(0);
+        this.locator.setWriteLocation(i);
         System.arraycopy(newData, 0, data, 0, i);
 
         return true;
@@ -579,8 +580,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         final E[] newData = (E[]) new Object[capacity];
 
         boolean changed = false;
-        int read = this.readLocation;
-        int write = this.writeLocation;
+        int read = this.locator.getReadLocation();
+        int write = this.locator.getWriteLocation();
 
         if (read == write)
             return false;
@@ -621,8 +622,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
         if (changed) {
 
-            this.readLocation = 0;
-            this.writeLocation = i;
+            this.locator.setReadLocation(0);
+            this.locator.setWriteLocation(i);
             System.arraycopy(newData, 0, data, 0, i);
 
             return true;
@@ -665,8 +666,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
     @Override
     public Object[] toArray() {
 
-        final int read = readLocation;
-        final int write = writeLocation;
+        final int read = locator.getReadLocation();
+        final int write = locator.getWriteLocation();
 
         if (read == write)
             return new Object[]{};
@@ -699,9 +700,9 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
     @Override
     public <T> T[] toArray(T[] result) {
 
-        //  new ArrayBlockingQueue<Integer>(data)
-        final int read = readLocation;
-        int write = writeLocation;
+
+        final int read = locator.getReadLocation();
+        int write = locator.getWriteLocation();
 
         if (result.length == 0)
             return result;
@@ -770,7 +771,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == capacity) ? 0 : readLocation + 1;
 
-        if (writeLocation == readLocation)
+        if (locator.getWriteLocation() == readLocation)
             throw new NoSuchElementException();
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -807,8 +808,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         if (o == null)
             throw new NullPointerException("object can not be null");
 
-        int read = this.readLocation;
-        int write = this.writeLocation;
+        int read = this.locator.getReadLocation();
+        int write = this.locator.getWriteLocation();
 
 
         if (read == write)
@@ -898,7 +899,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
         int i = 0;
 
         // to reduce the number of volatile reads we are going to perform a kind of double check reading on the volatile write location
-        int writeLocation = this.writeLocation;
+        int writeLocation = this.locator.getWriteLocation();
 
         do {
 
@@ -906,7 +907,7 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
             // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
             if (writeLocation == readLocation) {
 
-                writeLocation = this.writeLocation;
+                writeLocation = this.locator.getWriteLocation();
 
 
                 if (writeLocation == readLocation) {
@@ -936,8 +937,8 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends AbstractBlockingQueu
 
 
         //  new ArrayBlockingQueue<Integer>(data)
-        final int read = readLocation;
-        int write = writeLocation;
+        final int read = locator.getReadLocation();
+        int write = locator.getWriteLocation();
 
         if (read == write) {
             return "[]";
