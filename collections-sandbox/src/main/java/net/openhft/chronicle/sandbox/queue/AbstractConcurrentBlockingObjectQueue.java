@@ -1,6 +1,6 @@
 package net.openhft.chronicle.sandbox.queue;
 
-import net.openhft.chronicle.sandbox.queue.locators.VolatileBufferIndexLocator;
+import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -142,7 +142,7 @@ import java.util.concurrent.TimeoutException;
  * @author Rob Austin
  * @since 1.1
  */
-public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicle.sandbox.queue.AbstractBlockingQueue implements BlockingQueue<E> {
+abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements BlockingQueue<E> {
 
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final E[] data = (E[]) new Object[capacity];
@@ -151,24 +151,17 @@ public class ConcurrentSharedBlockingObjectQueue<E> extends net.openhft.chronicl
     /**
      * Creates an BlockingQueue with the default capacity of 1024
      */
-    public ConcurrentSharedBlockingObjectQueue() {
-        super(new VolatileBufferIndexLocator());
+    public AbstractConcurrentBlockingObjectQueue(BufferIndexLocator locator) {
+        super(locator);
     }
 
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
      */
-    public ConcurrentSharedBlockingObjectQueue(int capacity) {
-        super(capacity, new VolatileBufferIndexLocator());
+    public AbstractConcurrentBlockingObjectQueue(int capacity, BufferIndexLocator locator) {
+        super(capacity, locator);
     }
 
-    public ConcurrentSharedBlockingObjectQueue(int capacity, boolean b) {
-        super(capacity, new VolatileBufferIndexLocator());
-    }
-
-    public ConcurrentSharedBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements) {
-        super(capacity, new VolatileBufferIndexLocator());
-    }
 
     /**
      * {@inheritDoc}

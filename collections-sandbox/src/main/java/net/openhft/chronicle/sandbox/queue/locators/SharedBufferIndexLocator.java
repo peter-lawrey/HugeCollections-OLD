@@ -29,7 +29,7 @@ public class SharedBufferIndexLocator implements BufferIndexLocator {
 
     @Override
     public void setWriteLocation(int nextWriteLocation) {
-        directBytes.writeInt(nextWriteLocation, WRITE_OFFSET);
+        directBytes.writeInt(WRITE_OFFSET, nextWriteLocation);
     }
 
     @Override
@@ -40,6 +40,6 @@ public class SharedBufferIndexLocator implements BufferIndexLocator {
 
     @Override
     public void setReadLocation(int nextReadLocation) {
-        directBytes.writeInt(nextReadLocation, READ_OFFSET);
+        directBytes.writeInt(READ_OFFSET, nextReadLocation);
     }
 }

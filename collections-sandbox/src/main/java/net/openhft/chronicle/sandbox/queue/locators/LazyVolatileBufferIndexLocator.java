@@ -7,7 +7,7 @@ import java.lang.reflect.Field;
 /**
  * Created by Rob Austin
  */
-public class VolatileBufferIndexLocator implements BufferIndexLocator {
+public class LazyVolatileBufferIndexLocator implements BufferIndexLocator {
 
     private static final long READ_LOCATION_OFFSET;
     private static final long WRITE_LOCATION_OFFSET;
@@ -19,9 +19,9 @@ public class VolatileBufferIndexLocator implements BufferIndexLocator {
             field.setAccessible(true);
             unsafe = (Unsafe) field.get(null);
             READ_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (VolatileBufferIndexLocator.class.getDeclaredField("readLocation"));
+                    (LazyVolatileBufferIndexLocator.class.getDeclaredField("readLocation"));
             WRITE_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (VolatileBufferIndexLocator.class.getDeclaredField("writeLocation"));
+                    (LazyVolatileBufferIndexLocator.class.getDeclaredField("writeLocation"));
         } catch (Exception e) {
             throw new AssertionError(e);
         }

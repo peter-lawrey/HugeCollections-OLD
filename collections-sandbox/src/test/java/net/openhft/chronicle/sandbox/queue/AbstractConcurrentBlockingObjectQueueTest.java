@@ -4,10 +4,8 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -28,12 +26,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Rob Austin
  */
 
-public class ConcurrentSharedBlockingObjectQueueTest {
+public class AbstractConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testTake() throws Exception {
 
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
 
         // writer thread
         Executors.newSingleThreadExecutor().execute(new Runnable() {
@@ -77,7 +75,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
 
     @Test
     public void testRead() throws Exception {
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
         queue.put(10);
         final int value = queue.take();
         junit.framework.Assert.assertEquals(10, value);
@@ -85,7 +83,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
 
     @Test
     public void testRead2() throws Exception {
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
         queue.put(10);
         queue.put(11);
         final int value = queue.take();
@@ -96,7 +94,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
 
     @Test
     public void testReadLoop() throws Exception {
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
 
         for (int i = 1; i < 50; i++) {
             queue.put(i);
@@ -113,7 +111,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
     @Test
     public void testWithFasterReader() throws Exception {
 
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
         final int max = 100;
         final CountDownLatch countDown = new CountDownLatch(1);
 
@@ -187,7 +185,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
     @Test
     public void testWithFasterWriter() throws Exception {
 
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
         final int max = 200;
         final CountDownLatch countDown = new CountDownLatch(1);
         final AtomicBoolean success = new AtomicBoolean(true);
@@ -259,8 +257,8 @@ public class ConcurrentSharedBlockingObjectQueueTest {
 
     }
 
-    private void testConcurrentBlockingObjectQueue(final int nTimes) throws InterruptedException {
-        final ConcurrentSharedBlockingObjectQueue<Integer> queue = new ConcurrentSharedBlockingObjectQueue<Integer>(1024);
+    private void testConcurrentBlockingObjectQueue(final int nTimes) throws InterruptedException, IOException {
+        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>(1024);
         final CountDownLatch countDown = new CountDownLatch(1);
 
         final AtomicBoolean success = new AtomicBoolean(true);
@@ -285,7 +283,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
         );
 
 
-        writerThread.setName("ConcurrentSharedBlockingObjectQueue<Integer>-writer");
+        writerThread.setName("AbstractConcurrentBlockingObjectQueue<Integer>-writer");
 
         Thread readerThread = new Thread(
                 new Runnable() {
@@ -318,7 +316,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
                 }
         );
 
-        readerThread.setName("ConcurrentSharedBlockingObjectQueue<Integer>-reader");
+        readerThread.setName("AbstractConcurrentBlockingObjectQueue<Integer>-reader");
 
         writerThread.start();
         readerThread.start();
@@ -405,7 +403,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
 
     @Test
     @Ignore
-    public void testLatency() throws NoSuchFieldException, InterruptedException {
+    public void testLatency() throws NoSuchFieldException, InterruptedException, IOException {
 
 
         for (int pwr = 2; pwr < 200; pwr++) {
@@ -421,7 +419,7 @@ public class ConcurrentSharedBlockingObjectQueueTest {
             testConcurrentBlockingObjectQueue(i);
             final double concurrentBlockingDuration = System.nanoTime() - queueStart;
 
-            System.out.printf("Performing %,d loops, ArrayBlockingQueue() took %.3f ms and calling ConcurrentSharedBlockingObjectQueue<Integer> took %.3f ms on average, ratio=%.1f%n",
+            System.out.printf("Performing %,d loops, ArrayBlockingQueue() took %.3f ms and calling AbstractConcurrentBlockingObjectQueue<Integer> took %.3f ms on average, ratio=%.1f%n",
                     i, arrayBlockingDuration / 1000000.0, concurrentBlockingDuration / 1000000.0, (double) arrayBlockingDuration / (double) concurrentBlockingDuration);
             /**
              System.out.printf("%d\t%.3f\t%.3f\n",

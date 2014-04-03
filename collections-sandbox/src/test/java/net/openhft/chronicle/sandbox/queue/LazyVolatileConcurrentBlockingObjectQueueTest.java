@@ -4,7 +4,6 @@ package net.openhft.chronicle.sandbox.queue;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -14,14 +13,14 @@ import java.util.concurrent.Executors;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.*;
 
-public class SharedArrayBlockingQueueTest extends JSR166TestCase {
+public class LazyVolatileConcurrentBlockingObjectQueueTest extends JSR166TestCase {
 
     /**
      * Returns a new queue of given size containing consecutive
      * Integers 0 ... n.
      */
-    private AbstractConcurrentBlockingObjectQueue populatedQueue(int n) throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(n);
+    private LazyVolatileConcurrentBlockingObjectQueue populatedQueue(int n) {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(n);
         assertTrue(q.isEmpty());
         for (int i = 0; i < n; i++)
             assertTrue(q.offer(new Integer(i)));
@@ -36,17 +35,17 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
 
     @Test
-    public void testConstructor1() throws IOException {
-        assertEquals(SIZE, new SharedConcurrentBlockingObjectQueue(SIZE).remainingCapacity());
+    public void testConstructor1() {
+        assertEquals(SIZE, new LazyVolatileConcurrentBlockingObjectQueue(SIZE).remainingCapacity());
     }
 
     /**
      * Constructor throws IAE if capacity argument nonpositive
      */
     @Test
-    public void testConstructor2() throws IOException {
+    public void testConstructor2() {
         try {
-            new SharedConcurrentBlockingObjectQueue(0);
+            new LazyVolatileConcurrentBlockingObjectQueue(0);
             shouldThrow();
         } catch (IllegalArgumentException success) {
         }
@@ -57,9 +56,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testConstructor3() throws IOException {
+    public void testConstructor3() {
         try {
-            new SharedConcurrentBlockingObjectQueue(1, true, null);
+            new LazyVolatileConcurrentBlockingObjectQueue(1, true, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -70,10 +69,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testConstructor4() throws IOException {
+    public void testConstructor4() {
         Collection<Integer> elements = Arrays.asList(new Integer[SIZE]);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE, false, elements);
+            new LazyVolatileConcurrentBlockingObjectQueue(SIZE, false, elements);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -84,13 +83,13 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testConstructor5() throws IOException {
+    public void testConstructor5() {
         Integer[] ints = new Integer[SIZE];
         for (int i = 0; i < SIZE - 1; ++i)
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE, false, Arrays.asList(ints));
+            new LazyVolatileConcurrentBlockingObjectQueue(SIZE, false, Arrays.asList(ints));
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -101,13 +100,13 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testConstructor6() throws IOException {
+    public void testConstructor6() {
         Integer[] ints = new Integer[SIZE];
         for (int i = 0; i < SIZE; ++i)
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE - 1, false, elements);
+            new LazyVolatileConcurrentBlockingObjectQueue(SIZE - 1, false, elements);
             shouldThrow();
         } catch (IllegalArgumentException success) {
         }
@@ -118,12 +117,12 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testConstructor7() throws IOException {
+    public void testConstructor7() {
         Integer[] ints = new Integer[SIZE];
         for (int i = 0; i < SIZE; ++i)
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE, true, elements);
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE, true, elements);
         for (int i = 0; i < SIZE; ++i)
             assertEquals(ints[i], q.poll());
     }
@@ -132,8 +131,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * Queue transitions from empty to full when elements added
      */
     @Test
-    public void testEmptyFull() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+    public void testEmptyFull() {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(2);
         assertTrue(q.isEmpty());
         assertEquals(2, q.remainingCapacity());
         q.add(one);
@@ -148,8 +147,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * remainingCapacity decreases on add, increases on remove
      */
     @Test
-    public void testRemainingCapacity() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testRemainingCapacity() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.remainingCapacity());
             assertEquals(SIZE - i, q.size());
@@ -166,8 +165,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * Offer succeeds if not full; fails if full
      */
     @Test
-    public void testOffer() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(1);
+    public void testOffer() {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(1);
         assertTrue(q.offer(zero));
         assertFalse(q.offer(one));
     }
@@ -176,9 +175,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * add succeeds if not full; throws ISE if full
      */
     @Test
-    public void testAdd() throws IOException {
+    public void testAdd() {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+            LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
             for (int i = 0; i < SIZE; ++i) {
                 assertTrue(q.add(new Integer(i)));
             }
@@ -193,9 +192,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * addAll(this) throws IAE
      */
     @Test
-    public void testAddAllSelf() throws IOException {
+    public void testAddAllSelf() {
         try {
-            AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+            LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
             q.addAll(q);
             shouldThrow();
         } catch (IllegalArgumentException success) {
@@ -207,9 +206,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * possibly adding some elements
      */
     @Test
-    public void testAddAll3() throws IOException {
+    public void testAddAll3() {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+            LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
             Integer[] ints = new Integer[SIZE];
             for (int i = 0; i < SIZE - 1; ++i)
                 ints[i] = new Integer(i);
@@ -223,9 +222,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * addAll throws ISE if not enough room
      */
     @Test
-    public void testAddAll4() throws IOException {
+    public void testAddAll4() {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(1);
+            LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(1);
             Integer[] ints = new Integer[SIZE];
             for (int i = 0; i < SIZE; ++i)
                 ints[i] = new Integer(i);
@@ -239,12 +238,12 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * Queue contains all elements, in traversal order, of successful addAll
      */
     @Test
-    public void testAddAll5() throws IOException {
+    public void testAddAll5() {
         Integer[] empty = new Integer[0];
         Integer[] ints = new Integer[SIZE];
         for (int i = 0; i < SIZE; ++i)
             ints[i] = new Integer(i);
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         assertFalse(q.addAll(Arrays.asList(empty)));
         assertTrue(q.addAll(Arrays.asList(ints)));
         for (int i = 0; i < SIZE; ++i)
@@ -255,8 +254,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * all elements successfully put are contained
      */
     @Test
-    public void testPut() throws Exception, IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+    public void testPut() throws InterruptedException {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             Integer I = new Integer(i);
             q.put(I);
@@ -269,11 +268,11 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * put blocks interruptibly if full
      */
     @Test
-    public void testBlockingPut() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+    public void testBlockingPut() throws InterruptedException {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 for (int i = 0; i < SIZE; ++i)
                     q.put(i);
                 assertEquals(SIZE, q.size());
@@ -309,13 +308,13 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * put blocks interruptibly waiting for take when full
      */
     @Test
-    public void testPutWithTake() throws Exception {
+    public void testPutWithTake() throws InterruptedException {
         final int capacity = 2;
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(capacity);
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(capacity);
         final CountDownLatch pleaseTake = new CountDownLatch(1);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 for (int i = 0; i < capacity; i++)
                     q.put(i);
                 pleaseTake.countDown();
@@ -347,11 +346,11 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testTimedOffer() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+    public void testTimedOffer() throws InterruptedException {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(2);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 q.put(new Object());
                 q.put(new Object());
                 long startTime = System.nanoTime();
@@ -376,8 +375,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * take retrieves elements in FIFO order
      */
     @Test
-    public void testTake() throws Exception, IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testTake() throws InterruptedException {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.take());
         }
@@ -388,11 +387,11 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testBlockingTake() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testBlockingTake() throws InterruptedException {
+        final LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 for (int i = 0; i < SIZE; ++i) {
                     assertEquals(i, q.take());
                 }
@@ -425,8 +424,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * poll succeeds unless empty
      */
     @Test
-    public void testPoll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testPoll() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.poll());
         }
@@ -437,8 +436,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * timed poll with zero timeout succeeds when non-empty, else times out
      */
     @Test
-    public void testTimedPoll0() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testTimedPoll0() throws InterruptedException {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.poll(0, MILLISECONDS));
         }
@@ -450,8 +449,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * timed poll with nonzero timeout succeeds when non-empty, else times out
      */
     @Test
-    public void testTimedPoll() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testTimedPoll() throws InterruptedException {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             long startTime = System.nanoTime();
             assertEquals(i, q.poll(LONG_DELAY_MS, MILLISECONDS));
@@ -464,16 +463,16 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     }
 
     /**
-     * Interrupted timed poll throws Exception instead of
+     * Interrupted timed poll throws InterruptedException instead of
      * returning timeout status
      */
     @Ignore
     @Test
-    public void testInterruptedTimedPoll() throws Exception {
+    public void testInterruptedTimedPoll() throws InterruptedException {
         final BlockingQueue<Integer> q = populatedQueue(SIZE);
         final CountDownLatch aboutToWait = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 for (int i = 0; i < SIZE; ++i) {
                     long t0 = System.nanoTime();
                     assertEquals(i, (int) q.poll(LONG_DELAY_MS, MILLISECONDS));
@@ -501,8 +500,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * peek returns next element, or null if empty
      */
     @Test
-    public void testPeek() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testPeek() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.peek());
             assertEquals(i, q.poll());
@@ -517,8 +516,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testElement() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testElement() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.element());
             assertEquals(i, q.poll());
@@ -534,8 +533,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * remove removes next element, or throws NSEE if empty
      */
     @Test
-    public void testRemove() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testRemove() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.remove());
         }
@@ -550,8 +549,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * contains(x) reports true when elements added but not yet removed
      */
     @Test
-    public void testContains() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testContains() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(q.contains(new Integer(i)));
             assertEquals(i, q.poll());
@@ -563,8 +562,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * clear removes all elements
      */
     @Test
-    public void testClear() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testClear() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         q.clear();
         assertTrue(q.isEmpty());
         assertEquals(0, q.size());
@@ -580,9 +579,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * containsAll(c) is true when c contains a subset of elements
      */
     @Test
-    public void testContainsAll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-        AbstractConcurrentBlockingObjectQueue p = new SharedConcurrentBlockingObjectQueue(SIZE);
+    public void testContainsAll() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        LazyVolatileConcurrentBlockingObjectQueue p = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(q.containsAll(p));
             assertFalse(p.containsAll(q));
@@ -595,9 +594,9 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * retainAll(c) retains only those elements of c and reports true if changed
      */
     @Test
-    public void testRetainAll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-        AbstractConcurrentBlockingObjectQueue p = populatedQueue(SIZE);
+    public void testRetainAll() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        LazyVolatileConcurrentBlockingObjectQueue p = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             boolean changed = q.retainAll(p);
             if (i == 0)
@@ -615,10 +614,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * removeAll(c) removes only those elements of c and reports true if changed
      */
     @Test
-    public void testRemoveAll() throws IOException {
+    public void testRemoveAll() {
         for (int i = 1; i < SIZE; ++i) {
-            AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-            AbstractConcurrentBlockingObjectQueue p = populatedQueue(i);
+            LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+            LazyVolatileConcurrentBlockingObjectQueue p = populatedQueue(i);
             assertTrue(q.removeAll(p));
             assertEquals(SIZE - i, q.size());
             for (int j = 0; j < i; ++j) {
@@ -628,7 +627,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         }
     }
 
-    void checkToArray(AbstractConcurrentBlockingObjectQueue q) {
+    void checkToArray(LazyVolatileConcurrentBlockingObjectQueue q) {
         int size = q.size();
         Object[] o = q.toArray();
         assertEquals(size, o.length);
@@ -644,8 +643,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * toArray() contains all elements in FIFO order
      */
     @Test
-    public void testToArray() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+    public void testToArray() {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         for (int i = 0; i < SIZE; i++) {
             checkToArray(q);
             q.add(i);
@@ -663,7 +662,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         }
     }
 
-    void checkToArray2(AbstractConcurrentBlockingObjectQueue q) {
+    void checkToArray2(LazyVolatileConcurrentBlockingObjectQueue q) {
         int size = q.size();
         Integer[] a1 = size == 0 ? null : new Integer[size - 1];
         Integer[] a2 = new Integer[size];
@@ -700,8 +699,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testToArray2() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+    public void testToArray2() {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE);
         for (int i = 0; i < SIZE; i++) {
             checkToArray2(q);
             q.add(i);
@@ -723,8 +722,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * toArray(incompatible array type) throws ArrayStoreException
      */
     @Test
-    public void testToArray1_BadArg() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testToArray1_BadArg() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         try {
             q.toArray(new String[10]);
             shouldThrow();
@@ -736,8 +735,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * iterator iterates through all elements
      */
     @Test
-    public void testIterator() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testIterator() throws InterruptedException {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         Iterator it = q.iterator();
         while (it.hasNext()) {
             assertEquals(it.next(), q.take());
@@ -749,8 +748,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testIteratorRemove() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+    public void testIteratorRemove() {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(3);
         q.add(two);
         q.add(one);
         q.add(three);
@@ -769,8 +768,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * iterator ordering is FIFO
      */
     @Test
-    public void testIteratorOrdering() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+    public void testIteratorOrdering() {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(3);
         q.add(one);
         q.add(two);
         q.add(three);
@@ -788,8 +787,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * Modifications do not cause iterators to fail
      */
     @Test
-    public void testWeaklyConsistentIteration() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+    public void testWeaklyConsistentIteration() {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(3);
         q.add(one);
         q.add(two);
         q.add(three);
@@ -804,8 +803,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * toString contains toStrings of elements
      */
     @Test
-    public void testToString() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testToString() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         String s = q.toString();
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(s.contains(String.valueOf(i)));
@@ -816,14 +815,14 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * offer transfers elements across Executor tasks
      */
     @Test
-    public void testOfferInExecutor() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+    public void testOfferInExecutor() {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(2);
         q.add(one);
         q.add(two);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         final CheckedBarrier threadsStarted = new CheckedBarrier(2);
         executor.execute(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 assertFalse(q.offer(three));
                 threadsStarted.await();
                 assertTrue(q.offer(three, LONG_DELAY_MS, MILLISECONDS));
@@ -832,7 +831,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         });
 
         executor.execute(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 threadsStarted.await();
                 assertEquals(0, q.remainingCapacity());
                 assertSame(one, q.take());
@@ -846,12 +845,12 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * timed poll retrieves elements across Executor threads
      */
     @Test
-    public void testPollInExecutor() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+    public void testPollInExecutor() {
+        final LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(2);
         final CheckedBarrier threadsStarted = new CheckedBarrier(2);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         executor.execute(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 assertNull(q.poll());
                 threadsStarted.await();
                 assertSame(one, q.poll(LONG_DELAY_MS, MILLISECONDS));
@@ -860,7 +859,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         });
 
         executor.execute(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 threadsStarted.await();
                 q.put(one);
             }
@@ -894,8 +893,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     @Ignore
-    public void testDrainTo() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testDrainTo() {
+        LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         ArrayList l = new ArrayList();
         q.drainTo(l);
         assertEquals(0, q.size());
@@ -920,10 +919,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testDrainToWithActivePut() throws Exception {
-        final AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+    public void testDrainToWithActivePut() throws InterruptedException {
+        final LazyVolatileConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
         Thread t = new Thread(new CheckedRunnable() {
-            public void realRun() throws Exception {
+            public void realRun() throws InterruptedException {
                 q.put(new Integer(SIZE + 1));
             }
         });
@@ -943,8 +942,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Ignore
     @Test
-    public void testDrainToN() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE * 2);
+    public void testDrainToN() {
+        LazyVolatileConcurrentBlockingObjectQueue q = new LazyVolatileConcurrentBlockingObjectQueue(SIZE * 2);
         for (int i = 0; i < SIZE + 2; ++i) {
             for (int j = 0; j < SIZE; j++)
                 assertTrue(q.offer(new Integer(j)));
@@ -961,23 +960,13 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
 
     public static class Fair extends BlockingQueueTest {
         protected BlockingQueue emptyCollection() {
-            try {
-                return new SharedConcurrentBlockingObjectQueue(SIZE, true);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
+            return new LazyVolatileConcurrentBlockingObjectQueue(SIZE, true);
         }
     }
 
     public static class NonFair extends BlockingQueueTest {
         protected BlockingQueue emptyCollection() {
-            try {
-                return new SharedConcurrentBlockingObjectQueue(SIZE, false);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
+            return new LazyVolatileConcurrentBlockingObjectQueue(SIZE, false);
         }
     }
 
