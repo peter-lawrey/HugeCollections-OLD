@@ -36,20 +36,12 @@ public class VolatileBufferIndexLocator implements BufferIndexLocator {
         return writeLocation;
     }
 
-    @Override
-    public void setWriteLocation(int location) {
-        writeLocation = location;
-    }
 
     @Override
     public int getReadLocation() {
         return readLocation;
     }
 
-    @Override
-    public void setReadLocation(int location) {
-        readLocation = location;
-    }
 
     @Override
     public void lazySetReadLocation(int nextReadLocation) {
