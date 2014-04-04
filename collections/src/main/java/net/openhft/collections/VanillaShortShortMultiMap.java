@@ -58,11 +58,6 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
 
     @Override
     public void put(int key, int value) {
-        if (!putLimited(key, value, capacityMask + 1))
-            throw new IllegalStateException(getClass().getSimpleName() + " is full");
-    }
-
-    public boolean putLimited(int key, int value, int limit) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         else if ((key & ~0xFFFF) != 0)
@@ -70,21 +65,21 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         if ((value & ~0xFFFF) != 0)
             throw new IllegalArgumentException("Value out of range, was " + value);
         int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
-        for (int i = 0; i < limit; i++) {
+        for (int i = 0; i <= capacityMask; i++) {
             int entry = bytes.readInt(pos);
             int hash2 = entry >>> 16;
             if (hash2 == UNSET_KEY) {
                 bytes.writeInt(pos, ((key << 16) | value));
-                return true;
+                return;
             }
             if (hash2 == key) {
                 int value2 = entry & 0xFFFF;
                 if (value2 == value)
-                    return true;
+                    return;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
         }
-        return false;
+        throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
     @Override

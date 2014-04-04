@@ -34,16 +34,6 @@ interface IntIntMultiMap {
     void put(int key, int value);
 
     /**
-     * Add an entry.  Allow duplicate hashes, but not key/position pairs.
-     *
-     * @param key   to add
-     * @param value to add
-     * @param limit count of how many attempts to add the key value before you give up.
-     * @return true if added, false if not.
-     */
-    boolean putLimited(int key, int value, int limit);
-
-    /**
      * Remove a key/value pair.
      *
      * @param key   to remove
