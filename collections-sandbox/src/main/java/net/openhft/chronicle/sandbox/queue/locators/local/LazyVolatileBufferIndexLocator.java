@@ -1,5 +1,6 @@
-package net.openhft.chronicle.sandbox.queue.locators;
+package net.openhft.chronicle.sandbox.queue.locators.local;
 
+import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;

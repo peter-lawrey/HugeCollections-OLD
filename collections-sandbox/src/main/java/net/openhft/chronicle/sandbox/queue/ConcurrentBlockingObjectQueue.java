@@ -144,12 +144,12 @@ import java.util.concurrent.TimeoutException;
  * @author Rob Austin
  * @since 1.1
  */
-abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements BlockingQueue<E> {
+class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements BlockingQueue<E> {
 
     private final DataLocator<E> dataLocator;
 
-    public AbstractConcurrentBlockingObjectQueue(@NotNull final BufferIndexLocator locator,
-                                                 @NotNull final DataLocator dataLocator) {
+    public ConcurrentBlockingObjectQueue(@NotNull final BufferIndexLocator locator,
+                                         @NotNull final DataLocator dataLocator) {
         super(locator, dataLocator);
         this.dataLocator = dataLocator;
     }
@@ -504,6 +504,16 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         return true;
 
+    }
+
+
+    @Override
+    public boolean equals(Object obj) {
+
+        if (obj instanceof BlockingQueueDelegate) {
+            return super.equals(((BlockingQueueDelegate) obj).getDelegate());
+        }
+        return super.equals(obj);
     }
 
     @Override

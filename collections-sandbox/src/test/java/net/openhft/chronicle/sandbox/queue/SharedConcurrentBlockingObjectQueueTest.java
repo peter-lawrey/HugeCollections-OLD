@@ -283,7 +283,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
         );
 
 
-        writerThread.setName("AbstractConcurrentBlockingObjectQueue<Integer>-writer");
+        writerThread.setName("ConcurrentBlockingObjectQueue<Integer>-writer");
 
         Thread readerThread = new Thread(
                 new Runnable() {
@@ -316,7 +316,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
                 }
         );
 
-        readerThread.setName("AbstractConcurrentBlockingObjectQueue<Integer>-reader");
+        readerThread.setName("ConcurrentBlockingObjectQueue<Integer>-reader");
 
         writerThread.start();
         readerThread.start();
@@ -419,7 +419,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
             testConcurrentBlockingObjectQueue(i);
             final double concurrentBlockingDuration = System.nanoTime() - queueStart;
 
-            System.out.printf("Performing %,d loops, ArrayBlockingQueue() took %.3f ms and calling AbstractConcurrentBlockingObjectQueue<Integer> took %.3f ms on average, ratio=%.1f%n",
+            System.out.printf("Performing %,d loops, ArrayBlockingQueue() took %.3f ms and calling ConcurrentBlockingObjectQueue<Integer> took %.3f ms on average, ratio=%.1f%n",
                     i, arrayBlockingDuration / 1000000.0, concurrentBlockingDuration / 1000000.0, (double) arrayBlockingDuration / (double) concurrentBlockingDuration);
             /**
              System.out.printf("%d\t%.3f\t%.3f\n",

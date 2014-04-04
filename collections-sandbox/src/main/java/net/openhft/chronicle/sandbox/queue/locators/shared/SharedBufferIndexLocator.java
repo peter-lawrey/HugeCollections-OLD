@@ -1,5 +1,6 @@
-package net.openhft.chronicle.sandbox.queue.locators;
+package net.openhft.chronicle.sandbox.queue.locators.shared;
 
+import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.MappedStore;
 

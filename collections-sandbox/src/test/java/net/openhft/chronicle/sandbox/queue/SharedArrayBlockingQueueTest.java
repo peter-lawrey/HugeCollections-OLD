@@ -20,8 +20,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      * Returns a new queue of given size containing consecutive
      * Integers 0 ... n.
      */
-    private AbstractConcurrentBlockingObjectQueue populatedQueue(int n) throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(n);
+    private BlockingQueue<Integer> populatedQueue(int n) throws IOException {
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(n);
         assertTrue(q.isEmpty());
         for (int i = 0; i < n; i++)
             assertTrue(q.offer(new Integer(i)));
@@ -37,7 +37,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
 
     @Test
     public void testConstructor1() throws IOException {
-        assertEquals(SIZE, new SharedConcurrentBlockingObjectQueue(SIZE).remainingCapacity());
+        assertEquals(SIZE, new SharedConcurrentBlockingObjectQueue<Integer>(SIZE).remainingCapacity());
     }
 
     /**
@@ -46,7 +46,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testConstructor2() throws IOException {
         try {
-            new SharedConcurrentBlockingObjectQueue(0);
+            new SharedConcurrentBlockingObjectQueue<Integer>(0);
             shouldThrow();
         } catch (IllegalArgumentException success) {
         }
@@ -59,7 +59,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testConstructor3() throws IOException {
         try {
-            new SharedConcurrentBlockingObjectQueue(1, true, null);
+            new SharedConcurrentBlockingObjectQueue<Integer>(1, true, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -73,7 +73,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     public void testConstructor4() throws IOException {
         Collection<Integer> elements = Arrays.asList(new Integer[SIZE]);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE, false, elements);
+            new SharedConcurrentBlockingObjectQueue<Integer>(SIZE, false, elements);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -90,7 +90,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE, false, Arrays.asList(ints));
+            new SharedConcurrentBlockingObjectQueue<Integer>(SIZE, false, Arrays.asList(ints));
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -107,7 +107,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
         try {
-            new SharedConcurrentBlockingObjectQueue(SIZE - 1, false, elements);
+            new SharedConcurrentBlockingObjectQueue<Integer>(SIZE - 1, false, elements);
             shouldThrow();
         } catch (IllegalArgumentException success) {
         }
@@ -123,7 +123,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         for (int i = 0; i < SIZE; ++i)
             ints[i] = i;
         Collection<Integer> elements = Arrays.asList(ints);
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE, true, elements);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE, true, elements);
         for (int i = 0; i < SIZE; ++i)
             assertEquals(ints[i], q.poll());
     }
@@ -133,7 +133,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testEmptyFull() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(2);
         assertTrue(q.isEmpty());
         assertEquals(2, q.remainingCapacity());
         q.add(one);
@@ -149,7 +149,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testRemainingCapacity() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.remainingCapacity());
             assertEquals(SIZE - i, q.size());
@@ -167,7 +167,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testOffer() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(1);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(1);
         assertTrue(q.offer(zero));
         assertFalse(q.offer(one));
     }
@@ -178,7 +178,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testAdd() throws IOException {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+            BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
             for (int i = 0; i < SIZE; ++i) {
                 assertTrue(q.add(new Integer(i)));
             }
@@ -195,7 +195,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testAddAllSelf() throws IOException {
         try {
-            AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+            BlockingQueue<Integer> q = populatedQueue(SIZE);
             q.addAll(q);
             shouldThrow();
         } catch (IllegalArgumentException success) {
@@ -209,7 +209,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testAddAll3() throws IOException {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+            BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
             Integer[] ints = new Integer[SIZE];
             for (int i = 0; i < SIZE - 1; ++i)
                 ints[i] = new Integer(i);
@@ -225,7 +225,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testAddAll4() throws IOException {
         try {
-            AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(1);
+            BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(1);
             Integer[] ints = new Integer[SIZE];
             for (int i = 0; i < SIZE; ++i)
                 ints[i] = new Integer(i);
@@ -244,7 +244,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         Integer[] ints = new Integer[SIZE];
         for (int i = 0; i < SIZE; ++i)
             ints[i] = new Integer(i);
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         assertFalse(q.addAll(Arrays.asList(empty)));
         assertTrue(q.addAll(Arrays.asList(ints)));
         for (int i = 0; i < SIZE; ++i)
@@ -256,7 +256,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testPut() throws Exception, IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             Integer I = new Integer(i);
             q.put(I);
@@ -270,7 +270,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testBlockingPut() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
             public void realRun() throws Exception {
@@ -311,7 +311,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testPutWithTake() throws Exception {
         final int capacity = 2;
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(capacity);
+        final BlockingQueue q = new SharedConcurrentBlockingObjectQueue<Integer>(capacity);
         final CountDownLatch pleaseTake = new CountDownLatch(1);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
@@ -348,7 +348,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testTimedOffer() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+        final BlockingQueue q = new SharedConcurrentBlockingObjectQueue(2);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
             public void realRun() throws Exception {
@@ -377,7 +377,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testTake() throws Exception, IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.take());
         }
@@ -389,7 +389,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testBlockingTake() throws Exception, IOException {
-        final AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        final BlockingQueue q = populatedQueue(SIZE);
         final CountDownLatch pleaseInterrupt = new CountDownLatch(1);
         Thread t = newStartedThread(new CheckedRunnable() {
             public void realRun() throws Exception {
@@ -426,7 +426,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testPoll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.poll());
         }
@@ -438,7 +438,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testTimedPoll0() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.poll(0, MILLISECONDS));
         }
@@ -451,10 +451,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testTimedPoll() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             long startTime = System.nanoTime();
-            assertEquals(i, q.poll(LONG_DELAY_MS, MILLISECONDS));
+            assertEquals(i, (int) q.poll(LONG_DELAY_MS, MILLISECONDS));
             assertTrue(millisElapsedSince(startTime) < LONG_DELAY_MS);
         }
         long startTime = System.nanoTime();
@@ -502,10 +502,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testPeek() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
-            assertEquals(i, q.peek());
-            assertEquals(i, q.poll());
+            assertEquals(i, (int) q.peek());
+            assertEquals(i, (int) q.poll());
             assertTrue(q.peek() == null ||
                     !q.peek().equals(i));
         }
@@ -518,10 +518,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testElement() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
-            assertEquals(i, q.element());
-            assertEquals(i, q.poll());
+            assertEquals(i, (int) q.element());
+            assertEquals(i, (int) q.poll());
         }
         try {
             q.element();
@@ -535,7 +535,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testRemove() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertEquals(i, q.remove());
         }
@@ -551,10 +551,10 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testContains() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(q.contains(new Integer(i)));
-            assertEquals(i, q.poll());
+            assertEquals(i, (int) q.poll());
             assertFalse(q.contains(new Integer(i)));
         }
     }
@@ -564,7 +564,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testClear() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         q.clear();
         assertTrue(q.isEmpty());
         assertEquals(0, q.size());
@@ -581,8 +581,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testContainsAll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-        AbstractConcurrentBlockingObjectQueue p = new SharedConcurrentBlockingObjectQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
+        BlockingQueue p = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(q.containsAll(p));
             assertFalse(p.containsAll(q));
@@ -596,8 +596,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testRetainAll() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-        AbstractConcurrentBlockingObjectQueue p = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
+        BlockingQueue p = populatedQueue(SIZE);
         for (int i = 0; i < SIZE; ++i) {
             boolean changed = q.retainAll(p);
             if (i == 0)
@@ -617,8 +617,8 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     public void testRemoveAll() throws IOException {
         for (int i = 1; i < SIZE; ++i) {
-            AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
-            AbstractConcurrentBlockingObjectQueue p = populatedQueue(i);
+            BlockingQueue<Integer> q = populatedQueue(SIZE);
+            BlockingQueue p = populatedQueue(i);
             assertTrue(q.removeAll(p));
             assertEquals(SIZE - i, q.size());
             for (int j = 0; j < i; ++j) {
@@ -628,7 +628,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         }
     }
 
-    void checkToArray(AbstractConcurrentBlockingObjectQueue q) {
+    void checkToArray(BlockingQueue q) {
         int size = q.size();
         Object[] o = q.toArray();
         assertEquals(size, o.length);
@@ -645,7 +645,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testToArray() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         for (int i = 0; i < SIZE; i++) {
             checkToArray(q);
             q.add(i);
@@ -653,17 +653,17 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         // Provoke wraparound
         for (int i = 0; i < SIZE; i++) {
             checkToArray(q);
-            assertEquals(i, q.poll());
+            assertEquals(i, (int) q.poll());
             checkToArray(q);
             q.add(SIZE + i);
         }
         for (int i = 0; i < SIZE; i++) {
             checkToArray(q);
-            assertEquals(SIZE + i, q.poll());
+            assertEquals(SIZE + i, (int) q.poll());
         }
     }
 
-    void checkToArray2(AbstractConcurrentBlockingObjectQueue q) {
+    void checkToArray2(BlockingQueue<Integer> q) {
         int size = q.size();
         Integer[] a1 = size == 0 ? null : new Integer[size - 1];
         Integer[] a2 = new Integer[size];
@@ -701,7 +701,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testToArray2() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE);
+        BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE);
         for (int i = 0; i < SIZE; i++) {
             checkToArray2(q);
             q.add(i);
@@ -709,13 +709,13 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
         // Provoke wraparound
         for (int i = 0; i < SIZE; i++) {
             checkToArray2(q);
-            assertEquals(i, q.poll());
+            assertEquals(i, (int) q.poll());
             checkToArray2(q);
             q.add(SIZE + i);
         }
         for (int i = 0; i < SIZE; i++) {
             checkToArray2(q);
-            assertEquals(SIZE + i, q.poll());
+            assertEquals(SIZE + i, (int) q.poll());
         }
     }
 
@@ -724,7 +724,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testToArray1_BadArg() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         try {
             q.toArray(new String[10]);
             shouldThrow();
@@ -737,7 +737,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testIterator() throws Exception {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         Iterator it = q.iterator();
         while (it.hasNext()) {
             assertEquals(it.next(), q.take());
@@ -750,7 +750,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testIteratorRemove() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(3);
         q.add(two);
         q.add(one);
         q.add(three);
@@ -770,7 +770,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testIteratorOrdering() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(3);
         q.add(one);
         q.add(two);
         q.add(three);
@@ -789,7 +789,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testWeaklyConsistentIteration() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(3);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(3);
         q.add(one);
         q.add(two);
         q.add(three);
@@ -805,7 +805,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testToString() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         String s = q.toString();
         for (int i = 0; i < SIZE; ++i) {
             assertTrue(s.contains(String.valueOf(i)));
@@ -817,7 +817,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testOfferInExecutor() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(2);
         q.add(one);
         q.add(two);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -847,7 +847,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
      */
     @Test
     public void testPollInExecutor() throws IOException {
-        final AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(2);
+        final BlockingQueue<Integer> q = new SharedConcurrentBlockingObjectQueue<Integer>(2);
         final CheckedBarrier threadsStarted = new CheckedBarrier(2);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         executor.execute(new CheckedRunnable() {
@@ -895,7 +895,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Test
     @Ignore
     public void testDrainTo() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        BlockingQueue<Integer> q = populatedQueue(SIZE);
         ArrayList l = new ArrayList();
         q.drainTo(l);
         assertEquals(0, q.size());
@@ -921,7 +921,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testDrainToWithActivePut() throws Exception {
-        final AbstractConcurrentBlockingObjectQueue q = populatedQueue(SIZE);
+        final BlockingQueue<Integer> q = populatedQueue(SIZE);
         Thread t = new Thread(new CheckedRunnable() {
             public void realRun() throws Exception {
                 q.put(new Integer(SIZE + 1));
@@ -944,7 +944,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     @Ignore
     @Test
     public void testDrainToN() throws IOException {
-        AbstractConcurrentBlockingObjectQueue q = new SharedConcurrentBlockingObjectQueue(SIZE * 2);
+        BlockingQueue q = new SharedConcurrentBlockingObjectQueue<Integer>(SIZE * 2);
         for (int i = 0; i < SIZE + 2; ++i) {
             for (int j = 0; j < SIZE; j++)
                 assertTrue(q.offer(new Integer(j)));
@@ -962,7 +962,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     public static class Fair extends BlockingQueueTest {
         protected BlockingQueue emptyCollection() {
             try {
-                return new SharedConcurrentBlockingObjectQueue(SIZE, true);
+                return new SharedConcurrentBlockingObjectQueue<Integer>(SIZE, true);
             } catch (IOException e) {
                 e.printStackTrace();
                 return null;
@@ -973,7 +973,7 @@ public class SharedArrayBlockingQueueTest extends JSR166TestCase {
     public static class NonFair extends BlockingQueueTest {
         protected BlockingQueue emptyCollection() {
             try {
-                return new SharedConcurrentBlockingObjectQueue(SIZE, false);
+                return new SharedConcurrentBlockingObjectQueue<Integer>(SIZE, false);
             } catch (IOException e) {
                 e.printStackTrace();
                 return null;

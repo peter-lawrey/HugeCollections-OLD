@@ -1,40 +1,42 @@
 package net.openhft.chronicle.sandbox.queue;
 
-import net.openhft.chronicle.sandbox.queue.locators.LocalDataLocator;
-import net.openhft.chronicle.sandbox.queue.locators.SharedBufferIndexLocator;
-
 import java.io.IOException;
 import java.util.Collection;
+import java.util.concurrent.BlockingQueue;
 
 /**
  * Created by Rob Austin
  */
-public class SharedConcurrentBlockingObjectQueue<E> extends AbstractConcurrentBlockingObjectQueue<E> {
+public class SharedConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegate<E> {
 
-    public static final int DEFAULT_CAPACITY = 1024;
+    final ConcurrentBlockingObjectQueueBuilder<E> builder = new ConcurrentBlockingObjectQueueBuilder<E>();
+    final BlockingQueue<E> delegate;
 
 
-    /**
-     * Creates an BlockingQueue with the default capacity of 1024
-     */
     public SharedConcurrentBlockingObjectQueue() throws IOException {
-
-        super(new SharedBufferIndexLocator(), new LocalDataLocator(DEFAULT_CAPACITY));
+        this(1024);
     }
 
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
      */
     public SharedConcurrentBlockingObjectQueue(int capacity) throws IOException {
-        super(new SharedBufferIndexLocator(), new LocalDataLocator(capacity));
+        builder.setCapacity(capacity);
+        builder.isShared(true);
+        delegate = builder.create();
     }
 
     public SharedConcurrentBlockingObjectQueue(int capacity, boolean b) throws IOException {
-        super(new SharedBufferIndexLocator(), new LocalDataLocator(capacity));
+        this(capacity);
     }
 
     public SharedConcurrentBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements) throws IOException {
-        super(new SharedBufferIndexLocator(), new LocalDataLocator(capacity));
+        this(capacity);
     }
 
+
+    @Override
+    protected BlockingQueue<E> getDelegate() {
+        return delegate;
+    }
 }

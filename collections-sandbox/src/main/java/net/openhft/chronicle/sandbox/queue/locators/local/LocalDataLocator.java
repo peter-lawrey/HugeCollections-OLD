@@ -1,4 +1,6 @@
-package net.openhft.chronicle.sandbox.queue.locators;
+package net.openhft.chronicle.sandbox.queue.locators.local;
+
+import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 
 /**
  * Created by Rob Austin
