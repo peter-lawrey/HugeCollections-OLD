@@ -168,8 +168,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     /**
      * Cache line alignment, assuming 64-byte cache lines.
      */
-    private long align64(long l) {
-        // 64-byte alignment.
+    private static long align64(long l) {
         return (l + 63) & ~63;
     }
 
@@ -229,11 +228,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private V put0(K key, V value, boolean replaceIfPresent) {
         checkKey(key);
         checkValue(value);
-        DirectBytes bytes = getKeyAsBytes(key);
-        long hash = hasher.hash(bytes);
+        Bytes keyBytes = getKeyAsBytes(key);
+        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].put(bytes, key, value, segmentHash, replaceIfPresent);
+        return segments[segmentNum].put(keyBytes, key, value, segmentHash, replaceIfPresent);
     }
 
     private DirectBytes getKeyAsBytes(K key) {
@@ -266,11 +265,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     private V lookupUsing(K key, V value, boolean create) {
         checkKey(key);
-        DirectBytes bytes = getKeyAsBytes(key);
-        long hash = hasher.hash(bytes);
+        Bytes keyBytes = getKeyAsBytes(key);
+        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].acquire(bytes, key, value, segmentHash, create);
+        return segments[segmentNum].acquire(keyBytes, key, value, segmentHash, create);
     }
 
     /**
@@ -279,12 +278,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     @Override
     public boolean containsKey(final Object key) {
         checkKey(key);
-        final DirectBytes bytes = getKeyAsBytes((K) key);
-        long hash = hasher.hash(bytes);
+        Bytes keyBytes = getKeyAsBytes((K) key);
+        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
 
-        return segments[segmentNum].containsKey(bytes, segmentHash);
+        return segments[segmentNum].containsKey(keyBytes, segmentHash);
     }
 
     @Override
@@ -336,11 +335,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     private V removeIfValueIs(final Object key, final V expectedValue) {
         checkKey(key);
-        final DirectBytes bytes = getKeyAsBytes((K) key);
-        long hash = hasher.hash(bytes);
+        Bytes keyBytes = getKeyAsBytes((K) key);
+        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].remove(bytes, (K) key, expectedValue, segmentHash);
+        return segments[segmentNum].remove(keyBytes, (K) key, expectedValue, segmentHash);
     }
 
     /**
@@ -367,13 +366,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         return replaceIfValueIs(key, null, value);
     }
 
-
-    // TODO uncomment once tested -  HCOLL-16  implement map.size()
-
-    /**
-     * {@inheritDoc}
-     */
-
+    @Override
     public long longSize() {
         long result = 0;
 
@@ -401,29 +394,17 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
-        final DirectBytes bytes = getKeyAsBytes(key);
-        long hash = hasher.hash(bytes);
+        Bytes keyBytes = getKeyAsBytes(key);
+        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].replace(bytes, key, existingValue, newValue, segmentHash);
+        return segments[segmentNum].replace(keyBytes, key, existingValue, newValue, segmentHash);
     }
 
 
-    static final class Hasher<K> {
+    private static final class Hasher {
 
-        private final int segments;
-
-        private final int bits;
-
-        private final int mask;
-
-        Hasher(int segments, int mask) {
-            this.segments = segments;
-            this.bits = Maths.intLog2(segments);
-            this.mask = mask;
-        }
-
-        final long hash(Bytes bytes) {
+        static long hash(Bytes bytes) {
             long h = 0;
             int i = 0;
             long limit = bytes.limit(); // clustering.
@@ -439,11 +420,21 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return h;
         }
 
-        final int segmentHash(long hash) {
+        private final int segments;
+        private final int bits;
+        private final int mask;
+
+        Hasher(int segments, int mask) {
+            this.segments = segments;
+            this.bits = Maths.intLog2(segments);
+            this.mask = mask;
+        }
+
+        int segmentHash(long hash) {
             return (int) (hash >>> bits) & mask;
         }
 
-        public final int getSegment(long hash) {
+        int getSegment(long hash) {
             return (int) (hash & (segments - 1));
         }
     }
@@ -484,6 +475,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             assert bytes.capacity() >= entriesOffset + entriesPerSegment * entrySize;
         }
 
+        /* Methods with private access modifier considered private to Segment
+         * class, although Java allows to access them from outer class anyway.
+         */
+
         /**
          * increments the size by one
          */
@@ -491,7 +486,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             this.bytes.addInt(SIZE_OFFSET, 1);
         }
 
-        public void resetSize() {
+        private void resetSize() {
             this.bytes.writeInt(SIZE_OFFSET, 0);
         }
 
@@ -511,7 +506,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
 
-        void lock() throws IllegalStateException {
+        private void lock() throws IllegalStateException {
             while (true) {
                 final boolean success = bytes.tryLockNanosLong(LOCK_OFFSET, lockTimeOutNS);
                 if (success) return;
@@ -524,7 +519,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
-        void unlock() {
+        private void unlock() {
             try {
                 bytes.unlockLong(LOCK_OFFSET);
             } catch (IllegalMonitorStateException e) {
@@ -532,106 +527,86 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
+        private long offsetFromPos(int pos) {
+            return entriesOffset + pos * entrySize;
+        }
+
+        private MultiStoreBytes entry(long offset) {
+            tmpBytes.storePositionAndSize(bytes,
+                    offset + metaDataBytes, entrySize - metaDataBytes);
+            return tmpBytes;
+        }
 
         /**
-         * used to acquire and object of type V from the map,
-         * <p></p>
-         * when {@param create }== true, this method is equivalent to :
-         * <pre>
-         * Object value = map.get("Key");
+         * Used to acquire an object of type V from the Segment.
          *
-         * if ( counter == null ) {
-         *    value = new Object();
-         *    map.put("Key", value);
-         * }
+         * {@code usingValue} is reused to read the value if key is present
+         * in this Segment, if key is absent in this Segment:
          *
-         * return value;
-         * </pre>
+         * <ol><li>If {@code create == false}, just {@code null} is returned
+         * (except when event listener provides a value "on get missing" - then
+         * it is put into this Segment for the key).</li>
          *
-         * @param keyBytes   the key of the entry
-         * @param usingValue an object to be reused, null creates a new object.
-         * @param hash2      a hash code relating to the @keyBytes ( not the natural hash of {@keyBytes}  )
-         * @param create     false - if the  {@keyBytes} can not be found null will be returned, true - if the  {@keyBytes} can not be found an value will be acquired
-         * @return an entry.value whose entry.key equals {@param keyBytes}
+         * <li>If {@code create == true}, {@code usingValue} or a newly
+         * created instance of value class, if {@code usingValue == null},
+         * is put into this Segment for the key.</li></ol>
+         *
+         * @param keyBytes   serialized {@code key}
+         * @param hash2      a hash code related to the {@code keyBytes}
+         * @return the value which is finally associated with the given key in
+         *         this Segment after execution of this method, or {@code null}.
          */
-        V acquire(DirectBytes keyBytes, K key, V usingValue, int hash2, boolean create) {
+        V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create) {
             lock();
             try {
+                long keyLength = keyBytes.remaining();
                 hash2 = hashLookup.startSearch(hash2);
-                while (true) {
-                    int pos = hashLookup.nextPos();
-                    if (pos < 0) {
-                        return create ? acquireEntry(keyBytes, key, usingValue, hash2) : notifyMissed(keyBytes, key, usingValue, hash2);
-
-                    } else {
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-                        final boolean miss;
-                        if (LOGGER.isLoggable(Level.FINE)) {
-                            final long start0 = System.nanoTime();
-                            miss = !keyEquals(keyBytes, tmpBytes);
-                            final long time0 = System.nanoTime() - start0;
-                            if (time0 > 1e6)
-                                LOGGER.fine("startsWith took " + time0 / 100000 / 10.0 + " ms.");
-                        } else {
-                            miss = !keyEquals(keyBytes, tmpBytes);
-                        }
-                        if (miss)
-                            continue;
-                        long valueLengthOffset = keyBytes.remaining() + tmpBytes.position();
-                        tmpBytes.position(valueLengthOffset);
-                        // skip the value length
-                        // todo use the value length to limit reading below
-                        long valueLength = tmpBytes.readStopBit();
-                        final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
-                        tmpBytes.position(valueOffset);
-                        V v = readObjectUsing(usingValue, offset + valueOffset);
-                        notifyGet(offset - metaDataBytes, key, v);
-                        return v;
-                    }
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
+                    long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEqualsForAcquire(keyBytes, keyLength, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLength);
+                    V v = readValue(entry, usingValue);
+                    notifyGet(offset, key, v);
+                    return v;
                 }
+                // key is not found
+                if (create) {
+                    usingValue = createValueIfNull(usingValue);
+                } else {
+                    if (usingValue instanceof Byteable)
+                        ((Byteable) usingValue).bytes(null, 0);
+                    usingValue = notifyMissed(keyBytes, key, usingValue);
+                    if (usingValue == null)
+                        return null;
+                }
+                pos = nextFree();
+                long offset = offsetFromPos(pos);
+                putEntryConsideringByteableValue(offset, keyBytes, usingValue);
+                hashLookup.put(hash2, pos);
+                incrementSize();
+                notifyPut(offset, true, key, usingValue);
+                return usingValue;
             } finally {
                 unlock();
             }
         }
 
-        long align(long num) {
-            return (num + 3) & ~3;
-        }
-
         /**
-         * @param keyBytes the key of the entry
-         * @param value    to reuse if not null.
-         * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @return
+         * Who needs this? Why only in acquire()?
          */
-
-        V acquireEntry(DirectBytes keyBytes, K key, V value, int hash2) {
-            value = createValueIfNull(value);
-
-            final int pos = nextFree();
-            final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-            tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-            final long keyLength = keyBytes.remaining();
-            tmpBytes.writeStopBit(keyLength);
-            tmpBytes.write(keyBytes);
-            if (value instanceof Byteable) {
-                Byteable byteable = (Byteable) value;
-                int length = byteable.maxSize();
-                tmpBytes.writeStopBit(length);
-                tmpBytes.position(align(tmpBytes.position()));
-                if (length > tmpBytes.remaining())
-                    throw new IllegalStateException("Not enough space left in entry for value, needs " + length + " but only " + tmpBytes.remaining() + " left");
-                tmpBytes.zeroOut(tmpBytes.position(), tmpBytes.position() + length);
-                byteable.bytes(bytes, offset + tmpBytes.position());
-            } else {
-                appendInstance(keyBytes, value);
-            }
-            // add to index if successful.
-            hashLookup.put(hash2, pos);
-            incrementSize();
-            notifyPut(offset, true, key, value);
-            return value;
+        private boolean keyEqualsForAcquire(Bytes keyBytes, long keyLength, Bytes entry) {
+            if (!LOGGER.isLoggable(Level.FINE))
+                return keyEquals(keyBytes, keyLength, entry);
+            final long start0 = System.nanoTime();
+            boolean result = keyEquals(keyBytes, keyLength, entry);
+            final long time0 = System.nanoTime() - start0;
+            if (time0 > 1e6) // 1 million nanoseconds = 1 millisecond
+                LOGGER.fine("startsWith took " + time0 / 100000 / 10.0 + " ms.");
+            return result;
         }
 
         private V createValueIfNull(V value) {
@@ -648,46 +623,93 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return value;
         }
 
-        void putEntry(Bytes keyBytes, V value, int hash2) {
-            final int pos = nextFree();
-            final long offset = entriesOffset + pos * entrySize;
-            // clear any previous meta data.
-            clearMetaData(offset);
-            writeKey(keyBytes, offset + metaDataBytes);
-            appendInstance(keyBytes, value);
-            // add to index if successful.
-            hashLookup.put(hash2, pos);
-            incrementSize();
+        private void putEntryConsideringByteableValue(long offset,
+                Bytes keyBytes, V value) {
+            putEntry(offset, keyBytes, value, true);
         }
 
-        void directPutEntry(Bytes keyBytes, Bytes valueBytes, int hash2, K key, V value) {
-            final int pos = nextFree();
-            final long offset = entriesOffset + pos * entrySize;
-            // clear any previous meta data.
-            clearMetaData(offset);
-            writeKey(keyBytes, offset + metaDataBytes);
-            appendValue(valueBytes);
-            // add to index if successful.
-            hashLookup.put(hash2, pos);
-            incrementSize();
-            notifyPut(offset, false, key, value);
-        }
-
-        private void clearMetaData(long offset) {
-            if (metaDataBytes > 0) {
-                tmpBytes.storePositionAndSize(bytes, offset, metaDataBytes);
-                tmpBytes.zeroOut();
+        V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent) {
+            lock();
+            try {
+                long keyLength = keyBytes.remaining();
+                hash2 = hashLookup.startSearch(hash2);
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
+                    long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEquals(keyBytes, keyLength, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLength);
+                    if (replaceIfPresent) {
+                        V prevValue = null;
+                        if (!putReturnsNull) {
+                            long valuePosition = entry.position();
+                            prevValue = readValue(entry, null);
+                            entry.position(valuePosition);
+                        }
+                        putValue(entry, value, keyBytes);
+                        notifyPut(offset, false, key, value);
+                        return prevValue;
+                    } else {
+                        return putReturnsNull ? null : readValue(entry, null);
+                    }
+                }
+                // key is not found
+                pos = nextFree();
+                long offset = offsetFromPos(pos);
+                putEntry(offset, keyBytes, value);
+                hashLookup.put(hash2, pos);
+                incrementSize();
+                notifyPut(offset, true, key, value);
+                return null;
+            } finally {
+                unlock();
             }
         }
 
-        private void writeKey(Bytes keyBytes, long offset) {
-            tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-            long keyLength = keyBytes.remaining();
-            tmpBytes.writeStopBit(keyLength);
-            tmpBytes.write(keyBytes);
+        private void putEntry(long offset, Bytes keyBytes, V value) {
+            putEntry(offset, keyBytes, value, false);
         }
 
-        int nextFree() {
+        private void putEntry(long offset,
+                Bytes keyBytes, V value, boolean considerByteableValue) {
+            clearMetaData(offset);
+            NativeBytes entry = entry(offset);
+            writeKey(entry, keyBytes);
+            if (considerByteableValue && value instanceof Byteable) {
+                reuseValueAsByteable(entry, (Byteable) value);
+            } else {
+                putValue(entry, value, keyBytes);
+            }
+        }
+
+        private void clearMetaData(long offset) {
+            if (metaDataBytes > 0)
+                bytes.zeroOut(offset, offset + metaDataBytes);
+        }
+
+        private void writeKey(Bytes entry, Bytes keyBytes) {
+            long keyLength = keyBytes.remaining();
+            entry.writeStopBit(keyLength);
+            entry.write(keyBytes);
+        }
+
+        private void reuseValueAsByteable(NativeBytes entry, Byteable value) {
+            int valueLength = value.maxSize();
+            entry.writeStopBit(valueLength);
+            entry.alignPositionAddr(4);
+            if (valueLength > entry.remaining()) {
+                throw new IllegalStateException(
+                        "Not enough space left in entry for value, needs " +
+                        valueLength + " but only " + entry.remaining() + " left");
+            }
+            long valueOffset = entry.positionAddr() - bytes.address();
+            bytes.zeroOut(valueOffset, valueOffset + valueLength);
+            value.bytes(bytes, valueOffset);
+        }
+
+        private int nextFree() {
             int ret = (int) freeList.setNextClearBit(nextSet);
             if (ret == DirectBitSet.NOT_FOUND) {
                 ret = (int) freeList.setNextClearBit(0);
@@ -699,144 +721,87 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * Reads from {@link this.tmpBytes} an object at {@param offset}, will reuse {@param value} if possible, to reduce object creation.
-         *
-         * @param value  the object to reuse ( if possible ), if null a new object will be created an object and no reuse will occur.
-         * @param offset the offset to read the data from
+         * @param value the object to reuse (if possible),
+         *              if {@code null} a new object is created
          */
-        @SuppressWarnings("unchecked")
-        V readObjectUsing(V value, final long offset) {
+        private V readValue(NativeBytes entry, V value) {
+            // TODO use the value length to limit reading
+            long valueLength = entry.readStopBit();
+            entry.alignPositionAddr(4);
             if (generatedValueType)
                 if (value == null)
                     value = DataValueClasses.newDirectReference(vClass);
                 else
                     assert value instanceof Byteable;
             if (value instanceof Byteable) {
-                ((Byteable) value).bytes(bytes, offset);
+                long valueOffset = entry.positionAddr() - bytes.address();
+                ((Byteable) value).bytes(bytes, valueOffset);
                 return value;
             }
-            return tmpBytes.readInstance(vClass, value);
+            return entry.readInstance(vClass, value);
         }
 
-        boolean keyEquals(Bytes keyBytes, MultiStoreBytes tmpBytes) {
-            // check the length is the same.
-            long keyLength = tmpBytes.readStopBit();
-            return keyLength == keyBytes.remaining()
-                    && tmpBytes.startsWith(keyBytes);
+        boolean keyEquals(Bytes keyBytes, long keyLength, Bytes entry) {
+            return keyLength == entry.readStopBit() && entry.startsWith(keyBytes);
         }
 
         /**
-         * implementation for map.remove(Key,Value)
+         * Removes a key (or key-value pair) from the Segment.
          *
-         * @param keyBytes      the key of the entry to remove
-         * @param expectedValue the entry will only be removed if the {@param existingValue} equals null or the {@param existingValue} equals that of the entry.value
-         * @param hash2         a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @return if the entry corresponding to the {@param keyBytes} exists and removeReturnsNull==false, returns the value of the entry that was removed, otherwise null is returned
+         * The entry will only be removed if {@code expectedValue} equals
+         * to {@code null} or the value previously corresponding to the specified key.
+         *
+         * @param keyBytes bytes of the key to remove
+         * @param hash2 a hash code related to the {@code keyBytes}
+         * @return the value of the entry that was removed if the entry
+         *         corresponding to the {@code keyBytes} exists
+         *         and {@link #removeReturnsNull} is {@code false},
+         *         {@code null} otherwise
          */
-        V remove(final DirectBytes keyBytes, final K key, final V expectedValue, int hash2) {
+        V remove(Bytes keyBytes, K key, V expectedValue, int hash2) {
             lock();
             try {
+                long keyLength = keyBytes.remaining();
                 hash2 = hashLookup.startSearch(hash2);
-                while (true) {
-
-                    final int pos = hashLookup.nextPos();
-                    if (pos < 0) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
+                    long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEquals(keyBytes, keyLength, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLength);
+                    V valueRemoved = expectedValue != null || !removeReturnsNull
+                            ? readValue(entry, null) : null;
+                    if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-
-                    } else {
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-                        final long keyLength = keyBytes.remaining() + tmpBytes.position(); // includes the stop bit length.
-                        tmpBytes.position(keyLength);
-                        tmpBytes.readStopBit(); // read the length of the value.
-                        tmpBytes.alignPositionAddr(4);
-                        V valueRemoved = expectedValue == null && removeReturnsNull ? null : readObjectUsing(null, offset + keyLength);
-
-                        if (expectedValue != null && !expectedValue.equals(valueRemoved))
-                            return null;
-
-                        hashLookup.remove(hash2, pos);
-                        decrementSize();
-                        notifyRemoved(offset - metaDataBytes, key, valueRemoved);
-
-                        freeList.clear(pos);
-                        if (pos < nextSet)
-                            nextSet = pos;
-                        return valueRemoved;
-                    }
+                    hashLookup.remove(hash2, pos);
+                    decrementSize();
+                    freeList.clear(pos);
+                    if (pos < nextSet)
+                        nextSet = pos;
+                    notifyRemoved(offset, key, valueRemoved);
+                    return valueRemoved;
                 }
+                // key is not found
+                return null;
             } finally {
                 unlock();
             }
         }
 
-
-        void directRemove(final Bytes keyBytes, int hash2) {
+        boolean containsKey(Bytes keyBytes, int hash2) {
             lock();
             try {
-                hash2 = hashLookup.startSearch(hash2);
-                while (true) {
-
-                    final int pos = hashLookup.nextPos();
-                    if (pos < 0) {
-                        return;
-
-                    } else {
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-                        final long keyLength = align(keyBytes.remaining() + tmpBytes.position()); // includes the stop bit length.
-                        tmpBytes.position(keyLength);
-
-                        hashLookup.remove(hash2, pos);
-                        decrementSize();
-
-                        freeList.clear(pos);
-                        if (pos < nextSet)
-                            nextSet = pos;
-
-                        return;
-                    }
-                }
-            } finally {
-                unlock();
-            }
-        }
-
-        /**
-         * implementation for map.containsKey(Key)
-         *
-         * @param keyBytes the key of the entry
-         * @param hash2    a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @return true if and entry for this key exists
-         */
-        boolean containsKey(final DirectBytes keyBytes, final int hash2) {
-            lock();
-            try {
-
+                long keyLength = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                while (true) {
-
-                    final int pos = hashLookup.nextPos();
-
-                    if (pos < 0) {
-                        return false;
-
-                    } else {
-
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
+                    Bytes entry = entry(offsetFromPos(pos));
+                    if (keyEquals(keyBytes, keyLength, entry))
                         return true;
-
-                    }
                 }
+                return false;
             } finally {
                 unlock();
             }
@@ -844,95 +809,47 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         /**
-         * implementation for map.replace(Key,Value) and map.replace(Key,Old,New)
+         * Replaces the specified value for the key with the given value.
          *
-         * @param keyBytes      the key of the entry to be replaced
-         * @param expectedValue the expected value to replaced
-         * @param newValue      the new value that will only be set if the existing value in the map equals the {@param expectedValue} or  {@param expectedValue} is null
-         * @param hash2         a hash code relating to the {keyBytes} ( not the natural hash of {keyBytes}  )
-         * @return null if the value was not replaced, else the value that is replaced is returned
+         * {@code newValue} is set only if the existing value corresponding
+         * to the specified key is equal to {@code expectedValue}
+         * or {@code expectedValue == null}.
+         *
+         * @param hash2         a hash code related to the {@code keyBytes}
+         * @return the replaced value or {@code null} if the value was not replaced
          */
-        V replace(final DirectBytes keyBytes, final K key, final V expectedValue, final V newValue, final int hash2) {
+        V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2) {
             lock();
             try {
-
+                long keyLength = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                while (true) {
-
-                    final int pos = hashLookup.nextPos();
-
-                    if (pos < 0) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
+                    final long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEquals(keyBytes, keyLength, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLength);
+                    long valuePosition = entry.position();
+                    V valueRead = readValue(entry, null);
+                    if (valueRead == null)
                         return null;
-
-                    } else {
-
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-
-                        final long keyLength = keyBytes.remaining();
-                        tmpBytes.skip(keyLength);
-                        long valuePosition = tmpBytes.position();
-                        tmpBytes.readStopBit();
-                        final long alignPosition = align(tmpBytes.position());
-                        tmpBytes.position(alignPosition);
-
-                        final V valueRead = readObjectUsing(null, offset + keyLength);
-
-                        if (valueRead == null)
-                            return null;
-
-                        if (expectedValue == null || expectedValue.equals(valueRead)) {
-                            tmpBytes.position(valuePosition);
-                            appendInstance(keyBytes, newValue);
-                        }
-                        notifyPut(offset, false, key, valueRead);
+                    if (expectedValue == null || expectedValue.equals(valueRead)) {
+                        entry.position(valuePosition);
+                        putValue(entry, newValue, keyBytes);
+                        notifyPut(offset, false, key, newValue);
                         return valueRead;
                     }
+                    return null;
                 }
+                // key is not found
+                return null;
             } finally {
                 unlock();
             }
         }
 
-
-        /**
-         * implementation for map.put(Key,Value)
-         *
-         * @param keyBytes
-         * @param value
-         * @param hash2            a hash code relating to the {@keyBytes} ( not the natural hash of {@keyBytes}  )
-         * @param replaceIfPresent
-         * @return
-         */
-        V put(final DirectBytes keyBytes, final K key, final V value, int hash2, boolean replaceIfPresent) {
-            lock();
-            try {
-                hash2 = hashLookup.startSearch(hash2);
-                while (true) {
-                    final int pos = hashLookup.nextPos();
-                    if (pos < 0) {
-                        putEntry(keyBytes, value, hash2);
-                        final long offset = entriesOffset + pos * entrySize;
-                        notifyPut(offset, false, key, value);
-                        return null;
-
-                    } else {
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-                        V v = addForPut(keyBytes, value, replaceIfPresent, offset);
-                        notifyPut(offset - metaDataBytes, false, key, v);
-                        return v;
-                    }
-                }
-            } finally {
-                unlock();
-            }
-        }
 
         private void notifyPut(long offset, boolean added, K key, V value) {
             if (eventListener != SharedMapEventListeners.NOP) {
@@ -948,14 +865,9 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             }
         }
 
-        private V notifyMissed(DirectBytes keyBytes, K key, V usingValue, int hash2) {
-            if (usingValue instanceof Byteable)
-                ((Byteable) usingValue).bytes(null, 0);
+        private V notifyMissed(Bytes keyBytes, K key, V usingValue) {
             if (eventListener != SharedMapEventListeners.NOP) {
-                V value2 = eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes, key, usingValue);
-                if (value2 != null)
-                    put(keyBytes, key, value2, hash2, false);
-                return value2;
+                return eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes, key, usingValue);
             }
             return null;
         }
@@ -965,81 +877,24 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
                 eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, key, value);
             }
-
         }
 
-        private V addForPut(DirectBytes keyBytes, V value, boolean replaceIfPresent, long offset) {
-            final long keyLength = keyBytes.remaining();
-            tmpBytes.skip(keyLength);
-            if (replaceIfPresent) {
-                if (putReturnsNull) {
-                    appendInstance(keyBytes, value);
-                    return null;
-                }
-                long valuePosition = tmpBytes.position();
-                tmpBytes.readStopBit();
-                tmpBytes.alignPositionAddr(4);
-                final V v = readObjectUsing(null, offset + tmpBytes.position());
-                tmpBytes.position(valuePosition);
-                appendInstance(keyBytes, value);
-
-                return v;
-
-            } else {
-                if (putReturnsNull) {
-                    return null;
-                }
-
-                tmpBytes.readStopBit();
-                tmpBytes.alignPositionAddr(4);
-                return readObjectUsing(null, offset + tmpBytes.position());
-            }
-        }
-
-        void directPut(final Bytes keyBytes, final Bytes valueBytes, final int hash2, final K key, final V value) {
-            lock();
-            try {
-                for (int pos = hashLookup.startSearch(hash2); ; pos = hashLookup.nextPos()) {
-                    if (pos < 0) {
-                        directPutEntry(keyBytes, valueBytes, hash2, key, value);
-
-                        return;
-
-                    } else {
-                        final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-                        tmpBytes.storePositionAndSize(bytes, offset, entrySize - metaDataBytes);
-                        if (!keyEquals(keyBytes, tmpBytes))
-                            continue;
-                        final long keyLength = keyBytes.remaining();
-                        tmpBytes.skip(keyLength);
-                        appendValue(valueBytes);
-                        return;
-                    }
-                }
-            } finally {
-                unlock();
-            }
-        }
-
-        void appendInstance(final Bytes bytes, final V value) {
-            bytes.clear();
+        private void putValue(Bytes entry, V value, Bytes buffer) {
+            buffer.clear();
             if (generatedValueType)
-                ((BytesMarshallable) value).writeMarshallable(bytes);
+                ((BytesMarshallable) value).writeMarshallable(buffer);
             else
-                bytes.writeInstance(vClass, value);
-            bytes.flip();
-            appendValue(bytes);
+                buffer.writeInstance(vClass, value);
+            buffer.flip();
+            if (buffer.remaining() + 4 > entry.remaining())
+                throw new IllegalArgumentException("Value too large for entry was " + (
+                        buffer.remaining() + 4) + ", remaining: " + entry.remaining());
+            entry.writeStopBit(buffer.remaining());
+            entry.alignPositionAddr(4);
+            entry.write(buffer);
         }
 
-        void appendValue(final Bytes value) {
-            if (value.remaining() + 4 > tmpBytes.remaining())
-                throw new IllegalArgumentException("Value too large for entry was " + (value.remaining() + 4) + ", remaining: " + tmpBytes.remaining());
-            tmpBytes.writeStopBit(value.remaining());
-            tmpBytes.position(align(tmpBytes.position()));
-            tmpBytes.write(value);
-        }
-
-        public void clear() {
+        void clear() {
             lock();
             try {
                 hashLookup.clear();
@@ -1056,16 +911,12 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         Entry<K, V> getEntry(int pos) {
-            final long offset = entriesOffset + pos * entrySize + metaDataBytes;
-            int length = entrySize - metaDataBytes;
-            tmpBytes.storePositionAndSize(bytes, offset, length);
-            tmpBytes.readStopBit();
-            K key = tmpBytes.readInstance(kClass, null); //todo: readUsing?
+            long offset = offsetFromPos(pos);
+            NativeBytes entry = entry(offset);
+            entry.readStopBit();
+            K key = entry.readInstance(kClass, null); //todo: readUsing?
 
-            tmpBytes.readStopBit();
-            final long valueOffset = align(tmpBytes.position()); // includes the stop bit length.
-            tmpBytes.position(valueOffset);
-            V value = readObjectUsing(null, offset + valueOffset); //todo: reusable container
+            V value = readValue(entry, null); //todo: reusable container
 
             //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
 
