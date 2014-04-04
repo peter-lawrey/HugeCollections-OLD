@@ -1,4 +1,4 @@
-package net.openhft.chronicle.sandbox.queue;
+package net.openhft.chronicle.sandbox.queue.common;
 
 import junit.framework.AssertionFailedError;
 import org.junit.After;

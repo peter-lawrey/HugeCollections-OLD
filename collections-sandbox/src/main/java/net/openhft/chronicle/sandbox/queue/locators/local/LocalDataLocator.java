@@ -14,7 +14,7 @@ public class LocalDataLocator<E> implements DataLocator<E> {
     public LocalDataLocator(int capacity) {
 
         // the ring buffer works by having 1 item spare, that's why we add one
-        this.capacity = capacity + 1;
+        this.capacity = capacity;
 
         this.data = new Object[this.capacity];
     }

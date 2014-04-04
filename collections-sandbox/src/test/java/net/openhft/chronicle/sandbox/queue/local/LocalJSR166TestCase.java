@@ -1,6 +1,9 @@
-package net.openhft.chronicle.sandbox.queue;
+package net.openhft.chronicle.sandbox.queue.local;
 
 
+import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
+import net.openhft.chronicle.sandbox.queue.common.BlockingQueueTest;
+import net.openhft.chronicle.sandbox.queue.common.JSR166TestCase;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -13,7 +16,7 @@ import java.util.concurrent.Executors;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.*;
 
-public class LazyVolatileConcurrentBlockingObjectQueueTest extends JSR166TestCase {
+public class LocalJSR166TestCase extends JSR166TestCase {
 
     /**
      * Returns a new queue of given size containing consecutive

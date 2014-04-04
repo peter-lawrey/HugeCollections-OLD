@@ -8,7 +8,7 @@ import org.junit.Test;
  * Created by Rob Austin
  */
 //@RunWith(value = Parameterized.class)
-public class SharedBufferIndexLocatorTest extends TestCase {
+public class SharedRingIndexTest extends TestCase {
 
 
   /*  @Parameterized.Parameters

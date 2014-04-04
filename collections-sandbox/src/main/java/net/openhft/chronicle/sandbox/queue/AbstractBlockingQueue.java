@@ -1,7 +1,7 @@
 package net.openhft.chronicle.sandbox.queue;
 
-import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.NoSuchElementException;
@@ -33,7 +33,7 @@ abstract class AbstractBlockingQueue<E> {
     private static final Unsafe unsafe;*/
 
 
-    final BufferIndexLocator locator;
+    final RingIndex locator;
     private final DataLocator<E> dataLocator;
     // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
     int producerWriteLocation;
@@ -48,7 +48,7 @@ abstract class AbstractBlockingQueue<E> {
     /**
      * @param dataLocator
      */
-    public AbstractBlockingQueue(@NotNull final BufferIndexLocator locator, @NotNull final DataLocator<E> dataLocator) {
+    public AbstractBlockingQueue(@NotNull final RingIndex locator, @NotNull final DataLocator<E> dataLocator) {
         this.locator = locator;
         this.dataLocator = dataLocator;
         if (dataLocator.getCapacity() == 1)

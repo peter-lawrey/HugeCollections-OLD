@@ -1,7 +1,7 @@
 package net.openhft.chronicle.sandbox.queue;
 
-import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -148,7 +148,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
     private final DataLocator<E> dataLocator;
 
-    public ConcurrentBlockingObjectQueue(@NotNull final BufferIndexLocator locator,
+    public ConcurrentBlockingObjectQueue(@NotNull final RingIndex locator,
                                          @NotNull final DataLocator dataLocator) {
         super(locator, dataLocator);
         this.dataLocator = dataLocator;
@@ -623,7 +623,6 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
             this.locator.setWriterLocation(i);
             dataLocator.writeAll(newData, i);
 
-
             return true;
         }
 
@@ -952,7 +951,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         int i = 0;
 
         for (int location = read; location < write; location++) {
-            builder.append(dataLocator.getData(location)).append(',');
+            builder.append(location + "=" + dataLocator.getData(location)).append(',');
         }
 
 

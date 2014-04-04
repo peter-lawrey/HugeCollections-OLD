@@ -3,7 +3,7 @@ package net.openhft.chronicle.sandbox.queue.locators;
 /**
  * Created by Rob Austin
  */
-public interface BufferIndexLocator {
+public interface RingIndex {
 
     int getWriterLocation();
 

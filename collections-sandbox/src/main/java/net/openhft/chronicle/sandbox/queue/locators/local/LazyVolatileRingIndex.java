@@ -1,6 +1,6 @@
 package net.openhft.chronicle.sandbox.queue.locators.local;
 
-import net.openhft.chronicle.sandbox.queue.locators.BufferIndexLocator;
+import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 /**
  * Created by Rob Austin
  */
-public class LazyVolatileBufferIndexLocator implements BufferIndexLocator {
+public class LazyVolatileRingIndex implements RingIndex {
 
     private static final long READ_LOCATION_OFFSET;
     private static final long WRITE_LOCATION_OFFSET;
@@ -20,9 +20,9 @@ public class LazyVolatileBufferIndexLocator implements BufferIndexLocator {
             field.setAccessible(true);
             unsafe = (Unsafe) field.get(null);
             READ_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (LazyVolatileBufferIndexLocator.class.getDeclaredField("readLocation"));
+                    (LazyVolatileRingIndex.class.getDeclaredField("readLocation"));
             WRITE_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (LazyVolatileBufferIndexLocator.class.getDeclaredField("writeLocation"));
+                    (LazyVolatileRingIndex.class.getDeclaredField("writeLocation"));
         } catch (Exception e) {
             throw new AssertionError(e);
         }

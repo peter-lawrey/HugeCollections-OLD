@@ -1,5 +1,6 @@
-package net.openhft.chronicle.sandbox.queue;
+package net.openhft.chronicle.sandbox.queue.local;
 
+import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -26,12 +27,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Rob Austin
  */
 
-public class SharedConcurrentBlockingObjectQueueTest {
+public class LocalConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testTake() throws Exception {
 
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
 
         // writer thread
         Executors.newSingleThreadExecutor().execute(new Runnable() {
@@ -75,7 +76,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testRead() throws Exception {
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
         queue.put(10);
         final int value = queue.take();
         junit.framework.Assert.assertEquals(10, value);
@@ -83,7 +84,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testRead2() throws Exception {
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
         queue.put(10);
         queue.put(11);
         final int value = queue.take();
@@ -94,7 +95,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
 
     @Test
     public void testReadLoop() throws Exception {
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
 
         for (int i = 1; i < 50; i++) {
             queue.put(i);
@@ -111,7 +112,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
     @Test
     public void testWithFasterReader() throws Exception {
 
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
         final int max = 100;
         final CountDownLatch countDown = new CountDownLatch(1);
 
@@ -185,7 +186,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
     @Test
     public void testWithFasterWriter() throws Exception {
 
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>();
         final int max = 200;
         final CountDownLatch countDown = new CountDownLatch(1);
         final AtomicBoolean success = new AtomicBoolean(true);
@@ -258,7 +259,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
     }
 
     private void testConcurrentBlockingObjectQueue(final int nTimes) throws InterruptedException, IOException {
-        final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>(1024);
+        final BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>(1024);
         final CountDownLatch countDown = new CountDownLatch(1);
 
         final AtomicBoolean success = new AtomicBoolean(true);

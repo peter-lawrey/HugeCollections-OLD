@@ -13,25 +13,28 @@ public class SharedConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegat
     final BlockingQueue<E> delegate;
 
 
-    public SharedConcurrentBlockingObjectQueue() throws IOException {
-        this(1024);
+    public SharedConcurrentBlockingObjectQueue(Class<E> clazz) throws IOException {
+        this(1024, clazz);
     }
 
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
+     * @param clazz
      */
-    public SharedConcurrentBlockingObjectQueue(int capacity) throws IOException {
+    public SharedConcurrentBlockingObjectQueue(int capacity, Class<E> clazz) throws IOException {
         builder.setCapacity(capacity);
         builder.isShared(true);
+        builder.setClazz(clazz);
+
         delegate = builder.create();
     }
 
-    public SharedConcurrentBlockingObjectQueue(int capacity, boolean b) throws IOException {
-        this(capacity);
+    public SharedConcurrentBlockingObjectQueue(int capacity, boolean b, Class<E> clazz) throws IOException {
+        this(capacity, clazz);
     }
 
-    public SharedConcurrentBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements) throws IOException {
-        this(capacity);
+    public SharedConcurrentBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements, Class<E> clazz) throws IOException {
+        this(capacity, clazz);
     }
 
 
