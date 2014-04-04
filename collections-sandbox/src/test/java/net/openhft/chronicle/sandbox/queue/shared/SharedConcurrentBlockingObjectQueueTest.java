@@ -110,7 +110,6 @@ public class SharedConcurrentBlockingObjectQueueTest {
      * @throws Exception
      */
     @Test
-    @Ignore
     public void testWithFasterReader() throws Exception {
 
         final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>(Integer.class);
@@ -185,7 +184,6 @@ public class SharedConcurrentBlockingObjectQueueTest {
      * @throws Exception
      */
     @Test
-    @Ignore
     public void testWithFasterWriter() throws Exception {
 
         final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>(Integer.class);
@@ -255,9 +253,7 @@ public class SharedConcurrentBlockingObjectQueueTest {
     @Test
     @Ignore
     public void testFlatOut() throws Exception {
-
         testConcurrentBlockingObjectQueue(Integer.MAX_VALUE);
-
     }
 
     private void testConcurrentBlockingObjectQueue(final int nTimes) throws InterruptedException, IOException {

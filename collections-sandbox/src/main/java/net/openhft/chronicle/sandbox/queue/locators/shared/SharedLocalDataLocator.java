@@ -41,8 +41,9 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
         this.using = new Object[capacity];
     }
 
+    // todo remove the synchronized
     @Override
-    public E getData(final int index) {
+    public synchronized E getData(final int index) {
 
         if (valueClass == null) {
             // It not possible to read as no data has been written
@@ -51,11 +52,13 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
 
         storeSlice.position(index * valueMaxSize);
         storeSlice.alignPositionAddr(4);
-        return (E) storeSlice.readInstance(valueClass, (E) using[index]);
+        return (E) storeSlice.readInstance(valueClass, null);
     }
 
+
+    // todo remove the synchronized
     @Override
-    public void setData(final int index, final E value) {
+    public synchronized void setData(final int index, final E value) {
 
         final Class aClass = (Class) value.getClass();
         if (!valueClass.equals(aClass))
@@ -63,7 +66,12 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
 
         storeSlice.position(index * valueMaxSize);
         storeSlice.alignPositionAddr(4);
+
+        final long start = storeSlice.position();
         storeSlice.writeInstance(aClass, value);
+
+        if (storeSlice.position() - start > valueMaxSize)
+            throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (storeSlice.position() - start));
     }
 
 

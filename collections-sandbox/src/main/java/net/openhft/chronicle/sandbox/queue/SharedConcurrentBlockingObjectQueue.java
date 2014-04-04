@@ -25,7 +25,7 @@ public class SharedConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegat
         builder.setCapacity(capacity);
         builder.isShared(true);
         builder.setClazz(clazz);
-
+        builder.setMaxSize(10);
         delegate = builder.create();
     }
 

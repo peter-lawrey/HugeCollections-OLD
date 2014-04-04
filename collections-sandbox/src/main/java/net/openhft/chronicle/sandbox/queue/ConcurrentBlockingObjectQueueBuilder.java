@@ -2,8 +2,8 @@ package net.openhft.chronicle.sandbox.queue;
 
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
-import net.openhft.chronicle.sandbox.queue.locators.local.LazyVolatileRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalDataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.local.LocalRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedLocalDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.lang.io.DirectBytes;
@@ -11,11 +11,8 @@ import net.openhft.lang.io.MappedStore;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.BlockingQueue;
-
-import static net.openhft.lang.io.NativeBytes.UNSAFE;
 
 /**
  * Created by Rob Austin
@@ -23,6 +20,7 @@ import static net.openhft.lang.io.NativeBytes.UNSAFE;
 public class ConcurrentBlockingObjectQueueBuilder<E> {
 
     public static final int SIZE_OF_INT = 4;
+    public static final int OBJECT_TYPE_HEADER = 1;
     private int capacity;
     private boolean isShared;
     private int maxSize;
@@ -65,29 +63,21 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             int ringIndexLocationsStart = 0;
             int ringIndexLocationsLen = SIZE_OF_INT * 2;
-
-
             int storeStart = ringIndexLocationsLen;
-
-            if (maxSize == 0) {
-                maxSize = UNSAFE.arrayIndexScale(Array.newInstance(clazz, 0).getClass());
-            }
-
-            int storeLen = maxSize * align(capacity, 4);
-
+            int storeLen = capacity * align(maxSize, 4);
 
             final MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, ringIndexLocationsLen + storeLen);
 
             final DirectBytes ringIndexSlice = ms.createSlice(ringIndexLocationsStart, ringIndexLocationsLen);
             ringIndex = new SharedRingIndex(ringIndexSlice);
 
-
             // provides an index to the data in the ring buffer, the size of this index is proportional to the capacity of the ring buffer
             final DirectBytes storeSlice = ms.createSlice(storeStart, storeLen);
             dataLocator = new SharedLocalDataLocator(capacity, maxSize, storeSlice, clazz);
+            //   dataLocator = new LocalDataLocator(capacity);
 
         } else {
-            ringIndex = new LazyVolatileRingIndex();
+            ringIndex = new LocalRingIndex();
             dataLocator = new LocalDataLocator(capacity);
         }
 

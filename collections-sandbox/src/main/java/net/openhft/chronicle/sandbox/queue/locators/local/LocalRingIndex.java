@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 /**
  * Created by Rob Austin
  */
-public class LazyVolatileRingIndex implements RingIndex {
+public class LocalRingIndex implements RingIndex {
 
     private static final long READ_LOCATION_OFFSET;
     private static final long WRITE_LOCATION_OFFSET;
@@ -20,9 +20,9 @@ public class LazyVolatileRingIndex implements RingIndex {
             field.setAccessible(true);
             unsafe = (Unsafe) field.get(null);
             READ_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (LazyVolatileRingIndex.class.getDeclaredField("readLocation"));
+                    (LocalRingIndex.class.getDeclaredField("readLocation"));
             WRITE_LOCATION_OFFSET = unsafe.objectFieldOffset
-                    (LazyVolatileRingIndex.class.getDeclaredField("writeLocation"));
+                    (LocalRingIndex.class.getDeclaredField("writeLocation"));
         } catch (Exception e) {
             throw new AssertionError(e);
         }
