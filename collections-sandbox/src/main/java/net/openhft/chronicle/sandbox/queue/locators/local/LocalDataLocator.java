@@ -15,7 +15,6 @@ public class LocalDataLocator<E> implements DataLocator<E> {
 
         // the ring buffer works by having 1 item spare, that's why we add one
         this.capacity = capacity;
-
         this.data = new Object[this.capacity];
     }
 
@@ -27,7 +26,6 @@ public class LocalDataLocator<E> implements DataLocator<E> {
     @Override
     public void setData(final int index, final E value) {
         data[index] = value;
-
     }
 
     @Override
