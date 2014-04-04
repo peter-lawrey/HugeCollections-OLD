@@ -20,7 +20,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
     private final Class<E> valueClass;
 
     /**
-     * @param capacity      the maxiumm number of values that can be stored in the ring
+     * @param capacity      the maximum number of values that can be stored in the ring
      * @param valueMaxSize  the maximum size that an value can be, if a value is written to the buffer that is larger than this an exception will be thrown
      * @param valueClass
      */
