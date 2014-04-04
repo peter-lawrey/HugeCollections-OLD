@@ -32,12 +32,12 @@ public class LazyVolatileBufferIndexLocator implements BufferIndexLocator {
     volatile int writeLocation;
 
     @Override
-    public int getWriteLocation() {
+    public int getWriterLocation() {
         return writeLocation;
     }
 
     @Override
-    public void setWriteLocation(int nextWriteLocation) {
+    public void setWriterLocation(int nextWriteLocation) {
         unsafe.putOrderedInt(this, WRITE_LOCATION_OFFSET, nextWriteLocation);
     }
 

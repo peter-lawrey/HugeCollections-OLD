@@ -23,23 +23,23 @@ public class SharedBufferIndexLocator implements BufferIndexLocator {
     }
 
     @Override
-    public int getWriteLocation() {
-        return directBytes.readInt(WRITE_OFFSET);
+    public int getWriterLocation() {
+        return directBytes.readVolatileInt(WRITE_OFFSET);
     }
 
     @Override
-    public void setWriteLocation(int nextWriteLocation) {
-        directBytes.writeInt(WRITE_OFFSET, nextWriteLocation);
+    public void setWriterLocation(int nextWriteLocation) {
+        directBytes.writeOrderedInt(WRITE_OFFSET, nextWriteLocation);
     }
 
     @Override
     public int getReadLocation() {
-        return directBytes.readInt(READ_OFFSET);
+        return directBytes.readVolatileInt(READ_OFFSET);
 
     }
 
     @Override
     public void setReadLocation(int nextReadLocation) {
-        directBytes.writeInt(READ_OFFSET, nextReadLocation);
+        directBytes.writeOrderedInt(READ_OFFSET, nextReadLocation);
     }
 }

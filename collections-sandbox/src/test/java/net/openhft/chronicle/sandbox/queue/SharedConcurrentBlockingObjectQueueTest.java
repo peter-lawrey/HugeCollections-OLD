@@ -109,7 +109,6 @@ public class SharedConcurrentBlockingObjectQueueTest {
      * @throws Exception
      */
     @Test
-    @Ignore
     public void testWithFasterReader() throws Exception {
 
         final BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>();

@@ -377,7 +377,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
-        if (locator.getWriteLocation() == readLocation)
+        if (locator.getWriterLocation() == readLocation)
             return null;
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -395,7 +395,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         boolean hasRemovedItem = false;
         int read = this.locator.getReadLocation();
-        int write = this.locator.getWriteLocation();
+        int write = this.locator.getWriterLocation();
 
         if (read == write)
             return false;
@@ -438,7 +438,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             return false;
 
         this.locator.setReadLocation(0);
-        this.locator.setWriteLocation(i);
+        this.locator.setWriterLocation(i);
 
 
         dataLocator.writeAll(newData, i);
@@ -452,7 +452,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     public boolean containsAll(Collection<?> items) {
 
         final int read = locator.getReadLocation();
-        final int write = locator.getWriteLocation();
+        final int write = locator.getWriterLocation();
 
         if (items.size() == 0)
             return true;
@@ -512,7 +512,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         boolean hasRemovedItem = false;
         int read = this.locator.getReadLocation();
-        int write = this.locator.getWriteLocation();
+        int write = this.locator.getWriterLocation();
 
         if (read == write)
             return false;
@@ -554,7 +554,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             return false;
 
         this.locator.setReadLocation(0);
-        this.locator.setWriteLocation(i);
+        this.locator.setWriterLocation(i);
         dataLocator.writeAll(newData, i);
 
         return true;
@@ -568,7 +568,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         boolean changed = false;
         int read = this.locator.getReadLocation();
-        int write = this.locator.getWriteLocation();
+        int write = this.locator.getWriterLocation();
 
         if (read == write)
             return false;
@@ -610,7 +610,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         if (changed) {
 
             this.locator.setReadLocation(0);
-            this.locator.setWriteLocation(i);
+            this.locator.setWriterLocation(i);
             dataLocator.writeAll(newData, i);
 
 
@@ -655,7 +655,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
     public Object[] toArray() {
 
         final int read = locator.getReadLocation();
-        final int write = locator.getWriteLocation();
+        final int write = locator.getWriterLocation();
 
         if (read == write)
             return new Object[]{};
@@ -690,7 +690,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
 
         final int read = locator.getReadLocation();
-        int write = locator.getWriteLocation();
+        int write = locator.getWriterLocation();
 
         if (result.length == 0)
             return result;
@@ -759,7 +759,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
-        if (locator.getWriteLocation() == readLocation)
+        if (locator.getWriterLocation() == readLocation)
             throw new NoSuchElementException();
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -797,7 +797,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             throw new NullPointerException("object can not be null");
 
         int read = this.locator.getReadLocation();
-        int write = this.locator.getWriteLocation();
+        int write = this.locator.getWriterLocation();
 
 
         if (read == write)
@@ -887,7 +887,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
         int i = 0;
 
         // to reduce the number of volatile reads we are going to perform a kind of double check reading on the volatile write location
-        int writeLocation = this.locator.getWriteLocation();
+        int writeLocation = this.locator.getWriterLocation();
 
         do {
 
@@ -895,7 +895,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
             // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
             if (writeLocation == readLocation) {
 
-                writeLocation = this.locator.getWriteLocation();
+                writeLocation = this.locator.getWriterLocation();
 
 
                 if (writeLocation == readLocation) {
@@ -926,7 +926,7 @@ abstract class AbstractConcurrentBlockingObjectQueue<E> extends AbstractBlocking
 
         //  new ArrayBlockingQueue<Integer>(data)
         final int read = locator.getReadLocation();
-        int write = locator.getWriteLocation();
+        int write = locator.getWriterLocation();
 
         if (read == write) {
             return "[]";

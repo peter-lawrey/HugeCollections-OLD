@@ -5,9 +5,9 @@ package net.openhft.chronicle.sandbox.queue.locators;
  */
 public interface BufferIndexLocator {
 
-    int getWriteLocation();
+    int getWriterLocation();
 
-    void setWriteLocation(int nextWriteLocation);
+    void setWriterLocation(int nextWriteLocation);
 
     int getReadLocation();
 

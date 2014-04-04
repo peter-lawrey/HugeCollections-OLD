@@ -68,7 +68,7 @@ abstract class AbstractBlockingQueue<E> {
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
 
         // write back the next write location
-        locator.setWriteLocation(nextWriteLocation);
+        locator.setWriterLocation(nextWriteLocation);
     }
 
     void setReadLocation(int nextReadLocation) {
@@ -120,7 +120,7 @@ abstract class AbstractBlockingQueue<E> {
      */
     public int size() {
         int read = locator.getReadLocation();
-        int write = locator.getWriteLocation();
+        int write = locator.getWriterLocation();
 
         if (write < read)
             write += dataLocator.getCapacity();
@@ -136,7 +136,7 @@ abstract class AbstractBlockingQueue<E> {
      * @return an approximation of the size
      */
     public void clear() {
-        setReadLocation(locator.getWriteLocation());
+        setReadLocation(locator.getWriterLocation());
     }
 
 
@@ -147,7 +147,7 @@ abstract class AbstractBlockingQueue<E> {
      * @return an approximation of isEmpty()
      */
     public boolean isEmpty() {
-        return locator.getReadLocation() == locator.getWriteLocation();
+        return locator.getReadLocation() == locator.getWriterLocation();
     }
 
     /**
@@ -263,7 +263,7 @@ abstract class AbstractBlockingQueue<E> {
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
 
-        while (locator.getWriteLocation() == readLocation)
+        while (locator.getWriterLocation() == readLocation)
             if (!blockAtTake(timeoutAt))
                 throw new TimeoutException();
 
@@ -284,7 +284,7 @@ abstract class AbstractBlockingQueue<E> {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (locator.getWriteLocation() == readLocation)
+        while (locator.getWriterLocation() == readLocation)
             blockAtTake();
 
         return nextReadLocation;
@@ -304,7 +304,7 @@ abstract class AbstractBlockingQueue<E> {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (locator.getWriteLocation() == readLocation)
+        while (locator.getWriterLocation() == readLocation)
             throw new NoSuchElementException();
 
         return nextReadLocation;
@@ -327,7 +327,7 @@ abstract class AbstractBlockingQueue<E> {
     public int remainingCapacity() {
 
         int readLocation = locator.getReadLocation();
-        int writeLocation = locator.getWriteLocation();
+        int writeLocation = locator.getWriterLocation();
 
         if (writeLocation < readLocation)
             writeLocation += dataLocator.getCapacity();
