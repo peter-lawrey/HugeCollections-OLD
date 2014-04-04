@@ -131,20 +131,6 @@ public class IntIntMultiMapTest {
     }
 
     @Test
-    public void testPutLimited() {
-        initMap(16);
-        assertTrue(map.putLimited(1, 11, 2));
-        assertTrue(map.putLimited(1, 12, 2));
-        assertFalse(map.putLimited(1, 13, 2));
-        assertTrue(map.putLimited(3, 31, 2));
-        assertTrue(map.putLimited(3, 32, 2));
-        assertFalse(map.putLimited(3, 33, 2));
-        // not enough space
-        assertFalse(map.putLimited(2, 22, 2));
-        assertTrue(map.putLimited(2, 22, 4));
-    }
-
-    @Test
     public void testRemoveSpecific() {
         // Testing a specific case when the remove method on the map
         // does (did) not work as expected. The size goes correctly to

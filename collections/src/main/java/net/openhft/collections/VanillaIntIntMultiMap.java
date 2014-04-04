@@ -76,29 +76,24 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
 
     @Override
     public void put(int key, int value) {
-        if (!putLimited(key, value, capacityMask + 1))
-            throw new IllegalStateException("VanillaIntIntMultiMap is full");
-    }
-
-    public boolean putLimited(int key, int value, int limit) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         long pos = indexToPos(key & capacityMask);
-        for (int i = 0; i < limit; i++) {
+        for (int i = 0; i <= capacityMask; i++) {
             long entry = bytes.readLong(pos);
             int hash2 = (int) (entry >> 32);
             if (hash2 == UNSET_KEY) {
                 bytes.writeLong(pos, (((long) key) << 32) | (value & 0xFFFFFFFFL));
-                return true;
+                return;
             }
             if (hash2 == key) {
                 int value2 = (int) entry;
                 if (value2 == value)
-                    return true;
+                    return;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
         }
-        return false;
+        throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
     @Override
@@ -106,7 +101,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         long pos = indexToPos(key & capacityMask);
-        long removedPos = -1;
+        long posToRemove = -1;
         for (int i = 0; i <= capacityMask; i++) {
             long entry = bytes.readLong(pos);
 //            int hash2 = bytes.readInt(pos + KEY);
@@ -115,7 +110,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
 //                int value2 = bytes.readInt(pos + VALUE);
                 int value2 = (int) entry;
                 if (value2 == value) {
-                    removedPos = pos;
+                    posToRemove = pos;
                     break;
                 }
             } else if (hash2 == UNSET_KEY) {
@@ -123,9 +118,14 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
         }
-        if (removedPos < 0)
+        if (posToRemove < 0)
             return false;
-        long posToShift = removedPos;
+        removePos(posToRemove);
+        return true;
+    }
+
+    private void removePos(long posToRemove) {
+        long posToShift = posToRemove;
         for (int i = 0; i <= capacityMask; i++) {
             posToShift = (posToShift + ENTRY_SIZE) & capacityMask2;
             long entryToShift = bytes.readLong(posToShift);
@@ -134,22 +134,21 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
                 break;
             long insertPos = indexToPos(hash & capacityMask);
             // the following condition essentially means circular permutations
-            // of three (r = removedPos, s = posToShift, i = insertPos)
+            // of three (r = posToRemove, s = posToShift, i = insertPos)
             // positions are accepted:
             // [...i..r...s.] or
             // [...r..s...i.] or
             // [...s..i...r.]
-            boolean cond1 = insertPos <= removedPos;
-            boolean cond2 = removedPos <= posToShift;
+            boolean cond1 = insertPos <= posToRemove;
+            boolean cond2 = posToRemove <= posToShift;
             if ((cond1 && cond2) ||
                     // chain wrapped around capacity
                     (posToShift < insertPos && (cond1 || cond2))) {
-                bytes.writeLong(removedPos, entryToShift);
-                removedPos = posToShift;
+                bytes.writeLong(posToRemove, entryToShift);
+                posToRemove = posToShift;
             }
         }
-        bytes.writeLong(removedPos, UNSET_ENTRY);
-        return true;
+        bytes.writeLong(posToRemove, UNSET_ENTRY);
     }
 
     /////////////////////
@@ -180,7 +179,19 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
                 return (int) entry;
             }
         }
-        return UNSET_VALUE;
+        // if return UNSET_VALUE, we have 2 cases in putAfterFailedSearch()
+        throw new IllegalStateException(getClass().getSimpleName() + " is full");
+    }
+
+    @Override
+    public void removePrevPos() {
+        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
+    }
+
+    @Override
+    public void putAfterFailedSearch(int value) {
+        long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
+        bytes.writeLong(searchPos, entry);
     }
 
     @Override
