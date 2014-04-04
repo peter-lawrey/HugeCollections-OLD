@@ -56,6 +56,10 @@ interface IntIntMultiMap {
      */
     int nextPos();
 
+    void removePrevPos();
+
+    void putAfterFailedSearch(int value);
+
     void clear();
 
     void forEach(EntryConsumer action);

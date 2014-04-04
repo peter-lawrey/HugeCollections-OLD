@@ -87,7 +87,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
-        int removedPos = -1;
+        int posToRemove = -1;
         for (int i = 0; i <= capacityMask; i++) {
             int entry = bytes.readInt(pos);
 //            int hash2 = bytes.readInt(pos + KEY);
@@ -96,7 +96,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
 //                int value2 = bytes.readInt(pos + VALUE);
                 int value2 = entry & 0xFFFF;
                 if (value2 == value) {
-                    removedPos = pos;
+                    posToRemove = pos;
                     break;
                 }
             } else if (hash2 == UNSET_KEY) {
@@ -104,9 +104,14 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;
         }
-        if (removedPos < 0)
+        if (posToRemove < 0)
             return false;
-        int posToShift = removedPos;
+        removePos(posToRemove);
+        return true;
+    }
+
+    private void removePos(int posToRemove) {
+        int posToShift = posToRemove;
         for (int i = 0; i <= capacityMask; i++) {
             posToShift = (posToShift + ENTRY_SIZE) & capacityMask2;
             int entryToShift = bytes.readInt(posToShift);
@@ -115,17 +120,16 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
                 break;
             int insertPos = (hash & capacityMask) << ENTRY_SIZE_SHIFT;
             // see comment in VanillaIntIntMultiMap
-            boolean cond1 = insertPos <= removedPos;
-            boolean cond2 = removedPos <= posToShift;
+            boolean cond1 = insertPos <= posToRemove;
+            boolean cond2 = posToRemove <= posToShift;
             if ((cond1 && cond2) ||
                     // chain wrapped around capacity
                     (posToShift < insertPos && (cond1 || cond2))) {
-                bytes.writeInt(removedPos, entryToShift);
-                removedPos = posToShift;
+                bytes.writeInt(posToRemove, entryToShift);
+                posToRemove = posToShift;
             }
         }
-        bytes.writeInt(removedPos, UNSET_ENTRY);
-        return true;
+        bytes.writeInt(posToRemove, UNSET_ENTRY);
     }
 
     /////////////////////
@@ -156,7 +160,18 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
                 return entry & 0xFFFF;
             }
         }
-        return UNSET_VALUE;
+        // if return UNSET_VALUE, we have 2 cases in putAfterFailedSearch()
+        throw new IllegalStateException(getClass().getSimpleName() + " is full");
+    }
+
+    @Override
+    public void removePrevPos() {
+        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
+    }
+
+    @Override
+    public void putAfterFailedSearch(int value) {
+        bytes.writeInt(searchPos, ((searchHash << 16) | value));
     }
 
     @Override

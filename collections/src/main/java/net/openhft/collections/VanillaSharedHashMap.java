@@ -560,7 +560,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             lock();
             try {
                 long keyLength = keyBytes.remaining();
-                hash2 = hashLookup.startSearch(hash2);
+                hashLookup.startSearch(hash2);
                 int pos;
                 while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
@@ -586,7 +586,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 pos = nextFree();
                 long offset = offsetFromPos(pos);
                 putEntryConsideringByteableValue(offset, keyBytes, usingValue);
-                hashLookup.put(hash2, pos);
+                hashLookup.putAfterFailedSearch(pos);
                 incrementSize();
                 notifyPut(offset, true, key, usingValue);
                 return usingValue;
@@ -632,7 +632,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             lock();
             try {
                 long keyLength = keyBytes.remaining();
-                hash2 = hashLookup.startSearch(hash2);
+                hashLookup.startSearch(hash2);
                 int pos;
                 while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
@@ -659,7 +659,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 pos = nextFree();
                 long offset = offsetFromPos(pos);
                 putEntry(offset, keyBytes, value);
-                hashLookup.put(hash2, pos);
+                hashLookup.putAfterFailedSearch(pos);
                 incrementSize();
                 notifyPut(offset, true, key, value);
                 return null;
@@ -762,7 +762,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             lock();
             try {
                 long keyLength = keyBytes.remaining();
-                hash2 = hashLookup.startSearch(hash2);
+                hashLookup.startSearch(hash2);
                 int pos;
                 while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
@@ -775,7 +775,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                             ? readValue(entry, null) : null;
                     if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-                    hashLookup.remove(hash2, pos);
+                    hashLookup.removePrevPos();
                     decrementSize();
                     freeList.clear(pos);
                     if (pos < nextSet)
