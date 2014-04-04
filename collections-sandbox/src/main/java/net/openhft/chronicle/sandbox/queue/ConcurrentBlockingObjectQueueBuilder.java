@@ -6,8 +6,12 @@ import net.openhft.chronicle.sandbox.queue.locators.local.LazyVolatileBufferInde
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedBufferIndexLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedLocalDataLocator;
+import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.MappedStore;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -42,8 +46,17 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
         final BufferIndexLocator bufferIndexLocator;
 
         if (isShared) {
+
+
+            final String tmp = System.getProperty("java.io.tmpdir");
+            final File file = new File(tmp + "/share-queue-test" + System.nanoTime());
+            final MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, 8);
+            final DirectBytes indexLocationBytes = ms.createSlice(0, 8);
+
             dataLocator = new SharedLocalDataLocator(capacity, maxSize);
-            bufferIndexLocator = new SharedBufferIndexLocator();
+            bufferIndexLocator = new SharedBufferIndexLocator(indexLocationBytes);
+
+
         } else {
             bufferIndexLocator = new LazyVolatileBufferIndexLocator();
             dataLocator = new LocalDataLocator(capacity);
