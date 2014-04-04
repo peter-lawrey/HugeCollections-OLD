@@ -20,7 +20,8 @@ import java.util.concurrent.BlockingQueue;
 public class ConcurrentBlockingObjectQueueBuilder<E> {
 
     public static final int SIZE_OF_INT = 4;
-    public static final int OBJECT_TYPE_HEADER = 1;
+    public static final int HEADER_SIZE = SharedLocalDataLocator.LOCK_SIZE; // the size of a long for the lock
+    public static final int LOCK_TIME_OUT_NS = 100;
     private int capacity;
     private boolean isShared;
     private int maxSize;
@@ -34,7 +35,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     }
 
     public void setMaxSize(int maxSize) {
-        this.maxSize = maxSize;
+        this.maxSize = maxSize + HEADER_SIZE;
     }
 
     public void setCapacity(int capacity) {

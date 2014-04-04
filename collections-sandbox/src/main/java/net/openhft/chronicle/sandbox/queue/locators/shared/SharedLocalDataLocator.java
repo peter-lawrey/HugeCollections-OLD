@@ -9,36 +9,33 @@ import org.jetbrains.annotations.NotNull;
  */
 public class SharedLocalDataLocator<E> implements DataLocator<E> {
 
+    public static final int ALIGN = 4;
+    public static final int LOCK_SIZE = 8;
+
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final int capacity;
     private final int valueMaxSize;
 
     private final DirectBytes storeSlice;
-
-
-    // we create the using array, to reduce object creation on the read side
-    // the objects in this array will be reused
-    private final Object[] using;
-
     private final Class<E> valueClass;
 
     /**
-     * @param capacity     the maxiumm number of values that can be stored in the ring
-     * @param valueMaxSize the maximum size that an value can be, if a value is written to the buffer that is larger than this an exception will be thrown
+     * @param capacity      the maxiumm number of values that can be stored in the ring
+     * @param valueMaxSize  the maximum size that an value can be, if a value is written to the buffer that is larger than this an exception will be thrown
      * @param valueClass
      */
     public SharedLocalDataLocator(final int capacity,
-                                  @NotNull final int valueMaxSize,
+                                  final int valueMaxSize,
                                   @NotNull final DirectBytes storeSlice,
                                   @NotNull final Class<E> valueClass) {
 
         if (valueMaxSize == 0)
             throw new IllegalArgumentException("valueMaxSize has to be greater than 0.");
+
         this.valueMaxSize = valueMaxSize;
         this.valueClass = valueClass;
         this.capacity = capacity;
         this.storeSlice = storeSlice;
-        this.using = new Object[capacity];
     }
 
     // todo remove the synchronized
@@ -50,9 +47,20 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
             return null;
         }
 
-        storeSlice.position(index * valueMaxSize);
-        storeSlice.alignPositionAddr(4);
-        return (E) storeSlice.readInstance(valueClass, null);
+        int offset = getOffset(index);
+
+        try {
+
+            storeSlice.busyLockLong(offset);
+            storeSlice.position(offset + LOCK_SIZE);
+            return (E) storeSlice.readInstance((Class) valueClass, null);
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            storeSlice.unlockLong(offset);
+        }
     }
 
 
@@ -64,14 +72,24 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
         if (!valueClass.equals(aClass))
             throw new IllegalArgumentException("All data must be of type, class=" + valueClass);
 
-        storeSlice.position(index * valueMaxSize);
-        storeSlice.alignPositionAddr(4);
+        int offset = getOffset(index);
+        try {
+            storeSlice.busyLockLong(offset);
 
-        final long start = storeSlice.position();
-        storeSlice.writeInstance(aClass, value);
+            final long start = offset + LOCK_SIZE;
+            storeSlice.position(start);
+            storeSlice.writeInstance(aClass, value);
 
-        if (storeSlice.position() - start > valueMaxSize)
-            throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (storeSlice.position() - start));
+            if (storeSlice.position() - start > valueMaxSize)
+                throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (storeSlice.position() - start));
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+
+        } finally {
+            storeSlice.unlockLong(offset);
+        }
+
     }
 
 
@@ -103,4 +121,17 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
         return b.toString();
 
     }
+
+
+    /**
+     * calculates the offset for a given index
+     *
+     * @param index=
+     * @return
+     */
+    private int getOffset(int index) {
+        int position = index * valueMaxSize;
+        return (position + ALIGN - 1) & ~(ALIGN - 1);
+    }
+
 }
