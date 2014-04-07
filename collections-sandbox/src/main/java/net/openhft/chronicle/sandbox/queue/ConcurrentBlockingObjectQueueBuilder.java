@@ -4,7 +4,7 @@ import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalRingIndex;
-import net.openhft.chronicle.sandbox.queue.locators.shared.SharedLocalDataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.shared.SharedDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.MappedStore;
@@ -20,7 +20,7 @@ import java.util.concurrent.BlockingQueue;
 public class ConcurrentBlockingObjectQueueBuilder<E> {
 
     public static final int SIZE_OF_INT = 4;
-    public static final int HEADER_SIZE = SharedLocalDataLocator.LOCK_SIZE; // the size of a long for the lock
+
     public static final int LOCK_TIME_OUT_NS = 100;
     private int capacity;
     private boolean isShared;
@@ -35,7 +35,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     }
 
     public void setMaxSize(int maxSize) {
-        this.maxSize = maxSize + HEADER_SIZE;
+        this.maxSize = maxSize;
     }
 
     public void setCapacity(int capacity) {
@@ -74,8 +74,8 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             // provides an index to the data in the ring buffer, the size of this index is proportional to the capacity of the ring buffer
             final DirectBytes storeSlice = ms.createSlice(storeStart, storeLen);
-            dataLocator = new SharedLocalDataLocator(capacity, maxSize, storeSlice, clazz);
-            //   dataLocator = new LocalDataLocator(capacity);
+            final DirectBytes writerSlice = ms.createSlice(storeStart, storeLen);
+            dataLocator = new SharedDataLocator(clazz, capacity, maxSize, storeSlice, writerSlice);
 
         } else {
             ringIndex = new LocalRingIndex();
