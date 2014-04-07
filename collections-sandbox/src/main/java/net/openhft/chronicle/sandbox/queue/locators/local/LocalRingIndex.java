@@ -31,6 +31,7 @@ public class LocalRingIndex implements RingIndex {
 
     volatile int readLocation;
     volatile int writeLocation;
+    private int producerWriteLocation;
 
     @Override
     public int getWriterLocation() {
@@ -50,5 +51,15 @@ public class LocalRingIndex implements RingIndex {
     @Override
     public void setReadLocation(int nextReadLocation) {
         unsafe.putOrderedInt(this, READ_LOCATION_OFFSET, nextReadLocation);
+    }
+
+    @Override
+    public int getProducerWriteLocation() {
+        return this.producerWriteLocation;
+    }
+
+    @Override
+    public void setProducerWriteLocation(int nextWriteLocation) {
+        this.producerWriteLocation = nextWriteLocation;
     }
 }

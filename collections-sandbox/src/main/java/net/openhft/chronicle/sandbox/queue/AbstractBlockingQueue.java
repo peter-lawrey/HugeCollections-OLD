@@ -33,10 +33,10 @@ abstract class AbstractBlockingQueue<E> {
     private static final Unsafe unsafe;*/
 
 
-    final RingIndex locator;
+    final RingIndex ringIndex;
     private final DataLocator<E> dataLocator;
     // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
-    int producerWriteLocation;
+    int xproducerWriteLocation;
     // only set and read by the consumer thread, ( that the thread that's calling get(), poll() or peek() )
     int consumerReadLocation;
 
@@ -48,8 +48,8 @@ abstract class AbstractBlockingQueue<E> {
     /**
      * @param dataLocator
      */
-    public AbstractBlockingQueue(@NotNull final RingIndex locator, @NotNull final DataLocator<E> dataLocator) {
-        this.locator = locator;
+    public AbstractBlockingQueue(@NotNull final RingIndex ringIndex, @NotNull final DataLocator<E> dataLocator) {
+        this.ringIndex = ringIndex;
         this.dataLocator = dataLocator;
         if (dataLocator.getCapacity() == 1)
             throw new IllegalArgumentException();
@@ -62,13 +62,13 @@ abstract class AbstractBlockingQueue<E> {
 
 
         // putOrderedInt wont immediately make the updates available, even on this thread, so will update the field so the change is immediately visible to, at least this thread. ( note the field is non volatile )
-        this.producerWriteLocation = nextWriteLocation;
+        ringIndex.setProducerWriteLocation(nextWriteLocation);
 
         // the line below, is where the write memory barrier occurs,
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
 
         // write back the next write location
-        locator.setWriterLocation(nextWriteLocation);
+        ringIndex.setWriterLocation(nextWriteLocation);
     }
 
     void setReadLocation(int nextReadLocation) {
@@ -77,7 +77,7 @@ abstract class AbstractBlockingQueue<E> {
         this.consumerReadLocation = nextReadLocation;
 
         // the write memory barrier will occur here, as we are storing the nextReadLocation
-        locator.setReadLocation(nextReadLocation);
+        ringIndex.setReadLocation(nextReadLocation);
 
     }
 
@@ -119,8 +119,8 @@ abstract class AbstractBlockingQueue<E> {
      * @return an approximation of the size
      */
     public int size() {
-        int read = locator.getReadLocation();
-        int write = locator.getWriterLocation();
+        int read = ringIndex.getReadLocation();
+        int write = ringIndex.getWriterLocation();
 
         if (write < read)
             write += dataLocator.getCapacity();
@@ -136,7 +136,7 @@ abstract class AbstractBlockingQueue<E> {
      * @return an approximation of the size
      */
     public void clear() {
-        setReadLocation(locator.getWriterLocation());
+        setReadLocation(ringIndex.getWriterLocation());
     }
 
 
@@ -147,7 +147,7 @@ abstract class AbstractBlockingQueue<E> {
      * @return an approximation of isEmpty()
      */
     public boolean isEmpty() {
-        return locator.getReadLocation() == locator.getWriterLocation();
+        return ringIndex.getReadLocation() == ringIndex.getWriterLocation();
     }
 
     /**
@@ -163,10 +163,10 @@ abstract class AbstractBlockingQueue<E> {
 
         if (nextWriteLocation == dataLocator.getCapacity()) {
 
-            if (locator.getReadLocation() == 0)
+            if (ringIndex.getReadLocation() == 0)
                 throw new IllegalStateException("queue is full");
 
-        } else if (nextWriteLocation == locator.getReadLocation())
+        } else if (nextWriteLocation == ringIndex.getReadLocation())
             // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
             // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
             throw new IllegalStateException("queue is full");
@@ -188,7 +188,7 @@ abstract class AbstractBlockingQueue<E> {
 
         if (nextWriteLocation == dataLocator.getCapacity())
 
-            while (locator.getReadLocation() == 0) {
+            while (ringIndex.getReadLocation() == 0) {
 
                 if (Thread.interrupted())
                     throw new InterruptedException();
@@ -202,7 +202,7 @@ abstract class AbstractBlockingQueue<E> {
         else
 
 
-            while (nextWriteLocation == locator.getReadLocation()) {
+            while (nextWriteLocation == ringIndex.getReadLocation()) {
 
                 if (Thread.interrupted())
                     throw new InterruptedException();
@@ -228,7 +228,7 @@ abstract class AbstractBlockingQueue<E> {
 
         if (nextWriteLocation == dataLocator.getCapacity())
 
-            while (locator.getReadLocation() == 0)
+            while (ringIndex.getReadLocation() == 0)
                 // // this condition handles the case where writer has caught up with the read,
                 // we will wait for a read, ( which will cause a change on the read location )
                 blockAtAdd();
@@ -236,7 +236,7 @@ abstract class AbstractBlockingQueue<E> {
         else
 
 
-            while (nextWriteLocation == locator.getReadLocation())
+            while (nextWriteLocation == ringIndex.getReadLocation())
                 // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
                 // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
                 blockAtAdd();
@@ -263,7 +263,7 @@ abstract class AbstractBlockingQueue<E> {
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
 
-        while (locator.getWriterLocation() == readLocation)
+        while (ringIndex.getWriterLocation() == readLocation)
             if (!blockAtTake(timeoutAt))
                 throw new TimeoutException();
 
@@ -284,7 +284,7 @@ abstract class AbstractBlockingQueue<E> {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (locator.getWriterLocation() == readLocation)
+        while (ringIndex.getWriterLocation() == readLocation)
             blockAtTake();
 
         return nextReadLocation;
@@ -304,7 +304,7 @@ abstract class AbstractBlockingQueue<E> {
 
         // in the for loop below, we are blocked reading unit another item is written, this is because we are empty ( aka size()=0)
         // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
-        while (locator.getWriterLocation() == readLocation)
+        while (ringIndex.getWriterLocation() == readLocation)
             throw new NoSuchElementException();
 
         return nextReadLocation;
@@ -326,8 +326,8 @@ abstract class AbstractBlockingQueue<E> {
      */
     public int remainingCapacity() {
 
-        int readLocation = locator.getReadLocation();
-        int writeLocation = locator.getWriterLocation();
+        int readLocation = ringIndex.getReadLocation();
+        int writeLocation = ringIndex.getWriterLocation();
 
         if (writeLocation < readLocation)
             writeLocation += dataLocator.getCapacity();

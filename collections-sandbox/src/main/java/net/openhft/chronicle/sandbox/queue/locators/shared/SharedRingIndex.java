@@ -14,6 +14,7 @@ public class SharedRingIndex implements RingIndex {
     private static final int WRITE_OFFSET = READ_OFFSET + 4;
 
     private final DirectBytes indexLocationBytes;
+    private int producerWriteLocation;
 
     public SharedRingIndex(DirectBytes indexLocationBytes) throws IOException {
         this.indexLocationBytes = indexLocationBytes;
@@ -37,6 +38,16 @@ public class SharedRingIndex implements RingIndex {
     @Override
     public void setReadLocation(int nextReadLocation) {
         indexLocationBytes.writeOrderedInt(READ_OFFSET, nextReadLocation);
+    }
+
+    @Override
+    public int getProducerWriteLocation() {
+        return this.producerWriteLocation;
+    }
+
+    @Override
+    public void setProducerWriteLocation(int nextWriteLocation) {
+        this.producerWriteLocation = nextWriteLocation;
     }
 
     @Override

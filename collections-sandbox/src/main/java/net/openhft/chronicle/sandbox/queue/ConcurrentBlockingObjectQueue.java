@@ -161,7 +161,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
     public boolean add(E value) {
 
         // volatile read
-        final int writeLocation = this.producerWriteLocation;
+        final int writeLocation = ringIndex.getProducerWriteLocation();
 
         final int nextWriteLocation = getNextWriteLocationThrowIfFull(writeLocation);
 
@@ -227,17 +227,17 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
     public boolean offer(E value) {
 
         // non volatile read  ( which is quicker )
-        final int writeLocation = this.producerWriteLocation;
+        final int writeLocation = ringIndex.getProducerWriteLocation();
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
 
         if (nextWriteLocation == dataLocator.getCapacity()) {
 
-            if (locator.getReadLocation() == 0)
+            if (ringIndex.getReadLocation() == 0)
                 return false;
 
-        } else if (nextWriteLocation == locator.getReadLocation())
+        } else if (nextWriteLocation == ringIndex.getReadLocation())
             return false;
 
         // purposely not volatile see the comment below
@@ -259,7 +259,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
      */
     public void put(E value) throws InterruptedException {
 
-        final int writeLocation1 = this.producerWriteLocation;
+        final int writeLocation1 = ringIndex.getProducerWriteLocation();
         final int nextWriteLocation = blockForWriteSpaceInterruptibly(writeLocation1);
 
         // purposely not volatile see the comment below
@@ -290,7 +290,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
             throws InterruptedException {
 
         // non volatile read  ( which is quicker )
-        final int writeLocation = this.producerWriteLocation;
+        final int writeLocation = ringIndex.getProducerWriteLocation();
 
         // sets the nextWriteLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextWriteLocation = (writeLocation + 1 == dataLocator.getCapacity()) ? 0 : writeLocation + 1;
@@ -300,7 +300,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
             final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
-            while (locator.getReadLocation() == 0)
+            while (ringIndex.getReadLocation() == 0)
             // this condition handles the case where writer has caught up with the read,
             // we will wait for a read, ( which will cause a change on the read location )
             {
@@ -312,7 +312,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
             final long timeoutAt = System.nanoTime() + unit.toNanos(timeout);
 
-            while (nextWriteLocation == locator.getReadLocation())
+            while (nextWriteLocation == ringIndex.getReadLocation())
             // this condition handles the case general case where the read is at the start of the backing array and we are at the end,
             // blocks as our backing array is full, we will wait for a read, ( which will cause a change on the read location )
             {
@@ -377,7 +377,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
-        if (locator.getWriterLocation() == readLocation)
+        if (ringIndex.getWriterLocation() == readLocation)
             return null;
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -394,8 +394,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean hasRemovedItem = false;
-        int read = this.locator.getReadLocation();
-        int write = this.locator.getWriterLocation();
+        int read = this.ringIndex.getReadLocation();
+        int write = this.ringIndex.getWriterLocation();
 
         if (read == write)
             return false;
@@ -437,8 +437,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         if (!hasRemovedItem)
             return false;
 
-        this.locator.setReadLocation(0);
-        this.locator.setWriterLocation(i);
+        this.ringIndex.setReadLocation(0);
+        this.ringIndex.setWriterLocation(i);
 
 
         dataLocator.writeAll(newData, i);
@@ -451,8 +451,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
     @Override
     public boolean containsAll(Collection<?> items) {
 
-        final int read = locator.getReadLocation();
-        final int write = locator.getWriterLocation();
+        final int read = ringIndex.getReadLocation();
+        final int write = ringIndex.getWriterLocation();
 
         if (items.size() == 0)
             return true;
@@ -480,7 +480,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
             throw new IllegalArgumentException();
 
         // volatile read
-        final int writeLocation = this.producerWriteLocation;
+        final int writeLocation = ringIndex.getProducerWriteLocation();
         int writeLocation0 = writeLocation;
         int nextWriteLocation = -1;
 
@@ -521,8 +521,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean hasRemovedItem = false;
-        int read = this.locator.getReadLocation();
-        int write = this.locator.getWriterLocation();
+        int read = this.ringIndex.getReadLocation();
+        int write = this.ringIndex.getWriterLocation();
 
         if (read == write)
             return false;
@@ -563,8 +563,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         if (!hasRemovedItem)
             return false;
 
-        this.locator.setReadLocation(0);
-        this.locator.setWriterLocation(i);
+        this.ringIndex.setReadLocation(0);
+        this.ringIndex.setWriterLocation(i);
         dataLocator.writeAll(newData, i);
 
         return true;
@@ -577,8 +577,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         final E[] newData = (E[]) new Object[dataLocator.getCapacity()];
 
         boolean changed = false;
-        int read = this.locator.getReadLocation();
-        int write = this.locator.getWriterLocation();
+        int read = this.ringIndex.getReadLocation();
+        int write = this.ringIndex.getWriterLocation();
 
         if (read == write)
             return false;
@@ -619,8 +619,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
         if (changed) {
 
-            this.locator.setReadLocation(0);
-            this.locator.setWriterLocation(i);
+            this.ringIndex.setReadLocation(0);
+            this.ringIndex.setWriterLocation(i);
             dataLocator.writeAll(newData, i);
 
             return true;
@@ -663,8 +663,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
     @Override
     public Object[] toArray() {
 
-        final int read = locator.getReadLocation();
-        final int write = locator.getWriterLocation();
+        final int read = ringIndex.getReadLocation();
+        final int write = ringIndex.getWriterLocation();
 
         if (read == write)
             return new Object[]{};
@@ -698,8 +698,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
     public <T> T[] toArray(T[] result) {
 
 
-        final int read = locator.getReadLocation();
-        int write = locator.getWriterLocation();
+        final int read = ringIndex.getReadLocation();
+        int write = ringIndex.getWriterLocation();
 
         if (result.length == 0)
             return result;
@@ -768,7 +768,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         // sets the nextReadLocation my moving it on by 1, this may cause it it wrap back to the start.
         final int nextReadLocation = (readLocation + 1 == dataLocator.getCapacity()) ? 0 : readLocation + 1;
 
-        if (locator.getWriterLocation() == readLocation)
+        if (ringIndex.getWriterLocation() == readLocation)
             throw new NoSuchElementException();
 
         // purposely not volatile as the read memory barrier occurred when we read 'writeLocation'
@@ -805,8 +805,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         if (o == null)
             throw new NullPointerException("object can not be null");
 
-        int read = this.locator.getReadLocation();
-        int write = this.locator.getWriterLocation();
+        int read = this.ringIndex.getReadLocation();
+        int write = this.ringIndex.getWriterLocation();
 
 
         if (read == write)
@@ -896,7 +896,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         int i = 0;
 
         // to reduce the number of volatile reads we are going to perform a kind of double check reading on the volatile write location
-        int writeLocation = this.locator.getWriterLocation();
+        int writeLocation = this.ringIndex.getWriterLocation();
 
         do {
 
@@ -904,7 +904,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
             // inside the for loop, getting the 'writeLocation', this will serve as our read memory barrier.
             if (writeLocation == readLocation) {
 
-                writeLocation = this.locator.getWriterLocation();
+                writeLocation = this.ringIndex.getWriterLocation();
 
 
                 if (writeLocation == readLocation) {
@@ -934,8 +934,8 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
 
         //  new ArrayBlockingQueue<Integer>(data)
-        final int read = locator.getReadLocation();
-        int write = locator.getWriterLocation();
+        final int read = ringIndex.getReadLocation();
+        int write = ringIndex.getWriterLocation();
 
         if (read == write) {
             return "[]";

@@ -36,8 +36,8 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
     private final Class<E> valueClass;
 
     /**
-     * @param capacity      the maximum number of values that can be stored in the ring
-     * @param valueMaxSize  the maximum size that an value can be, if a value is written to the buffer that is larger than this an exception will be thrown
+     * @param capacity     the maximum number of values that can be stored in the ring
+     * @param valueMaxSize the maximum size that an value can be, if a value is written to the buffer that is larger than this an exception will be thrown
      * @param valueClass
      */
     public SharedLocalDataLocator(final int capacity,
@@ -82,7 +82,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
 
     // todo remove the synchronized
     @Override
-    public synchronized void setData(final int index, final E value) {
+    public synchronized int setData(final int index, final E value) {
 
         final Class aClass = (Class) value.getClass();
         if (!valueClass.equals(aClass))
@@ -106,6 +106,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
             storeSlice.unlockLong(offset);
         }
 
+        return 0;
     }
 
 

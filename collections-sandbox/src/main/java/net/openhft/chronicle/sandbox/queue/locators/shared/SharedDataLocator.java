@@ -1,28 +1,24 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared;
 
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
-import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.AbstractBytes;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by Rob Austin
  */
-public class SharedDataLocator<E> implements DataLocator<E> {
+public class SharedDataLocator<E, BYTES extends AbstractBytes> implements DataLocator<E> {
 
     public static final int ALIGN = 4;
-
+    protected final int valueMaxSize;
+    @NotNull
+    final BYTES readerSlice;
+    @NotNull
+    final Class<E> valueClass;
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final int capacity;
-    private final int valueMaxSize;
-
     @NotNull
-    private final DirectBytes readerSlice;
-
-    @NotNull
-    private final Class<E> valueClass;
-
-    @NotNull
-    private final DirectBytes writerSlice;
+    private final BYTES writerSlice;
 
     /**
      * @param valueClass
@@ -34,8 +30,8 @@ public class SharedDataLocator<E> implements DataLocator<E> {
     public SharedDataLocator(@NotNull final Class<E> valueClass,
                              final int capacity,
                              final int valueMaxSize,
-                             @NotNull final DirectBytes readerSlice,
-                             @NotNull final DirectBytes writerSlice) {
+                             @NotNull final BYTES readerSlice,
+                             @NotNull final BYTES writerSlice) {
 
         if (valueMaxSize == 0)
             throw new IllegalArgumentException("valueMaxSize has to be greater than 0.");
@@ -47,6 +43,16 @@ public class SharedDataLocator<E> implements DataLocator<E> {
         this.writerSlice = writerSlice;
     }
 
+    @NotNull
+    public BYTES getWriterSlice() {
+        return writerSlice;
+    }
+
+    @NotNull
+    public BYTES getReaderSlice() {
+        return readerSlice;
+    }
+
     @Override
     public E getData(final int index) {
         readerSlice.position(getOffset(index));
@@ -54,7 +60,10 @@ public class SharedDataLocator<E> implements DataLocator<E> {
     }
 
     @Override
-    public void setData(final int index, final E value) {
+    /**
+     * @returns the number of bytes written
+     */
+    public int setData(final int index, final E value) {
 
         final Class aClass = (Class) value.getClass();
         if (!valueClass.equals(aClass))
@@ -65,9 +74,11 @@ public class SharedDataLocator<E> implements DataLocator<E> {
         writerSlice.position(offset);
         writerSlice.writeInstance(aClass, value);
 
-        if (writerSlice.position() - offset > valueMaxSize)
-            throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (writerSlice.position() - offset));
+        final long actualSize = writerSlice.position() - offset;
+        if (actualSize > valueMaxSize)
+            throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + actualSize);
 
+        return (int) actualSize;
     }
 
 
@@ -107,7 +118,7 @@ public class SharedDataLocator<E> implements DataLocator<E> {
      * @param index=
      * @return the offset at {@param index}
      */
-    private int getOffset(int index) {
+    protected int getOffset(int index) {
         int position = index * valueMaxSize;
         return (position + ALIGN - 1) & ~(ALIGN - 1);
     }

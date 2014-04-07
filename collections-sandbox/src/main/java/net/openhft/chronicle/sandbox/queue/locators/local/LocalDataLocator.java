@@ -24,8 +24,9 @@ public class LocalDataLocator<E> implements DataLocator<E> {
     }
 
     @Override
-    public void setData(final int index, final E value) {
+    public int setData(final int index, final E value) {
         data[index] = value;
+        return 0;
     }
 
     @Override

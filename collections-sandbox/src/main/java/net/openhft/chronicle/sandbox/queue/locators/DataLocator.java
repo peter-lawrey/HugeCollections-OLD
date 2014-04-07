@@ -7,7 +7,7 @@ public interface DataLocator<E> {
 
     E getData(int readLocation);
 
-    void setData(int writeLocation1, E value);
+    int setData(int index, E value);
 
     void writeAll(E[] newData, int length);
 

@@ -13,4 +13,9 @@ public interface RingIndex {
 
     void setReadLocation(int nextReadLocation);
 
+    // non volatile read ( which is quicker )
+    int getProducerWriteLocation();
+
+    // non volatile write ( which is quicker )
+    void setProducerWriteLocation(int nextWriteLocation);
 }
