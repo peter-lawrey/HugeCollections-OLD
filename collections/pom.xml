@@ -34,7 +34,6 @@
     <description>Java Collections which are designed to be huge (may GB)</description>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <openhft.lang.version>6.3.4</openhft.lang.version>
         <openhft.compiler.version>2.1</openhft.compiler.version>
         <slf4j.version>1.7.6</slf4j.version>
@@ -173,23 +172,18 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
         </dependency>
 
-
     </dependencies>
 
     <build>
-
-
         <plugins>
-
-
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.16</version>
                 <configuration>
                     <systemPropertyVariables>
                         <openhft.lang.version>${openhft.lang.version}</openhft.lang.version>
@@ -205,7 +199,6 @@
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
-                <version>2.4.0</version>
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
@@ -228,7 +221,6 @@
             </plugin>
         </plugins>
     </build>
-
 
     <scm>
         <url>scm:git:https://github.com/OpenHFT/HugeCollections.git</url>
