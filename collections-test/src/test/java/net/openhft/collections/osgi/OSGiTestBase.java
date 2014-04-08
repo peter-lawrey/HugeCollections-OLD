@@ -15,11 +15,11 @@
  */
 package net.openhft.collections.osgi;
 
+import org.ops4j.pax.exam.CoreOptions;
 import org.ops4j.pax.exam.Option;
+import org.ops4j.pax.exam.options.MavenArtifactProvisionOption;
 
 import java.io.File;
-
-import static org.ops4j.pax.exam.CoreOptions.bundle;
 
 /**
  *
@@ -36,15 +36,20 @@ public class OSGiTestBase {
 
         bundleDir = String.format("%s/%s/target/classes",baseDir,projectName);
         if(new File(bundleDir).exists()) {
-            return bundle(String.format("reference:file:%s", bundleDir));
+            return CoreOptions.bundle(String.format("reference:file:%s", bundleDir));
         }
 
         bundleDir = String.format("%s/../%s/target/classes",baseDir,projectName);
         if(new File(bundleDir).exists()) {
-            return bundle(String.format("reference:file:%s", bundleDir));
+            return CoreOptions.bundle(String.format("reference:file:%s", bundleDir));
         }
 
         return null;
     }
+
+    public static MavenArtifactProvisionOption mavenBundleAsInProject(final String groupId,final String artifactId) {
+        return CoreOptions.mavenBundle().groupId(groupId).artifactId(artifactId).versionAsInProject();
+    }
+
 }
 
