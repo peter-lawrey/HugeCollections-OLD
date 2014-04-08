@@ -28,7 +28,7 @@
 
     <version>3.0f-SNAPSHOT</version>
     <modelVersion>4.0.0</modelVersion>
-    <name>OpenHFT/HugeCollections/chronicle-sandbox</name>
+    <name>OpenHFT/HugeCollections/collections-sandbox</name>
     <artifactId>collections-sandbox</artifactId>
 
     <dependencyManagement>
