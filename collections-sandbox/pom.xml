@@ -23,6 +23,7 @@
         <groupId>net.openhft</groupId>
         <artifactId>java-parent-pom</artifactId>
         <version>1.0-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
     <version>3.0f-SNAPSHOT</version>
@@ -30,16 +31,8 @@
     <name>OpenHFT/HugeCollections/chronicle-sandbox</name>
     <artifactId>collections-sandbox</artifactId>
 
-    <properties>
-        <!-- hft version is here so it can be included in OSGi tests -->
-        <openhft.lang.version>6.3.5-SNAPSHOT</openhft.lang.version>
-        <openhft.affinity.version>2.0.1</openhft.affinity.version>
-        <logback.version>0.9.6</logback.version>
-    </properties>
-
     <dependencyManagement>
         <dependencies>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
@@ -47,44 +40,41 @@
                 <version>3.1-SNAPSHOT</version>
                 <scope>import</scope>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
-                <artifactId>affinity</artifactId>
-                <version>${openhft.affinity.version}</version>
+                <artifactId>lang</artifactId>
+                <version>6.3.5-SNAPSHOT</version>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>chronicle</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>collections</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
+            <dependency>
+                <groupId>net.openhft</groupId>
+                <artifactId>affinity</artifactId>
+                <version>2.0.2-SNAPSHOT</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>affinity</artifactId>
         </dependency>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>collections</artifactId>
         </dependency>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>lang</artifactId>
-            <version>${openhft.lang.version}</version>
         </dependency>
 
         <!-- modules for testing -->
@@ -93,8 +83,10 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
+    <scm>
+        <url>scm:git:https://github.com/OpenHFT/Java-Lang.git</url>
+    </scm>
 
 </project>

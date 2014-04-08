@@ -24,20 +24,15 @@
         <groupId>net.openhft</groupId>
         <artifactId>java-parent-pom</artifactId>
         <version>1.0-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>collections</artifactId>
     <version>3.0f-SNAPSHOT</version>
     <packaging>bundle</packaging>
-    <name>Huge Collections</name>
+    <name>OpenHFT/HugeCollections/collections</name>
     <description>Java Collections which are designed to be huge (may GB)</description>
-
-    <properties>
-        <openhft.lang.version>6.3.4</openhft.lang.version>
-        <openhft.compiler.version>2.1</openhft.compiler.version>
-        <slf4j.version>1.7.6</slf4j.version>
-    </properties>
 
     <dependencyManagement>
         <dependencies>
@@ -48,25 +43,21 @@
                 <version>3.0</version>
                 <scope>import</scope>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>lang</artifactId>
-                <version>${openhft.lang.version}</version>
+                <version>6.3.4</version>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>affinity</artifactId>
                 <version>2.0.2-SNAPSHOT</version>
             </dependency>
-
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>compiler</artifactId>
-                <version>${openhft.compiler.version}</version>
+                <version>2.1</version>
             </dependency>
-
         </dependencies>
     </dependencyManagement>
 
@@ -76,12 +67,10 @@
             <groupId>com.intellij</groupId>
             <artifactId>annotations</artifactId>
         </dependency>
-
         <dependency>
             <groupId>com.sun.java</groupId>
             <artifactId>tools</artifactId>
         </dependency>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>lang</artifactId>
@@ -93,109 +82,41 @@
             <artifactId>compiler</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
             <version>4.0.0</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>affinity</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava-testlib</artifactId>
             <scope>test</scope>
         </dependency>
-
-        <!-- for OSGi testing -->
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.core</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.compendium</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.ops4j.pax.exam</groupId>
-            <artifactId>pax-exam-container-native</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.ops4j.pax.exam</groupId>
-            <artifactId>pax-exam-junit4</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.ops4j.pax.exam</groupId>
-            <artifactId>pax-exam-link-mvn</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.ops4j.pax.url</groupId>
-            <artifactId>pax-url-aether</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.ops4j.pax.url</groupId>
-            <artifactId>pax-url-wrap</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.apache.felix.framework</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
-            <plugin>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <systemPropertyVariables>
-                        <openhft.lang.version>${openhft.lang.version}</openhft.lang.version>
-                        <openhft.compiler.version>${openhft.compiler.version}</openhft.compiler.version>
-                        <!--<logback.version>${logback.version}</logback.version>-->
-                        <slf4j.version>${slf4j.version}</slf4j.version>
-                        <main.basedir>${project.basedir}</main.basedir>
-                    </systemPropertyVariables>
-                    <!--<forkMode>never</forkMode>-->
-                </configuration>
-            </plugin>
-
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>

@@ -32,7 +32,7 @@ import static org.junit.Assert.assertTrue;
 import static org.ops4j.pax.exam.CoreOptions.*;
 
 /**
- * @author lburgazzoli
+ *
  */
 @RunWith(PaxExam.class)
 public class OSGiBundleTest extends OSGiTestBase {
@@ -44,11 +44,13 @@ public class OSGiBundleTest extends OSGiTestBase {
         return options(
             systemProperty("org.osgi.framework.storage.clean").value("true"),
             systemProperty("org.ops4j.pax.logging.DefaultServiceLog.level").value("WARN"),
-            mavenBundle("net.openhft", "lang", System.getProperty("openhft.lang.version")),
-            mavenBundle("net.openhft", "compiler", System.getProperty("openhft.compiler.version")),
-            mavenBundle("org.slf4j", "slf4j-api", System.getProperty("slf4j.version")),
-            mavenBundle("org.slf4j", "slf4j-simple", System.getProperty("slf4j.version")).noStart(),
-            workspaceBundle("collections"),
+            mavenBundleAsInProject("org.slf4j"  ,"slf4j-api"),
+            mavenBundleAsInProject("org.slf4j"  ,"slf4j-simple").noStart(),
+            mavenBundleAsInProject("net.openhft","affinity"),
+            mavenBundleAsInProject("net.openhft","compiler"),
+            mavenBundleAsInProject("net.openhft","lang"),
+            mavenBundleAsInProject("net.openhft","collections"),
+            workspaceBundle("collections-test"),
             junitBundles(),
             systemPackage("sun.misc"),
             systemPackage("sun.nio.ch"),

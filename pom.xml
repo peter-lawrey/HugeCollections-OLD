@@ -35,6 +35,7 @@
     <modules>
         <module>collections</module>
         <module>collections-sandbox</module>
+        <module>collections-test</module>
     </modules>
 
     <scm>
