@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Peter Lawrey
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.openhft.chronicle.sandbox.queue.locators.shared.replication;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedDataLocator;
@@ -5,6 +21,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -97,7 +114,10 @@ public class TcpReader<E> extends SharedDataLocator<E, ByteBufferBytes> {
         private final SharedRingIndex ringIndex;
         private final Connection connection;
 
+        // use one buffer for
         private final ByteBuffer buffer = ByteBuffer.allocateDirect(valueMaxSize).order(ByteOrder.nativeOrder());
+        private final ByteBuffer rbuffer = buffer.slice();
+        private final ByteBuffer wbuffer = buffer.slice();
         private final ByteBuffer intBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
         private final ByteBufferBytes writerSlice;
 
@@ -118,6 +138,28 @@ public class TcpReader<E> extends SharedDataLocator<E, ByteBufferBytes> {
             for (; ; ) {
 
                 try {
+                    // TODO Rob to have a look at this code.
+                    if (false) {
+                        while (buffer.position() < 4) {
+                            int len = socket.read(buffer);
+                            if (len < 0) throw new EOFException();
+                        }
+                        int msgLen = buffer.getInt(0);
+                        buffer.flip();
+                        while (buffer.remaining() + 4 < msgLen) {
+                            buffer.flip();
+                            int len = socket.read(buffer);
+                            if (len < 0) throw new EOFException();
+                            buffer.flip();
+                        }
+                        // copy data.
+                        // todo not needed in read case.
+                        buffer.position(buffer.position() + msgLen);
+                        if (buffer.remaining() == 0)
+                            buffer.clear();
+                        else
+                            buffer.compact();
+                    }
 
                     intBuffer.reset();
 
