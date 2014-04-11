@@ -17,6 +17,7 @@
 package net.openhft.collections.fromdocs;
 
 import net.openhft.collections.SharedHashMapBuilder;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
@@ -31,6 +32,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class GettingStartedTest {
     @Test
+    @Ignore
     public void testTheCodeInGuide() throws IOException {
         String tmpdir = System.getProperty("java.io.tmpdir");
         Map<String, String> map = new SharedHashMapBuilder().create(new File(tmpdir + "/shared.map"), String.class, String.class);
