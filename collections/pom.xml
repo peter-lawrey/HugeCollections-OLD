@@ -23,7 +23,7 @@
     <parent>
         <groupId>net.openhft</groupId>
         <artifactId>java-parent-pom</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0.0</version>
         <relativePath/>
     </parent>
 
@@ -144,7 +144,10 @@
     </build>
 
     <scm>
-        <url>scm:git:https://github.com/OpenHFT/HugeCollections.git</url>
+        <url>scm:git:git@github.com:OpenHFT/HugeCollections.git</url>
+        <connection>scm:git:git@github.com:OpenHFT/HugeCollections.git</connection>
+        <developerConnection>scm:git:git@github.com:OpenHFT/HugeCollections.git</developerConnection>
+        <tag>master</tag>
     </scm>
 
 </project>
