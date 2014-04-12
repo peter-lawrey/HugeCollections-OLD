@@ -5,9 +5,9 @@ import net.openhft.lang.io.AbstractBytes;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Created by Rob Austin
+ * similar to LocalDataLocator.class but works with AbstractBytes
  */
-public class SharedDataLocator<E, BYTES extends AbstractBytes> implements DataLocator<E> {
+public class BytesDataLocator<E, BYTES extends AbstractBytes> implements DataLocator<E>, OffsetProvider, SliceProvider<BYTES> {
 
     public static final int ALIGN = 4;
     protected final int valueMaxSize;
@@ -27,11 +27,11 @@ public class SharedDataLocator<E, BYTES extends AbstractBytes> implements DataLo
      * @param readerSlice  an instance of the MessageStore used by the reader
      * @param writerSlice  an instance of the MessageStore used by the writer
      */
-    public SharedDataLocator(@NotNull final Class<E> valueClass,
-                             final int capacity,
-                             final int valueMaxSize,
-                             @NotNull final BYTES readerSlice,
-                             @NotNull final BYTES writerSlice) {
+    public BytesDataLocator(@NotNull final Class<E> valueClass,
+                            final int capacity,
+                            final int valueMaxSize,
+                            @NotNull final BYTES readerSlice,
+                            @NotNull final BYTES writerSlice) {
 
         if (valueMaxSize == 0)
             throw new IllegalArgumentException("valueMaxSize has to be greater than 0.");
@@ -43,11 +43,13 @@ public class SharedDataLocator<E, BYTES extends AbstractBytes> implements DataLo
         this.writerSlice = writerSlice;
     }
 
+    @Override
     @NotNull
     public BYTES getWriterSlice() {
         return writerSlice;
     }
 
+    @Override
     @NotNull
     public BYTES getReaderSlice() {
         return readerSlice;
@@ -111,14 +113,13 @@ public class SharedDataLocator<E, BYTES extends AbstractBytes> implements DataLo
 
     }
 
-
     /**
      * calculates the offset for a given index
      *
      * @param index=
      * @return the offset at {@param index}
      */
-    protected int getOffset(int index) {
+    public int getOffset(int index) {
         int position = index * valueMaxSize;
         return (position + ALIGN - 1) & ~(ALIGN - 1);
     }

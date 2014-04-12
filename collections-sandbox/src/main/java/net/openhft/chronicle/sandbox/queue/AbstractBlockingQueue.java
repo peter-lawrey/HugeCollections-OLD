@@ -64,10 +64,10 @@ abstract class AbstractBlockingQueue<E> {
         // putOrderedInt wont immediately make the updates available, even on this thread, so will update the field so the change is immediately visible to, at least this thread. ( note the field is non volatile )
         ringIndex.setProducerWriteLocation(nextWriteLocation);
 
-        // the line below, is where the write memory barrier occurs,
+        // the line below, is where the writeBytes memory barrier occurs,
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
 
-        // write back the next write location
+        // writeBytes back the next writeBytes location
         ringIndex.setWriterLocation(nextWriteLocation);
     }
 
@@ -76,7 +76,7 @@ abstract class AbstractBlockingQueue<E> {
         // putOrderedInt wont immediately make the updates available, even on this thread, so will update the field so the change is immediately visible to, at least this thread. ( note the field is non volatile )
         this.consumerReadLocation = nextReadLocation;
 
-        // the write memory barrier will occur here, as we are storing the nextReadLocation
+        // the writeBytes memory barrier will occur here, as we are storing the nextReadLocation
         ringIndex.setReadLocation(nextReadLocation);
 
     }
@@ -151,8 +151,8 @@ abstract class AbstractBlockingQueue<E> {
     }
 
     /**
-     * @param writeLocation the current write location
-     * @return the next write location
+     * @param writeLocation the current writeBytes location
+     * @return the next writeBytes location
      */
     int getNextWriteLocationThrowIfFull(int writeLocation) throws IllegalStateException {
 
@@ -176,8 +176,8 @@ abstract class AbstractBlockingQueue<E> {
 
 
     /**
-     * @param writeLocation the current write location
-     * @return the next write location
+     * @param writeLocation the current writeBytes location
+     * @return the next writeBytes location
      */
     int blockForWriteSpaceInterruptibly(int writeLocation) throws InterruptedException {
 
@@ -216,8 +216,8 @@ abstract class AbstractBlockingQueue<E> {
     }
 
     /**
-     * @param writeLocation the current write location
-     * @return the next write location
+     * @param writeLocation the current writeBytes location
+     * @return the next writeBytes location
      */
     int blockForWriteSpace(int writeLocation) {
 

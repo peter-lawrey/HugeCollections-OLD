@@ -23,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Created by Rob Austin
  */
-public class SharedLocalDataLocator<E> implements DataLocator<E> {
+public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider {
 
     public static final int ALIGN = 4;
     public static final int LOCK_SIZE = 8;
@@ -146,7 +146,8 @@ public class SharedLocalDataLocator<E> implements DataLocator<E> {
      * @param index=
      * @return
      */
-    private int getOffset(int index) {
+    @Override
+    public int getOffset(int index) {
         int position = index * valueMaxSize;
         return (position + ALIGN - 1) & ~(ALIGN - 1);
     }
