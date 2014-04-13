@@ -20,7 +20,7 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
 
     @NotNull
     private final RingIndex ringIndex;
-    private final SocketWriter toPublisher;
+    private final SocketWriter tcpSender;
     private final BytesDataLocator<E, BYTES> bytesDataLocator;
     @NotNull
     private final SliceProvider<BYTES> sliceProvider;
@@ -45,16 +45,16 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
 
             @Override
             public int getProducerWriteLocation() {
-                return ringIndex.getProducerWriteLocation();
+                throw new UnsupportedOperationException();
             }
 
         };
 
         final ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider));
+        executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider, "Producer"));
 
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        toPublisher = new SocketWriter(producerService, socketChannelProvider);
+        tcpSender = new SocketWriter(producerService, socketChannelProvider, "Producer");
         this.ringIndex = ringIndex;
         this.bytesDataLocator = bytesDataLocator;
     }
@@ -67,7 +67,7 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
     @Override
     public void setWriterLocation(int nextWriteLocation) {
         ringIndex.setWriterLocation(nextWriteLocation);
-        toPublisher.writeNextLocation(nextWriteLocation);
+        tcpSender.writeInt(-nextWriteLocation);
     }
 
     @Override
@@ -102,7 +102,8 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
         // todo we maybe able to optomize this out
         int offset = offsetProvider.getOffset(index);
 
-        toPublisher.writeBytes(sliceProvider.getWriterSlice(), offset, len);
+        tcpSender.writeInt(len);
+        tcpSender.writeBytes(sliceProvider.getWriterSlice(), offset, len);
 
         return len;
     }

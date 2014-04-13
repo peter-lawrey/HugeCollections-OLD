@@ -28,11 +28,13 @@ public class SocketReader implements Runnable {
     private final OffsetProvider offsetProvider;
     @NotNull
     private final SocketChannelProvider socketChannelProvider;
+    @NotNull
+    private final String name;
 
     // use one buffer for
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(RECEIVE_BUFFER_SIZE).order(ByteOrder.nativeOrder());
-    private final ByteBuffer rbuffer = buffer.slice();
-    private final ByteBuffer wbuffer = buffer.slice();
+    private final ByteBuffer rbuffer = buffer.slice().order(ByteOrder.nativeOrder());
+    private final ByteBuffer wbuffer = buffer.slice().order(ByteOrder.nativeOrder());
 
 
     /**
@@ -40,14 +42,17 @@ public class SocketReader implements Runnable {
      * @param targetBuffer          the buffer that supports the offset provider
      * @param offsetProvider        the location into the buffer for an index location
      * @param socketChannelProvider
+     * @param name
      */
     public SocketReader(@NotNull final Index ringIndex,
                         @NotNull final ByteBuffer targetBuffer,
                         @NotNull final OffsetProvider offsetProvider,
-                        @NotNull final SocketChannelProvider socketChannelProvider) {
+                        @NotNull final SocketChannelProvider socketChannelProvider,
+                        @NotNull String name) {
         this.ringIndex = ringIndex;
         this.offsetProvider = offsetProvider;
         this.socketChannelProvider = socketChannelProvider;
+        this.name = name;
         this.targetBuffer = targetBuffer.slice();
     }
 
@@ -76,7 +81,9 @@ public class SocketReader implements Runnable {
 
                 // if this int is negative then we are using it to demote and writerLocation change
                 if (intValue <= 0) {
-                    ringIndex.setNextLocation(-intValue);
+                    // the locations have been -'ed
+                    final int index = -intValue;
+                    ringIndex.setNextLocation(index);
                 } else {
 
                     int endOfMessageOffset = intValue + 4;
@@ -87,6 +94,7 @@ public class SocketReader implements Runnable {
                     }
 
                     // to allow the target buffer to read uo to the end of the message
+                    rbuffer.position(4);
                     rbuffer.limit(endOfMessageOffset);
 
                     int offset = offsetProvider.getOffset(ringIndex.getProducerWriteLocation());
@@ -95,9 +103,8 @@ public class SocketReader implements Runnable {
 
                 }
 
-                wbuffer.limit(rbuffer.position());
+                wbuffer.flip();
                 wbuffer.position(rbuffer.position());
-
                 wbuffer.compact();
 
             }
@@ -107,4 +114,10 @@ public class SocketReader implements Runnable {
         }
     }
 
+    @Override
+    public String toString() {
+        return "SocketReader{" +
+                "name='" + name + '\'' +
+                '}';
+    }
 }

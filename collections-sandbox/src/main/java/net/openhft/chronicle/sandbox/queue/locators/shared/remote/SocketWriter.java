@@ -21,17 +21,21 @@ public class SocketWriter<E> {
     @NotNull
     private final ExecutorService producerService;
     private final SocketChannelProvider socketChannelProvider;
+    @NotNull
+    private final String name;
 
 
     /**
      * @param producerService       this must be a single threaded executor
      * @param socketChannelProvider
+     * @param name
      */
     public SocketWriter(@NotNull final ExecutorService producerService,
-                        SocketChannelProvider socketChannelProvider) {
+                        @NotNull final SocketChannelProvider socketChannelProvider,
+                        @NotNull final String name) {
         this.producerService = producerService;
-
         this.socketChannelProvider = socketChannelProvider;
+        this.name = name;
     }
 
 
@@ -46,16 +50,20 @@ public class SocketWriter<E> {
      */
     public void writeBytes(final ByteBufferBytes directBytes, int offset, final int length) {
 
-        final ByteBufferBytes slice = directBytes.createSlice(offset, length);
+        final ByteBuffer buffer = directBytes.buffer();
+
+        final ByteBuffer slice = buffer.slice();
+        slice.position(offset);
+        slice.limit(offset + length);
+
+        // final ByteBufferBytes slice = directBytes.createSlice(offset, length);
 
         producerService.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-                    intBuffer.clear();
-                    socketChannel.write(intBuffer);
-                    socketChannel.write(slice.buffer());
+                    socketChannel.write(slice);
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
                 }
@@ -67,18 +75,22 @@ public class SocketWriter<E> {
     /**
      * the index is encode as a negative number when put on the wire, this is because positive number are used to demote the size of preceding serialized instance
      *
-     * @param index
+     * @param value used to write an int to the socket
      */
-    public void writeNextLocation(final int index) {
+    public void writeInt(final int value) {
 
         producerService.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+
                     intBuffer.clear();
-                    intBuffer.putInt(-index);
+                    intBuffer.putInt(value);
+                    intBuffer.flip();
+
                     socketChannel.write(intBuffer);
+
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
                     e.printStackTrace();
@@ -86,5 +98,12 @@ public class SocketWriter<E> {
             }
 
         });
+    }
+
+    @Override
+    public String toString() {
+        return "SocketWriter{" +
+                ", name='" + name + '\'' +
+                '}';
     }
 }

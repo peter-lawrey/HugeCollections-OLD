@@ -41,15 +41,15 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
 
             @Override
             public int getProducerWriteLocation() {
-                throw new UnsupportedOperationException();
+                return ringIndex.getProducerWriteLocation();
             }
         };
 
         final ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider));
+        executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider, "Consumer"));
 
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        toPublisher = new SocketWriter(producerService, socketChannelProvider);
+        toPublisher = new SocketWriter(producerService, socketChannelProvider, "Consumer");
         this.ringIndex = ringIndex;
     }
 
@@ -72,7 +72,9 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
     @Override
     public void setReadLocation(int nextReadLocation) {
         ringIndex.setReadLocation(nextReadLocation);
-        toPublisher.writeNextLocation(nextReadLocation);
+
+        // - number are used to denote index's
+        toPublisher.writeInt(-nextReadLocation);
     }
 
     @Override
