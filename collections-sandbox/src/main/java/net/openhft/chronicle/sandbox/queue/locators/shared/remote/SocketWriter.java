@@ -33,6 +33,7 @@ public class SocketWriter<E> {
         this.socketChannel = socketChannel;
     }
 
+
     /**
      * used to writeBytes a byte buffer bytes to the socket at {@param offset} and {@param length}
      * It is assumed that the byte buffer will contain the bytes of a serialized instance,

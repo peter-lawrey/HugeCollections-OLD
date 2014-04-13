@@ -125,7 +125,6 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
         } else {
             throw new IllegalArgumentException("Unsupported Type=" + type);
-
         }
 
         return new ConcurrentBlockingObjectQueue<E>(ringIndex, dataLocator);

@@ -50,7 +50,6 @@ public class PutAndTakeTests {
     public static Collection<BlockingQueue<Integer>[]> data() throws IOException {
 
         final ArrayList<BlockingQueue<Integer>[]> result = new ArrayList<BlockingQueue<Integer>[]>();
-
         //local
         {
             BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>(1024);
@@ -65,8 +64,8 @@ public class PutAndTakeTests {
 
         // remote
         /*{
-            BlockingQueue<Integer> producerQueue = new ProducerConcurrentBlockingObjectQueue<Integer>(1024,Integer.class);
-            BlockingQueue<Integer> consumerQueue = new ConsumerConcurrentBlockingObjectQueue<Integer>(1024,Integer.class);
+            BlockingQueue<Integer> producerQueue = new ProducerConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
+            BlockingQueue<Integer> consumerQueue = new ConsumerConcurrentBlockingObjectQueue<Integer>(1024, Integer.class,"localhost");
             result.add(new BlockingQueue[]{producerQueue, consumerQueue});
         }*/
 
