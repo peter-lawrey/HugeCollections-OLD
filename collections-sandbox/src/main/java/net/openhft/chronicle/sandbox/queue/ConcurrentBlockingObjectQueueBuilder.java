@@ -8,6 +8,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.BytesDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Consumer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Producer;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.DirectBytes;
@@ -104,8 +105,6 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
         } else if (type == Type.REMOTE_PRODUCER || type == Type.REMOTE_CONSUMER) {
 
-            final SocketChannel socketChannel = (type == Type.REMOTE_PRODUCER) ? producerConnectSocketChannel() : consumerConnectSocketChannel();
-
             final int bufferSize = capacity * align(maxSize, 4);
             final ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
             final ByteBufferBytes byteBufferBytes = new ByteBufferBytes(buffer);
@@ -117,11 +116,42 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                     byteBufferBytes.createSlice(),
                     byteBufferBytes.createSlice());
 
-            ringIndex = (type == Type.REMOTE_PRODUCER) ?
-                    new Producer<ByteBufferBytes>(socketChannel, new LocalRingIndex(), bytesDataLocator, bytesDataLocator) :
-                    new Consumer<ByteBufferBytes>(socketChannel, new LocalRingIndex(), bytesDataLocator, bytesDataLocator);
+            if (type == Type.REMOTE_PRODUCER) {
 
-            dataLocator = bytesDataLocator;
+                SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
+
+                    @Override
+                    public SocketChannel getSocketChannel() throws IOException {
+                        ServerSocketChannel serverSocket = ServerSocketChannel.open();
+                        serverSocket.socket().setReuseAddress(true);
+                        serverSocket.socket().bind(new InetSocketAddress(port));
+                        serverSocket.configureBlocking(true);
+                        LOG.info("Server waiting for client on port " + port);
+                        serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
+                        return serverSocket.accept();
+                    }
+                };
+
+                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, socketChannelProvider, bytesDataLocator);
+                ringIndex = producer;
+                dataLocator = producer;
+
+            } else {
+
+                SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
+
+                    @Override
+                    public SocketChannel getSocketChannel() throws IOException {
+                        final SocketChannel sc = SocketChannel.open(new InetSocketAddress(host, port));
+                        sc.socket().setReceiveBufferSize(256 * 1024);
+                        return sc;
+                    }
+
+                };
+
+                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, socketChannelProvider);
+                dataLocator = bytesDataLocator;
+            }
 
         } else {
             throw new IllegalArgumentException("Unsupported Type=" + type);
@@ -131,23 +161,6 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
     }
 
-    private SocketChannel producerConnectSocketChannel() throws IOException {
-        ServerSocketChannel serverSocket = ServerSocketChannel.open();
-        serverSocket.socket().setReuseAddress(true);
-        serverSocket.socket().bind(new InetSocketAddress(port));
-        serverSocket.configureBlocking(true);
-        LOG.info("Server waiting for client on port " + port);
-        serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
-        return serverSocket.accept();
-    }
-
-    private SocketChannel consumerConnectSocketChannel() throws IOException {
-
-        final SocketChannel sc = SocketChannel.open(new InetSocketAddress(host, port));
-        sc.socket().setReceiveBufferSize(256 * 1024);
-
-        return sc;
-    }
 
     public enum Type {
 

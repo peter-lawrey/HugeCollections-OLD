@@ -20,17 +20,18 @@ public class SocketWriter<E> {
     final ByteBuffer intBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
     @NotNull
     private final ExecutorService producerService;
-    @NotNull
-    private final SocketChannel socketChannel;
+    private final SocketChannelProvider socketChannelProvider;
+
 
     /**
-     * @param producerService this must be a single threaded executor
-     * @param socketChannel
+     * @param producerService       this must be a single threaded executor
+     * @param socketChannelProvider
      */
     public SocketWriter(@NotNull final ExecutorService producerService,
-                        @NotNull final SocketChannel socketChannel) {
+                        SocketChannelProvider socketChannelProvider) {
         this.producerService = producerService;
-        this.socketChannel = socketChannel;
+
+        this.socketChannelProvider = socketChannelProvider;
     }
 
 
@@ -50,11 +51,9 @@ public class SocketWriter<E> {
         producerService.submit(new Runnable() {
             @Override
             public void run() {
-
-                intBuffer.clear();
-                intBuffer.putInt(length);
-
                 try {
+                    final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+                    intBuffer.clear();
                     socketChannel.write(intBuffer);
                     socketChannel.write(slice.buffer());
                 } catch (IOException e) {
@@ -76,11 +75,10 @@ public class SocketWriter<E> {
         producerService.submit(new Runnable() {
             @Override
             public void run() {
-
-                intBuffer.clear();
-                intBuffer.putInt(-length);
-
                 try {
+                    final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+                    intBuffer.clear();
+                    intBuffer.putInt(-length);
                     socketChannel.write(intBuffer);
                 } catch (IOException e) {
                     LOG.log(Level.SEVERE, "", e);

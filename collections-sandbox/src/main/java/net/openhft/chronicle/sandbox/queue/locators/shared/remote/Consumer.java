@@ -7,7 +7,6 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.SliceProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -26,10 +25,10 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
     private final RingIndex ringIndex;
     private final SocketWriter toPublisher;
 
-    public Consumer(@NotNull final SocketChannel socketChannel,
-                    @NotNull final RingIndex ringIndex,
+    public Consumer(@NotNull final RingIndex ringIndex,
                     @NotNull final SliceProvider<BYTES> sliceProvider,
-                    @NotNull final OffsetProvider offsetProvider) {
+                    @NotNull final OffsetProvider offsetProvider,
+                    @NotNull final SocketChannelProvider socketChannelProvider) {
 
 
         final Index index = new Index() {
@@ -45,9 +44,9 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
             }
         };
 
-        new SocketReader(index, sliceProvider.getWriterSlice().buffer(), socketChannel, offsetProvider);
+        new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider);
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        toPublisher = new SocketWriter(producerService, socketChannel);
+        toPublisher = new SocketWriter(producerService, socketChannelProvider);
         this.ringIndex = ringIndex;
     }
 

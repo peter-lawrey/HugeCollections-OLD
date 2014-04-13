@@ -22,9 +22,11 @@ public class SocketReader implements Runnable {
 
     @NotNull
     private final ByteBuffer targetBuffer;
-    private final SocketChannel socketChannel;
+
     @NotNull
     private final OffsetProvider offsetProvider;
+    @NotNull
+    private final SocketChannelProvider socketChannelProvider;
 
     // use one buffer for
     private final ByteBuffer buffer = ByteBuffer.allocateDirect(RECEIVE_BUFFER_SIZE).order(ByteOrder.nativeOrder());
@@ -34,19 +36,19 @@ public class SocketReader implements Runnable {
 
     /**
      * @param ringIndex
-     * @param targetBuffer   the buffer that supports the offset provider
-     * @param socketChannel
-     * @param offsetProvider the location into the buffer for an index location
+     * @param targetBuffer          the buffer that supports the offset provider
+     * @param offsetProvider        the location into the buffer for an index location
+     * @param socketChannelProvider
      */
     public SocketReader(@NotNull final Index ringIndex,
                         @NotNull final ByteBuffer targetBuffer,
-                        @NotNull final SocketChannel socketChannel,
-                        @NotNull final OffsetProvider offsetProvider) {
+                        @NotNull final OffsetProvider offsetProvider,
+                        @NotNull final SocketChannelProvider socketChannelProvider) {
         this.ringIndex = ringIndex;
         this.offsetProvider = offsetProvider;
+        this.socketChannelProvider = socketChannelProvider;
         this.targetBuffer = targetBuffer.slice();
 
-        this.socketChannel = socketChannel;
 
     }
 
@@ -56,7 +58,7 @@ public class SocketReader implements Runnable {
 
 
         try {
-
+            final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
 
             wbuffer.clear();
 

@@ -1,29 +1,39 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
+import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
+import net.openhft.chronicle.sandbox.queue.locators.shared.BytesDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.Index;
 import net.openhft.chronicle.sandbox.queue.locators.shared.OffsetProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SliceProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * Created by Rob Austin
  */
-public class Producer<BYTES extends ByteBufferBytes> implements RingIndex {
+public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, DataLocator<E> {
 
     @NotNull
     private final RingIndex ringIndex;
     private final SocketWriter toPublisher;
+    private final BytesDataLocator<E, BYTES> bytesDataLocator;
+    @NotNull
+    private final SliceProvider<BYTES> sliceProvider;
+    @NotNull
+    private final OffsetProvider offsetProvider;
 
-    public Producer(@NotNull final SocketChannel socketChannel,
-                    @NotNull final RingIndex ringIndex,
+
+    public Producer(@NotNull final RingIndex ringIndex,
                     @NotNull final SliceProvider<BYTES> sliceProvider,
-                    @NotNull final OffsetProvider offsetProvider) {
+                    @NotNull final OffsetProvider offsetProvider,
+                    @NotNull final SocketChannelProvider socketChannelProvider,
+                    @NotNull final BytesDataLocator<E, BYTES> bytesDataLocator) {
+        this.sliceProvider = sliceProvider;
+        this.offsetProvider = offsetProvider;
 
         final Index index = new Index() {
 
@@ -39,12 +49,12 @@ public class Producer<BYTES extends ByteBufferBytes> implements RingIndex {
 
         };
 
-        new SocketReader(index, sliceProvider.getWriterSlice().buffer(), socketChannel, offsetProvider);
+        new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider);
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        toPublisher = new SocketWriter(producerService, socketChannel);
+        toPublisher = new SocketWriter(producerService, socketChannelProvider);
         this.ringIndex = ringIndex;
+        this.bytesDataLocator = bytesDataLocator;
     }
-
 
     @Override
     public int getWriterLocation() {
@@ -77,5 +87,30 @@ public class Producer<BYTES extends ByteBufferBytes> implements RingIndex {
         ringIndex.setProducerWriteLocation(nextWriteLocation);
     }
 
+    @Override
+    public E getData(int readLocation) {
+        return bytesDataLocator.getData(readLocation);
+    }
 
+    @Override
+    public int setData(int index, E value) {
+        final int len = bytesDataLocator.setData(index, value);
+
+        // todo we maybe able to optomize this out
+        int offset = offsetProvider.getOffset(index);
+
+        toPublisher.writeBytes(sliceProvider.getWriterSlice(), offset, len);
+
+        return len;
+    }
+
+    @Override
+    public void writeAll(E[] newData, int length) {
+        bytesDataLocator.writeAll(newData, length);
+    }
+
+    @Override
+    public int getCapacity() {
+        return bytesDataLocator.getCapacity();
+    }
 }
