@@ -8,8 +8,10 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.BytesDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Consumer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Producer;
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ConsumerSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ProducerSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.MappedStore;
@@ -118,38 +120,13 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             if (type == Type.REMOTE_PRODUCER) {
 
-                SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
-
-                    @Override
-                    public SocketChannel getSocketChannel() throws IOException {
-                        ServerSocketChannel serverSocket = ServerSocketChannel.open();
-                        serverSocket.socket().setReuseAddress(true);
-                        serverSocket.socket().bind(new InetSocketAddress(port));
-                        serverSocket.configureBlocking(true);
-                        LOG.info("Server waiting for client on port " + port);
-                        serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
-                        return serverSocket.accept();
-                    }
-                };
-
-                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, socketChannelProvider, bytesDataLocator);
+                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ProducerSocketChannelProvider(port), bytesDataLocator);
                 ringIndex = producer;
                 dataLocator = producer;
 
             } else {
 
-                SocketChannelProvider socketChannelProvider = new SocketChannelProvider() {
-
-                    @Override
-                    public SocketChannel getSocketChannel() throws IOException {
-                        final SocketChannel sc = SocketChannel.open(new InetSocketAddress(host, port));
-                        sc.socket().setReceiveBufferSize(256 * 1024);
-                        return sc;
-                    }
-
-                };
-
-                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, socketChannelProvider);
+                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host));
                 dataLocator = bytesDataLocator;
             }
 
@@ -159,6 +136,24 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
         return new ConcurrentBlockingObjectQueue<E>(ringIndex, dataLocator);
 
+    }
+
+    private SocketChannelProvider getProducerSocketChannelProvider() {
+
+
+        return new SocketChannelProvider() {
+
+            @Override
+            public SocketChannel getSocketChannel() throws IOException {
+                ServerSocketChannel serverSocket = ServerSocketChannel.open();
+                serverSocket.socket().setReuseAddress(true);
+                serverSocket.socket().bind(new InetSocketAddress(port));
+                serverSocket.configureBlocking(true);
+                LOG.info("Server waiting for client on port " + port);
+                serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
+                return serverSocket.accept();
+            }
+        };
     }
 
 

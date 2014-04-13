@@ -1,9 +1,9 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
@@ -56,9 +56,8 @@ public class SocketWriter<E> {
                     intBuffer.clear();
                     socketChannel.write(intBuffer);
                     socketChannel.write(slice.buffer());
-                } catch (IOException e) {
+                } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
-                    e.printStackTrace();
                 }
             }
         });
@@ -68,9 +67,9 @@ public class SocketWriter<E> {
     /**
      * the index is encode as a negative number when put on the wire, this is because positive number are used to demote the size of preceding serialized instance
      *
-     * @param length
+     * @param index
      */
-    public void writeNextLocation(final int length) {
+    public void writeNextLocation(final int index) {
 
         producerService.submit(new Runnable() {
             @Override
@@ -78,9 +77,9 @@ public class SocketWriter<E> {
                 try {
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
                     intBuffer.clear();
-                    intBuffer.putInt(-length);
+                    intBuffer.putInt(-index);
                     socketChannel.write(intBuffer);
-                } catch (IOException e) {
+                } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
                     e.printStackTrace();
                 }

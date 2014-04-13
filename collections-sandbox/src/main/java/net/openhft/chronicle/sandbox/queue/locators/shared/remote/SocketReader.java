@@ -2,6 +2,7 @@ package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.Index;
 import net.openhft.chronicle.sandbox.queue.locators.shared.OffsetProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.EOFException;
@@ -48,8 +49,6 @@ public class SocketReader implements Runnable {
         this.offsetProvider = offsetProvider;
         this.socketChannelProvider = socketChannelProvider;
         this.targetBuffer = targetBuffer.slice();
-
-
     }
 
 
@@ -73,10 +72,10 @@ public class SocketReader implements Runnable {
                 }
 
                 rbuffer.limit(wbuffer.position());
-                int intValue = rbuffer.getInt(0);
+                int intValue = rbuffer.getInt();
 
                 // if this int is negative then we are using it to demote and writerLocation change
-                if (intValue < 0) {
+                if (intValue <= 0) {
                     ringIndex.setNextLocation(-intValue);
                 } else {
 

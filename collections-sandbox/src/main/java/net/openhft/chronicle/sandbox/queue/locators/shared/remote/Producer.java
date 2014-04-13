@@ -6,6 +6,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.BytesDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.Index;
 import net.openhft.chronicle.sandbox.queue.locators.shared.OffsetProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SliceProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
@@ -49,7 +50,9 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
 
         };
 
-        new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider);
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider));
+
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
         toPublisher = new SocketWriter(producerService, socketChannelProvider);
         this.ringIndex = ringIndex;

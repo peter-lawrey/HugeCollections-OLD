@@ -63,12 +63,12 @@ public class PutAndTakeTests {
         }
 
         // remote
-        /*{
+      /*   {
             BlockingQueue<Integer> producerQueue = new ProducerConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
             BlockingQueue<Integer> consumerQueue = new ConsumerConcurrentBlockingObjectQueue<Integer>(1024, Integer.class,"localhost");
             result.add(new BlockingQueue[]{producerQueue, consumerQueue});
-        }*/
-
+        }
+        */
         return result;
 
     }
