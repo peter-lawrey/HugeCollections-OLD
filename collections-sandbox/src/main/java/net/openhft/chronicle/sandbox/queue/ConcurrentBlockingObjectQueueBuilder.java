@@ -34,11 +34,11 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     public static final int LOCK_TIME_OUT_NS = 100;
     private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
     int capacity;
-    boolean isShared;
+
     int maxSize;
     Class<E> clazz;
     Type type = Type.LOCAL;
-    private int portNumber;
+    private int port;
     private String host;
 
     /**
@@ -46,6 +46,18 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
      */
     public static int align(int capacity, int powerOf2) {
         return (capacity + powerOf2 - 1) & ~(powerOf2 - 1);
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
     }
 
     public void setMaxSize(int maxSize) {
@@ -61,9 +73,6 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
         this.clazz = clazz;
     }
 
-    public void isShared(boolean isShared) {
-        this.isShared = isShared;
-    }
 
     public BlockingQueue<E> create() throws IOException {
 
@@ -126,16 +135,16 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     private SocketChannel producerConnectSocketChannel() throws IOException {
         ServerSocketChannel serverSocket = ServerSocketChannel.open();
         serverSocket.socket().setReuseAddress(true);
-        serverSocket.socket().bind(new InetSocketAddress(portNumber));
+        serverSocket.socket().bind(new InetSocketAddress(port));
         serverSocket.configureBlocking(true);
-        LOG.info("Server waiting for client on port " + portNumber);
+        LOG.info("Server waiting for client on port " + port);
         serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
         return serverSocket.accept();
     }
 
     private SocketChannel consumerConnectSocketChannel() throws IOException {
 
-        final SocketChannel sc = SocketChannel.open(new InetSocketAddress(host, portNumber));
+        final SocketChannel sc = SocketChannel.open(new InetSocketAddress(host, port));
         sc.socket().setReceiveBufferSize(256 * 1024);
 
         return sc;
