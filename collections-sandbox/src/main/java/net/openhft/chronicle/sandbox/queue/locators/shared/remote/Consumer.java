@@ -40,8 +40,8 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
             }
 
             @Override
-            public int getProducerWriteLocation() {
-                return ringIndex.getProducerWriteLocation();
+            public int getWriterLocation() {
+                return ringIndex.getWriterLocation();
             }
         };
 
@@ -84,7 +84,9 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
 
     @Override
     public void setProducerWriteLocation(int nextWriteLocation) {
-        ringIndex.setProducerWriteLocation(nextWriteLocation);
+
+        throw new UnsupportedOperationException();
+        // ringIndex.setProducerWriteLocation(nextWriteLocation);
     }
 
 

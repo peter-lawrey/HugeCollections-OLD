@@ -67,6 +67,7 @@ public class SocketReader implements Runnable {
             wbuffer.clear();
 
             for (; ; ) {
+
                 rbuffer.clear();
                 rbuffer.limit(0);
 
@@ -94,11 +95,12 @@ public class SocketReader implements Runnable {
                     }
 
                     // to allow the target buffer to read uo to the end of the message
-                    rbuffer.position(4);
                     rbuffer.limit(endOfMessageOffset);
 
-                    int offset = offsetProvider.getOffset(ringIndex.getProducerWriteLocation());
+                    int offset = offsetProvider.getOffset(ringIndex.getWriterLocation());
                     targetBuffer.position(offset);
+
+                    ///  LOG.info("reading byte=" + ByteUtils.toString(rbuffer));
                     targetBuffer.put(rbuffer);
 
                 }

@@ -38,7 +38,6 @@ public class SocketWriter<E> {
         this.name = name;
     }
 
-
     /**
      * used to writeBytes a byte buffer bytes to the socket at {@param offset} and {@param length}
      * It is assumed that the byte buffer will contain the bytes of a serialized instance,
@@ -50,20 +49,19 @@ public class SocketWriter<E> {
      */
     public void writeBytes(final ByteBufferBytes directBytes, int offset, final int length) {
 
-        final ByteBuffer buffer = directBytes.buffer();
+        // we have to make a safe copy as the buffer is processed on another thread
+        final ByteBuffer buffer = directBytes.buffer().duplicate();
+        buffer.position(offset);
+        buffer.limit(offset + length);
 
-        final ByteBuffer slice = buffer.slice();
-        slice.position(offset);
-        slice.limit(offset + length);
-
-        // final ByteBufferBytes slice = directBytes.createSlice(offset, length);
+        //     LOG.info("writing byte=" + ByteUtils.toString(buffer));
 
         producerService.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-                    socketChannel.write(slice);
+                    socketChannel.write(buffer);
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
                 }
@@ -106,4 +104,5 @@ public class SocketWriter<E> {
                 ", name='" + name + '\'' +
                 '}';
     }
+
 }

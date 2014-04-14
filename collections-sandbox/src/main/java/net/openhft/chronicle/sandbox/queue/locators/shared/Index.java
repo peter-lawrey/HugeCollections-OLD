@@ -15,5 +15,5 @@ public interface Index {
     /**
      * get the index where the data is stored in the byte buffer
      */
-    int getProducerWriteLocation();
+    int getWriterLocation();
 }

@@ -4,12 +4,15 @@ import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.lang.io.AbstractBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.logging.Logger;
+
 /**
  * similar to LocalDataLocator.class but works with AbstractBytes
  */
 public class BytesDataLocator<E, BYTES extends AbstractBytes> implements DataLocator<E>, OffsetProvider, SliceProvider<BYTES> {
 
     public static final int ALIGN = 4;
+    private static Logger LOG = Logger.getLogger(BytesDataLocator.class.getName());
     protected final int valueMaxSize;
     @NotNull
     final BYTES readerSlice;
@@ -76,7 +79,7 @@ public class BytesDataLocator<E, BYTES extends AbstractBytes> implements DataLoc
         writerSlice.position(offset);
         writerSlice.writeInstance(aClass, value);
 
-        final long actualSize = writerSlice.position() - offset;
+        final long actualSize = (writerSlice.position() - offset);
         if (actualSize > valueMaxSize)
             throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + actualSize);
 

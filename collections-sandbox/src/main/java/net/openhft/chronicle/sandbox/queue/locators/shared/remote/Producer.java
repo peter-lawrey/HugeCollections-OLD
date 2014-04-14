@@ -44,7 +44,7 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
             }
 
             @Override
-            public int getProducerWriteLocation() {
+            public int getWriterLocation() {
                 throw new UnsupportedOperationException();
             }
 
