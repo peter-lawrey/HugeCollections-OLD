@@ -20,6 +20,7 @@ import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.lang.model.DataValueClasses;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -38,7 +39,16 @@ public class OpenJDKAndHashMapExamplesTest {
 
     private static final String TMP = System.getProperty("java.io.tmpdir");
 
+    private static long parseYYYYMMDD(String s) {
+        try {
+            return YYYYMMDD.parse(s).getTime();
+        } catch (ParseException e) {
+            throw new AssertionError(e);
+        }
+    }
+
     @Test
+    @Ignore
     public void bondExample() throws IOException, InterruptedException {
 
 
@@ -143,14 +153,6 @@ public class OpenJDKAndHashMapExamplesTest {
         shmB.close();
         new File("/dev/shm/myBondPortfolioSHM").delete();
 
-    }
-
-    private static long parseYYYYMMDD(String s) {
-        try {
-            return YYYYMMDD.parse(s).getTime();
-        } catch (ParseException e) {
-            throw new AssertionError(e);
-        }
     }
 
 

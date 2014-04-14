@@ -37,7 +37,7 @@
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
                 <type>pom</type>
-                <version>3.3.0</version>
+                <version>3.3.1</version>
                 <scope>import</scope>
             </dependency>
             <dependency>
@@ -48,7 +48,7 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>chronicle</artifactId>
-                <version>${project.version}</version>
+                <version>3.0.1</version>
             </dependency>
             <dependency>
                 <groupId>net.openhft</groupId>

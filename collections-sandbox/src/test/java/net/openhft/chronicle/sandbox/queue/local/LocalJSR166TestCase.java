@@ -2,7 +2,6 @@ package net.openhft.chronicle.sandbox.queue.local;
 
 
 import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
-import net.openhft.chronicle.sandbox.queue.common.BlockingQueueTest;
 import net.openhft.chronicle.sandbox.queue.common.JSR166TestCase;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -961,17 +960,6 @@ public class LocalJSR166TestCase extends JSR166TestCase {
         }
     }
 
-    public static class Fair extends BlockingQueueTest {
-        protected BlockingQueue emptyCollection() {
-            return new LocalConcurrentBlockingObjectQueue(SIZE, true);
-        }
-    }
-
-    public static class NonFair extends BlockingQueueTest {
-        protected BlockingQueue emptyCollection() {
-            return new LocalConcurrentBlockingObjectQueue(SIZE, false);
-        }
-    }
 
 }
 

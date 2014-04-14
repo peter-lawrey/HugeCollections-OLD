@@ -12,16 +12,11 @@ public class LocalConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegate
     final ConcurrentBlockingObjectQueueBuilder<E> builder = new ConcurrentBlockingObjectQueueBuilder<E>();
     final BlockingQueue<E> delegate;
 
-    public LocalConcurrentBlockingObjectQueue() throws IOException {
-        this(1024);
-    }
-
     /**
      * @param capacity Creates an BlockingQueue with the given (fixed) capacity
      */
     public LocalConcurrentBlockingObjectQueue(int capacity) {
         builder.setCapacity(capacity);
-        builder.isShared(false);
 
         BlockingQueue<E> delegate0 = null;
         try {
@@ -33,10 +28,8 @@ public class LocalConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegate
         delegate = delegate0;
     }
 
-    public LocalConcurrentBlockingObjectQueue(int capacity, boolean b) {
-        this(capacity);
-    }
 
+    // todo
     public LocalConcurrentBlockingObjectQueue(int capacity, boolean b, Collection<Integer> elements) {
         this(capacity);
     }

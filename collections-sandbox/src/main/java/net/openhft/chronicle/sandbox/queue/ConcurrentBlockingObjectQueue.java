@@ -17,7 +17,7 @@ import java.util.concurrent.TimeoutException;
  * Unlike the other classes in this package thi class implements {@linkplain java.util.concurrent.BlockingQueue BlockingQueue},
  * <p/>
  * This class takes advantage of the Unsafe.putOrderedObject, which allows us to create non-blocking code with guaranteed writes.
- * These writes will not be re-ordered by instruction reordering. Under the covers it uses the faster store-store barrier, rather than the the slower store-load barrier, which is used when doing a volatile write.
+ * These writes will not be re-ordered by instruction reordering. Under the covers it uses the faster store-store barrier, rather than the the slower store-load barrier, which is used when doing a volatile writeBytes.
  * One of the trade off with this improved performance is we are limited to a single producer, single consumer.
  * For further information on this see, the blog post <a href="http://robsjava.blogspot.co.uk/2013/06/a-faster-volatile.html">A Faster Volatile</a> by Rob Austin.
  * <p/>
@@ -324,7 +324,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
         // purposely not volatile see the comment below
         dataLocator.setData(writeLocation, value);
 
-        // the line below, is where the write memory barrier occurs,
+        // the line below, is where the writeBytes memory barrier occurs,
         // we have just written back the data in the line above ( which is not require to have a memory barrier as we will be doing that in the line below
         setWriteLocation(nextWriteLocation);
 
@@ -895,7 +895,7 @@ class ConcurrentBlockingObjectQueue<E> extends AbstractBlockingQueue implements 
 
         int i = 0;
 
-        // to reduce the number of volatile reads we are going to perform a kind of double check reading on the volatile write location
+        // to reduce the number of volatile reads we are going to perform a kind of double check reading on the volatile writeBytes location
         int writeLocation = this.ringIndex.getWriterLocation();
 
         do {
