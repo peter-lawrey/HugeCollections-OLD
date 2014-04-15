@@ -29,8 +29,7 @@ public class SocketWriter<E> {
     int offset = Integer.MIN_VALUE;
     long value = Long.MIN_VALUE;
     int length = Integer.MIN_VALUE;
-    boolean sendValue = false;
-
+    Type type = Type.INT;
     AtomicBoolean isBusy = new AtomicBoolean(true);
 
     /**
@@ -46,14 +45,16 @@ public class SocketWriter<E> {
         this.producerService = producerService;
         this.socketChannelProvider = socketChannelProvider;
         this.name = name;
+
+        // make a local safe copy
         final ByteBuffer byteBuffer = buffer.duplicate();
 
         new Thread(new Runnable() {
             @Override
             public void run() {
 
-
                 try {
+
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
 
                     for (; ; ) {
@@ -64,17 +65,19 @@ public class SocketWriter<E> {
                                 isBusy.wait();
                             }
 
-                            if (SocketWriter.this.sendValue) {
+                            if (type == Type.INT) {
                                 intBuffer.clear();
                                 final long value1 = SocketWriter.this.value;
                                 intBuffer.putInt((int) value1);
                                 intBuffer.flip();
                                 socketChannel.write(intBuffer);
-                            } else {
+                            } else if (type == Type.BYTES) {
                                 int offset = SocketWriter.this.offset;
                                 byteBuffer.limit(offset + SocketWriter.this.length);
                                 byteBuffer.position(offset);
                                 socketChannel.write(byteBuffer);
+                            } else {
+                                throw new IllegalArgumentException("unsupported type=" + type);
                             }
 
 
@@ -90,7 +93,6 @@ public class SocketWriter<E> {
             }
         }).start();
     }
-
 
     /**
      * used to writeBytes a byte buffer bytes to the socket at {@param offset} and {@param length}
@@ -108,7 +110,7 @@ public class SocketWriter<E> {
         }
 
         synchronized (isBusy) {
-            this.sendValue = false;
+            this.type = Type.BYTES;
             this.length = length;
             this.offset = offset;
             isBusy.notifyAll();
@@ -129,12 +131,11 @@ public class SocketWriter<E> {
         }
 
         synchronized (isBusy) {
-            this.sendValue = true;
+            this.type = Type.INT;
             this.value = value;
             isBusy.notifyAll();
         }
     }
-
 
     @Override
     public String toString() {
@@ -142,5 +143,8 @@ public class SocketWriter<E> {
                 ", name='" + name + '\'' +
                 '}';
     }
+
+
+    private enum Type {INT, BYTES}
 
 }

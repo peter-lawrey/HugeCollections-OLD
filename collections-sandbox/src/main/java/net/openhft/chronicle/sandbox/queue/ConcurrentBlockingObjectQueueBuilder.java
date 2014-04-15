@@ -120,13 +120,14 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             if (type == Type.REMOTE_PRODUCER) {
 
-                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ProducerSocketChannelProvider(port), bytesDataLocator, buffer.duplicate());
+                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ProducerSocketChannelProvider(port), bytesDataLocator, buffer);
                 ringIndex = producer;
                 dataLocator = producer;
 
             } else {
 
-                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host), buffer.duplicate());
+                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host), buffer);
+
                 dataLocator = bytesDataLocator;
             }
 
