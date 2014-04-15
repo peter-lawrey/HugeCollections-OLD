@@ -17,20 +17,16 @@ import java.util.logging.Logger;
 public class SocketWriter<E> {
 
     private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
-    final ByteBuffer intBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
-    final Object signal = new Object();
-    @NotNull
-    private final ExecutorService producerService;
-    private final SocketChannelProvider socketChannelProvider;
+
+
     @NotNull
     private final String name;
+    private final AtomicBoolean isBusy = new AtomicBoolean(true);
     // intentionally not volatile
-
-    int offset = Integer.MIN_VALUE;
-    long value = Long.MIN_VALUE;
-    int length = Integer.MIN_VALUE;
-    Type type = Type.INT;
-    AtomicBoolean isBusy = new AtomicBoolean(true);
+    private int offset = Integer.MIN_VALUE;
+    private long value = Long.MIN_VALUE;
+    private int length = Integer.MIN_VALUE;
+    private Type type = Type.INT;
 
     /**
      * @param producerService       this must be a single threaded executor
@@ -42,14 +38,14 @@ public class SocketWriter<E> {
                         @NotNull final SocketChannelProvider socketChannelProvider,
                         @NotNull final String name,
                         @NotNull final ByteBuffer buffer) {
-        this.producerService = producerService;
-        this.socketChannelProvider = socketChannelProvider;
+
         this.name = name;
 
         // make a local safe copy
         final ByteBuffer byteBuffer = buffer.duplicate();
+        final ByteBuffer intBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
 
-        new Thread(new Runnable() {
+        producerService.submit(new Runnable() {
             @Override
             public void run() {
 
@@ -91,7 +87,7 @@ public class SocketWriter<E> {
                     LOG.log(Level.SEVERE, "", e);
                 }
             }
-        }).start();
+        });
     }
 
     /**
