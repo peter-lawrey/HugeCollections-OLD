@@ -25,10 +25,11 @@ public class SocketWriter<E> {
     @NotNull
     private final String name;
     // intentionally not volatile
-    volatile int offset = Integer.MIN_VALUE;
-    volatile long value = Long.MIN_VALUE;
-    volatile int length = Integer.MIN_VALUE;
-    volatile boolean sendValue = false;
+
+    int offset = Integer.MIN_VALUE;
+    long value = Long.MIN_VALUE;
+    int length = Integer.MIN_VALUE;
+    boolean sendValue = false;
 
     AtomicBoolean isBusy = new AtomicBoolean(true);
 
@@ -55,35 +56,25 @@ public class SocketWriter<E> {
                 try {
                     final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
 
-                    boolean sendValue;
-
                     for (; ; ) {
                         try {
 
-                            isBusy.set(false);
-
                             synchronized (isBusy) {
+                                isBusy.set(false);
                                 isBusy.wait();
                             }
 
-                            length = SocketWriter.this.length;
-                            sendValue = SocketWriter.this.sendValue;
-
-
-                            // write the integer
-                            if (sendValue) {
+                            if (SocketWriter.this.sendValue) {
                                 intBuffer.clear();
                                 final long value1 = SocketWriter.this.value;
                                 intBuffer.putInt((int) value1);
                                 intBuffer.flip();
                                 socketChannel.write(intBuffer);
-
                             } else {
                                 int offset = SocketWriter.this.offset;
                                 byteBuffer.limit(offset + SocketWriter.this.length);
                                 byteBuffer.position(offset);
                                 socketChannel.write(byteBuffer);
-
                             }
 
 
@@ -116,11 +107,10 @@ public class SocketWriter<E> {
             // spin lock -  we have to add the spin lock so that messages are not skipped
         }
 
-        this.sendValue = false;
-        this.length = length;
-        this.offset = offset;
-        LOG.info("writeBytes offset=" + offset);
         synchronized (isBusy) {
+            this.sendValue = false;
+            this.length = length;
+            this.offset = offset;
             isBusy.notifyAll();
         }
 
@@ -134,16 +124,13 @@ public class SocketWriter<E> {
      */
     public void writeInt(final int value) {
 
-
         while (!isBusy.compareAndSet(false, true)) {
             // spin lock -  we have to add the spin lock so that messages are not skipped
         }
 
-        this.sendValue = true;
-        this.value = value;
-
-        LOG.info("writeInt value=" + value);
         synchronized (isBusy) {
+            this.sendValue = true;
+            this.value = value;
             isBusy.notifyAll();
         }
     }
