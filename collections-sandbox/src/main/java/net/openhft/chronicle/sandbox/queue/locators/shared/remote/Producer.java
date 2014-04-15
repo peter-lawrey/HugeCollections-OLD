@@ -10,6 +10,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provid
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -32,7 +33,8 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
                     @NotNull final SliceProvider<BYTES> sliceProvider,
                     @NotNull final OffsetProvider offsetProvider,
                     @NotNull final SocketChannelProvider socketChannelProvider,
-                    @NotNull final BytesDataLocator<E, BYTES> bytesDataLocator) {
+                    @NotNull final BytesDataLocator<E, BYTES> bytesDataLocator,
+                    @NotNull final ByteBuffer byteBuffer) {
         this.sliceProvider = sliceProvider;
         this.offsetProvider = offsetProvider;
 
@@ -54,7 +56,7 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
         executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider, "Producer"));
 
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        tcpSender = new SocketWriter(producerService, socketChannelProvider, "Producer");
+        tcpSender = new SocketWriter(producerService, socketChannelProvider, "Producer", byteBuffer);
         this.ringIndex = ringIndex;
         this.bytesDataLocator = bytesDataLocator;
     }
@@ -103,7 +105,7 @@ public class Producer<E, BYTES extends ByteBufferBytes> implements RingIndex, Da
         int offset = offsetProvider.getOffset(index);
 
         tcpSender.writeInt(len);
-        tcpSender.writeBytes(sliceProvider.getWriterSlice(), offset, len);
+        tcpSender.writeBytes(offset, len);
 
         return len;
     }

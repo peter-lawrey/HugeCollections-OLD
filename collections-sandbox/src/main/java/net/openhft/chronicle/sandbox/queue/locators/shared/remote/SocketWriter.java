@@ -1,13 +1,13 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
-import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,55 +18,112 @@ public class SocketWriter<E> {
 
     private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
     final ByteBuffer intBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
+    final Object signal = new Object();
     @NotNull
     private final ExecutorService producerService;
     private final SocketChannelProvider socketChannelProvider;
     @NotNull
     private final String name;
+    // intentionally not volatile
+    volatile int offset = Integer.MIN_VALUE;
+    volatile long value = Long.MIN_VALUE;
+    volatile int length = Integer.MIN_VALUE;
+    volatile boolean sendValue = false;
 
+    AtomicBoolean isBusy = new AtomicBoolean(true);
 
     /**
      * @param producerService       this must be a single threaded executor
      * @param socketChannelProvider
      * @param name
+     * @param buffer
      */
     public SocketWriter(@NotNull final ExecutorService producerService,
                         @NotNull final SocketChannelProvider socketChannelProvider,
-                        @NotNull final String name) {
+                        @NotNull final String name,
+                        @NotNull final ByteBuffer buffer) {
         this.producerService = producerService;
         this.socketChannelProvider = socketChannelProvider;
         this.name = name;
+        final ByteBuffer byteBuffer = buffer.duplicate();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+
+                try {
+                    final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+
+                    boolean sendValue;
+
+                    for (; ; ) {
+                        try {
+
+                            isBusy.set(false);
+
+                            synchronized (isBusy) {
+                                isBusy.wait();
+                            }
+
+                            length = SocketWriter.this.length;
+                            sendValue = SocketWriter.this.sendValue;
+
+
+                            // write the integer
+                            if (sendValue) {
+                                intBuffer.clear();
+                                final long value1 = SocketWriter.this.value;
+                                intBuffer.putInt((int) value1);
+                                intBuffer.flip();
+                                socketChannel.write(intBuffer);
+
+                            } else {
+                                int offset = SocketWriter.this.offset;
+                                byteBuffer.limit(offset + SocketWriter.this.length);
+                                byteBuffer.position(offset);
+                                socketChannel.write(byteBuffer);
+
+                            }
+
+
+                        } catch (Exception e) {
+                            LOG.log(Level.SEVERE, "", e);
+                        }
+
+                    }
+
+                } catch (Exception e) {
+                    LOG.log(Level.SEVERE, "", e);
+                }
+            }
+        }).start();
     }
+
 
     /**
      * used to writeBytes a byte buffer bytes to the socket at {@param offset} and {@param length}
      * It is assumed that the byte buffer will contain the bytes of a serialized instance,
      * The first thing that is written to the socket is the {@param length}, this should be size of your serialized instance
      *
-     * @param directBytes
      * @param offset
-     * @param length      this should be size of your serialized instance
+     * @param length this should be size of your serialized instance
      */
-    public void writeBytes(final ByteBufferBytes directBytes, int offset, final int length) {
 
-        // we have to make a safe copy as the buffer is processed on another thread
-        final ByteBuffer buffer = directBytes.buffer().duplicate();
-        buffer.position(offset);
-        buffer.limit(offset + length);
+    public void writeBytes(int offset, final int length) {
 
-        //     LOG.info("writing byte=" + ByteUtils.toString(buffer));
+        while (!isBusy.compareAndSet(false, true)) {
+            // spin lock -  we have to add the spin lock so that messages are not skipped
+        }
 
-        producerService.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-                    socketChannel.write(buffer);
-                } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
-                }
-            }
-        });
+        this.sendValue = false;
+        this.length = length;
+        this.offset = offset;
+        LOG.info("writeBytes offset=" + offset);
+        synchronized (isBusy) {
+            isBusy.notifyAll();
+        }
+
 
     }
 
@@ -77,26 +134,20 @@ public class SocketWriter<E> {
      */
     public void writeInt(final int value) {
 
-        producerService.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
 
-                    intBuffer.clear();
-                    intBuffer.putInt(value);
-                    intBuffer.flip();
+        while (!isBusy.compareAndSet(false, true)) {
+            // spin lock -  we have to add the spin lock so that messages are not skipped
+        }
 
-                    socketChannel.write(intBuffer);
+        this.sendValue = true;
+        this.value = value;
 
-                } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
-                    e.printStackTrace();
-                }
-            }
-
-        });
+        LOG.info("writeInt value=" + value);
+        synchronized (isBusy) {
+            isBusy.notifyAll();
+        }
     }
+
 
     @Override
     public String toString() {

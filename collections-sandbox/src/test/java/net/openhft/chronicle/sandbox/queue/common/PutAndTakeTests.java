@@ -2,9 +2,7 @@ package net.openhft.chronicle.sandbox.queue.common;
 
 
 import net.openhft.chronicle.sandbox.queue.ConsumerConcurrentBlockingObjectQueue;
-import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
 import net.openhft.chronicle.sandbox.queue.ProducerConcurrentBlockingObjectQueue;
-import net.openhft.chronicle.sandbox.queue.SharedConcurrentBlockingObjectQueue;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,7 +51,7 @@ public class PutAndTakeTests {
 
         final ArrayList<BlockingQueue<Integer>[]> result = new ArrayList<BlockingQueue<Integer>[]>();
         //local
-        {
+     /*   {
             BlockingQueue<Integer> queue = new LocalConcurrentBlockingObjectQueue<Integer>(1024);
             result.add(new BlockingQueue[]{queue, queue});
         }
@@ -62,7 +60,7 @@ public class PutAndTakeTests {
         {
             BlockingQueue<Integer> queue = new SharedConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
             result.add(new BlockingQueue[]{queue, queue});
-        }
+        }*/
 
         // remote
         {

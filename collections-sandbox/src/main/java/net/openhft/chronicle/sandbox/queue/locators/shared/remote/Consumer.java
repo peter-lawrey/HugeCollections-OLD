@@ -8,6 +8,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provid
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,7 +30,8 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
     public Consumer(@NotNull final RingIndex ringIndex,
                     @NotNull final SliceProvider<BYTES> sliceProvider,
                     @NotNull final OffsetProvider offsetProvider,
-                    @NotNull final SocketChannelProvider socketChannelProvider) {
+                    @NotNull final SocketChannelProvider socketChannelProvider,
+                    @NotNull final ByteBuffer byteBuffer) {
 
 
         final Index index = new Index() {
@@ -49,7 +51,8 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
         executor.submit(new SocketReader(index, sliceProvider.getWriterSlice().buffer(), offsetProvider, socketChannelProvider, "Consumer"));
 
         final ExecutorService producerService = Executors.newSingleThreadExecutor();
-        toPublisher = new SocketWriter(producerService, socketChannelProvider, "Consumer");
+
+        toPublisher = new SocketWriter(producerService, socketChannelProvider, "Consumer", byteBuffer);
         this.ringIndex = ringIndex;
     }
 
@@ -84,9 +87,7 @@ public class Consumer<BYTES extends ByteBufferBytes> implements RingIndex {
 
     @Override
     public void setProducerWriteLocation(int nextWriteLocation) {
-
         throw new UnsupportedOperationException();
-        // ringIndex.setProducerWriteLocation(nextWriteLocation);
     }
 
 
