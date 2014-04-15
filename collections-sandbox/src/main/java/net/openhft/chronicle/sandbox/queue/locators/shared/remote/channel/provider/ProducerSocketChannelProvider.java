@@ -24,8 +24,11 @@ public class ProducerSocketChannelProvider implements SocketChannelProvider {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                ServerSocketChannel serverSocket = null;
+
+
                 try {
-                    ServerSocketChannel serverSocket = ServerSocketChannel.open();
+                    serverSocket = ServerSocketChannel.open();
                     serverSocket.socket().setReuseAddress(true);
                     serverSocket.socket().bind(new InetSocketAddress(port));
                     serverSocket.configureBlocking(true);
@@ -37,6 +40,14 @@ public class ProducerSocketChannelProvider implements SocketChannelProvider {
                     latch.countDown();
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
+                    if (serverSocket != null) {
+                        try {
+                            serverSocket.close();
+                        } catch (IOException e1) {
+
+
+                        }
+                    }
                 }
             }
         }).start();

@@ -61,7 +61,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
 
     // todo remove the synchronized
     @Override
-    public synchronized E getData(final int index) {
+    public E getData(final int index) {
 
         if (valueClass == null) {
             // It not possible to read as no data has been written
@@ -88,7 +88,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
 
     // todo remove the synchronized
     @Override
-    public synchronized int setData(final int index, final E value) {
+    public int setData(final int index, final E value) {
 
         final Class aClass = (Class) value.getClass();
         if (!valueClass.equals(aClass))

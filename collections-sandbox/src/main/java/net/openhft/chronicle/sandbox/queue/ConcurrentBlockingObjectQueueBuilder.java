@@ -39,10 +39,10 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
     int capacity;
 
-    int maxSize;
+    int maxSize = 128;
     Class<E> clazz;
     Type type = Type.LOCAL;
-    private int port;
+    private int port = 8096;
     private String host;
     private String fileName = "/share-queue-test" + System.nanoTime();
 

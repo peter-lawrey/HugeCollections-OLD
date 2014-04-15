@@ -24,7 +24,6 @@ public class ConsumerConcurrentBlockingObjectQueue<E> extends BlockingQueueDeleg
 
         builder.setClazz(clazz);
         builder.setType(REMOTE_CONSUMER);
-        builder.setPort(8095);
         builder.setHost(hostname);
 
         //todo change the way we default the max size, there is an unsafe method we can use

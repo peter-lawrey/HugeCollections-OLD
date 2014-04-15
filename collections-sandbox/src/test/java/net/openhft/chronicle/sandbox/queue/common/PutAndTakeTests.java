@@ -60,10 +60,10 @@ public class PutAndTakeTests {
 
         // shared
         {
-      /*      BlockingQueue<Integer> producerQueue = new SharedConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
+        /*    BlockingQueue<Integer> producerQueue = new SharedConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
             BlockingQueue<Integer> consumerQueue = new SharedConcurrentBlockingObjectQueue<Integer>(1024, Integer.class);
-            result.add(new BlockingQueue[]{producerQueue, consumerQueue});
-*/
+            result.add(new BlockingQueue[]{producerQueue, consumerQueue});*/
+
         }
 
         // remote

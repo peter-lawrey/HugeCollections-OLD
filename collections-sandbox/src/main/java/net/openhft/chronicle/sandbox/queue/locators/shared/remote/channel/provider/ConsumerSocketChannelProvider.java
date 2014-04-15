@@ -25,15 +25,22 @@ public class ConsumerSocketChannelProvider implements SocketChannelProvider {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    final SocketChannel result = SocketChannel.open(new InetSocketAddress(host, port));
 
+                SocketChannel result = null;
+                try {
+                    result = SocketChannel.open(new InetSocketAddress(host, port));
                     result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
 
                     socketChannel.set(result);
                     latch.countDown();
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
+                    if (result != null)
+                        try {
+                            result.close();
+                        } catch (IOException e1) {
+                            e1.printStackTrace();
+                        }
                 }
             }
         }).start();
