@@ -1,9 +1,7 @@
 package net.openhft.chronicle.sandbox.queue.common;
 
 
-import net.openhft.chronicle.sandbox.queue.ConsumerConcurrentBlockingObjectQueue;
 import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
-import net.openhft.chronicle.sandbox.queue.ProducerConcurrentBlockingObjectQueue;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,9 +66,9 @@ public class PutAndTakeTests {
 
         // remote
         {
-            BlockingQueue<Integer> producerQueue = new ProducerConcurrentBlockingObjectQueue<Integer>(50, Integer.class);
+         /*   BlockingQueue<Integer> producerQueue = new ProducerConcurrentBlockingObjectQueue<Integer>(50, Integer.class);
             BlockingQueue<Integer> consumerQueue = new ConsumerConcurrentBlockingObjectQueue<Integer>(50, Integer.class, "localhost");
-            result.add(new BlockingQueue[]{producerQueue, consumerQueue});
+            result.add(new BlockingQueue[]{producerQueue, consumerQueue});*/
         }
 
         return result;
