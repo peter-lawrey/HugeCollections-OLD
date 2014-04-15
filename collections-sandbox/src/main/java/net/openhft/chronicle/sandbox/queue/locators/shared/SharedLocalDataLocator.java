@@ -17,17 +17,22 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared;
 
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
 import net.openhft.lang.io.DirectBytes;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
  */
 public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider {
 
+
     public static final int ALIGN = 4;
     public static final int LOCK_SIZE = 8;
-
+    private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final int capacity;
     private final int valueMaxSize;
@@ -66,16 +71,17 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
         int offset = getOffset(index);
 
         try {
-
             storeSlice.busyLockLong(offset);
-            storeSlice.position(offset + LOCK_SIZE);
-            return storeSlice.readInstance(valueClass, null);
+            try {
+                storeSlice.position(offset + LOCK_SIZE);
+                return storeSlice.readInstance(valueClass, null);
 
+            } finally {
+                storeSlice.unlockLong(offset);
+            }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOG.log(Level.SEVERE, "", e);
             return null;
-        } finally {
-            storeSlice.unlockLong(offset);
         }
     }
 
@@ -89,21 +95,24 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
             throw new IllegalArgumentException("All data must be of type, class=" + valueClass);
 
         int offset = getOffset(index);
+
         try {
             storeSlice.busyLockLong(offset);
+            try {
 
-            final long start = offset + LOCK_SIZE;
-            storeSlice.position(start);
-            storeSlice.writeInstance(aClass, value);
+                final long start = offset + LOCK_SIZE;
+                storeSlice.position(start);
+                storeSlice.writeInstance(aClass, value);
 
-            if (storeSlice.position() - start > valueMaxSize)
-                throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (storeSlice.position() - start));
+                if (storeSlice.position() - start > valueMaxSize)
+                    throw new IllegalArgumentException("Object too large, valueMaxSize=" + valueMaxSize + ", actual-size=" + (storeSlice.position() - start));
 
+
+            } finally {
+                storeSlice.unlockLong(offset);
+            }
         } catch (InterruptedException e) {
-            e.printStackTrace();
-
-        } finally {
-            storeSlice.unlockLong(offset);
+            LOG.log(Level.SEVERE, "", e);
         }
 
         return 0;
