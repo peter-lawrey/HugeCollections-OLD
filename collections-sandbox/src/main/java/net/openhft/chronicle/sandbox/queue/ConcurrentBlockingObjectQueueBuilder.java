@@ -5,6 +5,7 @@ import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.local.LocalRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.BytesDataLocator;
+import net.openhft.chronicle.sandbox.queue.locators.shared.SharedLocalDataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Consumer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Producer;
@@ -43,12 +44,17 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     Type type = Type.LOCAL;
     private int port;
     private String host;
+    private String fileName = "/share-queue-test" + System.nanoTime();
 
     /**
      * returns the value to nearest {@parm powerOf2}
      */
     public static int align(int capacity, int powerOf2) {
         return (capacity + powerOf2 - 1) & ~(powerOf2 - 1);
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 
     public void setType(Type type) {
@@ -89,7 +95,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
         } else if (type == Type.SHARED) {
 
             final String tmp = System.getProperty("java.io.tmpdir");
-            final File file = new File(tmp + "/share-queue-test" + System.nanoTime());
+            final File file = new File(tmp + fileName);
 
             int ringIndexLocationsStart = 0;
             int ringIndexLocationsLen = SIZE_OF_INT * 2;
@@ -101,9 +107,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             // provides an index to the data in the ring buffer, the size of this index is proportional to the capacity of the ring buffer
             final DirectBytes storeSlice = ms.createSlice(ringIndexLocationsLen, storeLen);
-            final DirectBytes writerSlice = ms.createSlice(ringIndexLocationsLen, storeLen);
-
-            dataLocator = new BytesDataLocator<E, DirectBytes>(clazz, capacity, maxSize, storeSlice, writerSlice);
+            dataLocator = new SharedLocalDataLocator(capacity, maxSize, storeSlice, clazz);
 
         } else if (type == Type.REMOTE_PRODUCER || type == Type.REMOTE_CONSUMER) {
 
@@ -127,7 +131,6 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
             } else {
 
                 ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host), buffer);
-
                 dataLocator = bytesDataLocator;
             }
 
