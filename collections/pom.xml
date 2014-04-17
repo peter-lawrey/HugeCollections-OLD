@@ -44,7 +44,12 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>lang</artifactId>
-                <version>6.3.5</version>
+                <version>6.3.6</version>
+            </dependency>
+            <dependency>
+                <groupId>net.openhft</groupId>
+                <artifactId>lang-sandbox</artifactId>
+                <version>6.3.7-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>net.openhft</groupId>
@@ -72,6 +77,10 @@
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>lang</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.openhft</groupId>
+            <artifactId>lang-sandbox</artifactId>
         </dependency>
 
         <!-- test dependencies -->

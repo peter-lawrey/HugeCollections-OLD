@@ -21,13 +21,14 @@ import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
+import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -42,8 +43,10 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final long lockTimeOutNS;
     private final int metaDataBytes;
     private Segment[] segments; // non-final for close()
-    private MappedStore ms;     // non-final for close()
+    //private MappedStore ms;     // non-final for close()
+    private VanillaMappedFile vmf;
     private final Hasher hasher;
+    private final BytesMarshallerFactory bytesMarshallerFactory;
 
     private final int replicas;
     private final int entrySize;
@@ -86,7 +89,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
         this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
-
+        this.bytesMarshallerFactory = new VanillaBytesMarshallerFactory();
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
@@ -94,20 +97,19 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 new VanillaSharedHashMap.Segment[segments];
         this.segments = ss;
 
-        this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes());
+        this.vmf = VanillaMappedFile.readWrite(file,sizeInBytes());
 
         long offset = SharedHashMapBuilder.HEADER_SIZE;
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = new Segment(ms.createSlice(offset, segmentSize));
+            this.segments[i] = new Segment(vmf.sliceAt(offset, segmentSize));
             offset += segmentSize;
         }
     }
 
     @Override
     public File file() {
-        return ms.file();
+        return new File(vmf.path());
     }
 
     @Override
@@ -177,17 +179,23 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      */
     @Override
     public void close() {
-        if (ms == null)
+        if (vmf == null)
             return;
-        ms.free();
+
+        try {
+            vmf.close();
+        } catch(IOException e) {
+            LOGGER.warning(e.getMessage());
+        }
+
         segments = null;
-        ms = null;
+        vmf = null;
     }
 
     DirectBytes acquireBytes() {
         DirectBytes bytes = localBytes.get();
         if (bytes == null) {
-            localBytes.set(bytes = new DirectStore(ms.bytesMarshallerFactory(), entrySize * 2, false).createSlice());
+            localBytes.set(bytes = new DirectStore(this.bytesMarshallerFactory, entrySize * 2, false).createSlice());
         } else {
             bytes.clear();
         }
