@@ -620,7 +620,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return tmpBytes;
         }
 
-        private long entrySizeAddr(long offset) {
+        private long entryStartAddr(long offset) {
             // entry.address() points to "needed" start addr + metaDataBytes
             return bytes.startAddr() + offset;
         }
@@ -927,7 +927,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         return null;
                     hashLookup.removePrevPos();
                     decrementSize();
-                    free(pos, inBlocks(entryEndAddr - entrySizeAddr(offset)));
+                    free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
                     notifyRemoved(offset, key, valueRemoved);
                     return valueRemoved;
                 }
@@ -1057,7 +1057,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             // integral division
             newValueDoesNotFit:
             if (newEntryEndAddr != entryEndAddr) {
-                long entryStartAddr = entrySizeAddr(offset);
+                long entryStartAddr = entryStartAddr(offset);
                 long oldEntrySize = entryEndAddr - entryStartAddr;
                 int oldSizeInBlocks = inBlocks(oldEntrySize);
                 int newSizeInBlocks = inBlocks(newEntryEndAddr - entryStartAddr);
@@ -1079,7 +1079,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     // Moving metadata, key stop bit and key.
                     // Don't want to fiddle with pseudo-buffers for this,
                     // since we already have all absolute addresses.
-                    long newEntryStartAddr = entrySizeAddr(offset);
+                    long newEntryStartAddr = entryStartAddr(offset);
                     NativeBytes.UNSAFE.copyMemory(entryStartAddr,
                             newEntryStartAddr, valueLenAddr - entryStartAddr);
                     entry = entry(offset);
