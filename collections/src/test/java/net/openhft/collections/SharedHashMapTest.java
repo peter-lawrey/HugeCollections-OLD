@@ -1144,4 +1144,47 @@ public class SharedHashMapTest {
 
         return map;
     }
+
+    @Test
+    public void testOversizeEntriesPutRemoveReplace() throws IOException {
+        VanillaSharedHashMap<CharSequence, CharSequence> map =
+                (VanillaSharedHashMap<CharSequence, CharSequence>)
+                        new SharedHashMapBuilder().entries(2).minSegments(1)
+                                .entrySize(8).create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class);
+        String key = "k";
+        String oversizedKey = "oversized key";
+        String value = "v";
+        String oversizedValue = "oversized value";
+
+        map.put(key, oversizedValue);
+        assertEquals(oversizedValue, map.get(key));
+        map.replace(key, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(key));
+        map.replace(key, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(key));
+
+        map.put(oversizedKey, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(oversizedKey));
+        map.replace(oversizedKey, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(oversizedKey));
+        map.remove(oversizedKey);
+        map.checkConsistency();
+        assertEquals(null, map.get(oversizedKey));
+        map.put(oversizedKey, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(oversizedKey));
+        map.replace(oversizedKey, oversizedValue, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(oversizedKey));
+
+        assertEquals(value, map.remove(oversizedKey));
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.remove(key));
+        map.checkConsistency();
+    }
 }

@@ -178,6 +178,15 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     }
 
     @Override
+    public void replacePrevPos(int newValue) {
+        checkValue(newValue);
+        int prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
+        // Don't need to overwrite searchHash, but we don't know our bytes
+        // byte order, and can't determine offset of the value within entry.
+        bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
+    }
+
+    @Override
     public void putAfterFailedSearch(int value) {
         checkValue(value);
         bytes.writeInt(searchPos, ((searchHash << 16) | value));
