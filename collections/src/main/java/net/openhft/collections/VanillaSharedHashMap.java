@@ -620,6 +620,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return tmpBytes;
         }
 
+        private long entrySizeAddr(long offset) {
+            // entry.address() points to "needed" start addr + metaDataBytes
+            return bytes.startAddr() + offset;
+        }
+
         private long entrySize(long keyLen, long valueLen) {
             // Assuming entrySize is divisible by VALUE_ALIGNMENT
             return alignValueAddr(metaDataBytes +
@@ -915,13 +920,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     // key is found
                     entry.skip(keyLen);
                     long valueLen = readValueLen(entry);
+                    long entryEndAddr = entry.positionAddr() + valueLen;
                     V valueRemoved = expectedValue != null || !removeReturnsNull
                             ? readValue(entry, null, valueLen) : null;
                     if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
                     hashLookup.removePrevPos();
                     decrementSize();
-                    free(pos, inBlocks(entrySize(keyLen, valueLen)));
+                    free(pos, inBlocks(entryEndAddr - entrySizeAddr(offset)));
                     notifyRemoved(offset, key, valueRemoved);
                     return valueRemoved;
                 }
@@ -1051,8 +1057,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             // integral division
             newValueDoesNotFit:
             if (newEntryEndAddr != entryEndAddr) {
-                // entry.address() points to "needed" start addr + metaDataBytes
-                long entryStartAddr = bytes.startAddr() + offset;
+                long entryStartAddr = entrySizeAddr(offset);
                 long oldEntrySize = entryEndAddr - entryStartAddr;
                 int oldSizeInBlocks = inBlocks(oldEntrySize);
                 int newSizeInBlocks = inBlocks(newEntryEndAddr - entryStartAddr);
@@ -1074,7 +1079,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                     // Moving metadata, key stop bit and key.
                     // Don't want to fiddle with pseudo-buffers for this,
                     // since we already have all absolute addresses.
-                    long newEntryStartAddr = bytes.startAddr() + offset;
+                    long newEntryStartAddr = entrySizeAddr(offset);
                     NativeBytes.UNSAFE.copyMemory(entryStartAddr,
                             newEntryStartAddr, valueLenAddr - entryStartAddr);
                     entry = entry(offset);
