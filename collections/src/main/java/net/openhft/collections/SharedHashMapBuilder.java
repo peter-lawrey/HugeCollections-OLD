@@ -36,6 +36,7 @@ public class SharedHashMapBuilder implements Cloneable {
     private int actualEntriesPerSegment = -1;
 
     private int entrySize = 256;
+    private Alignment alignment = Alignment.OF_4_BYTES;
     private long entries = 1 << 20;
     private int replicas = 0;
     private boolean transactional = false;
@@ -76,13 +77,23 @@ public class SharedHashMapBuilder implements Cloneable {
 
     private int tryMinSegments(int min, int max) {
         for (int i = min; i < max; i <<= 1) {
-            if (i * i * i >= entrySize() * 2)
+            if (i * i * i >= alignedEntrySize() * 2)
                 return i;
         }
         return max;
     }
 
-
+    /**
+     * <p>Note that the actual entrySize will be aligned
+     * to 4 (default entry alignment). I. e. if you set entry size to 30, the
+     * actual entry size will be 32 (30 aligned to 4 bytes). If you don't want
+     * entry size to be aligned, set
+     * {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
+     *
+     * @return this {@code SharedHashMapBuilder} back
+     * @see #entryAndValueAlignment(Alignment)
+     * @see #entryAndValueAlignment()
+     */
     public SharedHashMapBuilder entrySize(int entrySize) {
         this.entrySize = entrySize;
         return this;
@@ -90,6 +101,44 @@ public class SharedHashMapBuilder implements Cloneable {
 
     public int entrySize() {
         return entrySize;
+    }
+
+    int alignedEntrySize() {
+        return entryAndValueAlignment().alignSize(entrySize());
+    }
+
+    /**
+     * Specifies alignment of address in memory of entries
+     * and independently of address in memory of values within entries.
+     *
+     * <p>Useful when values of the map are updated intensively, particularly
+     * fields with volatile access, because it doesn't work well
+     * if the value crosses cache lines. Also, on some (nowadays rare)
+     * architectures any misaligned memory access is more expensive than aligned.
+     *
+     * <p>Note that specified {@link #entrySize()} will be aligned according to
+     * this alignment. I. e. if you set {@code entrySize(20)} and
+     * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
+     * will be 24 (20 aligned to 8 bytes).
+     *
+     * @return this {@code SharedHashMapBuilder} back
+     * @see #entryAndValueAlignment()
+     */
+    public SharedHashMapBuilder entryAndValueAlignment(Alignment alignment) {
+        this.alignment = alignment;
+        return this;
+    }
+
+    /**
+     * Returns alignment of addresses in memory of entries and independently
+     * of values within entries.
+     *
+     * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
+     *
+     * @see #entryAndValueAlignment(Alignment)
+     */
+    public Alignment entryAndValueAlignment() {
+        return alignment;
     }
 
     public SharedHashMapBuilder entries(long entries) {
@@ -194,6 +243,7 @@ public class SharedHashMapBuilder implements Cloneable {
         builder.actualSegments(bb.getInt());
         builder.actualEntriesPerSegment(bb.getInt());
         builder.entrySize(bb.getInt());
+        builder.entryAndValueAlignment(Alignment.fromOrdinal(bb.get()));
         builder.replicas(bb.getInt());
         builder.transactional(bb.get() == 'Y');
         builder.metaDataBytes(bb.get() & 0xFF);
@@ -207,6 +257,7 @@ public class SharedHashMapBuilder implements Cloneable {
         bb.putInt(actualSegments());
         bb.putInt(actualEntriesPerSegment());
         bb.putInt(entrySize());
+        bb.put((byte) entryAndValueAlignment().ordinal());
         bb.putInt(replicas());
         bb.put((byte) (transactional ? 'Y' : 'N'));
         bb.put((byte) metaDataBytes);
@@ -336,6 +387,7 @@ public class SharedHashMapBuilder implements Cloneable {
                 (actualSegments > 0 ? ", actualSegments=" + actualSegments() : ", minSegments=" + minSegments()) +
                 ", actualEntriesPerSegment=" + actualEntriesPerSegment() +
                 ", entrySize=" + entrySize() +
+                ", entryAndValueAlignment=" + entryAndValueAlignment() +
                 ", entries=" + entries() +
                 ", replicas=" + replicas() +
                 ", transactional=" + transactional() +
@@ -362,6 +414,7 @@ public class SharedHashMapBuilder implements Cloneable {
         if (actualSegments() != that.actualSegments()) return false;
         if (entries() != that.entries()) return false;
         if (entrySize() != that.entrySize()) return false;
+        if (entryAndValueAlignment() != that.entryAndValueAlignment()) return false;
         if (generatedKeyType() != that.generatedKeyType()) return false;
         if (generatedValueType() != that.generatedValueType()) return false;
         if (lockTimeOutMS() != that.lockTimeOutMS()) return false;

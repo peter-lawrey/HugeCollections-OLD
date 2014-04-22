@@ -38,16 +38,6 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
 
     /**
-     * The values can be mapped and contain many fields e.g. field with volatile
-     * access doesn't work well if the value crosses cache lines.
-     */
-    private static final int VALUE_ALIGNMENT = 4;
-
-    private static long alignValueAddr(long address) {
-        return (address + VALUE_ALIGNMENT - 1) & ~(VALUE_ALIGNMENT - 1);
-    }
-
-    /**
      * @param size positive number
      * @return number of bytes taken by
      *         {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
@@ -91,6 +81,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
     private final int replicas;
     private final int entrySize;
+    private final Alignment alignment;
     private final int entriesPerSegment;
     private final int hashMask;
 
@@ -118,7 +109,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
 
         this.replicas = builder.replicas();
-        this.entrySize = builder.entrySize();
+        this.entrySize = builder.alignedEntrySize();
+        this.alignment = builder.entryAndValueAlignment();
 
         this.errorListener = builder.errorListener();
         this.generatedKeyType = builder.generatedKeyType();
@@ -626,8 +618,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         private long entrySize(long keyLen, long valueLen) {
-            // Assuming entrySize is divisible by VALUE_ALIGNMENT
-            return alignValueAddr(metaDataBytes +
+            return alignment.alignAddr(metaDataBytes +
                     expectedStopBits(keyLen) + keyLen +
                     expectedStopBits(valueLen)) + valueLen;
         }
@@ -802,7 +793,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             entry.write(keyBytes);
 
             entry.writeStopBit(valueLen);
-            entry.alignPositionAddr(VALUE_ALIGNMENT);
+            alignment.alignPositionAddr(entry);
 
             if (!byteableValue) {
                 entry.write(valueBytes);
@@ -866,7 +857,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         private long readValueLen(Bytes entry) {
             long valueLen = entry.readStopBit();
-            entry.alignPositionAddr(VALUE_ALIGNMENT);
+            alignment.alignPositionAddr(entry);
             return valueLen;
         }
 
@@ -1050,8 +1041,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 long entryEndAddr, Bytes valueBytes) {
             long valueLenAddr = entry.address() + valueLenPos;
             long newValueLen = valueBytes.remaining();
-            long newValueAddr =
-                    alignValueAddr(valueLenAddr + expectedStopBits(newValueLen));
+            long newValueAddr = alignment.alignAddr(
+                    valueLenAddr + expectedStopBits(newValueLen));
             long newEntryEndAddr = newValueAddr + newValueLen;
             // Fast check before counting "sizes in blocks" that include
             // integral division
@@ -1097,7 +1088,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             // Common code for all cases
             entry.position(valueLenPos);
             entry.writeStopBit(newValueLen);
-            entry.alignPositionAddr(VALUE_ALIGNMENT);
+            alignment.alignPositionAddr(entry);
             entry.write(valueBytes);
             return offset;
         }
