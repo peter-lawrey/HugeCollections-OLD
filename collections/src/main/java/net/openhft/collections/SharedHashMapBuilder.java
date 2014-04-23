@@ -61,7 +61,6 @@ public class SharedHashMapBuilder implements Cloneable {
 
     /**
      * Set minimum number of segments.
-     * <p></p>
      * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
@@ -90,6 +89,7 @@ public class SharedHashMapBuilder implements Cloneable {
      * entry size to be aligned, set
      * {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
      *
+     * @param entrySize the size in bytes
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment(Alignment)
      * @see #entryAndValueAlignment()
@@ -110,12 +110,12 @@ public class SharedHashMapBuilder implements Cloneable {
     /**
      * Specifies alignment of address in memory of entries
      * and independently of address in memory of values within entries.
-     *
+     * <p/>
      * <p>Useful when values of the map are updated intensively, particularly
      * fields with volatile access, because it doesn't work well
      * if the value crosses cache lines. Also, on some (nowadays rare)
      * architectures any misaligned memory access is more expensive than aligned.
-     *
+     * <p/>
      * <p>Note that specified {@link #entrySize()} will be aligned according to
      * this alignment. I. e. if you set {@code entrySize(20)} and
      * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
@@ -132,8 +132,8 @@ public class SharedHashMapBuilder implements Cloneable {
     /**
      * Returns alignment of addresses in memory of entries and independently
      * of values within entries.
-     *
-     * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
+     * <p/>
+     * Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
      *
      * @see #entryAndValueAlignment(Alignment)
      */
@@ -196,6 +196,8 @@ public class SharedHashMapBuilder implements Cloneable {
 
     /**
      * Not supported yet.
+     *
+     * @return an instance of the map builder
      */
     public SharedHashMapBuilder transactional(boolean transactional) {
         this.transactional = transactional;
@@ -291,6 +293,7 @@ public class SharedHashMapBuilder implements Cloneable {
      * Either way it's expensive for something you probably don't use.
      *
      * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
+     * @return an instance of the map builder
      */
     public SharedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
         this.putReturnsNull = putReturnsNull;
@@ -314,6 +317,7 @@ public class SharedHashMapBuilder implements Cloneable {
      * Either way it's expensive for something you probably don't use.
      *
      * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
+     * @return an instance of the map builder
      */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
         this.removeReturnsNull = removeReturnsNull;

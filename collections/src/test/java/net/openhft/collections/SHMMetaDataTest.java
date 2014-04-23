@@ -45,7 +45,7 @@ public class SHMMetaDataTest {
             }
 
             @Override
-            public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value) {
+            public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value, long pos, VanillaSharedHashMap.Segment segment) {
                 assertEquals(8, metaDataBytes);
                 if (added)
                     assertEquals(0, entry.readLong());
@@ -53,7 +53,7 @@ public class SHMMetaDataTest {
             }
 
             @Override
-            public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
+            public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value, int pos, VanillaSharedHashMap.Segment segment) {
                 assertEquals(8, metaDataBytes);
                 System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
             }
