@@ -33,6 +33,16 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
 
     private static final int UNSET_ENTRY = 0xFFFF;
 
+    private static void checkKey(int key) {
+        if ((key & ~0xFFFF) != 0)
+            throw new IllegalArgumentException("Key out of range, was " + key);
+    }
+
+    private static void checkValue(int value) {
+        if ((value & ~0xFFFF) != 0)
+            throw new IllegalArgumentException("Value out of range, was " + value);
+    }
+
     private final int capacity;
     private final int capacityMask;
     private final int capacityMask2;
@@ -60,10 +70,8 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public void put(int key, int value) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
-        else if ((key & ~0xFFFF) != 0)
-            throw new IllegalArgumentException("Key out of range, was " + key);
-        if ((value & ~0xFFFF) != 0)
-            throw new IllegalArgumentException("Value out of range, was " + value);
+        else checkKey(key);
+        checkValue(value);
         int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
         for (int i = 0; i <= capacityMask; i++) {
             int entry = bytes.readInt(pos);
@@ -170,7 +178,17 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     }
 
     @Override
+    public void replacePrevPos(int newValue) {
+        checkValue(newValue);
+        int prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
+        // Don't need to overwrite searchHash, but we don't know our bytes
+        // byte order, and can't determine offset of the value within entry.
+        bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
+    }
+
+    @Override
     public void putAfterFailedSearch(int value) {
+        checkValue(value);
         bytes.writeInt(searchPos, ((searchHash << 16) | value));
     }
 

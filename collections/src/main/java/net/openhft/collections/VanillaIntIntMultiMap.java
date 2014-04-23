@@ -189,6 +189,15 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     }
 
     @Override
+    public void replacePrevPos(int newValue) {
+        long prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
+        // Don't need to overwrite searchHash, but we don't know our bytes
+        // byte order, and can't determine offset of the value within entry.
+        long entry = (((long) searchHash) << 32) | (newValue & 0xFFFFFFFFL);
+        bytes.writeLong(prevPos, entry);
+    }
+
+    @Override
     public void putAfterFailedSearch(int value) {
         long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
         bytes.writeLong(searchPos, entry);

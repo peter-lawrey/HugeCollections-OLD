@@ -32,6 +32,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static net.openhft.collections.Alignment.NO_ALIGNMENT;
+import static net.openhft.collections.Alignment.OF_4_BYTES;
+import static net.openhft.collections.Alignment.OF_8_BYTES;
 import static org.junit.Assert.*;
 
 @SuppressWarnings({"unchecked", "ResultOfMethodCallIgnored"})
@@ -398,10 +401,17 @@ public class SharedHashMapTest {
     }
 
     @Test
-    public void testAcquireAndGet() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+    public void testAcquireAndGet() throws IOException, ClassNotFoundException,
+            IllegalAccessException, InstantiationException {
         int entries = 1000 * 1000;
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(entries, 128, 24);
+        testAcquireAndGet(getSharedMap(entries, 128, 24, NO_ALIGNMENT), entries);
+        testAcquireAndGet(getSharedMap(entries, 128, 24, OF_4_BYTES), entries);
+        testAcquireAndGet(getSharedMap(entries, 128, 24, OF_8_BYTES), entries);
+    }
 
+    public void testAcquireAndGet(SharedHashMap<CharSequence, LongValue> map, int entries)
+            throws IOException, ClassNotFoundException, IllegalAccessException,
+            InstantiationException {
         LongValue value = new LongValue$$Native();
         LongValue value2 = new LongValue$$Native();
         LongValue value3 = new LongValue$$Native();
@@ -432,7 +442,14 @@ public class SharedHashMapTest {
 
     @Test
     public void testAcquireFromMultipleThreads() throws Exception {
-        SharedHashMap<CharSequence, LongValue> map = getSharedMap(1000 * 1000, 128, 24);
+        int entries = 1000 * 1000;
+        testAcquireFromMultipleThreads(getSharedMap(entries, 128, 24, NO_ALIGNMENT));
+        testAcquireFromMultipleThreads(getSharedMap(entries, 128, 24, OF_4_BYTES));
+        testAcquireFromMultipleThreads(getSharedMap(entries, 128, 24, OF_8_BYTES));
+    }
+
+    public void testAcquireFromMultipleThreads(SharedHashMap<CharSequence, LongValue> map)
+            throws Exception {
 
         CharSequence key = getUserCharSequence(0);
         map.acquireUsing(key, new LongValue$$Native());
@@ -673,11 +690,19 @@ public class SharedHashMapTest {
         return file;
     }
 
-    private static SharedHashMap<CharSequence, LongValue> getSharedMap(long entries, int segments, int entrySize) throws IOException {
+    private static SharedHashMap<CharSequence, LongValue> getSharedMap(
+            long entries, int segments, int entrySize) throws IOException {
+        return getSharedMap(entries, segments, entrySize, OF_4_BYTES);
+    }
+
+    private static SharedHashMap<CharSequence, LongValue> getSharedMap(
+            long entries, int segments, int entrySize, Alignment alignment)
+            throws IOException {
         return new SharedHashMapBuilder()
                 .entries(entries)
                 .minSegments(segments)
                 .entrySize(entrySize)
+                .entryAndValueAlignment(alignment)
                 .generatedValueType(true)
                 .create(getPersistenceFile(), CharSequence.class, LongValue.class);
     }
@@ -1145,5 +1170,69 @@ public class SharedHashMapTest {
         }
 
         return map;
+    }
+
+    @Test
+    public void testOversizeEntriesPutRemoveReplace() throws IOException {
+        SharedHashMapBuilder builder = new SharedHashMapBuilder()
+                .entries(2)
+                .minSegments(1)
+                .entrySize(10);
+        builder.entryAndValueAlignment(NO_ALIGNMENT);
+        testOversizeEntriesPutRemoveReplace(
+                (VanillaSharedHashMap<CharSequence, CharSequence>)
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class)
+        );
+        builder.entryAndValueAlignment(Alignment.OF_4_BYTES);
+        testOversizeEntriesPutRemoveReplace(
+                (VanillaSharedHashMap<CharSequence, CharSequence>)
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class));
+        builder.entryAndValueAlignment(OF_8_BYTES);
+        testOversizeEntriesPutRemoveReplace(
+                (VanillaSharedHashMap<CharSequence, CharSequence>)
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class));
+    }
+
+    public void testOversizeEntriesPutRemoveReplace(
+            VanillaSharedHashMap<CharSequence, CharSequence> map) {
+        String key = "k";
+        String oversizedKey = "oversized key";
+        String value = "v";
+        String oversizedValue = "oversized value";
+
+        map.put(key, oversizedValue);
+        assertEquals(oversizedValue, map.get(key));
+        map.replace(key, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(key));
+        map.replace(key, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(key));
+
+        map.put(oversizedKey, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(oversizedKey));
+        map.replace(oversizedKey, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(oversizedKey));
+        map.remove(oversizedKey);
+        map.checkConsistency();
+        assertEquals(null, map.get(oversizedKey));
+        map.put(oversizedKey, oversizedValue);
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.get(oversizedKey));
+        map.replace(oversizedKey, oversizedValue, value);
+        map.checkConsistency();
+        assertEquals(value, map.get(oversizedKey));
+
+        assertEquals(value, map.remove(oversizedKey));
+        map.checkConsistency();
+        assertEquals(oversizedValue, map.remove(key));
+        map.checkConsistency();
+
+        map.close();
     }
 }

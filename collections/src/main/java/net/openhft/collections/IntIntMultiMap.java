@@ -58,6 +58,8 @@ interface IntIntMultiMap {
 
     void removePrevPos();
 
+    void replacePrevPos(int newValue);
+
     void putAfterFailedSearch(int value);
 
     void clear();
