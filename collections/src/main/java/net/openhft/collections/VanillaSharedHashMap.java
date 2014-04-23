@@ -230,19 +230,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         vmf = null;
     }
 
-<<<<<<< HEAD
-    DirectBytes acquireBytes() {
-        DirectBytes bytes = localBytes.get();
-        if (bytes == null) {
-            localBytes.set(bytes = new DirectStore(this.bytesMarshallerFactory, entrySize * 2, false).createSlice());
-=======
     private DirectBytes acquireBufferForKey() {
         DirectBytes buffer = localBufferForKeys.get();
         if (buffer == null) {
-            buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).createSlice();
+            buffer = new DirectStore(this.bytesMarshallerFactory, 
+                entrySize * bufferAllocationFactor, false).createSlice());
+
             localBufferForKeys.set(buffer);
->>>>>>> master
         } else {
             buffer.clear();
         }
@@ -253,7 +247,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         DirectBytes buffer = localBufferForValues.get();
         if (buffer == null) {
             buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).createSlice();
+                entrySize * bufferAllocationFactor, false).createSlice();
+
             localBufferForValues.set(buffer);
         } else {
             buffer.clear();
