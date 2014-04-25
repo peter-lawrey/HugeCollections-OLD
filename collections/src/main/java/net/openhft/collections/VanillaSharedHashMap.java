@@ -34,7 +34,7 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V> {
+public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
 
     /**

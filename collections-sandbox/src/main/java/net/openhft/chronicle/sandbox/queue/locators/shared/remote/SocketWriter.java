@@ -31,6 +31,8 @@ import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
+ * <p/>
+ * todo remove the locking in this class by introducing bit sets in this class.
  */
 public class SocketWriter<E> {
 
@@ -120,7 +122,7 @@ public class SocketWriter<E> {
     public void writeBytes(int offset, final int length) {
 
         while (!isBusy.compareAndSet(false, true)) {
-            // spin lock -  we have to add the spin lock so that messages are not skipped
+            // spin lock -  we have to touch the spin lock so that messages are not skipped
         }
 
         synchronized (isBusy) {

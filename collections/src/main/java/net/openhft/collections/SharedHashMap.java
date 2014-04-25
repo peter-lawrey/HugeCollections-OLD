@@ -20,7 +20,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.util.concurrent.ConcurrentMap;
 
-public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable, SegmentInfoProvider {
+public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
     /**
      * @return size as a long.
      * @see java.util.Map size()

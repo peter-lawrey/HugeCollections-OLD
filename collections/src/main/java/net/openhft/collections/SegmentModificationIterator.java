@@ -23,15 +23,23 @@ import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
+import java.util.EnumSet;
 import java.util.Map;
+
+import static java.util.Arrays.asList;
+import static java.util.EnumSet.copyOf;
+import static net.openhft.collections.SegmentModificationIterator.State.PUT;
+import static net.openhft.collections.SegmentModificationIterator.State.REMOVE;
 
 /**
  * Once a change occurs to a map, map replication requires that these changes are picked up by another thread,
  * this class provides an iterator like interface to poll for such changes.
  * In most cases the thread that adds data to the node is unlikely to be the same thread that replicates the data over to the other nodes,
- * so data will have to be marshalled between the main thread storing data to the map, and the thread running the replication.
+ * so data will have to be marshaled between the main thread storing data to the map, and the thread running the replication.
  * One way to perform this marshalling, would be to pipe the data into a queue. However, This class takes another approach.
  * It uses a bit set, and marks bits which correspond to the indexes of the entries that have changed.
  * It then provides an iterator like interface to poll for such changes.
@@ -41,8 +49,25 @@ import java.util.Map;
 public class SegmentModificationIterator<K, V> implements SharedMapEventListener {
 
 
+    private final Object notifier;
+
+    public enum State {PUT, REMOVE}
+
     private SegmentInfoProvider segmentInfoProvider;
     private SingleThreadedDirectBitSet changes;
+
+    private final EnumSet<State> watchList;
+
+    /**
+     * @param notifier  if not NULL, notifyAll() is called on this object when ever an item is added to the watchlist
+     * @param watchList if you don't provide a {@code watchList} all the items are deemed to be in the watchlist
+     */
+    public SegmentModificationIterator(@Nullable final Object notifier, final State... watchList) {
+
+        this.notifier = notifier;
+        this.watchList = (watchList.length == 0) ? EnumSet.allOf(State.class) : copyOf(asList(watchList));
+    }
+
 
     /**
      * {@inheritDoc}
@@ -66,8 +91,15 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      */
     @Override
     public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, VanillaSharedHashMap.Segment segment) {
+        if (!watchList.contains(PUT))
+            return;
         final long bitIndex = (segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos;
         changes.set(bitIndex);
+
+        if (notifier != null)
+            synchronized (notifier) {
+                notifier.notifyAll();
+            }
     }
 
     /**
@@ -75,7 +107,15 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      */
     @Override
     public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, VanillaSharedHashMap.Segment segment) {
+        if (!watchList.contains(REMOVE))
+            return;
         changes.set((segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos);
+
+        if (notifier != null)
+            synchronized (notifier) {
+                notifier.notifyAll();
+            }
+
     }
 
     private long offset = DirectBitSet.NOT_FOUND;
@@ -99,7 +139,6 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
         }
         return true;
     }
-
 
     public Map.Entry<K, V> nextEntry() {
 
@@ -165,7 +204,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      *
      * @param segmentInfoProvider information about the Segment
      */
-    public void setSegmentInfoProvider(SegmentInfoProvider segmentInfoProvider) {
+    public void setSegmentInfoProvider(@NotNull final SegmentInfoProvider segmentInfoProvider) {
         this.segmentInfoProvider = segmentInfoProvider;
         changes = new SingleThreadedDirectBitSet(new ByteBufferBytes(
                 ByteBuffer.allocate(1 + (int) ((segmentInfoProvider.getEntriesPerSegment() * segmentInfoProvider.getSegments().length) / 8.0))));

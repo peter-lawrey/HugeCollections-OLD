@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 import static net.openhft.collections.Alignment.NO_ALIGNMENT;
+import static net.openhft.collections.SegmentModificationIterator.State.PUT;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -60,10 +61,10 @@ public class SegmentModificationIteratorTest {
     public void testUsingHasNext() throws IOException {
 
 
-        final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator();
+        final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator(PUT);
         final SharedHashMap<CharSequence, LongValue> sharedMap = getSharedMap(5, 128, 24, NO_ALIGNMENT, segmentModificationIterator);
 
-        segmentModificationIterator.setSegmentInfoProvider(sharedMap);
+        segmentModificationIterator.setSegmentInfoProvider((SegmentInfoProvider) sharedMap);
 
         final LongValue value = DataValueClasses.newInstance(LongValue.class);
         final int initialCapacity = 1000;
@@ -103,10 +104,10 @@ public class SegmentModificationIteratorTest {
     public void testWithoutHasNext() throws IOException {
 
 
-        final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator();
+        final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator(null, PUT);
         final SharedHashMap<CharSequence, LongValue> sharedMap = getSharedMap(5, 128, 24, NO_ALIGNMENT, segmentModificationIterator);
 
-        segmentModificationIterator.setSegmentInfoProvider(sharedMap);
+        segmentModificationIterator.setSegmentInfoProvider((SegmentInfoProvider) sharedMap);
 
         final LongValue value = DataValueClasses.newInstance(LongValue.class);
         final int initialCapacity = 1000;
