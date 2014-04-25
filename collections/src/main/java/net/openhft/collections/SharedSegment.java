@@ -35,4 +35,6 @@ public interface SharedSegment<K, V> {
     void unlock();
 
     NativeBytes entry(long pos);
+
+    int getIndex();
 }

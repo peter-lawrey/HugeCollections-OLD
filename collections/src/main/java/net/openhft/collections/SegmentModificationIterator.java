@@ -90,7 +90,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, VanillaSharedHashMap.Segment segment) {
+    public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos,SharedSegment segment) {
         if (!watchList.contains(PUT))
             return;
         final long bitIndex = (segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos;
@@ -106,7 +106,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, VanillaSharedHashMap.Segment segment) {
+    public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
         if (!watchList.contains(REMOVE))
             return;
         changes.set((segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos);

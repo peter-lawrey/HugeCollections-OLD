@@ -32,11 +32,11 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, VanillaSharedHashMap.Segment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
         }
 
         @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, VanillaSharedHashMap.Segment segment) {
+        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
         }
     }, BYTES_LOGGING {
         public final Logger LOGGER = Logger.getLogger(getClass().getName());
@@ -77,12 +77,12 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, VanillaSharedHashMap.Segment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos,SharedSegment segment) {
             logOperation(map, entry, metaDataBytes, added ? " +put " : " put ");
         }
 
         @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, VanillaSharedHashMap.Segment segment) {
+        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
             logOperation(map, entry, metaDataBytes, " remove ");
         }
     }, KEY_VALUE_LOGGING {
@@ -100,12 +100,12 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, VanillaSharedHashMap.Segment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
             LOGGER.info(map.file() + " put " + key + " = " + value);
         }
 
         @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, VanillaSharedHashMap.Segment segment) {
+        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
             LOGGER.info(map.file() + " remove " + key + " was " + value);
         }
     }
