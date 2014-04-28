@@ -682,8 +682,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
@@ -707,7 +706,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 long offset =
                         putEntryConsideringByteableValue(keyBytes, usingValue);
                 incrementSize();
-                notifyPut(offset, true, key, usingValue, pos);
+                notifyPut(offset, true, key, usingValue, posFromOffset(offset));
                 return usingValue;
             } finally {
                 unlock();
@@ -751,8 +750,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -770,7 +768,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         // putValue may relocate entry and change offset
                         offset = putValue(pos, offset, entry, valueLenPos,
                                 entryEndAddr, getValueAsBytes(value));
-                        notifyPut(offset, false, key, value, pos);
+                        notifyPut(offset, false, key, value,
+                                posFromOffset(offset));
                         return prevValue;
                     } else {
                         return putReturnsNull ? null : readValue(entry, null);
@@ -929,8 +928,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -961,8 +959,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
                     Bytes entry = entry(offsetFromPos(pos));
                     if (keyEquals(keyBytes, keyLen, entry))
                         return true;
@@ -989,8 +986,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -1007,7 +1003,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         // putValue may relocate entry and change offset
                         offset = putValue(pos, offset, entry, valueLenPos,
                                 entryEndAddr, getValueAsBytes(newValue));
-                        notifyPut(offset, false, key, newValue, pos);
+                        notifyPut(offset, false, key, newValue,
+                                posFromOffset(offset));
                         return valueRead;
                     }
                     return null;
@@ -1154,8 +1151,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         void checkConsistency() {
             lock();
             try {
-                int pos = 0;
-                while ((pos = (int) freeList.nextSetBit(pos)) >= 0) {
+                for (int pos = 0; (pos = (int) freeList.nextSetBit(pos)) >= 0;) {
                     PosPresentOnce check = new PosPresentOnce(pos);
                     hashLookup.forEach(check);
                     if (check.count != 1)
