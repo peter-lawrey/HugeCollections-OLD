@@ -16,22 +16,25 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared;
+package net.openhft.collections;
+
+import net.openhft.lang.io.NativeBytes;
+
+import java.util.Map;
 
 /**
- * can either be a writer index or a reader index
+ * Allow access to the Segments that user used to make up the shared map, these methods should be used with exceptional caution
+ * and were initially introduce to facilitate remote map replication.
  */
-public interface Index {
+public interface SharedSegment<K, V> {
 
-    /**
-     * if this is being used for a producer then it will setReadLocation, if its being used by a producer it will setWriteLocation
-     *
-     * @param index the index to be set
-     */
-    void setNextLocation(int index);
+    void lock();
 
-    /**
-     * get the index where the data is stored in the byte buffer
-     */
-    int getWriterLocation();
+    Map.Entry<K, V> getEntry(int pos);
+
+    void unlock();
+
+    NativeBytes entry(long pos);
+
+    int getIndex();
 }

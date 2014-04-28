@@ -16,22 +16,18 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared;
+package net.openhft.collections;
 
 /**
- * can either be a writer index or a reader index
+ * @author Rob Austin.
  */
-public interface Index {
+public interface SegmentInfoProvider<S> {
 
     /**
-     * if this is being used for a producer then it will setReadLocation, if its being used by a producer it will setWriteLocation
-     *
-     * @param index the index to be set
+     * @return the number of Entries Per Segment
      */
-    void setNextLocation(int index);
+    int getEntriesPerSegment();
 
-    /**
-     * get the index where the data is stored in the byte buffer
-     */
-    int getWriterLocation();
+    SharedSegment[] getSegments();
+
 }

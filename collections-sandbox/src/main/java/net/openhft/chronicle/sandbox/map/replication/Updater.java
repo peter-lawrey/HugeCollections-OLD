@@ -16,22 +16,16 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared;
+package net.openhft.chronicle.sandbox.map.replication;
+
+import java.nio.ByteBuffer;
 
 /**
- * can either be a writer index or a reader index
+ * @author Rob Austin.
  */
-public interface Index {
+public interface Updater {
 
-    /**
-     * if this is being used for a producer then it will setReadLocation, if its being used by a producer it will setWriteLocation
-     *
-     * @param index the index to be set
-     */
-    void setNextLocation(int index);
+    // the data that is send over the socket
+    public ByteBuffer getNextPayload(ByteBuffer targetBuffer) throws InterruptedException;
 
-    /**
-     * get the index where the data is stored in the byte buffer
-     */
-    int getWriterLocation();
 }

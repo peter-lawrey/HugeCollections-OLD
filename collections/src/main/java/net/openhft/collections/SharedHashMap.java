@@ -22,8 +22,8 @@ import java.util.concurrent.ConcurrentMap;
 
 public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
     /**
-     * @see java.util.Map size()
      * @return size as a long.
+     * @see java.util.Map size()
      */
     long longSize();
 

@@ -1,12 +1,14 @@
 /*
- * Copyright 2013 Peter Lawrey
- *
+ * Copyright 2014 Higher Frequency Trading
+ * <p/>
+ * http://www.higherfrequencytrading.com
+ * <p/>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,6 +26,7 @@ import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,8 +37,9 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
-    private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
+public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
+    private static final Logger LOGGER = Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+    public static final int META_DATA_SIZE = 8;
 
     /**
      * @param size positive number
@@ -95,12 +99,14 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     // rather than as returning the Object can be expensive for something you probably don't use.
     private final boolean putReturnsNull;
     private final boolean removeReturnsNull;
+    private final boolean canReplicate;
 
     transient Set<Map.Entry<K, V>> entrySet;
 
 
-    public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
-                                Class<K> kClass, Class<V> vClass) throws IOException {
+    public VanillaSharedReplicatedHashMap(VanillaSharedReplicatedHashMapBuilder builder,
+                                          File file,
+                                          Class<K> kClass, Class<V> vClass) throws IOException {
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
 
         this.kClass = kClass;
@@ -117,6 +123,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.generatedValueType = builder.generatedValueType();
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
+        this.canReplicate = builder.canReplicate();
 
         int segments = builder.actualSegments();
         int entriesPerSegment = builder.actualEntriesPerSegment();
@@ -128,8 +135,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
-        Segment[] ss = (VanillaSharedHashMap.Segment[])
-                new VanillaSharedHashMap.Segment[segments];
+        Segment[] ss = (VanillaSharedReplicatedHashMap.Segment[])
+                new VanillaSharedReplicatedHashMap.Segment[segments];
         this.segments = ss;
 
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
@@ -226,7 +233,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         ms = null;
     }
 
-    public VanillaSharedHashMap.Segment[] getSegments() {
+    public VanillaSharedReplicatedHashMap.Segment[] getSegments() {
         return segments;
     }
 
@@ -682,13 +689,31 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
+
+
+                    // todo replication
+                    if (canReplicate) {
+
+                        final long readTimeStamp = entry.readLong();
+
+                        // if the readTimeStamp is newer then we'll reject this put()
+                        if (readTimeStamp > System.currentTimeMillis()) {
+                            return null;
+                        }
+
+                        // was deleted
+                        if (entry.readBoolean())
+                            return null;
+                    }
+
                     V v = readValue(entry, usingValue);
                     notifyGet(offset, key, v);
                     return v;
@@ -706,7 +731,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 long offset =
                         putEntryConsideringByteableValue(keyBytes, usingValue);
                 incrementSize();
-                notifyPut(offset, true, key, usingValue, posFromOffset(offset));
+                notifyPut(offset, true, key, usingValue, pos);
                 return usingValue;
             } finally {
                 unlock();
@@ -746,18 +771,43 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent) {
+
+            long timeStamp = 0;
+
+
             lock();
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
+
+
                     if (replaceIfPresent) {
+
+                        if (canReplicate) {
+
+                            long readTimeStamp = entry.readLong();
+
+                            // if the readTimeStamp is newer then we'll reject this put()
+                            if (readTimeStamp > System.currentTimeMillis()) {
+                                return null;
+                            }
+
+                            entry.skip(-8);
+
+                            entry.writeLong(System.currentTimeMillis());
+
+                            // we the skip a byte, for the isDeleted field
+                            entry.writeBoolean(false);
+                        }
+
                         long valueLenPos = entry.position();
                         long valueLen = readValueLen(entry);
                         long entryEndAddr = entry.positionAddr() + valueLen;
@@ -768,13 +818,26 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         // putValue may relocate entry and change offset
                         offset = putValue(pos, offset, entry, valueLenPos,
                                 entryEndAddr, getValueAsBytes(value));
-                        notifyPut(offset, false, key, value,
-                                posFromOffset(offset));
+                        notifyPut(offset, false, key, value, pos);
                         return prevValue;
                     } else {
-                        return putReturnsNull ? null : readValue(entry, null);
+                        if (putReturnsNull)
+                            return null;
+                        if (canReplicate) {
+                            long readTimeStamp = entry.readLong();
+
+                            // if the readTimeStamp is newer then we'll reject this put()
+                            if (readTimeStamp > System.currentTimeMillis()) {
+                                return null;
+                            }
+                            entry.skip(1);
+
+                        }
+
+                        return readValue(entry, null);
                     }
                 }
+
                 // key is not found
                 long offset = putEntry(keyBytes, value);
                 incrementSize();
@@ -815,6 +878,13 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
             entry.writeStopBit(keyLen);
             entry.write(keyBytes);
+
+            if (canReplicate) {
+                entry.writeLong(System.currentTimeMillis());
+
+                // we the skip a byte, for the isDeleted field
+                entry.writeBoolean(false);
+            }
 
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
@@ -928,22 +998,44 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
+
+                    long timeStampPos = 0;
+                    if (canReplicate) {
+                        timeStampPos = entry.position();
+                        long readTimeStamp = entry.readLong();
+
+                        // if the readTimeStamp is newer then we'll reject this put()
+                        if (readTimeStamp > System.currentTimeMillis()) {
+                            return null;
+                        }
+
+                        entry.skip(1);
+                    }
+
+
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
                     V valueRemoved = expectedValue != null || !removeReturnsNull
                             ? readValue(entry, null, valueLen) : null;
-                    if (expectedValue != null && !expectedValue.equals(valueRemoved))
+                    if (expectedValue != null && !expectedValue.equals(valueRemoved)) {
                         return null;
+                    }
                     hashLookup.removePrevPos();
                     decrementSize();
-                    free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
+
+                    if (!canReplicate) {
+                        free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
+                    }
+                    entry.writeLong(timeStampPos, System.currentTimeMillis());
+                    entry.writeBoolean(timeStampPos + 8, true);
                     notifyRemoved(offset, key, valueRemoved, pos);
                     return valueRemoved;
                 }
@@ -959,7 +1051,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     Bytes entry = entry(offsetFromPos(pos));
                     if (keyEquals(keyBytes, keyLen, entry))
                         return true;
@@ -986,13 +1079,30 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                int pos;
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
+
+
+                    if (canReplicate) {
+                        long readTimeStamp = entry.readLong();
+
+                        // if the readTimeStamp is newer then we'll reject this put()
+                        if (readTimeStamp > System.currentTimeMillis()) {
+                            return null;
+                        }
+
+                        // if was deleted run null
+                        if (entry.readBoolean())
+                            return null;
+
+                    }
+
                     long valueLenPos = entry.position();
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
@@ -1003,8 +1113,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                         // putValue may relocate entry and change offset
                         offset = putValue(pos, offset, entry, valueLenPos,
                                 entryEndAddr, getValueAsBytes(newValue));
-                        notifyPut(offset, false, key, newValue,
-                                posFromOffset(offset));
+                        notifyPut(offset, false, key, newValue, pos);
                         return valueRead;
                     }
                     return null;
@@ -1020,20 +1129,20 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private void notifyPut(long offset, boolean added, K key, V value, final long pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, added, key, value, pos, this);
+                eventListener.onPut(VanillaSharedReplicatedHashMap.this, tmpBytes, metaDataBytes, added, key, value, pos, this);
             }
         }
 
         private void notifyGet(long offset, K key, V value) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, key, value);
+                eventListener.onGetFound(VanillaSharedReplicatedHashMap.this, tmpBytes, metaDataBytes, key, value);
             }
         }
 
         private V notifyMissed(Bytes keyBytes, K key, V usingValue) {
             if (eventListener != SharedMapEventListeners.NOP) {
-                return eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes, key, usingValue);
+                return eventListener.onGetMissing(VanillaSharedReplicatedHashMap.this, keyBytes, key, usingValue);
             }
             return null;
         }
@@ -1041,7 +1150,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         private void notifyRemoved(long offset, K key, V value, final int pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, key, value, pos, this);
+                eventListener.onRemove(VanillaSharedReplicatedHashMap.this, tmpBytes, metaDataBytes, key, value, pos, this);
             }
         }
 
@@ -1132,11 +1241,30 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             hashLookup.forEach(entryConsumer);
         }
 
+        /**
+         * returns a null value if the entry has been deleted
+         *
+         * @param pos
+         * @return a null value if the entry has been deleted
+         */
+        @Nullable
+
+
         public Entry<K, V> getEntry(int pos) {
             long offset = offsetFromPos(pos);
             NativeBytes entry = entry(offset);
             entry.readStopBit();
             K key = entry.readInstance(kClass, null); //todo: readUsing?
+
+            if (canReplicate) {
+                // skip timestamp
+                entry.skip(8);
+                boolean isDeleted = entry.readBoolean();
+
+                if (isDeleted)
+                    return null;
+            }
+
 
             V value = readValue(entry, null); //todo: reusable container
 
@@ -1145,13 +1273,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             return new WriteThroughEntry(key, value);
         }
 
+
         /**
          * Check there is no garbage in freeList.
          */
         void checkConsistency() {
             lock();
             try {
-                for (int pos = 0; (pos = (int) freeList.nextSetBit(pos)) >= 0;) {
+                int pos = 0;
+                while ((pos = (int) freeList.nextSetBit(pos)) >= 0) {
                     PosPresentOnce check = new PosPresentOnce(pos);
                     hashLookup.forEach(check);
                     if (check.count != 1)
@@ -1204,7 +1334,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         public void remove() {
             if (lastReturned == null) throw new IllegalStateException();
-            VanillaSharedHashMap.this.remove(lastReturned.getKey());
+            VanillaSharedReplicatedHashMap.this.remove(lastReturned.getKey());
             lastReturned = null;
         }
 
@@ -1258,7 +1388,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
             try {
-                V v = VanillaSharedHashMap.this.get(e.getKey());
+                V v = VanillaSharedReplicatedHashMap.this.get(e.getKey());
                 return v != null && v.equals(e.getValue());
             } catch (ClassCastException ex) {
                 return false;
@@ -1274,7 +1404,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 Object key = e.getKey();
                 Object value = e.getValue();
-                return VanillaSharedHashMap.this.remove(key, value);
+                return VanillaSharedReplicatedHashMap.this.remove(key, value);
             } catch (ClassCastException ex) {
                 return false;
             } catch (NullPointerException ex) {
@@ -1283,15 +1413,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         public int size() {
-            return VanillaSharedHashMap.this.size();
+            return VanillaSharedReplicatedHashMap.this.size();
         }
 
         public boolean isEmpty() {
-            return VanillaSharedHashMap.this.isEmpty();
+            return VanillaSharedReplicatedHashMap.this.isEmpty();
         }
 
         public void clear() {
-            VanillaSharedHashMap.this.clear();
+            VanillaSharedReplicatedHashMap.this.clear();
         }
     }
 

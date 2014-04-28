@@ -54,8 +54,10 @@ public interface SharedMapEventListener<K, V> {
      * @param added         if this is a new entry
      * @param key           looked up
      * @param value         set for key
+     * @param pos           the position of this entry in the segment
+     * @param segment       the segment that the entry is store in
      */
-    void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes, boolean added, K key, V value);
+    void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes, boolean added, K key, V value, long pos, SharedSegment segment);
 
     /**
      * This is called when an entry is removed. Misses are not notified.
@@ -65,6 +67,8 @@ public interface SharedMapEventListener<K, V> {
      * @param metaDataBytes length of meta data
      * @param key           removed
      * @param value         removed
+     * @param pos           the position of this entry in the segment
+     * @param segment       the segment that the entry is store in
      */
-    void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes, K key, V value);
+    void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes, K key, V value, int pos, SharedSegment segment);
 }
