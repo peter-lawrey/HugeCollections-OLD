@@ -37,8 +37,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, Segm
      *
      * @param key        key with which the specified value is to be associated
      * @param value      value to be associated with the specified key
-     * @param timeStamp  timestamp in milliseconds, that the put() occurred
      * @param identifier a unique identifier for a replicating node
+     * @param timeStamp  timestamp in milliseconds, that the put() occurred
      * @return
      * @throws UnsupportedOperationException if the <tt>put</tt> operation
      *                                       is not supported by this map
@@ -52,7 +52,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, Segm
      *                                       <p/>
      *                                       /**
      */
-    public V put(K key, V value, long timeStamp, byte identifier);
+    public V put(K key, V value, byte identifier, long timeStamp);
 
     /**
      * Used in conjunction with map replication, all remove() events that originate from a remote node will be processed using this method

@@ -285,15 +285,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      */
     @Override
     public V put(K key, V value) {
-        return put0(key, value, true, timeProvider.currentTimeMillis(), localIdentifier);
+        return put0(key, value, true, localIdentifier, timeProvider.currentTimeMillis());
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public V put(K key, V value, long timeStamp, byte identifier) {
-        return put0(key, value, true, timeStamp, identifier);
+    public V put(K key, V value, byte identifier, long timeStamp) {
+        return put0(key, value, true, identifier, timeStamp);
     }
 
     /**
@@ -301,10 +301,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      */
     @Override
     public V putIfAbsent(K key, V value) {
-        return put0(key, value, false, timeProvider.currentTimeMillis(), localIdentifier);
+        return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
-    private V put0(K key, V value, boolean replaceIfPresent, long timeStamp, final byte identifier) {
+    private V put0(K key, V value, boolean replaceIfPresent, final byte identifier, long timeStamp) {
         checkKey(key);
         checkValue(value);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -359,7 +359,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].acquire(keyBytes, key, value, segmentHash, create);
+        return segments[segmentNum].acquire(keyBytes, key, value, segmentHash, create, timeProvider.currentTimeMillis());
     }
 
     /**
@@ -499,7 +499,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].replace(keyBytes, key, existingValue, newValue, segmentHash);
+        return segments[segmentNum].replace(keyBytes, key, existingValue, newValue, segmentHash, timeProvider.currentTimeMillis());
     }
 
     /**
@@ -705,12 +705,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
          * created instance of value class, if {@code usingValue == null},
          * is put into this Segment for the key.</li></ol>
          *
-         * @param keyBytes serialized {@code key}
-         * @param hash2    a hash code related to the {@code keyBytes}
+         * @param timestamp
+         * @param keyBytes  serialized {@code key}
+         * @param hash2     a hash code related to the {@code keyBytes}
          * @return the value which is finally associated with the given key in
          * this Segment after execution of this method, or {@code null}.
          */
-        V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create) {
+        V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create, final long timestamp) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -724,7 +725,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     // key is found
                     entry.skip(keyLen);
 
-                    if (canReplicate && shouldTerminate(entry))
+                    if (canReplicate && shouldTerminate(entry, timestamp))
                         return null;
 
                     V v = readValue(entry, usingValue);
@@ -808,7 +809,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                             final long timeStampPos = entry.positionAddr();
 
-                            if (shouldTerminate(entry))
+                            if (shouldTerminate(entry, timestamp))
                                 return null;
 
                             entry.positionAddr(timeStampPos);
@@ -831,7 +832,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     } else {
                         if (putReturnsNull)
                             return null;
-                        if (canReplicate && shouldTerminate(entry))
+                        if (canReplicate && shouldTerminate(entry, timestamp))
                             return null;
 
                         return readValue(entry, null);
@@ -854,19 +855,21 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
          * we sometime will reject put() and removes()  when comparing times stamps with remote systems
          *
          * @param entry
+         * @param providedTimestamp
          * @return
          */
-        private boolean shouldTerminate(NativeBytes entry) {
+        private boolean shouldTerminate(NativeBytes entry, long providedTimestamp) {
 
-            final long readTimeStamp = entry.readLong();
+            final long lastModifiedTimeStamp = entry.readLong();
 
             // if the readTimeStamp is newer then we'll reject this put() or they are the same and have a larger id
-            if (readTimeStamp < timeProvider.currentTimeMillis()) {
+
+            if (lastModifiedTimeStamp < providedTimestamp) {
                 entry.skip(1); // skip the byte used for the identifier
                 return false;
             }
 
-            if (readTimeStamp > timeProvider.currentTimeMillis())
+             if (lastModifiedTimeStamp > providedTimestamp)
                 return true;
 
             return entry.readByte() > localIdentifier;
@@ -1040,7 +1043,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     long timeStampPos = 0;
                     if (canReplicate) {
                         timeStampPos = entry.position();
-                        if (shouldTerminate(entry))
+                        if (shouldTerminate(entry, timestamp))
                             return null;
 
                     }
@@ -1103,10 +1106,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
          * to the specified key is equal to {@code expectedValue}
          * or {@code expectedValue == null}.
          *
-         * @param hash2 a hash code related to the {@code keyBytes}
+         * @param hash2     a hash code related to the {@code keyBytes}
+         * @param timestamp
          * @return the replaced value or {@code null} if the value was not replaced
          */
-        V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2) {
+        V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2, final long timestamp) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -1123,7 +1127,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                     if (canReplicate) {
 
-                        if (shouldTerminate(entry)) {
+                        if (shouldTerminate(entry, timestamp)) {
                             return null;
                         }
 
