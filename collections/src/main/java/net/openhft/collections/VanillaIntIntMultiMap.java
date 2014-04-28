@@ -183,13 +183,29 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
+    public long getSearchPosition() {
+        return searchPos;
+    }
+
     @Override
     public void removePrevPos() {
         removePos((searchPos - ENTRY_SIZE) & capacityMask2);
     }
 
     @Override
+    public void removeSearchPos(long searchPos) {
+        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
+    }
+
+
+    @Override
     public void replacePrevPos(int newValue) {
+        replacePos(searchPos, newValue, searchHash);
+    }
+
+
+    @Override
+    public void replacePos(long searchPos, int newValue, final int searchHash) {
         long prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
@@ -197,10 +213,20 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         bytes.writeLong(prevPos, entry);
     }
 
+
     @Override
-    public void putAfterFailedSearch(int value) {
+    public void putAfterFailedSearch(long searchPos, int value, final int searchHash) {
         long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
         bytes.writeLong(searchPos, entry);
+    }
+
+    @Override
+    public void putAfterFailedSearch(int value) {
+        putAfterFailedSearch(searchPos, value, searchHash);
+    }
+
+    public int getSearchHash() {
+        return searchHash;
     }
 
     @Override

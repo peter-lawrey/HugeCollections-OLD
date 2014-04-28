@@ -543,7 +543,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         private final NativeBytes bytes;
         private final int index;
         private final MultiStoreBytes tmpBytes = new MultiStoreBytes();
-        private final IntIntMultiMap hashLookup;
+        private final IntIntMultiMap hashLookupLiveAndDelted;
+        private final IntIntMultiMap hashLookupLiveOnly;
         private final SingleThreadedDirectBitSet freeList;
         private int nextPosToSearchFrom = 0;
         private final long entriesOffset;
@@ -560,8 +561,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             final NativeBytes iimmapBytes = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
             iimmapBytes.load();
-            hashLookup = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
+            hashLookupLiveAndDelted = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
+            hashLookupLiveOnly = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
+
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
             start += numberOfBitSets() * sizeOfBitSets();
@@ -688,9 +691,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             lock();
             try {
                 long keyLen = keyBytes.remaining();
-                hashLookup.startSearch(hash2);
+                hashLookupLiveOnly.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
@@ -706,12 +709,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                         // if the readTimeStamp is newer then we'll reject this put()
                         if (readTimeStamp > System.currentTimeMillis()) {
+                            hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                             return null;
                         }
 
-                        // was deleted
-                        if (entry.readBoolean())
-                            return null;
+
                     }
 
                     V v = readValue(entry, usingValue);
@@ -778,9 +780,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             lock();
             try {
                 long keyLen = keyBytes.remaining();
-                hashLookup.startSearch(hash2);
+                hashLookupLiveAndDelted.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                while ((pos = hashLookupLiveAndDelted.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -797,15 +799,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                             // if the readTimeStamp is newer then we'll reject this put()
                             if (readTimeStamp > System.currentTimeMillis()) {
+                                // since this entry has expired we'll remove it from the live set
+                                hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                                 return null;
                             }
 
                             entry.skip(-8);
-
                             entry.writeLong(System.currentTimeMillis());
 
-                            // we the skip a byte, for the isDeleted field
-                            entry.writeBoolean(false);
+
                         }
 
                         long valueLenPos = entry.position();
@@ -824,13 +826,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         if (putReturnsNull)
                             return null;
                         if (canReplicate) {
-                            long readTimeStamp = entry.readLong();
 
                             // if the readTimeStamp is newer then we'll reject this put()
-                            if (readTimeStamp > System.currentTimeMillis()) {
+                            if (entry.readLong() > System.currentTimeMillis()) {
                                 return null;
                             }
-                            entry.skip(1);
 
                         }
 
@@ -879,12 +879,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             entry.writeStopBit(keyLen);
             entry.write(keyBytes);
 
-            if (canReplicate) {
+            if (canReplicate)
                 entry.writeLong(System.currentTimeMillis());
-
-                // we the skip a byte, for the isDeleted field
-                entry.writeBoolean(false);
-            }
 
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
@@ -897,7 +893,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                 valueAsByteable.bytes(bytes, valueOffset);
             }
 
-            hashLookup.putAfterFailedSearch(pos);
+            final long position = this.hashLookupLiveAndDelted.getSearchPosition();
+            final int searchHash = this.hashLookupLiveAndDelted.getSearchHash();
+
+            // we have to add it both to the live
+            this.hashLookupLiveAndDelted.putAfterFailedSearch(pos);
+            this.hashLookupLiveOnly.putAfterFailedSearch(position, pos, searchHash);
             return offset;
         }
 
@@ -997,9 +998,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             lock();
             try {
                 long keyLen = keyBytes.remaining();
-                hashLookup.startSearch(hash2);
+                hashLookupLiveOnly.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -1012,14 +1013,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         timeStampPos = entry.position();
                         long readTimeStamp = entry.readLong();
 
-                        // if the readTimeStamp is newer then we'll reject this put()
+                        // if the readTimeStamp is newer then we'll reject the remove()
                         if (readTimeStamp > System.currentTimeMillis()) {
                             return null;
                         }
 
-                        entry.skip(1);
                     }
 
+                    long valueLenPos = entry.position();
 
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
@@ -1028,14 +1029,21 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     if (expectedValue != null && !expectedValue.equals(valueRemoved)) {
                         return null;
                     }
-                    hashLookup.removePrevPos();
+
+                    hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+
                     decrementSize();
 
-                    if (!canReplicate) {
+                    if (canReplicate) {
+
+                        entry.position(timeStampPos);
+                        entry.writeLong(System.currentTimeMillis());
+
+                        // set the value len to zero
+                        entry.writeStopBit(0);
+                    } else
                         free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
-                    }
-                    entry.writeLong(timeStampPos, System.currentTimeMillis());
-                    entry.writeBoolean(timeStampPos + 8, true);
+
                     notifyRemoved(offset, key, valueRemoved, pos);
                     return valueRemoved;
                 }
@@ -1050,9 +1058,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             lock();
             try {
                 long keyLen = keyBytes.remaining();
-                hashLookup.startSearch(hash2);
+                hashLookupLiveOnly.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
                     Bytes entry = entry(offsetFromPos(pos));
                     if (keyEquals(keyBytes, keyLen, entry))
                         return true;
@@ -1078,9 +1086,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             lock();
             try {
                 long keyLen = keyBytes.remaining();
-                hashLookup.startSearch(hash2);
+                hashLookupLiveOnly.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookup.nextPos()) >= 0) {
+                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -1090,16 +1098,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
 
                     if (canReplicate) {
-                        long readTimeStamp = entry.readLong();
 
                         // if the readTimeStamp is newer then we'll reject this put()
-                        if (readTimeStamp > System.currentTimeMillis()) {
+                        if (entry.readLong() > System.currentTimeMillis()) {
+                            hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                             return null;
                         }
-
-                        // if was deleted run null
-                        if (entry.readBoolean())
-                            return null;
 
                     }
 
@@ -1198,7 +1202,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     pos = alloc(newSizeInBlocks);
                     // putValue() is called from put() and replace()
                     // after successful search by key
-                    hashLookup.replacePrevPos(pos);
+                    final long position = hashLookupLiveAndDelted.getSearchPosition();
+                    final int searchHash = hashLookupLiveAndDelted.getSearchHash();
+                    hashLookupLiveAndDelted.replacePos(position, pos, searchHash);
+                    hashLookupLiveOnly.replacePos(position, pos, searchHash);
+
                     offset = offsetFromPos(pos);
                     // Moving metadata, key stop bit and key.
                     // Don't want to fiddle with pseudo-buffers for this,
@@ -1228,8 +1236,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         void clear() {
             lock();
             try {
-                hashLookup.clear();
-                freeList.clear();
+
+                hashLookupLiveOnly.clear();
+                //    freeList.clear();
                 resetSize();
             } finally {
                 unlock();
@@ -1238,7 +1247,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         }
 
         void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
-            hashLookup.forEach(entryConsumer);
+            hashLookupLiveOnly.forEach(entryConsumer);
         }
 
         /**
@@ -1259,10 +1268,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             if (canReplicate) {
                 // skip timestamp
                 entry.skip(8);
-                boolean isDeleted = entry.readBoolean();
-
-                if (isDeleted)
-                    return null;
             }
 
 
@@ -1283,7 +1288,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                 int pos = 0;
                 while ((pos = (int) freeList.nextSetBit(pos)) >= 0) {
                     PosPresentOnce check = new PosPresentOnce(pos);
-                    hashLookup.forEach(check);
+                    hashLookupLiveAndDelted.forEach(check);
                     if (check.count != 1)
                         throw new AssertionError();
                     long offset = offsetFromPos(pos);

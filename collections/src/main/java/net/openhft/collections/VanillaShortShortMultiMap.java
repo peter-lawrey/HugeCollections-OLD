@@ -172,24 +172,51 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
-    @Override
-    public void removePrevPos() {
-        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
+    public long getSearchPosition() {
+        return searchPos;
     }
 
     @Override
+    public void removeSearchPos(long searchPos) {
+        removePos(((int) searchPos - ENTRY_SIZE) & capacityMask2);
+    }
+
+
+    @Override
+    public void removePrevPos() {
+        removeSearchPos(searchPos);
+    }
+
+
+    @Override
     public void replacePrevPos(int newValue) {
+        replacePos(searchPos, newValue, searchHash);
+    }
+
+
+    @Override
+    public void replacePos(long searchPos, int newValue, final int searchHash) {
         checkValue(newValue);
-        int prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
+        int prevPos = (((int) searchPos - ENTRY_SIZE) & capacityMask2);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
         bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
     }
 
+
     @Override
-    public void putAfterFailedSearch(int value) {
+    public void putAfterFailedSearch(long searchPos, int value, final int searchHash) {
         checkValue(value);
         bytes.writeInt(searchPos, ((searchHash << 16) | value));
+    }
+
+    @Override
+    public void putAfterFailedSearch(int value) {
+        putAfterFailedSearch(searchPos, value, searchHash);
+    }
+
+    public int getSearchHash() {
+        return searchHash;
     }
 
     @Override
