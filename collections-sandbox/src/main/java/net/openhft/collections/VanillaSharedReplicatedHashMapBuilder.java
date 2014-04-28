@@ -37,7 +37,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return entryAndValueAlignment().alignSize(entrySize() + META_BYTES_SIZE);
     }
 
-    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
+    public <K, V> VanillaSharedReplicatedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         VanillaSharedReplicatedHashMapBuilder builder = clone();
 
         for (int i = 0; i < 10; i++) {
@@ -224,8 +224,9 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private TimeProvider timeProvider = new TimeProvider();
 
-    public void setTimeProvider(TimeProvider timeProvider) {
+    public VanillaSharedReplicatedHashMapBuilder timeProvider(TimeProvider timeProvider) {
         this.timeProvider = timeProvider;
+        return this;
     }
 
     public TimeProvider getTimeProvider() {

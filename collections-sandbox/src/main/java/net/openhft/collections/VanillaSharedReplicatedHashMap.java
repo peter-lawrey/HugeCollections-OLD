@@ -799,7 +799,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         if (canReplicate) {
 
                             long readTimeStamp = entry.readLong();
-
+                            final long timeStampPos = entry.position();
                             // if the readTimeStamp is newer then we'll reject this put()
                             if (readTimeStamp > timeProvider.currentTimeMillis()) {
                                 // since this entry has expired we'll remove it from the live set
@@ -807,9 +807,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                                 return null;
                             }
 
-                            entry.skip(-8);
-                            entry.writeLong(timeProvider.currentTimeMillis());
-
+                            entry.writeLong(timeStampPos, timeProvider.currentTimeMillis());
 
                         }
 
