@@ -26,10 +26,11 @@ import java.io.IOException;
 import java.util.*;
 
 /**
+ * This is an example of how you can use a wrapper class over a shared hashmap, it was initially implemented as a possible candidate for map replication
+ *
  * @author Rob Austin.
  */
-public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMap<K, V> {
-
+public class ReplicatedShareHashMapWrapper<K extends Object, V> implements SharedHashMap<K, V> {
 
     @NotNull
     private final MapModifier<K, V> mapModifier;
@@ -39,7 +40,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
     private EntrySet entrySet = null;
     private long timestamp;
 
-    public ReplicatedShareHashMap(SharedHashMap<K, MetaData<V>> delegate, final MapModifier<K, V> mapModifier, Class<V> vClass) {
+    public ReplicatedShareHashMapWrapper(SharedHashMap<K, MetaData<V>> delegate, final MapModifier<K, V> mapModifier, Class<V> vClass) {
         this.delegate = delegate;
         this.mapModifier = mapModifier;
         this.vClass = vClass;
@@ -215,7 +216,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
     @Override
     public SharedHashMapBuilder builder() {
-        return new SharedReplicatedHashMapBuilder();
+        return new ReplicatedSharedHashMapWrapperBuilder();
     }
 
     @Override
@@ -240,16 +241,13 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
-        return mapModifier.replace(key,oldValue,newValue);
+        return mapModifier.replace(key, oldValue, newValue);
     }
 
     @Override
     public V replace(K key, V value) {
         return mapModifier.replace(key, value);
     }
-
-
-
 
 
     private final class KeySet extends AbstractSet<K> {
@@ -274,7 +272,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
                 @Override
                 public void remove() {
                     if (item != null)
-                        ReplicatedShareHashMap.this.remove(item);
+                        ReplicatedShareHashMapWrapper.this.remove(item);
                     else
                         throw new IllegalStateException("Next has not yet been called.");
                 }
@@ -282,7 +280,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
         }
 
         public int size() {
-            return ReplicatedShareHashMap.this.size();
+            return ReplicatedShareHashMapWrapper.this.size();
         }
 
         public boolean contains(Object o) {
@@ -290,11 +288,11 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
         }
 
         public boolean remove(Object o) {
-            return ReplicatedShareHashMap.this.remove(o) != null;
+            return ReplicatedShareHashMapWrapper.this.remove(o) != null;
         }
 
         public void clear() {
-            ReplicatedShareHashMap.this.clear();
+            ReplicatedShareHashMapWrapper.this.clear();
         }
     }
 
@@ -332,7 +330,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
                         @Override
                         public V setValue(V value) {
-                            return ReplicatedShareHashMap.this.put(metaDataEntry.getKey(), value);
+                            return ReplicatedShareHashMapWrapper.this.put(metaDataEntry.getKey(), value);
                         }
                     };
                 }
@@ -340,7 +338,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
                 @Override
                 public void remove() {
                     if (item != null)
-                        ReplicatedShareHashMap.this.remove(item.getKey());
+                        ReplicatedShareHashMapWrapper.this.remove(item.getKey());
                     else
                         throw new IllegalStateException("Next has not yet been called.");
                 }
@@ -352,7 +350,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
             if (!(o instanceof Map.Entry))
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            V v = ReplicatedShareHashMap.this.get(e.getKey());
+            V v = ReplicatedShareHashMapWrapper.this.get(e.getKey());
             return v != null && v.equals(e.getValue());
         }
 
@@ -360,19 +358,19 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
             if (!(o instanceof Map.Entry))
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-            return ReplicatedShareHashMap.this.remove(e.getKey()) != null;
+            return ReplicatedShareHashMapWrapper.this.remove(e.getKey()) != null;
         }
 
         public int size() {
-            return ReplicatedShareHashMap.this.size();
+            return ReplicatedShareHashMapWrapper.this.size();
         }
 
         public boolean isEmpty() {
-            return ReplicatedShareHashMap.this.isEmpty();
+            return ReplicatedShareHashMapWrapper.this.isEmpty();
         }
 
         public void clear() {
-            ReplicatedShareHashMap.this.clear();
+            ReplicatedShareHashMapWrapper.this.clear();
         }
     }
 
@@ -393,19 +391,19 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
         }
 
         public int size() {
-            return ReplicatedShareHashMap.this.size();
+            return ReplicatedShareHashMapWrapper.this.size();
         }
 
         public boolean isEmpty() {
-            return ReplicatedShareHashMap.this.isEmpty();
+            return ReplicatedShareHashMapWrapper.this.isEmpty();
         }
 
         public boolean contains(Object o) {
-            return ReplicatedShareHashMap.this.containsValue(o);
+            return ReplicatedShareHashMapWrapper.this.containsValue(o);
         }
 
         public void clear() {
-            ReplicatedShareHashMap.this.clear();
+            ReplicatedShareHashMapWrapper.this.clear();
         }
     }
 

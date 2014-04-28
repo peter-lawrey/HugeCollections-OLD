@@ -18,8 +18,8 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
-import net.openhft.chronicle.sandbox.map.replication.ReplicatedShareHashMap;
-import net.openhft.chronicle.sandbox.map.replication.SharedReplicatedHashMapBuilder;
+import net.openhft.chronicle.sandbox.map.replication.ReplicatedShareHashMapWrapper;
+import net.openhft.chronicle.sandbox.map.replication.ReplicatedSharedHashMapWrapperBuilder;
 import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
 import net.openhft.collections.SharedHashMap;
 import org.junit.Test;
@@ -50,50 +50,50 @@ public class SharedReplicatedHashMapTest extends SharedJSR166TestCase {
         return file;
     }
 
-    static ReplicatedShareHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
+    static ReplicatedShareHashMapWrapper<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .entries(size)
                 .create(getPersistenceFile(), getPersistenceFile(), Integer.class, CharSequence.class, (byte) 1);
 
     }
 
-    static ReplicatedShareHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
+    static ReplicatedShareHashMapWrapper<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .entries(size)
                 .create(getPersistenceFile(), getPersistenceFile(), ArrayList.class, CharSequence.class, (byte) 1);
 
     }
 
 
-    static ReplicatedShareHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
+    static ReplicatedShareHashMapWrapper<ArrayList, CharSequence> newShmListBoolean() throws IOException {
 
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .create(getPersistenceFile(), getPersistenceFile(), ArrayList.class, CharSequence.class, (byte) 1);
 
     }
 
-    static ReplicatedShareHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
+    static ReplicatedShareHashMapWrapper<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .entries(size)
                 .create(getPersistenceFile(), getPersistenceFile(), CharSequence.class, CharSequence.class, (byte) 1);
 
     }
 
 
-    static ReplicatedShareHashMap<Integer, CharSequence> newShmIntString() throws IOException {
+    static ReplicatedShareHashMapWrapper<Integer, CharSequence> newShmIntString() throws IOException {
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .create(getPersistenceFile(), getPersistenceFile(), Integer.class, CharSequence.class, (byte) 1);
 
     }
 
-    static ReplicatedShareHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
+    static ReplicatedShareHashMapWrapper<BI, Boolean> newShmBiBoolean() throws IOException {
 
-        return new SharedReplicatedHashMapBuilder()
+        return new ReplicatedSharedHashMapWrapperBuilder()
                 .create(getPersistenceFile(), getPersistenceFile(), BI.class, Boolean.class, (byte) 1);
 
     }

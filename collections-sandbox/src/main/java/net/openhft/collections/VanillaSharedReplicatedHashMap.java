@@ -37,10 +37,11 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
+public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> implements ReplicatedSharedHashMap<K, V> {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
     public static final int META_DATA_SIZE = 8;
     private final TimeProvider timeProvider;
+    private final byte localIdentifier;
 
     /**
      * @param size positive number
@@ -134,8 +135,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
 
         this.hasher = new Hasher(segments, hashMask);
-        this.timeProvider = builder.getTimeProvider();
-
+        this.timeProvider = builder.timeProvider();
+        this.localIdentifier = builder.identifier();
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedReplicatedHashMap.Segment[])
@@ -284,7 +285,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      */
     @Override
     public V put(K key, V value) {
-        return put0(key, value, true);
+        return put0(key, value, true, timeProvider.currentTimeMillis(), localIdentifier);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public V put(K key, V value, long timeStamp, byte identifier) {
+        return put0(key, value, true, timeStamp, identifier);
     }
 
     /**
@@ -292,17 +301,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      */
     @Override
     public V putIfAbsent(K key, V value) {
-        return put0(key, value, false);
+        return put0(key, value, false, timeProvider.currentTimeMillis(), localIdentifier);
     }
 
-    private V put0(K key, V value, boolean replaceIfPresent) {
+    private V put0(K key, V value, boolean replaceIfPresent, long timeStamp, final byte identifier) {
         checkKey(key);
         checkValue(value);
         Bytes keyBytes = getKeyAsBytes(key);
         long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].put(keyBytes, key, value, segmentHash, replaceIfPresent);
+        return segments[segmentNum].put(keyBytes, key, value, segmentHash, replaceIfPresent, identifier, timeStamp);
     }
 
     private DirectBytes getKeyAsBytes(K key) {
@@ -390,8 +399,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      */
     @Override
     public V remove(final Object key) {
-        return removeIfValueIs(key, null);
+        return removeIfValueIs(key, null, localIdentifier, timeProvider.currentTimeMillis());
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public V remove(K key, V value, byte identifier, long timeStamp) {
+        return removeIfValueIs(key, null, identifier, timeStamp);
+    }
+
 
     /**
      * {@inheritDoc}
@@ -402,7 +420,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
     public boolean remove(final Object key, final Object value) {
         if (value == null)
             return false; // CHM compatibility; I would throw NPE
-        return removeIfValueIs(key, (V) value) != null;
+        return removeIfValueIs(key, (V) value, localIdentifier, timeProvider.currentTimeMillis()) != null;
     }
 
 
@@ -412,15 +430,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
      *
      * @param key           the key of the entry to remove
      * @param expectedValue null if not required
+     * @param identifier
+     * @param timestamp
      * @return true if and entry was removed
      */
-    private V removeIfValueIs(final Object key, final V expectedValue) {
+    private V removeIfValueIs(final Object key, final V expectedValue, final byte identifier, final long timestamp) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes((K) key);
         long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
-        return segments[segmentNum].remove(keyBytes, (K) key, expectedValue, segmentHash);
+        return segments[segmentNum].remove(keyBytes, (K) key, expectedValue, segmentHash, timestamp, identifier);
     }
 
     /**
@@ -704,20 +724,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     // key is found
                     entry.skip(keyLen);
 
-
-                    // todo replication
-                    if (canReplicate) {
-
-                        final long readTimeStamp = entry.readLong();
-
-                        // if the readTimeStamp is newer then we'll reject this put()
-                        if (readTimeStamp > timeProvider.currentTimeMillis()) {
-                            //  hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
-                            return null;
-                        }
-
-
-                    }
+                    if (canReplicate && shouldTerminate(entry))
+                        return null;
 
                     V v = readValue(entry, usingValue);
                     notifyGet(offset, key, v);
@@ -738,7 +746,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                 incrementSize();
                 notifyPut(offset, true, key, usingValue, pos);
                 return usingValue;
-            } finally {
+            } finally
+
+            {
                 unlock();
             }
         }
@@ -772,13 +782,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         }
 
         private long putEntryConsideringByteableValue(Bytes keyBytes, V value) {
-            return putEntry(keyBytes, value, true);
+            return putEntry(keyBytes, value, true, localIdentifier, timeProvider.currentTimeMillis());
         }
 
-        V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent) {
-
-            long timeStamp = 0;
-
+        V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent, final byte identifier, final long timestamp) {
 
             lock();
             try {
@@ -798,17 +805,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                         if (canReplicate) {
 
-                            long readTimeStamp = entry.readLong();
-                            final long timeStampPos = entry.position();
-                            // if the readTimeStamp is newer then we'll reject this put()
-                            if (readTimeStamp > timeProvider.currentTimeMillis()) {
-                                // since this entry has expired we'll remove it from the live set
-                                //          hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+
+                            final long timeStampPos = entry.positionAddr();
+
+                            if (shouldTerminate(entry))
                                 return null;
-                            }
 
-                            entry.writeLong(timeStampPos, timeProvider.currentTimeMillis());
-
+                            entry.positionAddr(timeStampPos);
+                            entry.writeLong(timestamp);
+                            entry.writeByte(identifier);
                         }
 
                         long valueLenPos = entry.position();
@@ -826,34 +831,53 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     } else {
                         if (putReturnsNull)
                             return null;
-                        if (canReplicate) {
-
-                            // if the readTimeStamp is newer then we'll reject this put()
-                            if (entry.readLong() > timeProvider.currentTimeMillis()) {
-                                return null;
-                            }
-
-                        }
+                        if (canReplicate && shouldTerminate(entry))
+                            return null;
 
                         return readValue(entry, null);
                     }
                 }
 
                 // key is not found
-                long offset = putEntry(keyBytes, value);
+                long offset = putEntry(keyBytes, value, identifier);
                 incrementSize();
                 notifyPut(offset, true, key, value, posFromOffset(offset));
                 return null;
-            } finally {
+            } finally
+
+            {
                 unlock();
             }
         }
 
-        private long putEntry(Bytes keyBytes, V value) {
-            return putEntry(keyBytes, value, false);
+        /**
+         * we sometime will reject put() and removes()  when comparing times stamps with remote systems
+         *
+         * @param entry
+         * @return
+         */
+        private boolean shouldTerminate(NativeBytes entry) {
+
+            final long readTimeStamp = entry.readLong();
+
+            // if the readTimeStamp is newer then we'll reject this put() or they are the same and have a larger id
+            if (readTimeStamp < timeProvider.currentTimeMillis()) {
+                entry.skip(1); // skip the byte used for the identifier
+                return false;
+            }
+
+            if (readTimeStamp > timeProvider.currentTimeMillis())
+                return true;
+
+            return entry.readByte() > localIdentifier;
+
         }
 
-        private long putEntry(Bytes keyBytes, V value, boolean considerByteableValue) {
+        private long putEntry(Bytes keyBytes, V value, final int remoteIdentifier) {
+            return putEntry(keyBytes, value, false, remoteIdentifier, timeProvider.currentTimeMillis());
+        }
+
+        private long putEntry(Bytes keyBytes, V value, boolean considerByteableValue, final int remoteIdentifier, final long timestamp) {
             long keyLen = keyBytes.remaining();
 
             // "if-else polymorphism" is not very beautiful, but allows to
@@ -880,8 +904,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             entry.writeStopBit(keyLen);
             entry.write(keyBytes);
 
-            if (canReplicate)
-                entry.writeLong(timeProvider.currentTimeMillis());
+            if (canReplicate) {
+                entry.writeLong(timestamp);
+                entry.writeByte(remoteIdentifier);
+            }
 
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
@@ -988,14 +1014,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
          * The entry will only be removed if {@code expectedValue} equals
          * to {@code null} or the value previously corresponding to the specified key.
          *
-         * @param keyBytes bytes of the key to remove
-         * @param hash2    a hash code related to the {@code keyBytes}
+         * @param keyBytes   bytes of the key to remove
+         * @param hash2      a hash code related to the {@code keyBytes}
+         * @param timestamp
+         * @param identifier
          * @return the value of the entry that was removed if the entry
          * corresponding to the {@code keyBytes} exists
          * and {@link #removeReturnsNull} is {@code false},
          * {@code null} otherwise
          */
-        V remove(Bytes keyBytes, K key, V expectedValue, int hash2) {
+        V remove(Bytes keyBytes, K key, V expectedValue, int hash2, final long timestamp, final byte identifier) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -1012,12 +1040,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     long timeStampPos = 0;
                     if (canReplicate) {
                         timeStampPos = entry.position();
-                        long readTimeStamp = entry.readLong();
-
-                        // if the readTimeStamp is newer then we'll reject the remove()
-                        if (readTimeStamp > timeProvider.currentTimeMillis()) {
+                        if (shouldTerminate(entry))
                             return null;
-                        }
 
                     }
 
@@ -1036,7 +1060,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     if (canReplicate) {
 
                         entry.position(timeStampPos);
-                        entry.writeLong(timeProvider.currentTimeMillis());
+                        entry.writeLong(timestamp);
+                        entry.writeByte(identifier);
 
                         // set the value len to zero
                         //entry.writeStopBit(0);
@@ -1098,9 +1123,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
                     if (canReplicate) {
 
-                        // if the readTimeStamp is newer then we'll reject this put()
-                        if (entry.readLong() > timeProvider.currentTimeMillis()) {
-                            hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+                        if (shouldTerminate(entry)) {
                             return null;
                         }
 
@@ -1265,8 +1288,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             K key = entry.readInstance(kClass, null); //todo: readUsing?
 
             if (canReplicate) {
-                // skip timestamp
-                entry.skip(8);
+                // skip timestamp and id
+                entry.skip(9);
             }
 
 

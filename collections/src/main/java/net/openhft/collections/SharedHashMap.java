@@ -56,4 +56,5 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
      * @return The file or directory for this SharedHashMap
      */
     File file();
+
 }

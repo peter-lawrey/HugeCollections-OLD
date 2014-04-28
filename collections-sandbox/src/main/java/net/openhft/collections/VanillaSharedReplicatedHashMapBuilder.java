@@ -28,6 +28,7 @@ import java.io.IOException;
 public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
 
     public static final int META_BYTES_SIZE = 16;
+    private byte identifier = 1;
 
     public boolean canReplicate() {
         return true;
@@ -229,7 +230,16 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return this;
     }
 
-    public TimeProvider getTimeProvider() {
+    public TimeProvider timeProvider() {
         return timeProvider;
     }
+
+    public byte identifier() {
+        return identifier;
+    }
+
+    public void identifier(byte identifier) {
+        this.identifier = identifier;
+    }
+
 }

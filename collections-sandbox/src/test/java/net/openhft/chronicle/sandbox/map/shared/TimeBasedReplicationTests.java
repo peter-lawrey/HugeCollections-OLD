@@ -58,8 +58,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -69,8 +69,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
 
@@ -88,8 +88,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -100,8 +100,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
     }
@@ -118,8 +118,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -130,8 +130,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
     }
@@ -148,8 +148,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -160,8 +160,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
     }
@@ -178,8 +178,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -189,8 +189,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
     }
@@ -207,8 +207,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we do a put at the current time
         map.put("key-1", "value-1");
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
 
         // now test assume that we receive a late update to the map, the following update should be ignored
         late(timeProvider);
@@ -216,8 +216,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
 
         // we'll now flip the time back to the current in order to do the read the result
         current(timeProvider);
-        assertEquals(map.size(), 1);
-        assertEquals(map.get("key-1"), "value-1");
+        assertEquals(1,map.size());
+        assertEquals("value-1",map.get("key-1") );
         assertTrue(map.containsValue("value-1"));
         assertFalse(map.containsValue("value-2"));
 

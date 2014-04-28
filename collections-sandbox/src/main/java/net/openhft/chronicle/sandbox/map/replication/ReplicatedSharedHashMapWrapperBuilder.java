@@ -26,12 +26,12 @@ import java.io.IOException;
 /**
  * @author Rob Austin.
  */
-public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
+public class ReplicatedSharedHashMapWrapperBuilder extends SharedHashMapBuilder implements Cloneable {
 
 
     public static final int META_BYTES_SIZE = 16;
 
-    public <K, V> ReplicatedShareHashMap<K, V> create(final File liveDataFile, final File metaDataFile, final Class<K> kClass, final Class<V> vClass, byte sequenceNumber) throws IOException {
+    public <K, V> ReplicatedShareHashMapWrapper<K, V> create(final File liveDataFile, final File metaDataFile, final Class<K> kClass, final Class<V> vClass, byte sequenceNumber) throws IOException {
 
         final SharedHashMapBuilder liveBuilder = clone();
 
@@ -42,13 +42,13 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
         final SharedHashMap<K, MetaData<V>> metaData = liveBuilder.<K, MetaData<V>>create(metaDataFile, kClass, (Class) MetaData.class);
 
         final MapModifier<K, V> mapModifier1 = new MapModifier<K, V>(sequenceNumber, live, metaData, vClass, generatedValueType());
-        return new ReplicatedShareHashMap<K, V>(live, mapModifier1, vClass);
+        return new ReplicatedShareHashMapWrapper<K, V>(live, mapModifier1, vClass);
 
     }
 
     @Override
-    public SharedReplicatedHashMapBuilder clone() {
-        return (SharedReplicatedHashMapBuilder) super.clone();
+    public ReplicatedSharedHashMapWrapperBuilder clone() {
+        return (ReplicatedSharedHashMapWrapperBuilder) super.clone();
     }
 
     /**
@@ -57,7 +57,7 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      *
      * @return this builder object back
      */
-    public SharedReplicatedHashMapBuilder minSegments(int minSegments) {
+    public ReplicatedSharedHashMapWrapperBuilder minSegments(int minSegments) {
         super.minSegments(minSegments);
         return this;
     }
@@ -75,7 +75,7 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @see #entryAndValueAlignment(Alignment)
      * @see #entryAndValueAlignment()
      */
-    public SharedReplicatedHashMapBuilder entrySize(int entrySize) {
+    public ReplicatedSharedHashMapWrapperBuilder entrySize(int entrySize) {
         super.entrySize(entrySize);
         return this;
     }
@@ -98,31 +98,31 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @return this {@code SharedReplicatedHashMapBuilder} back
      * @see #entryAndValueAlignment()
      */
-    public SharedReplicatedHashMapBuilder entryAndValueAlignment(Alignment alignment) {
+    public ReplicatedSharedHashMapWrapperBuilder entryAndValueAlignment(Alignment alignment) {
         super.entryAndValueAlignment(alignment);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder entries(long entries) {
+    public ReplicatedSharedHashMapWrapperBuilder entries(long entries) {
         super.entries(entries);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder replicas(int replicas) {
+    public ReplicatedSharedHashMapWrapperBuilder replicas(int replicas) {
         super.replicas(replicas);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder actualEntriesPerSegment(int actualEntriesPerSegment) {
+    public ReplicatedSharedHashMapWrapperBuilder actualEntriesPerSegment(int actualEntriesPerSegment) {
         super.actualEntriesPerSegment(actualEntriesPerSegment);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder actualSegments(int actualSegments) {
+    public ReplicatedSharedHashMapWrapperBuilder actualSegments(int actualSegments) {
         super.actualSegments(actualSegments);
         return this;
     }
@@ -132,19 +132,19 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      *
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder transactional(boolean transactional) {
+    public ReplicatedSharedHashMapWrapperBuilder transactional(boolean transactional) {
         super.transactional(transactional);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {
+    public ReplicatedSharedHashMapWrapperBuilder lockTimeOutMS(long lockTimeOutMS) {
         super.lockTimeOutMS(lockTimeOutMS);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder errorListener(SharedMapErrorListener errorListener) {
+    public ReplicatedSharedHashMapWrapperBuilder errorListener(SharedMapErrorListener errorListener) {
         super.errorListener(errorListener);
         return this;
     }
@@ -158,7 +158,7 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
+    public ReplicatedSharedHashMapWrapperBuilder putReturnsNull(boolean putReturnsNull) {
         super.putReturnsNull(putReturnsNull);
         return this;
     }
@@ -172,37 +172,37 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
+    public ReplicatedSharedHashMapWrapperBuilder removeReturnsNull(boolean removeReturnsNull) {
         super.removeReturnsNull(removeReturnsNull);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
+    public ReplicatedSharedHashMapWrapperBuilder generatedKeyType(boolean generatedKeyType) {
         super.generatedKeyType(generatedKeyType);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder generatedValueType(boolean generatedValueType) {
+    public ReplicatedSharedHashMapWrapperBuilder generatedValueType(boolean generatedValueType) {
         super.generatedValueType(generatedValueType);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder largeSegments(boolean largeSegments) {
+    public ReplicatedSharedHashMapWrapperBuilder largeSegments(boolean largeSegments) {
         super.largeSegments(largeSegments);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder metaDataBytes(int metaDataBytes) {
+    public ReplicatedSharedHashMapWrapperBuilder metaDataBytes(int metaDataBytes) {
         super.metaDataBytes(metaDataBytes);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
+    public ReplicatedSharedHashMapWrapperBuilder eventListener(SharedMapEventListener eventListener) {
         super.eventListener(eventListener);
         return this;
     }
