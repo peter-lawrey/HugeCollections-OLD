@@ -221,4 +221,14 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         super.eventListener(eventListener);
         return this;
     }
+
+    private TimeProvider timeProvider = new TimeProvider();
+
+    public void setTimeProvider(TimeProvider timeProvider) {
+        this.timeProvider = timeProvider;
+    }
+
+    public TimeProvider getTimeProvider() {
+        return timeProvider;
+    }
 }

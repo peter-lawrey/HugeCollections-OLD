@@ -40,6 +40,7 @@ import static java.lang.Thread.currentThread;
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
     public static final int META_DATA_SIZE = 8;
+    private final TimeProvider timeProvider;
 
     /**
      * @param size positive number
@@ -133,6 +134,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
         this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
 
         this.hasher = new Hasher(segments, hashMask);
+        this.timeProvider = builder.getTimeProvider();
+
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (VanillaSharedReplicatedHashMap.Segment[])
@@ -708,8 +711,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         final long readTimeStamp = entry.readLong();
 
                         // if the readTimeStamp is newer then we'll reject this put()
-                        if (readTimeStamp > System.currentTimeMillis()) {
-                            hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+                        if (readTimeStamp > timeProvider.currentTimeMillis()) {
+                            //  hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                             return null;
                         }
 
@@ -798,14 +801,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                             long readTimeStamp = entry.readLong();
 
                             // if the readTimeStamp is newer then we'll reject this put()
-                            if (readTimeStamp > System.currentTimeMillis()) {
+                            if (readTimeStamp > timeProvider.currentTimeMillis()) {
                                 // since this entry has expired we'll remove it from the live set
-                                hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+                                //          hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                                 return null;
                             }
 
                             entry.skip(-8);
-                            entry.writeLong(System.currentTimeMillis());
+                            entry.writeLong(timeProvider.currentTimeMillis());
 
 
                         }
@@ -828,7 +831,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         if (canReplicate) {
 
                             // if the readTimeStamp is newer then we'll reject this put()
-                            if (entry.readLong() > System.currentTimeMillis()) {
+                            if (entry.readLong() > timeProvider.currentTimeMillis()) {
                                 return null;
                             }
 
@@ -880,7 +883,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             entry.write(keyBytes);
 
             if (canReplicate)
-                entry.writeLong(System.currentTimeMillis());
+                entry.writeLong(timeProvider.currentTimeMillis());
 
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
@@ -1014,13 +1017,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         long readTimeStamp = entry.readLong();
 
                         // if the readTimeStamp is newer then we'll reject the remove()
-                        if (readTimeStamp > System.currentTimeMillis()) {
+                        if (readTimeStamp > timeProvider.currentTimeMillis()) {
                             return null;
                         }
 
                     }
-
-                    long valueLenPos = entry.position();
 
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
@@ -1030,17 +1031,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                         return null;
                     }
 
-                    hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
+                    hashLookupLiveOnly.removePrevPos();
 
                     decrementSize();
 
                     if (canReplicate) {
 
                         entry.position(timeStampPos);
-                        entry.writeLong(System.currentTimeMillis());
+                        entry.writeLong(timeProvider.currentTimeMillis());
 
                         // set the value len to zero
-                        entry.writeStopBit(0);
+                        //entry.writeStopBit(0);
                     } else
                         free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
 
@@ -1100,7 +1101,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     if (canReplicate) {
 
                         // if the readTimeStamp is newer then we'll reject this put()
-                        if (entry.readLong() > System.currentTimeMillis()) {
+                        if (entry.readLong() > timeProvider.currentTimeMillis()) {
                             hashLookupLiveOnly.removeSearchPos(hashLookupLiveAndDelted.getSearchPosition());
                             return null;
                         }
