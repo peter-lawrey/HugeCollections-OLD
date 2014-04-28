@@ -35,8 +35,13 @@ import static org.junit.Assert.assertNotNull;
  * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.2/15/20/147
  * run 1 50000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.2/15/20/139
  * </pre><pre>
- * For 1M entries to ext4
- *     run 1 1000000 : 50/90/99/99.9/99.99/worst: 0.9/3.2/14/18/106/188
+ * For 1M entries to ext4 on laptop with SSD
+ * run 1 2,000,000 : 50/90/99/99.9/99.99/worst : 0.2 / 0.7 / 8.7 / 15 / 60 / 129 micro-seconds.
+ * run 1 1,000,000 : 50/90/99/99.9/99.99/worst : 0.2 / 0.5 / 6.6 / 10 / 15 / 43 micro-seconds.
+ * run 1   500,000 : 50/90/99/99.9/99.99/worst : 0.2 / 0.5 / 5.6 / 10 / 15 / 53 micro-seconds.
+ * </pre><pre>
+ * For 1M entries on server to ext4 with PCI-SSD
+ * run 1 1000000 : 50/90/99/99.9/99.99/worst: 0.9/3.2/14/18/106/188
  * run 1 500000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/11/16/46/172
  * run 1 250000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/10/16/20/163
  * run 1 100000 : 50/90/99/99.9/99.99/worst: 0.2/3.0/9.9/15/20/163
@@ -59,14 +64,14 @@ import static org.junit.Assert.assertNotNull;
  */
 public class SHMLatencyTestMain {
     static final int KEYS = 1000 * 1000;
-    static final int RUN_TIME = 20;
+    static final int RUN_TIME = 30;
     static final long START_TIME = System.currentTimeMillis();
 
     // TODO test passes but is under development.
     public static void main(String... ignored) throws IOException {
         AffinityLock lock = AffinityLock.acquireCore();
-        File file = File.createTempFile("testSHMLatency", "deleteme");
-//        File file = new File("/ocz/tmp/testSHMLatency.deleteme");
+//        File file = File.createTempFile("testSHMLatency", "deleteme");
+        File file = new File("testSHMLatency.deleteme");
         SharedHashMap<LongValue, LongValue> countersMap = new SharedHashMapBuilder()
                 .entries(KEYS * 3 / 2)
                 .entrySize(24)
@@ -86,7 +91,7 @@ public class SHMLatencyTestMain {
 //        Monitor monitor = new Monitor();
         LongValue value2 = DataValueClasses.newDirectReference(LongValue.class);
         for (int t = 0; t < 5; t++) {
-            for (int rate : new int[]{1000 * 1000, 500 * 1000, 250 * 1000, 100 * 1000, 50 * 1000}) {
+            for (int rate : new int[]{2 * 1000 * 1000, 1000 * 1000, 500 * 1000/*, 250 * 1000, 100 * 1000, 50 * 1000*/}) {
                 Histogram times = new Histogram();
                 int u = 0;
                 long start = System.nanoTime();
@@ -107,6 +112,7 @@ public class SHMLatencyTestMain {
                         if (using == null)
                             assertNotNull(using);
                         value2.addAtomicValue(1);
+
                         // calculate the time using the time it should have started, not when it was able.
                         long elapse = System.nanoTime() - start0;
                         times.sample(elapse);
@@ -114,9 +120,10 @@ public class SHMLatencyTestMain {
                     }
 //                    monitor.sample = Long.MAX_VALUE;
                 }
-                System.out.print("run " + t + " " + rate + " : ");
-                times.printPercentiles();
+                System.out.printf("run %d %,9d : ", t, rate);
+                times.printPercentiles(" micro-seconds.");
             }
+            System.out.println();
         }
 //        monitor.running = false;
         countersMap.close();
