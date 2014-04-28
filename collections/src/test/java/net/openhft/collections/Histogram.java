@@ -49,6 +49,10 @@ public class Histogram {
     }
 
     public void printPercentiles() {
+        printPercentiles("");
+    }
+
+    public void printPercentiles(String tail) {
         long[] times = new long[FRACTIONS.length];
         int f = 0;
         long total = 0;
@@ -64,16 +68,17 @@ public class Histogram {
             sb.append(FRACTION_STR[i]).append("/");
         }
         sb.setLength(sb.length() - 1);
-        sb.append(": ");
+        sb.append(" : ");
         for (int i = FRACTIONS.length - 1; i >= 0; i--) {
             long time = times[i];
             if (time < 10000)
                 sb.append(time / 100 / 10.0);
             else
                 sb.append(time / 1000);
-            sb.append("/");
+            sb.append(" / ");
         }
-        sb.setLength(sb.length() - 1);
+        sb.setLength(sb.length() - 3);
+        sb.append(tail);
         System.out.println(sb);
     }
 }
