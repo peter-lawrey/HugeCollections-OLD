@@ -29,7 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 /**
  * @author Rob Austin.
@@ -71,6 +71,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
 
     }
 
@@ -100,7 +102,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
-
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
     }
 
     @Test
@@ -129,7 +132,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
-
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
     }
 
     @Test
@@ -158,7 +162,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
-
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
     }
 
     @Test
@@ -186,7 +191,8 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
-
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
     }
 
     @Test
@@ -212,6 +218,9 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         current(timeProvider);
         assertEquals(map.size(), 1);
         assertEquals(map.get("key-1"), "value-1");
+        assertTrue(map.containsValue("value-1"));
+        assertFalse(map.containsValue("value-2"));
+
 
     }
 
