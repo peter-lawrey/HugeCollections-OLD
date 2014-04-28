@@ -70,10 +70,11 @@ public class SHMLatencyTestMain {
     // TODO test passes but is under development.
     public static void main(String... ignored) throws IOException {
         AffinityLock lock = AffinityLock.acquireCore();
-//        File file = File.createTempFile("testSHMLatency", "deleteme");
-        File file = new File("testSHMLatency.deleteme");
+        File file = File.createTempFile("testSHMLatency", "deleteme");
+//        File file = new File("testSHMLatency.deleteme");
+        file.delete();
         SharedHashMap<LongValue, LongValue> countersMap = new SharedHashMapBuilder()
-                .entries(KEYS * 3 / 2)
+                .entries(KEYS)
                 .entrySize(24)
                 .generatedKeyType(true)
                 .generatedValueType(true)
