@@ -16,39 +16,54 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.replication;
-
-import net.openhft.collections.*;
+package net.openhft.collections;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
  * @author Rob Austin.
  */
-public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
-
+public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
 
     public static final int META_BYTES_SIZE = 16;
 
-    public <K, V> ReplicatedShareHashMap<K, V> create(final File liveDataFile, final File metaDataFile, final Class<K> kClass, final Class<V> vClass, byte sequenceNumber) throws IOException {
-
-        final SharedHashMapBuilder liveBuilder = clone();
-
-        liveBuilder.entrySize(this.entrySize() + META_BYTES_SIZE);
-        final SharedHashMap<K, MetaData<V>> live = liveBuilder.<K, MetaData<V>>create(liveDataFile, kClass, (Class) MetaData.class);
-
-        liveBuilder.entrySize(META_BYTES_SIZE);
-        final SharedHashMap<K, MetaData<V>> metaData = liveBuilder.<K, MetaData<V>>create(metaDataFile, kClass, (Class) MetaData.class);
-
-        final MapModifier<K, V> mapModifier1 = new MapModifier<K, V>(sequenceNumber, live, metaData, vClass, generatedValueType());
-        return new ReplicatedShareHashMap<K, V>(live, mapModifier1, vClass);
-
+    public boolean canReplicate() {
+        return true;
     }
 
+    int alignedEntrySize() {
+        return entryAndValueAlignment().alignSize(entrySize() + META_BYTES_SIZE);
+    }
+
+    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
+        VanillaSharedReplicatedHashMapBuilder builder = clone();
+
+        for (int i = 0; i < 10; i++) {
+            if (file.exists() && file.length() > 0) {
+                readFile(file, builder);
+                break;
+            }
+            if (file.createNewFile() || file.length() == 0) {
+                newFile(file);
+                break;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+        }
+        if (builder == null || !file.exists())
+            throw new FileNotFoundException("Unable to create " + file);
+        return new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+    }
+
+
     @Override
-    public SharedReplicatedHashMapBuilder clone() {
-        return (SharedReplicatedHashMapBuilder) super.clone();
+    public VanillaSharedReplicatedHashMapBuilder clone() {
+        return (VanillaSharedReplicatedHashMapBuilder) super.clone();
     }
 
     /**
@@ -57,7 +72,7 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      *
      * @return this builder object back
      */
-    public SharedReplicatedHashMapBuilder minSegments(int minSegments) {
+    public VanillaSharedReplicatedHashMapBuilder minSegments(int minSegments) {
         super.minSegments(minSegments);
         return this;
     }
@@ -71,11 +86,11 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
      *
      * @param entrySize the size in bytes
-     * @return this {@code SharedReplicatedHashMapBuilder} back
+     * @return this {@code VanillaSharedReplicatedHashMapBuilder} back
      * @see #entryAndValueAlignment(Alignment)
      * @see #entryAndValueAlignment()
      */
-    public SharedReplicatedHashMapBuilder entrySize(int entrySize) {
+    public VanillaSharedReplicatedHashMapBuilder entrySize(int entrySize) {
         super.entrySize(entrySize);
         return this;
     }
@@ -95,34 +110,34 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
      * will be 24 (20 aligned to 8 bytes).
      *
-     * @return this {@code SharedReplicatedHashMapBuilder} back
+     * @return this {@code VanillaSharedReplicatedHashMapBuilder} back
      * @see #entryAndValueAlignment()
      */
-    public SharedReplicatedHashMapBuilder entryAndValueAlignment(Alignment alignment) {
+    public VanillaSharedReplicatedHashMapBuilder entryAndValueAlignment(Alignment alignment) {
         super.entryAndValueAlignment(alignment);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder entries(long entries) {
+    public VanillaSharedReplicatedHashMapBuilder entries(long entries) {
         super.entries(entries);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder replicas(int replicas) {
+    public VanillaSharedReplicatedHashMapBuilder replicas(int replicas) {
         super.replicas(replicas);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder actualEntriesPerSegment(int actualEntriesPerSegment) {
+    public VanillaSharedReplicatedHashMapBuilder actualEntriesPerSegment(int actualEntriesPerSegment) {
         super.actualEntriesPerSegment(actualEntriesPerSegment);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder actualSegments(int actualSegments) {
+    public VanillaSharedReplicatedHashMapBuilder actualSegments(int actualSegments) {
         super.actualSegments(actualSegments);
         return this;
     }
@@ -132,19 +147,19 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      *
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder transactional(boolean transactional) {
+    public VanillaSharedReplicatedHashMapBuilder transactional(boolean transactional) {
         super.transactional(transactional);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {
+    public VanillaSharedReplicatedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {
         super.lockTimeOutMS(lockTimeOutMS);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder errorListener(SharedMapErrorListener errorListener) {
+    public VanillaSharedReplicatedHashMapBuilder errorListener(SharedMapErrorListener errorListener) {
         super.errorListener(errorListener);
         return this;
     }
@@ -158,7 +173,7 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
+    public VanillaSharedReplicatedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
         super.putReturnsNull(putReturnsNull);
         return this;
     }
@@ -172,40 +187,38 @@ public class SharedReplicatedHashMapBuilder extends SharedHashMapBuilder impleme
      * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
      * @return an instance of the map builder
      */
-    public SharedReplicatedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
+    public VanillaSharedReplicatedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
         super.removeReturnsNull(removeReturnsNull);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
+    public VanillaSharedReplicatedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
         super.generatedKeyType(generatedKeyType);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder generatedValueType(boolean generatedValueType) {
+    public VanillaSharedReplicatedHashMapBuilder generatedValueType(boolean generatedValueType) {
         super.generatedValueType(generatedValueType);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder largeSegments(boolean largeSegments) {
+    public VanillaSharedReplicatedHashMapBuilder largeSegments(boolean largeSegments) {
         super.largeSegments(largeSegments);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder metaDataBytes(int metaDataBytes) {
+    public VanillaSharedReplicatedHashMapBuilder metaDataBytes(int metaDataBytes) {
         super.metaDataBytes(metaDataBytes);
         return this;
     }
 
 
-    public SharedReplicatedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
+    public VanillaSharedReplicatedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
         super.eventListener(eventListener);
         return this;
     }
-
-
 }

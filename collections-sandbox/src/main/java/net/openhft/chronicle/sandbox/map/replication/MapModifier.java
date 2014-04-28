@@ -28,7 +28,7 @@ import java.io.Closeable;
  *
  * @author Rob Austin.
  */
-public class PutRemove<K extends Object, V> implements Closeable {
+public class MapModifier<K extends Object, V> implements Closeable {
 
     private final byte sequenceNumber;
 
@@ -45,10 +45,10 @@ public class PutRemove<K extends Object, V> implements Closeable {
      * @param deletedItemsMap
      * @param generatedValueType
      */
-    public PutRemove(byte sequenceNumber,
-                     @NotNull final SharedHashMap<K, MetaData<V>> delegate,
-                     @NotNull final SharedHashMap<K, MetaData<V>> deletedItemsMap,
-                     @NotNull final Class<V> clazzV, boolean generatedValueType) {
+    public MapModifier(byte sequenceNumber,
+                       @NotNull final SharedHashMap<K, MetaData<V>> delegate,
+                       @NotNull final SharedHashMap<K, MetaData<V>> deletedItemsMap,
+                       @NotNull final Class<V> clazzV, boolean generatedValueType) {
         this.sequenceNumber = sequenceNumber;
         this.delegate = delegate;
         this.deletedItemsMap = deletedItemsMap;
@@ -287,7 +287,7 @@ public class PutRemove<K extends Object, V> implements Closeable {
         if (live == null)
             return null;
 
-        final MetaData metaData = (live != null && live.isNewer(deleted)) ? live : deleted;
+        final MetaData metaData = live.isNewer(deleted)  ? live : deleted;
 
         // someone else has made a change before us, so we are going to ignore this update
         if (metaData != null && metaData.isNewer(timestamp, sequenceNumber))
@@ -300,7 +300,7 @@ public class PutRemove<K extends Object, V> implements Closeable {
         if (deleted != null)
             deletedItemsMap.remove(key, deleted);
 
-        return (live == null) ? null : live.get(vClass);
+        return   live.get(vClass);
     }
 }
 

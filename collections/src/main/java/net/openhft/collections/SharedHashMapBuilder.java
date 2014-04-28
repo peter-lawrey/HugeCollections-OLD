@@ -231,7 +231,7 @@ public class SharedHashMapBuilder implements Cloneable {
         return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
     }
 
-    private static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
+    static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         FileInputStream fis = new FileInputStream(file);
         fis.getChannel().read(bb);
@@ -253,7 +253,7 @@ public class SharedHashMapBuilder implements Cloneable {
             throw new IOException("Corrupt header for " + file);
     }
 
-    private void newFile(File file) throws IOException {
+    void newFile(File file) throws IOException {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
         bb.put(MAGIC);
         bb.putInt(actualSegments());

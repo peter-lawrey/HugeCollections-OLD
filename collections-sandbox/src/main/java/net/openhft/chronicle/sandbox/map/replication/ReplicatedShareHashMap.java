@@ -32,16 +32,16 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
 
     @NotNull
-    private final PutRemove<K, V> putRemove;
+    private final MapModifier<K, V> mapModifier;
     private final Class<V> vClass;
     private final SharedHashMap<K, MetaData<V>> delegate;
 
     private EntrySet entrySet = null;
     private long timestamp;
 
-    public ReplicatedShareHashMap(SharedHashMap<K, MetaData<V>> delegate, final PutRemove<K, V> putRemove, Class<V> vClass) {
+    public ReplicatedShareHashMap(SharedHashMap<K, MetaData<V>> delegate, final MapModifier<K, V> mapModifier, Class<V> vClass) {
         this.delegate = delegate;
-        this.putRemove = putRemove;
+        this.mapModifier = mapModifier;
         this.vClass = vClass;
     }
 
@@ -123,7 +123,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
     @Override
     public V put(K key, V value) {
-        return putRemove.put(key, value);
+        return mapModifier.put(key, value);
     }
 
 
@@ -132,7 +132,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
      */
     @Override
     public V remove(Object key) {
-        return putRemove.remove((K) key);
+        return mapModifier.remove((K) key);
     }
 
 
@@ -157,7 +157,7 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
         timestamp = System.currentTimeMillis();
 
         for (K key : delegate.keySet()) {
-            putRemove.removeWithTimeStamp(key, timestamp);
+            mapModifier.removeWithTimeStamp(key, timestamp);
         }
 
     }
@@ -225,27 +225,27 @@ public class ReplicatedShareHashMap<K extends Object, V> implements SharedHashMa
 
     @Override
     public void close() throws IOException {
-        putRemove.close();
+        mapModifier.close();
     }
 
     @Override
     public V putIfAbsent(K key, V value) {
-        return putRemove.putIfAbsent(key, value);
+        return mapModifier.putIfAbsent(key, value);
     }
 
     @Override
     public boolean remove(Object key, Object value) {
-        return putRemove.remove(((K) key), (V) value);
+        return mapModifier.remove(((K) key), (V) value);
     }
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
-        return putRemove.replace(key,oldValue,newValue);
+        return mapModifier.replace(key,oldValue,newValue);
     }
 
     @Override
     public V replace(K key, V value) {
-        return putRemove.replace( key,  value);
+        return mapModifier.replace(key, value);
     }
 
 
