@@ -274,6 +274,34 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         assertEquals(map.get("key-1"), "value-1");
     }
 
+
+    @Test
+    public void testRemoveFollowedByLatePut() throws IOException {
+
+        final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
+        final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
+                .entries(10)
+                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+
+        current(timeProvider);
+
+        // we do a put at the current time
+        map.put("key-1", "value-1");
+        map.remove("key-1", "value-1");
+        assertEquals(0, map.size());
+        assertEquals(null, map.get("key-1"));
+        assertEquals(false, map.containsKey("key-1"));
+
+        // now test assume that we receive a late update to the map, the following update should be ignored
+        final long late = System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(50);
+        assertEquals(null, map.put("key-1", "value-2", IDENTIFIER, late));
+
+
+        assertEquals(null, map.get("key-1"));
+        assertEquals(false, map.containsKey("key-1"));
+        assertEquals(0, map.size(), 0);
+    }
+
     private void current(TimeProvider timeProvider) {
         Mockito.when(timeProvider.currentTimeMillis()).thenReturn(System.currentTimeMillis());
     }

@@ -203,7 +203,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
 
     long segmentSize() {
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + sizeOfMultiMap() // the VanillaIntIntMultiMap
+                + sizeOfMultiMap() * (canReplicate ? 2 : 1) // the VanillaIntIntMultiMap
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         assert (ss & 63) == 0;
@@ -586,7 +586,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
             iimmapBytes.load();
             hashLookupLiveAndDelted = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
-            hashLookupLiveOnly = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes) : new VanillaShortShortMultiMap(iimmapBytes);
+
+            if (canReplicate) {
+                final NativeBytes iimmapBytes2 = new NativeBytes(null, start, start + sizeOfMultiMap(), null);
+                iimmapBytes2.load();
+                hashLookupLiveOnly = hashMask == ~0 ? new VanillaIntIntMultiMap(iimmapBytes2) : new VanillaShortShortMultiMap(iimmapBytes2);
+                start += sizeOfMultiMap();
+            } else {
+                hashLookupLiveOnly = hashLookupLiveAndDelted;
+            }
 
             final NativeBytes bsBytes = new NativeBytes(tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -839,6 +847,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                     }
                 }
 
+
                 // key is not found
                 long offset = putEntry(keyBytes, value, identifier);
                 incrementSize();
@@ -869,7 +878,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractMap<K, V> impl
                 return false;
             }
 
-             if (lastModifiedTimeStamp > providedTimestamp)
+            if (lastModifiedTimeStamp > providedTimestamp)
                 return true;
 
             return entry.readByte() > localIdentifier;
