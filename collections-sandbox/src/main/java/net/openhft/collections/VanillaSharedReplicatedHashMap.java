@@ -18,17 +18,15 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.DirectBitSet;
-import net.openhft.lang.collection.SingleThreadedDirectBitSet;
-import net.openhft.lang.io.*;
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.io.MultiStoreBytes;
+import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
-import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
 import java.util.logging.Logger;
 
 
@@ -264,6 +262,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                             return null;
                         if (canReplicate && shouldTerminate(entry, timestamp))
                             return null;
+
+                        // todo fixed add here.
 
                         return readValue(entry, null);
                     }
