@@ -34,8 +34,20 @@ import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
-public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
-    private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
+
+public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
+
+    public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
+                                Class<K> kClass, Class<V> vClass) throws IOException {
+        super(builder, kClass, vClass);
+        createMappedStoreAndSegments(file);
+    }
+}
+
+abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
+        implements SharedHashMap<K, V>, SegmentInfoProvider {
+    private static final Logger LOGGER =
+            Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
 
 
 
@@ -64,7 +76,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final long lockTimeOutNS;
     final int metaDataBytes;
     Segment[] segments; // non-final for close()
-    private MappedStore ms;     // non-final for close()
+    // non-final for close() and because it is initialized out of constructor
+    private MappedStore ms;
     final Hasher hasher;
 
     private final int replicas;
@@ -87,8 +100,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     transient Set<Map.Entry<K, V>> entrySet;
 
 
-    public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
-                                Class<K> kClass, Class<V> vClass) throws IOException {
+    public AbstractVanillaSharedHashMap(SharedHashMapBuilder builder,
+                                        Class<K> kClass, Class<V> vClass) throws IOException {
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
         this.builder = builder;
         this.kClass = kClass;
@@ -116,10 +129,11 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
-        Segment[] ss = (VanillaSharedHashMap.Segment[])
-                new VanillaSharedHashMap.Segment[segments];
+        Segment[] ss = (Segment[]) new AbstractVanillaSharedHashMap.Segment[segments];
         this.segments = ss;
+    }
 
+    void createMappedStoreAndSegments(File file) throws IOException {
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
                 sizeInBytes());
 
@@ -242,7 +256,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         ms = null;
     }
 
-    public VanillaSharedHashMap.Segment[] getSegments() {
+    public SharedSegment[] getSegments() {
         return segments;
     }
 
@@ -1083,22 +1097,22 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         void notifyPut(long offset, boolean added, K key, V value, final long pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes, added,
-                        key, value, pos, this);
+                eventListener.onPut(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                        added, key, value, pos, this);
             }
         }
 
         void notifyGet(long offset, K key, V value) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener.onGetFound(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value);
             }
         }
 
         V notifyMissed(Bytes keyBytes, K key, V usingValue) {
             if (eventListener != SharedMapEventListeners.NOP) {
-                return eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes,
+                return eventListener.onGetMissing(AbstractVanillaSharedHashMap.this, keyBytes,
                         key, usingValue);
             }
             return null;
@@ -1107,7 +1121,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         void notifyRemoved(long offset, K key, V value, final int pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener.onRemove(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value, pos, this);
             }
         }
@@ -1284,7 +1298,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
 
         public void remove() {
             if (lastReturned == null) throw new IllegalStateException();
-            VanillaSharedHashMap.this.remove(lastReturned.getKey());
+            AbstractVanillaSharedHashMap.this.remove(lastReturned.getKey());
             lastReturned = null;
         }
 
@@ -1338,7 +1352,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
             try {
-                V v = VanillaSharedHashMap.this.get(e.getKey());
+                V v = AbstractVanillaSharedHashMap.this.get(e.getKey());
                 return v != null && v.equals(e.getValue());
             } catch (ClassCastException ex) {
                 return false;
@@ -1354,7 +1368,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 Object key = e.getKey();
                 Object value = e.getValue();
-                return VanillaSharedHashMap.this.remove(key, value);
+                return AbstractVanillaSharedHashMap.this.remove(key, value);
             } catch (ClassCastException ex) {
                 return false;
             } catch (NullPointerException ex) {
@@ -1363,15 +1377,15 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         public int size() {
-            return VanillaSharedHashMap.this.size();
+            return AbstractVanillaSharedHashMap.this.size();
         }
 
         public boolean isEmpty() {
-            return VanillaSharedHashMap.this.isEmpty();
+            return AbstractVanillaSharedHashMap.this.isEmpty();
         }
 
         public void clear() {
-            VanillaSharedHashMap.this.clear();
+            AbstractVanillaSharedHashMap.this.clear();
         }
     }
 

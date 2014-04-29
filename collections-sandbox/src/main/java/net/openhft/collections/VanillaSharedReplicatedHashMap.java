@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 
-public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
+public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V> {
     private static final Logger LOGGER =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
@@ -43,10 +43,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
     public VanillaSharedReplicatedHashMap(VanillaSharedReplicatedHashMapBuilder builder,
                                           File file,
                                           Class<K> kClass, Class<V> vClass) throws IOException {
-        super(builder, file, kClass, vClass);
+        super(builder, kClass, vClass);
         this.canReplicate = builder.canReplicate();
         this.timeProvider = builder.timeProvider();
         this.localIdentifier = builder.identifier();
+        createMappedStoreAndSegments(file);
     }
 
     @Override
