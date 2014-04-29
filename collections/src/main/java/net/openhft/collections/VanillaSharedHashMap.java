@@ -43,7 +43,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
      * {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
      * applied to {@code size}
      */
-    private static int expectedStopBits(long size) {
+    static int expectedStopBits(long size) {
         if (size <= 127)
             return 1;
         // numberOfLeadingZeros is cheap intrinsic on modern CPUs

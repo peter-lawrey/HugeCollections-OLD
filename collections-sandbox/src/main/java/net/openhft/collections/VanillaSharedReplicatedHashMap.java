@@ -38,39 +38,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
     public static final int META_DATA_SIZE = 8;
 
-    /**
-     * @param size positive number
-     * @return number of bytes taken by
-     * {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
-     * applied to {@code size}
-     */
-    private static int expectedStopBits(long size) {
-        if (size <= 127)
-            return 1;
-        // numberOfLeadingZeros is cheap intrinsic on modern CPUs
-        // integral division is not... but there is no choice
-        return ((70 - Long.numberOfLeadingZeros(size)) / 7);
-    }
-
-    /**
-     * Because DirectBitSet implementations couldn't find more
-     * than 64 continuous clear or set bits.
-     */
-    private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
-
-    private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
-        // if expected map size is about 1000, seems rather wasteful to allocate
-        // key and value serialization buffers each x64 of expected entry size..
-        return (int) Math.min(Math.max(2L, builder.entries() >> 10),
-                MAX_ENTRY_OVERSIZE_FACTOR);
-    }
-
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-
-    transient Set<Map.Entry<K, V>> entrySet;
-
 
     public VanillaSharedReplicatedHashMap(VanillaSharedReplicatedHashMapBuilder builder,
                                           File file,
