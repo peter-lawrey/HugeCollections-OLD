@@ -23,6 +23,7 @@ import net.openhft.chronicle.sandbox.queue.ConsumerConcurrentBlockingObjectQueue
 import net.openhft.chronicle.sandbox.queue.LocalConcurrentBlockingObjectQueue;
 import net.openhft.chronicle.sandbox.queue.ProducerConcurrentBlockingObjectQueue;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -101,6 +102,7 @@ public class PutAndTakeTests {
      * @throws Exception
      */
     @Test
+    @Ignore
     public void testWithFasterReader() throws Exception {
 
 
@@ -177,6 +179,7 @@ public class PutAndTakeTests {
      * @throws Exception
      */
     @Test
+    @Ignore
     public void testWithFasterWriter() throws Exception {
 
         final int max = 200;

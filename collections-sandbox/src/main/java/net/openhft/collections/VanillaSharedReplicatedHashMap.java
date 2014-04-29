@@ -62,7 +62,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
 
     @Override
     int multiMapsPerSegment() {
-        return canReplicate ? 2 : 1;
+        final VanillaSharedReplicatedHashMapBuilder builder = getBuilder();
+        return builder.canReplicate() ? 2 : 1;
     }
 
     /**
@@ -115,20 +116,26 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                 timeProvider.currentTimeMillis());
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V remove(final Object key) {
         return removeIfValueIs(key, null, localIdentifier, timeProvider.currentTimeMillis());
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public V remove(K key, V value, byte identifier, long timeStamp) {
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean remove(final Object key, final Object value) {
         if (value == null)
@@ -138,7 +145,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
     }
 
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     private V removeIfValueIs(final Object key, final V expectedValue,
                               final byte identifier, final long timestamp) {
         checkKey(key);
@@ -150,7 +159,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                 timestamp, identifier);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
@@ -167,7 +178,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
         private IntIntMultiMap hashLookupLiveAndDeleted;
         private IntIntMultiMap hashLookupLiveOnly;
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         Segment(NativeBytes bytes, int index) {
             super(bytes, index);
         }
@@ -182,7 +195,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                     new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
 
-            if (canReplicate) {
+            final VanillaSharedReplicatedHashMapBuilder builder = getBuilder();
+            if (builder.canReplicate()) {
                 final NativeBytes iimmapBytes2 =
                         new NativeBytes(null, start, start + sizeOfMultiMap(), null);
                 iimmapBytes2.load();
@@ -211,6 +225,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                 if (offset >= 0) {
                     if (canReplicate && shouldTerminate(entry, timestamp))
                         return null;
+                    // skip the is deleted flag
+                    entry.skip(1);
+
                     return onKeyPresentOnAcquire(key, usingValue, offset, entry);
                 } else {
                     usingValue = tryObtainUsingValueOnAcquire(keyBytes, key, usingValue, create);
@@ -248,24 +265,50 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                     // key is found
                     entry.skip(keyLen);
                     if (replaceIfPresent) {
+                        boolean wasDeleted = false;
                         if (canReplicate) {
                             final long timeStampPos = entry.positionAddr();
                             if (shouldTerminate(entry, timestamp))
                                 return null;
+
+                            wasDeleted = entry.readBoolean();
                             entry.positionAddr(timeStampPos);
                             entry.writeLong(timestamp);
                             entry.writeByte(identifier);
+                            // deleted flag
+                            entry.writeBoolean(false);
                         }
-                        return replaceValueOnPut(key, value, entry, pos, offset);
+
+                        final V result = replaceValueOnPut(key, value, entry, pos, offset);
+
+                        if (wasDeleted) {
+                            // remove() would have got rid of this so we have to add it back in
+                            hashLookupLiveOnly.put(hash2, pos);
+                            incrementSize();
+                            return null;
+                        } else {
+                            return result;
+                        }
+
                     } else {
+
                         if (putReturnsNull)
                             return null;
+
                         if (canReplicate && shouldTerminate(entry, timestamp))
                             return null;
 
-                        // todo fixed add here.
+                        final boolean wasDeleted = entry.readBoolean();
 
-                        return readValue(entry, null);
+                        if (wasDeleted) {
+                            // remove would have got rid of this so we have to add it back in
+                            hashLookupLiveOnly.put(hash2, pos);
+                            incrementSize();
+                            return null;
+                        } else {
+                            return readValue(entry, null);
+                        }
+
                     }
                 }
                 // key is not found
@@ -312,8 +355,18 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                     timeProvider.currentTimeMillis(), hashLookupLiveAndDeleted);
         }
 
+        /**
+         * @param keyBytes
+         * @param hash2
+         * @param value
+         * @param considerByteableValue
+         * @param identifier
+         * @param timestamp             the timestamp the entry was put ( this could be later if if was a remote put )
+         * @param searchedHashLookup
+         * @return
+         */
         private long putEntry(Bytes keyBytes, int hash2, V value, boolean considerByteableValue,
-                              final int remoteIdentifier, final long timestamp,
+                              final int identifier, final long timestamp,
                               IntIntMultiMap searchedHashLookup) {
             long keyLen = keyBytes.remaining();
 
@@ -343,7 +396,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
 
             if (canReplicate) {
                 entry.writeLong(timestamp);
-                entry.writeByte(remoteIdentifier);
+                entry.writeByte(identifier);
+                entry.writeBoolean(false);
             }
 
             writeValueOnPutEntry(byteableValue, valueLen, valueBytes, valueAsByteable, entry);
@@ -363,8 +417,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
         /**
          * @see net.openhft.collections.VanillaSharedHashMap.Segment#remove(net.openhft.lang.io.Bytes, Object, Object, int)
          */
-        V remove(Bytes keyBytes, K key, V expectedValue, int hash2,
-                 final long timestamp, final byte identifier) {
+        public V remove(Bytes keyBytes, K key, V expectedValue, int hash2,
+                        final long timestamp, final byte identifier) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -383,6 +437,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                         timeStampPos = entry.position();
                         if (shouldTerminate(entry, timestamp))
                             return null;
+                        // skip the is deleted flag
+                        entry.skip(1);
                     }
 
                     long valueLen = readValueLen(entry);
@@ -400,6 +456,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                         entry.position(timeStampPos);
                         entry.writeLong(timestamp);
                         entry.writeByte(identifier);
+                        // was deleted
+                        entry.writeBoolean(true);
                         // set the value len to zero
                         //entry.writeStopBit(0);
                     } else {
@@ -424,8 +482,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
         /**
          * @see net.openhft.collections.VanillaSharedHashMap.Segment#remove(net.openhft.lang.io.Bytes, Object, Object, int)
          */
-        V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2,
-                  final long timestamp) {
+
+        public V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2,
+                         long timestamp) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -441,6 +500,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K
                     if (canReplicate && shouldTerminate(entry, timestamp)) {
                         return null;
                     }
+
+                    // skip the is deleted flag
+                    entry.skip(1);
+
                     return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry);
                 }
                 // key is not found

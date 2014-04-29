@@ -39,7 +39,7 @@ import static org.junit.Assert.*;
  */
                              // Replicated
 
-public class SharedReplicatedHashMapTest extends SharedJSR166TestCase {
+public class ReplicatedShareHashMapWrapperTest extends SharedJSR166TestCase {
 
 
     private static File getPersistenceFile() {

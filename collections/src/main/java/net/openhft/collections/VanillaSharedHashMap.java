@@ -37,19 +37,7 @@ import static java.lang.Thread.currentThread;
 public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements SharedHashMap<K, V>, SegmentInfoProvider {
     private static final Logger LOGGER = Logger.getLogger(VanillaSharedHashMap.class.getName());
 
-    /**
-     * @param size positive number
-     * @return number of bytes taken by
-     * {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
-     * applied to {@code size}
-     */
-    static int expectedStopBits(long size) {
-        if (size <= 127)
-            return 1;
-        // numberOfLeadingZeros is cheap intrinsic on modern CPUs
-        // integral division is not... but there is no choice
-        return ((70 - Long.numberOfLeadingZeros(size)) / 7);
-    }
+
 
     /**
      * Because DirectBitSet implementations couldn't find more
@@ -89,7 +77,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     private final SharedMapEventListener<K, V> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
-
+    private final SharedHashMapBuilder builder;
 
     // if set the ReturnsNull fields will cause some functions to return NULL
     // rather than as returning the Object can be expensive for something you probably don't use.
@@ -102,7 +90,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
-
+        this.builder = builder;
         this.kClass = kClass;
         this.vClass = vClass;
 
@@ -173,6 +161,25 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 .transactional(false)
                 .metaDataBytes(metaDataBytes)
                 .eventListener(eventListener);
+    }
+
+    /**
+     * @param size positive number
+     * @return number of bytes taken by
+     * {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
+     * applied to {@code size}
+     */
+    static int expectedStopBits(long size) {
+        if (size <= 127)
+            return 1;
+        // numberOfLeadingZeros is cheap intrinsic on modern CPUs
+        // integral division is not... but there is no choice
+        return ((70 - Long.numberOfLeadingZeros(size)) / 7);
+    }
+
+
+    <B extends SharedHashMapBuilder> B getBuilder() {
+        return (B) builder;
     }
 
     long sizeInBytes() {
@@ -725,7 +732,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                        MultiStoreBytes entry, IntIntMultiMap hashLookup) {
             long keyLen = keyBytes.remaining();
             hashLookup.startSearch(hash2);
-            for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+            for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                 long offset = offsetFromPos(pos);
                 reuse(entry, offset);
                 if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
@@ -789,7 +796,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -975,7 +982,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -1007,7 +1014,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
                 long keyLen = keyBytes.remaining();
                 IntIntMultiMap hashLookup = containsKeyHashLookup();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                     Bytes entry = entry(offsetFromPos(pos));
                     if (keyEquals(keyBytes, keyLen, entry))
                         return true;
@@ -1037,7 +1044,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookup.startSearch(hash2);
-                for (int pos; (pos = hashLookup.nextPos()) >= 0;) {
+                for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -1054,7 +1061,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
         }
 
         V onKeyPresentOnReplace(K key, V expectedValue, V newValue, int pos, long offset,
-                                        NativeBytes entry) {
+                                NativeBytes entry) {
             long valueLenPos = entry.position();
             long valueLen = readValueLen(entry);
             long entryEndAddr = entry.positionAddr() + valueLen;
@@ -1215,7 +1222,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractMap<K, V> implements Sha
             lock();
             try {
                 IntIntMultiMap hashLookup = checkConsistencyHashLookup();
-                for (int pos = 0; (pos = (int) freeList.nextSetBit(pos)) >= 0;) {
+                for (int pos = 0; (pos = (int) freeList.nextSetBit(pos)) >= 0; ) {
                     PosPresentOnce check = new PosPresentOnce(pos);
                     hashLookup.forEach(check);
                     if (check.count != 1)
