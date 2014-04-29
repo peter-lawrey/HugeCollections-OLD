@@ -21,8 +21,6 @@ package net.openhft.collections;
  */
 interface IntIntMultiMap {
 
-    int getSearchHash();
-
     static interface EntryConsumer {
         void accept(int key, int value);
     }
@@ -44,12 +42,16 @@ interface IntIntMultiMap {
      */
     boolean remove(int key, int value);
 
+    boolean replace(int key, int oldValue, int newValue);
+
     /**
      * Used for start a search for a given key
      *
      * @return normalized key value, better to be used in subsequent calls
      */
     int startSearch(int key);
+
+    int getSearchHash();
 
     /**
      * Used for getting the next position for a given key
@@ -58,24 +60,13 @@ interface IntIntMultiMap {
      */
     int nextPos();
 
-    void removeSearchPos(long position);
-
-
     void removePrevPos();
 
     void replacePrevPos(int newValue);
-
-    void replacePos(long prevPos, int newValue, final int hash);
-
-    void putAfterFailedSearch(long pos, int value, int hash);
 
     void putAfterFailedSearch(int value);
 
     void clear();
 
     void forEach(EntryConsumer action);
-
-
-    public long getSearchPosition();
-
 }

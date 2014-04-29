@@ -124,6 +124,28 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         return true;
     }
 
+    @Override
+    public boolean replace(int key, int oldValue, int newValue) {
+        if (key == UNSET_KEY)
+            key = HASH_INSTEAD_OF_UNSET_KEY;
+        long pos = indexToPos(key & capacityMask);
+        for (int i = 0; i <= capacityMask; i++) {
+            long entry = bytes.readLong(pos);
+            int hash2 = (int) (entry >> 32);
+            if (hash2 == key) {
+                int value2 = (int) entry;
+                if (value2 == oldValue) {
+                    bytes.writeLong(pos, (((long) key) << 32) | (newValue & 0xFFFFFFFFL));
+                    return true;
+                }
+            } else if (hash2 == UNSET_KEY) {
+                break;
+            }
+            pos = (pos + ENTRY_SIZE) & capacityMask2;
+        }
+        return false;
+    }
+
     private void removePos(long posToRemove) {
         long posToShift = posToRemove;
         for (int i = 0; i <= capacityMask; i++) {
@@ -183,29 +205,13 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
-    public long getSearchPosition() {
-        return searchPos;
-    }
-
     @Override
     public void removePrevPos() {
         removePos((searchPos - ENTRY_SIZE) & capacityMask2);
     }
 
     @Override
-    public void removeSearchPos(long searchPos) {
-        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
-    }
-
-
-    @Override
     public void replacePrevPos(int newValue) {
-        replacePos(searchPos, newValue, searchHash);
-    }
-
-
-    @Override
-    public void replacePos(long searchPos, int newValue, final int searchHash) {
         long prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
@@ -215,15 +221,11 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
 
 
     @Override
-    public void putAfterFailedSearch(long searchPos, int value, final int searchHash) {
+    public void putAfterFailedSearch(int value) {
         long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
         bytes.writeLong(searchPos, entry);
     }
 
-    @Override
-    public void putAfterFailedSearch(int value) {
-        putAfterFailedSearch(searchPos, value, searchHash);
-    }
 
     public int getSearchHash() {
         return searchHash;

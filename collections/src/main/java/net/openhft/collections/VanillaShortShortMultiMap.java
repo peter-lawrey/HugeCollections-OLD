@@ -94,6 +94,8 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public boolean remove(int key, int value) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
+        else checkKey(key);
+        checkValue(value);
         int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
         int posToRemove = -1;
         for (int i = 0; i <= capacityMask; i++) {
@@ -116,6 +118,31 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             return false;
         removePos(posToRemove);
         return true;
+    }
+
+    @Override
+    public boolean replace(int key, int oldValue, int newValue) {
+        if (key == UNSET_KEY)
+            key = HASH_INSTEAD_OF_UNSET_KEY;
+        else checkKey(key);
+        checkValue(oldValue);
+        checkValue(newValue);
+        int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
+        for (int i = 0; i <= capacityMask; i++) {
+            int entry = bytes.readInt(pos);
+            int hash2 = entry >>> 16;
+            if (hash2 == key) {
+                int value2 = entry & 0xFFFF;
+                if (value2 == oldValue) {
+                    bytes.writeInt(pos, ((key << 16) | newValue));
+                    return true;
+                }
+            } else if (hash2 == UNSET_KEY) {
+                break;
+            }
+            pos = (pos + ENTRY_SIZE) & capacityMask2;
+        }
+        return false;
     }
 
     private void removePos(int posToRemove) {
@@ -172,30 +199,13 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
-    public long getSearchPosition() {
-        return searchPos;
-    }
-
-    @Override
-    public void removeSearchPos(long searchPos) {
-        removePos(((int) searchPos - ENTRY_SIZE) & capacityMask2);
-    }
-
-
     @Override
     public void removePrevPos() {
-        removeSearchPos(searchPos);
+        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
     }
-
 
     @Override
     public void replacePrevPos(int newValue) {
-        replacePos(searchPos, newValue, searchHash);
-    }
-
-
-    @Override
-    public void replacePos(long searchPos, int newValue, final int searchHash) {
         checkValue(newValue);
         int prevPos = (((int) searchPos - ENTRY_SIZE) & capacityMask2);
         // Don't need to overwrite searchHash, but we don't know our bytes
@@ -203,16 +213,10 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
     }
 
-
-    @Override
-    public void putAfterFailedSearch(long searchPos, int value, final int searchHash) {
-        checkValue(value);
-        bytes.writeInt(searchPos, ((searchHash << 16) | value));
-    }
-
     @Override
     public void putAfterFailedSearch(int value) {
-        putAfterFailedSearch(searchPos, value, searchHash);
+        checkValue(value);
+        bytes.writeInt(searchPos, ((searchHash << 16) | value));
     }
 
     public int getSearchHash() {
