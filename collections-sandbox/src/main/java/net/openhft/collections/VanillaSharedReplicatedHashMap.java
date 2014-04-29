@@ -63,8 +63,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     int multiMapsPerSegment() {
-        final VanillaSharedReplicatedHashMapBuilder builder = getBuilder();
-        return builder.canReplicate() ? 2 : 1;
+        return canReplicate ? 2 : 1;
     }
 
     /**
@@ -196,8 +195,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     new VanillaShortShortMultiMap(iimmapBytes);
             start += sizeOfMultiMap();
 
-            final VanillaSharedReplicatedHashMapBuilder builder = getBuilder();
-            if (builder.canReplicate()) {
+            if (canReplicate) {
                 final NativeBytes iimmapBytes2 =
                         new NativeBytes(null, start, start + sizeOfMultiMap(), null);
                 iimmapBytes2.load();
