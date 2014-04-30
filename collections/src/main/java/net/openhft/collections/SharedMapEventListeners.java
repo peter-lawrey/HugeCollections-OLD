@@ -77,7 +77,7 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos,SharedSegment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
             logOperation(map, entry, metaDataBytes, added ? " +put " : " put ");
         }
 

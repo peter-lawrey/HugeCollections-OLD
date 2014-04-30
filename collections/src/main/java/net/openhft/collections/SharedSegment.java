@@ -26,7 +26,7 @@ import java.util.Map;
  * Allow access to the Segments that user used to make up the shared map, these methods should be used with exceptional caution
  * and were initially introduce to facilitate remote map replication.
  */
-public interface SharedSegment<K, V> {
+ interface SharedSegment<K, V> {
 
     void lock();
 
@@ -37,4 +37,7 @@ public interface SharedSegment<K, V> {
     NativeBytes entry(long pos);
 
     int getIndex();
+
+    long offsetFromPos(int pos);
+
 }

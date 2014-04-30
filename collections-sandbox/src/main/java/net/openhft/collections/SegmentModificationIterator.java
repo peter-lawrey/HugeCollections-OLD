@@ -28,7 +28,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
-import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.EnumSet.copyOf;
@@ -46,7 +45,7 @@ import static net.openhft.collections.SegmentModificationIterator.State.REMOVE;
  *
  * @author Rob Austin.
  */
-public class SegmentModificationIterator<K, V> implements SharedMapEventListener {
+public class SegmentModificationIterator<K, V> implements SharedMapEventListener<K, V, ReplicatedSharedHashMap<K, V>> {
 
 
     private final Object notifier;
@@ -58,13 +57,30 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
 
     private final EnumSet<State> watchList;
 
+    private final int identifier;
+
+
+    public SegmentModificationIterator() {
+        this(null, 1);
+    }
+
+
     /**
      * @param notifier  if not NULL, notifyAll() is called on this object when ever an item is added to the watchlist
      * @param watchList if you don't provide a {@code watchList} all the items are deemed to be in the watchlist
      */
     public SegmentModificationIterator(@Nullable final Object notifier, final State... watchList) {
+        this(null, 1, watchList);
+    }
 
+    /**
+     * @param notifier   if not NULL, notifyAll() is called on this object when ever an item is added to the watchlist
+     * @param identifier
+     * @param watchList  if you don't provide a {@code watchList} all the items are deemed to be in the watchlist
+     */
+    public SegmentModificationIterator(@Nullable final Object notifier, int identifier, final State... watchList) {
         this.notifier = notifier;
+        this.identifier = identifier;
         this.watchList = (watchList.length == 0) ? EnumSet.allOf(State.class) : copyOf(asList(watchList));
     }
 
@@ -73,7 +89,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public Object onGetMissing(SharedHashMap map, Bytes keyBytes, Object key, Object usingValue) {
+    public V onGetMissing(ReplicatedSharedHashMap<K, V> map, Bytes keyBytes, K key, V usingValue) {
         // do nothing
         return null;
     }
@@ -82,7 +98,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value) {
+    public void onGetFound(ReplicatedSharedHashMap<K, V> map, Bytes entry, int metaDataBytes, K key, V value) {
         // do nothing
     }
 
@@ -90,8 +106,9 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos,SharedSegment segment) {
-        if (!watchList.contains(PUT))
+    public void onPut(ReplicatedSharedHashMap<K, V> map, Bytes entry, int metaDataBytes, boolean added, K key, V value, long pos, SharedSegment segment) {
+
+        if (this.identifier == map.getIdentifier() && !watchList.contains(PUT))
             return;
         final long bitIndex = (segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos;
         changes.set(bitIndex);
@@ -106,8 +123,9 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * {@inheritDoc}
      */
     @Override
-    public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
-        if (!watchList.contains(REMOVE))
+    public void onRemove(ReplicatedSharedHashMap<K, V> map, Bytes entry, int metaDataBytes, K key, V value, int pos, SharedSegment segment) {
+
+        if (this.identifier == map.getIdentifier() && !watchList.contains(REMOVE))
             return;
         changes.set((segment.getIndex() * segmentInfoProvider.getEntriesPerSegment()) + pos);
 
@@ -118,7 +136,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
 
     }
 
-    private long offset = DirectBitSet.NOT_FOUND;
+    private long position = DirectBitSet.NOT_FOUND;
 
     /**
      * you can continue to poll hasNext() until data becomes available.
@@ -127,77 +145,55 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      */
     public boolean hasNext() {
 
-        long oldOffset = offset;
+        long oldOffset = position;
 
         final long offset0 = changes.nextSetBit(oldOffset + 1);
 
         if (offset0 == DirectBitSet.NOT_FOUND) {
             if (oldOffset == DirectBitSet.NOT_FOUND)
                 return false;
-            offset = -1;
+            position = -1;
             return hasNext();
         }
         return true;
     }
 
-    public Map.Entry<K, V> nextEntry() {
+    interface EntryProcessor {
+        void onEntry(final NativeBytes entry);
+    }
 
-        long oldOffset = offset;
-        offset = changes.nextSetBit(offset + 1);
 
-        if (offset != DirectBitSet.NOT_FOUND)
-            changes.clear(offset);
+    /**
+     * @param entryProcessor
+     * @return true if an entry was processed
+     */
+    public boolean nextEntry(@NotNull final EntryProcessor entryProcessor) {
 
-        if (offset == DirectBitSet.NOT_FOUND) {
-            if (oldOffset == DirectBitSet.NOT_FOUND)
-                throw new IllegalArgumentException();
-            return nextEntry();
-        }
+        long oldOffset = position;
+        position = changes.nextSetBit(position + 1);
 
-        final int segmentIndex = (int) (offset / segmentInfoProvider.getEntriesPerSegment());
+        if (position != DirectBitSet.NOT_FOUND)
+            changes.clear(position);
+
+        if (position == DirectBitSet.NOT_FOUND)
+            return oldOffset != DirectBitSet.NOT_FOUND && nextEntry(entryProcessor);
+
+        final int segmentIndex = (int) (position / segmentInfoProvider.getEntriesPerSegment());
         final SharedSegment segment = segmentInfoProvider.getSegments()[segmentIndex];
 
-        final int segmentPos = (int) offset - (segmentInfoProvider.getEntriesPerSegment() * segmentIndex);
+        final int segmentPos = (int) position - (segmentInfoProvider.getEntriesPerSegment() * segmentIndex);
 
         segment.lock();
         try {
-            return segment.getEntry(segmentPos);
+
+            final NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
+            entryProcessor.onEntry(entry);
+            return true;
         } finally {
             segment.unlock();
         }
     }
 
-    public NativeBytes nextNativeBytes() {
-
-        long oldOffset = offset;
-
-        offset = changes.nextSetBit(offset + 1);
-        if (offset != DirectBitSet.NOT_FOUND)
-            changes.clear(offset);
-
-        if (offset == DirectBitSet.NOT_FOUND) {
-            if (oldOffset == DirectBitSet.NOT_FOUND)
-                throw new IllegalArgumentException();
-            return nextNativeBytes();
-        }
-
-        final int segmentIndex = (int) (offset / segmentInfoProvider.getEntriesPerSegment());
-        final SharedSegment segment = segmentInfoProvider.getSegments()[segmentIndex];
-
-        final int segmentPos = (int) offset - (segmentInfoProvider.getEntriesPerSegment() * segmentIndex);
-
-        segment.lock();
-        try {
-            if (offset == DirectBitSet.NOT_FOUND)
-                return null;
-            final NativeBytes nativeBytes = segment.entry(segmentPos);
-            nativeBytes.readStopBit();
-            return nativeBytes;
-        } finally {
-            segment.unlock();
-        }
-
-    }
 
     /**
      * this must be called just after construction

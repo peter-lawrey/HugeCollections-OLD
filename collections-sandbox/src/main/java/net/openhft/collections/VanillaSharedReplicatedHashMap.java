@@ -18,6 +18,7 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.MultiStoreBytes;
 import net.openhft.lang.io.NativeBytes;
@@ -132,6 +133,45 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
+    @Override
+    public void onUpdate(AbstractBytes entry) {
+
+        if (!canReplicate)
+            throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
+
+        final long keyLen = entry.readStopBit();
+        final Bytes keyBytes = entry.createSlice(entry.position(), keyLen);
+
+        final long timeStamp = entry.readLong();
+        final byte identifier = entry.readByte();
+        final boolean isDeleted = entry.readBoolean();
+
+
+        long entrySize1 = entry.position();
+
+        long hash = Hasher.hash(keyBytes);
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+
+        if (isDeleted)
+            segment(segmentNum).remoteRemove(keyBytes, segmentHash, timeStamp, identifier);
+        else {
+            long valueLen = entry.readStopBit();
+            alignment.alignPositionAddr(entry);
+            final Bytes value = entry.createSlice(entry.position(), valueLen);
+
+            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp, valueLen, entrySize1);
+        }
+
+    }
+
+
+    @Override
+    public byte getIdentifier() {
+        return localIdentifier;
+    }
+
+
     /**
      * {@inheritDoc}
      */
@@ -208,7 +248,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         private long entrySize(long keyLen, long valueLen) {
             return alignment.alignAddr(metaDataBytes +
-                    expectedStopBits(keyLen) + keyLen + (canReplicate ? 9 : 0) +
+                    expectedStopBits(keyLen) + keyLen + (canReplicate ? 10 : 0) +
                     expectedStopBits(valueLen)) + valueLen;
         }
 
@@ -246,6 +286,164 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         private long putEntryConsideringByteableValue(Bytes keyBytes, int hash2, V value) {
             return putEntry(keyBytes, hash2, value, true, localIdentifier,
                     timeProvider.currentTimeMillis(), hashLookupLiveOnly);
+        }
+
+
+        /**
+         * called from a remote node as part of replication
+         *
+         * @param keyBytes
+         * @param hash2
+         * @param timestamp
+         * @param identifier
+         * @return
+         */
+        private V remoteRemove(Bytes keyBytes, int hash2,
+                               final long timestamp, final byte identifier) {
+            lock();
+            try {
+                long keyLen = keyBytes.remaining();
+                hashLookupLiveOnly.startSearch(hash2);
+                int pos;
+                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
+                    long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEquals(keyBytes, keyLen, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLen);
+
+                    long timeStampPos = 0;
+                    if (canReplicate) {
+                        timeStampPos = entry.position();
+                        if (shouldTerminate(entry, timestamp))
+                            return null;
+                        // skip the is deleted flag
+                        entry.skip(1);
+                    }
+
+                    long valueLen = readValueLen(entry);
+                    long entryEndAddr = entry.positionAddr() + valueLen;
+
+
+                    hashLookupLiveOnly.removePrevPos();
+                    decrementSize();
+
+                    if (canReplicate) {
+                        entry.position(timeStampPos);
+                        entry.writeLong(timestamp);
+                        entry.writeByte(identifier);
+                        // was deleted
+                        entry.writeBoolean(true);
+                        // set the value len to zero
+                        //entry.writeStopBit(0);
+                    } else {
+                        free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
+                    }
+
+                }
+                // key is not found
+                return null;
+            } finally {
+                unlock();
+            }
+        }
+
+
+        /**
+         * called from a remote node as part of replication
+         *
+         * @param keyBytes
+         * @param value
+         * @param hash2
+         * @param identifier
+         * @param timestamp
+         * @param valueLen
+         * @param entrySize1
+         * @return
+         */
+        private void replicatingPut(Bytes keyBytes, Bytes value, int hash2,
+                                    final byte identifier, final long timestamp, final long valueLen, final long entrySize1) {
+            lock();
+
+            try {
+                long keyLen = keyBytes.remaining();
+                hashLookupLiveAndDeleted.startSearch(hash2);
+                int pos;
+                while ((pos = hashLookupLiveAndDeleted.nextPos()) >= 0) {
+                    long offset = offsetFromPos(pos);
+                    NativeBytes entry = entry(offset);
+                    if (!keyEquals(keyBytes, keyLen, entry))
+                        continue;
+                    // key is found
+                    entry.skip(keyLen);
+
+                    boolean wasDeleted;
+
+                    final long timeStampPos = entry.positionAddr();
+                    if (shouldTerminate(entry, timestamp))
+                        return;
+
+                    wasDeleted = entry.readBoolean();
+                    entry.positionAddr(timeStampPos);
+                    entry.writeLong(timestamp);
+                    entry.writeByte(identifier);
+                    // deleted flag
+                    entry.writeBoolean(false);
+
+
+                    // replaceValueOnPut
+                    {
+                        long valueLenPos = entry.position();
+
+                        long entryEndAddr = entry.positionAddr() + valueLen;
+                        V prevValue = null;
+                        if (!putReturnsNull)
+                            prevValue = readValue(entry, null, valueLen);
+
+                        // putValue may relocate entry and change offset
+                        putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
+
+                    }
+
+
+                    if (wasDeleted) {
+                        // remove() would have got rid of this so we have to add it back in
+                        hashLookupLiveOnly.put(hash2, pos);
+                        incrementSize();
+
+                    }
+                    return;
+
+
+                }
+
+                // key is not found
+                //   long offset = putEntry(keyBytes, hash2, value, identifier);
+
+                int pos1 = alloc(inBlocks(entrySize1));
+                long offset = offsetFromPos(pos1);
+                clearMetaData(offset);
+                NativeBytes entry = entry(offset);
+
+                entry.writeStopBit(keyLen);
+                entry.write(keyBytes);
+                entry.writeLong(timestamp);
+                entry.writeByte(identifier);
+                entry.writeBoolean(false);
+
+                entry.writeStopBit(valueLen);
+                alignment.alignPositionAddr(entry);
+                entry.write(value);
+
+                hashLookupLiveAndDeleted.putAfterFailedSearch(pos);
+                hashLookupLiveOnly.put(hash2, pos);
+
+                incrementSize();
+
+            } finally {
+                unlock();
+            }
         }
 
         V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent,

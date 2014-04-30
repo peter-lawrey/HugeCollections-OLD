@@ -431,4 +431,8 @@ public class SharedHashMapBuilder implements Cloneable {
         return errorListener().equals(that.errorListener());
 
     }
+
+    public Alignment alignment() {
+        return alignment;
+    }
 }

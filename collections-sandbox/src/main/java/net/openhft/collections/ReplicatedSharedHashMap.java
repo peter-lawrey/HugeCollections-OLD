@@ -18,10 +18,12 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
+
 /**
  * @author Rob Austin.
  */
-public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, SegmentInfoProvider {
+interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, SegmentInfoProvider {
 
 
     /**
@@ -52,7 +54,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, Segm
      *                                       <p/>
      *                                       /**
      */
-    public V put(K key, V value, byte identifier, long timeStamp);
+    V put(K key, V value, byte identifier, long timeStamp);
 
     /**
      * Used in conjunction with map replication, all remove() events that originate from a remote node will be processed using this method
@@ -80,7 +82,18 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, Segm
      *                                       and this map does not permit null keys or values
      *                                       (<a href="../Collection.html#optional-restrictions">optional</a>)
      */
-    public V remove(K key, V value, byte identifier, long timeStamp);
+    V remove(K key, V value, byte identifier, long timeStamp);
 
 
+    /**
+     * called when we receive a remote replication event
+     *
+     * @param entry the entry bytes of the remote node
+     */
+    void onUpdate(AbstractBytes entry);
+
+    /**
+     * @return used to identify which replicating node made the change
+     */
+    byte getIdentifier();
 }

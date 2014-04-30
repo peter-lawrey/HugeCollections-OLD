@@ -78,12 +78,12 @@ public class MapSocketWriter {
                                 (hasDeletedItems = deletedItems.hasNext())) {
 
                             if (hasLiveItems) {
-                                liveItems.nextEntry();
+                             //   liveItems.nextEntry();
                                 // send the data
                             }
 
                             if (hasDeletedItems) {
-                                deletedItems.nextEntry();
+                            //    deletedItems.nextEntry();
                                 // send the data
                             }
                         }

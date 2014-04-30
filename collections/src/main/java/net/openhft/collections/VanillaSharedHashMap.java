@@ -50,7 +50,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
 
 
-
     /**
      * Because DirectBitSet implementations couldn't find more
      * than 64 continuous clear or set bits.
@@ -87,10 +86,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int hashMask;
 
     private final SharedMapErrorListener errorListener;
-    private final SharedMapEventListener<K, V> eventListener;
+    private final SharedMapEventListener<K, V, AbstractVanillaSharedHashMap<K, V>> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
-    private final SharedHashMapBuilder builder;
 
     // if set the ReturnsNull fields will cause some functions to return NULL
     // rather than as returning the Object can be expensive for something you probably don't use.
@@ -103,7 +101,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     public AbstractVanillaSharedHashMap(SharedHashMapBuilder builder,
                                         Class<K> kClass, Class<V> vClass) throws IOException {
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
-        this.builder = builder;
         this.kClass = kClass;
         this.vClass = vClass;
 
@@ -653,7 +650,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        long offsetFromPos(int pos) {
+        public long offsetFromPos(int pos) {
             return entriesOffset + pos * entrySize;
         }
 
@@ -940,7 +937,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 nextPosToSearchFrom = fromPos;
         }
 
-        V readValue(NativeBytes entry, V value) {
+          V readValue(NativeBytes entry, V value) {
             return readValue(entry, value, readValueLen(entry));
         }
 
@@ -1137,8 +1134,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
          * @return relative offset of the entry in Segment bytes after putting value
          * (that may cause entry relocation)
          */
-        private long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
-                              long entryEndAddr, Bytes valueBytes) {
+        long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
+                      long entryEndAddr, Bytes valueBytes) {
             long valueLenAddr = entry.address() + valueLenPos;
             long newValueLen = valueBytes.remaining();
             long newValueAddr = alignment.alignAddr(

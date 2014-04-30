@@ -21,7 +21,7 @@ package net.openhft.collections;
 /**
  * @author Rob Austin.
  */
-public interface SegmentInfoProvider<S> {
+interface SegmentInfoProvider<S> {
 
     /**
      * @return the number of Entries Per Segment

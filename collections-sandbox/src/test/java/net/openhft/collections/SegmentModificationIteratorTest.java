@@ -1,4 +1,4 @@
-package net.openhft.collections;/*
+/**
  * Copyright 2014 Higher Frequency Trading
  * <p/>
  * http://www.higherfrequencytrading.com
@@ -15,19 +15,9 @@ package net.openhft.collections;/*
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import net.openhft.lang.model.DataValueClasses;
-import net.openhft.lang.values.LongValue;
-import org.junit.Test;
+package net.openhft.collections;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Map;
-
-import static net.openhft.collections.Alignment.NO_ALIGNMENT;
-import static net.openhft.collections.SegmentModificationIterator.State.PUT;
-import static org.junit.Assert.assertEquals;
 
 /**
  * @author Rob Austin.
@@ -44,7 +34,7 @@ public class SegmentModificationIteratorTest {
     }
 
 
-    private static SharedHashMap<CharSequence, LongValue> getSharedMap(
+   /* private static SharedHashMap<CharSequence, LongValue> getSharedMap(
             long entries, int segments, int entrySize, Alignment alignment, SharedMapEventListener eventListener)
             throws IOException {
         return new SharedHashMapBuilder()
@@ -149,7 +139,7 @@ public class SegmentModificationIteratorTest {
 
         assertEquals(expectedKeys, actualKeys2);
     }
-
+*/
 
 }
 
