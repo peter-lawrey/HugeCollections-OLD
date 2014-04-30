@@ -30,8 +30,15 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     public static final int META_BYTES_SIZE = 16;
     private byte identifier = 1;
 
+    boolean canReplicate;
+
     public boolean canReplicate() {
-        return true;
+        return canReplicate;
+    }
+
+    public VanillaSharedReplicatedHashMapBuilder canReplicate(boolean canReplicate) {
+        this.canReplicate = canReplicate;
+        return this;
     }
 
     int alignedEntrySize() {

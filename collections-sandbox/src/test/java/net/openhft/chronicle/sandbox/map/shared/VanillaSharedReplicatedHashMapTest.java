@@ -22,6 +22,8 @@ import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,16 +32,34 @@ import java.util.*;
 import static org.junit.Assert.*;
 
 /*
- * Written by Doug Lea with assistance from members of JCP JSR-166
+ * Originally written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
  * Other contributors include Andrew Wright, Jeffrey Hayes,
- * Pat Fisher, Mike Judd.
+ * Pat Fisher, Mike Judd. Then modified by the Open HFT team.
  */
-// Replicated
 
+@RunWith(value = Parameterized.class)
 public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
+    boolean canReplicate;
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> data() {
+
+        return Arrays.asList(new Object[][]{
+                {
+                        Boolean.TRUE
+                },
+                {
+                        Boolean.FALSE
+                }
+        });
+    }
+
+    public VanillaSharedReplicatedHashMapTest(Boolean canReplicate) {
+        this.canReplicate = canReplicate;
+    }
 
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
@@ -49,50 +69,56 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         return file;
     }
 
-    static SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
+    SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
-    static SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
+    SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
 
-    static SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
+    SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
 
 
         return new VanillaSharedReplicatedHashMapBuilder()
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
-    static SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
+    SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
     }
 
 
-    static SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
+    SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
-    static SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
+    SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
+                .canReplicate(canReplicate)
                 .create(getPersistenceFile(), BI.class, Boolean.class);
 
     }
@@ -100,7 +126,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     /**
      * Returns a new map from Integers 1-5 to Strings "A"-"E".
      */
-    private static SharedHashMap map5() throws IOException {
+    private SharedHashMap map5() throws IOException {
         SharedHashMap<Integer, CharSequence> map = newShmIntString(5);
         assertTrue(map.isEmpty());
         map.put(one, "A");

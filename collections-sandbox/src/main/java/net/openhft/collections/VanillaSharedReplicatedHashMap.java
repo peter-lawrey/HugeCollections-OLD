@@ -34,7 +34,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         implements ReplicatedSharedHashMap<K, V> {
     private static final Logger LOGGER =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
-    public static final int META_DATA_SIZE = 8;
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
