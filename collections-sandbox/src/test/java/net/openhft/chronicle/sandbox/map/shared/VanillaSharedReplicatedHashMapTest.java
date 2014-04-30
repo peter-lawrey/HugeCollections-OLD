@@ -430,7 +430,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     }
 
     /**
-     * putIfAbsent does not add the pair if the key is already present
+     * putIfAbsent does not add the §pair if the key is already present
      */
     @Test
     public void testPutIfAbsent2() throws IOException {

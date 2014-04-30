@@ -290,10 +290,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     } else {
 
-                        if (putReturnsNull)
-                            return null;
+                        if (!canReplicate)
+                            return putReturnsNull ? null : readValue(entry, null);
 
-                        if (canReplicate && shouldTerminate(entry, timestamp))
+                        if (shouldTerminate(entry, timestamp))
                             return null;
 
                         final boolean wasDeleted = entry.readBoolean();
@@ -303,9 +303,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             hashLookupLiveOnly.put(hash2, pos);
                             incrementSize();
                             return null;
-                        } else {
-                            return readValue(entry, null);
                         }
+
+                        return putReturnsNull ? null : readValue(entry, null);
 
                     }
                 }
@@ -322,6 +322,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         /**
+         * used only with replication, it sometimes possible to receive and old ( or stale update ) from a remote system
+         * The method is used to determine if we should ignore such updates.
+         * <p/>
          * we sometime will reject put() and removes()
          * when comparing times stamps with remote systems
          *
