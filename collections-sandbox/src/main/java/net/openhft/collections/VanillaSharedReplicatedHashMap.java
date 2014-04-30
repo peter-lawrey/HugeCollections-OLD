@@ -549,24 +549,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             K key = entry.readInstance(kClass, null); //todo: readUsing?
             if (canReplicate) {
                 // skip timestamp and id
-                entry.skip(9);
+                entry.skip(10);
             }
             V value = readValue(entry, null); //todo: reusable container
             //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
             return new WriteThroughEntry(key, value);
         }
 
-        @Override
-        void afterKeyHookOnCheckConsistency(Bytes entry) {
-            if (canReplicate) {
-                // skip timestamp and id
-                entry.skip(9);
-            }
-        }
-
-        @Override
-        IntIntMultiMap checkConsistencyHashLookup() {
-            return hashLookupLiveAndDeleted;
-        }
     }
 }

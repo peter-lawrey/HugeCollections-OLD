@@ -192,10 +192,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
 
-    <B extends SharedHashMapBuilder> B getBuilder() {
-        return (B) builder;
-    }
-
     long sizeInBytes() {
         return SharedHashMapBuilder.HEADER_SIZE +
                 segments.length * segmentSize();
