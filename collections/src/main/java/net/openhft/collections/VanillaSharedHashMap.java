@@ -80,7 +80,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final Hasher hasher;
 
     private final int replicas;
-    private final int entrySize;
+    final int entrySize;
     final Alignment alignment;
     private final int entriesPerSegment;
     final int hashMask;

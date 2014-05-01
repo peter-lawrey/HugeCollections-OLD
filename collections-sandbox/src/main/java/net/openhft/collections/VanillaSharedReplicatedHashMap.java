@@ -416,8 +416,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 // key is not found
                 //   long offset = putEntry(keyBytes, hash2, value, identifier);
 
-                int pos1 = alloc(inBlocks(entrySize1));
-                long offset = offsetFromPos(pos1);
+                pos = alloc(inBlocks(entrySize1));
+                long offset = offsetFromPos(pos);
                 clearMetaData(offset);
                 NativeBytes entry = entry(offset);
 
