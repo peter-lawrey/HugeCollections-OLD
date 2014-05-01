@@ -311,13 +311,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     entry.skip(keyLen);
 
                     long timeStampPos = 0;
-                    if (canReplicate) {
-                        timeStampPos = entry.position();
-                        if (shouldTerminate(entry, timestamp))
-                            return null;
-                        // skip the is deleted flag
-                        entry.skip(1);
-                    }
+
+                    timeStampPos = entry.position();
+                    if (shouldTerminate(entry, timestamp))
+                        return null;
+                    // skip the is deleted flag
+                    entry.skip(1);
+
 
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
@@ -326,17 +326,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     hashLookupLiveOnly.removePrevPos();
                     decrementSize();
 
-                    if (canReplicate) {
-                        entry.position(timeStampPos);
-                        entry.writeLong(timestamp);
-                        entry.writeByte(identifier);
-                        // was deleted
-                        entry.writeBoolean(true);
-                        // set the value len to zero
-                        //entry.writeStopBit(0);
-                    } else {
-                        free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
-                    }
+                    entry.position(timeStampPos);
+                    entry.writeLong(timestamp);
+                    entry.writeByte(identifier);
+                    // was deleted
+                    entry.writeBoolean(true);
+                    // set the value len to zero
+                    //entry.writeStopBit(0);
+
 
                 }
                 // key is not found
@@ -717,8 +714,20 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         void clear() {
             lock();
             try {
+
+                // todo improve how we do this, this its going to be slow,
+                // we have to make sure that every calls notifys on remove, so that the replicators can pick it up, but there must be a quicker
+                // way to do it than this.
+                if (canReplicate) {
+                    for (K k : keySet()) {
+                        VanillaSharedReplicatedHashMap.this.remove(k);
+                    }
+                }
+
                 hashLookupLiveOnly.clear();
                 resetSize();
+
+
             } finally {
                 unlock();
             }

@@ -245,8 +245,9 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return identifier;
     }
 
-    public void identifier(byte identifier) {
+    public VanillaSharedReplicatedHashMapBuilder identifier(byte identifier) {
         this.identifier = identifier;
+        return this;
     }
 
 }

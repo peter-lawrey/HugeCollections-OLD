@@ -18,30 +18,21 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
-import net.openhft.collections.*;
+import net.openhft.collections.SegmentModificationIterator;
+import net.openhft.collections.SharedHashMap;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Rob Austin.
  */
 public class ReplicationTest {
-
-    private static File getPersistenceFile() {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + System.nanoTime());
-        file.delete();
-        file.deleteOnExit();
-        return file;
-    }
 
 
     @Test
@@ -51,22 +42,23 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 = newShmIntString(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1);
-        final SharedHashMap<Integer, CharSequence> map2 = newShmIntString(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2);
+        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
 
         map1.put(1, "EXAMPLE");
-        map1.remove(1, "EXAMPLE");
 
-        map2.put(2, "EXAMPLE-2");
 
         // allow time for the recompilation to resolve
         Thread.sleep(10);
 
 
         assertEquals(map1, map2);
+        assertTrue(!map2.isEmpty());
         System.out.print(map1);
 
     }
+
+    // todo occasionally this will fail, at the moment, I have no idea why but we have to get to the bottom of this
 
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
@@ -74,10 +66,10 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, Integer> map1 = newShmIntInt(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1);
-        final SharedHashMap<Integer, Integer> map2 = newShmIntInt(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2);
+        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
 
-        for (int i = 1; i < 100000; i++) {
+        for (int i = 1; i < 1000000; i++) {
 
             final ConcurrentMap map = (Math.random() > 0.5) ? map1 : map2;
 
@@ -94,49 +86,19 @@ public class ReplicationTest {
         }
 
 
+        int i = 0;
+        for (; i < 100; i++) {
+            if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty()) {
+                i = 0;
+            }
+            Thread.sleep(1);
+        }
+
         // allow time for the recompilation to resolve
-        Thread.sleep(100);
 
 
         assertEquals(map1, map2);
         System.out.print(map1);
-
-    }
-
-
-    SharedHashMap<Integer, CharSequence> newShmIntString(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output) throws IOException {
-
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .eventListener(segmentModificationIterator);
-
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
-
-        final Executor e = Executors.newFixedThreadPool(2);
-
-        new QueueBasedReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize());
-
-        return result;
-
-    }
-
-    SharedHashMap<Integer, Integer> newShmIntInt(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output) throws IOException {
-
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .eventListener(segmentModificationIterator);
-
-        final VanillaSharedReplicatedHashMap<Integer, Integer> result = builder.create(getPersistenceFile(), Integer.class, Integer.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
-
-        final Executor e = Executors.newFixedThreadPool(2);
-
-        new QueueBasedReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize());
-
-        return result;
 
     }
 

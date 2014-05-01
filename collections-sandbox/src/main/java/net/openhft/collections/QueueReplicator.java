@@ -23,7 +23,6 @@ import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
-import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 
@@ -31,19 +30,19 @@ import java.util.concurrent.Executor;
  * @author Rob Austin.
  */
 
-public class QueueBasedReplicator<K, V> {
+public class QueueReplicator<K, V> {
 
     public static final int STOPBIT = 1;
     public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
 
 
-    public QueueBasedReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
-                                @NotNull final SegmentModificationIterator segmentModificationIterator,
-                                @NotNull final BlockingQueue<byte[]> input,
-                                @NotNull final Queue<byte[]> output,
-                                @NotNull final Executor e,
-                                @NotNull final Alignment alignment,
-                                final int entrySize) {
+    public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
+                           @NotNull final SegmentModificationIterator segmentModificationIterator,
+                           @NotNull final BlockingQueue<byte[]> input,
+                           @NotNull final BlockingQueue<byte[]> output,
+                           @NotNull final Executor e,
+                           @NotNull final Alignment alignment,
+                           final int entrySize) {
 
 
         // in bound
@@ -159,7 +158,11 @@ public class QueueBasedReplicator<K, V> {
                         dest[1] = (byte) ((count >> 8) & 0xff);
 
                         System.arraycopy(source, 0, dest, 2, length);
-                        output.add(dest);
+                        try {
+                            output.put(dest);
+                        } catch (InterruptedException e1) {
+                            //
+                        }
 
                         // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
