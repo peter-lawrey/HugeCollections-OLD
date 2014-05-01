@@ -19,7 +19,6 @@
 package net.openhft.chronicle.sandbox.map.shared;
 
 import net.openhft.collections.*;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -67,15 +66,15 @@ public class ReplicationTest {
     }
 
     @Test
-    @Ignore
     public void test() throws IOException, InterruptedException {
 
 
         final SharedHashMap<Integer, CharSequence> map = newShmIntString(10, new SegmentModificationIterator());
 
         map.put(1, "EXAMPLE");
+        Thread.sleep(100);
+        System.out.println(map.get(1));
 
-        Thread.sleep(10000);
     }
 
 

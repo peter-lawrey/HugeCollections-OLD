@@ -42,10 +42,8 @@ public class QueueBasedReplicator<K, V> {
                                 @NotNull final BlockingQueue<byte[]> input,
                                 @NotNull final Queue<byte[]> output,
                                 @NotNull final Executor e,
-                                @NotNull final Alignment alignment, int entrySize) {
-
-
-        final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
+                                @NotNull final Alignment alignment,
+                                final int entrySize) {
 
 
         // in bound
@@ -68,11 +66,18 @@ public class QueueBasedReplicator<K, V> {
                         final ByteBufferBytes bufferBytes = new ByteBufferBytes(ByteBuffer.wrap(item));
                         int numberOfEntries = bufferBytes.readShort();
 
+
                         for (int i = 1; i <= numberOfEntries; i++) {
 
-                            long entrySize = bufferBytes.readStopBit();
-                            final ByteBufferBytes slice = bufferBytes.createSlice(bufferBytes.position(), entrySize);
+                            final long entrySize = bufferBytes.readStopBit();
+
+                            // process that entry
+                            final ByteBufferBytes slice = bufferBytes.createSlice(0, entrySize);
+
+
                             replicatedMap.onUpdate(slice);
+
+                            // skip onto the next entry
                             bufferBytes.skip(entrySize);
                         }
 
@@ -94,6 +99,8 @@ public class QueueBasedReplicator<K, V> {
             @Override
             public void run() {
 
+                final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
+
                 // this is used in nextEntry() below, its what could be described as callback method
                 final SegmentModificationIterator.EntryProcessor entryProcessor = new SegmentModificationIterator.EntryProcessor() {
 
@@ -103,25 +110,30 @@ public class QueueBasedReplicator<K, V> {
                         long keyLen = entry.readStopBit();
                         entry.skip(keyLen);
 
-                        // timestamp + and id
+                        // timestamp + and id, but not the deleted flag
                         entry.skip(9);
 
                         final boolean isDeleted = entry.readBoolean();
-                        final long size;
+                        long valueLen = isDeleted ? 0 : entry.readStopBit();
 
-                        if (!isDeleted) {
-                            long valueLen = alignment.alignSize((int) entry.readStopBit());
-                            alignment.alignPositionAddr(entry);
-                            size = entry.position() + valueLen;
-
-                        } else
-                            size = entry.position();
-
-                        entry.limit(size);
-                        entry.position(0);
+                        // set the limit on the entry to the length ( in bytes ) of our entry
+                        final long position = entry.position();
 
                         // write the entry size
-                        buffer.writeStopBit(size);
+                        final long length = position + valueLen;
+                        buffer.writeStopBit(length);
+
+                        // we are going to write the first part of the entry
+                        buffer.write(entry.position(0).limit(position));
+
+                        if (isDeleted)
+                            return;
+
+                        // what we are doing here is skipping the alignment, as this wont work when we send the data over the wire.
+                        entry.position(position);
+                        alignment.alignPositionAddr(entry);
+                        entry.limit(entry.position() + valueLen);
+
                         buffer.write(entry);
 
                     }
@@ -137,18 +149,19 @@ public class QueueBasedReplicator<K, V> {
 
                     if (count == MAX_NUMBER_OF_ENTRIES_PER_CHUNK || (!wasDataRead && count > 0)) {
 
+                        // we are going to create an byte[] so that the buffer can be copied into this.
                         final byte[] source = buffer.buffer().array();
                         final int length = (int) buffer.position();
-                        final byte[] dest = new byte[(int) length + 2];
+                        final byte[] dest = new byte[length + 2];
 
                         // lets write out the number of entries in this chunk
                         dest[0] = (byte) (count & 0xff);
                         dest[1] = (byte) ((count >> 8) & 0xff);
 
-
                         System.arraycopy(source, 0, dest, 2, length);
                         output.add(dest);
 
+                        // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
 
                         // if we are not reading the MAX_NUMBER_OF_ENTRIES_PER_CHUNK then we'll sleep before doing the next one

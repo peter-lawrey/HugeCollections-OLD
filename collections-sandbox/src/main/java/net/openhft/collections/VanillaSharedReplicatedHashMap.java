@@ -140,14 +140,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
 
         final long keyLen = entry.readStopBit();
-        final Bytes keyBytes = entry.createSlice(entry.position(), keyLen);
+        final Bytes keyBytes = entry.createSlice(0, keyLen);
+        entry.skip(keyLen);
 
         final long timeStamp = entry.readLong();
         final byte identifier = entry.readByte();
         final boolean isDeleted = entry.readBoolean();
-
-
-        long entrySize1 = entry.position();
 
         long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
@@ -156,11 +154,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (isDeleted)
             segment(segmentNum).remoteRemove(keyBytes, segmentHash, timeStamp, identifier);
         else {
-            long valueLen = entry.readStopBit();
-            alignment.alignPositionAddr(entry);
-            final Bytes value = entry.createSlice(entry.position(), valueLen);
 
-            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp, valueLen, entrySize1);
+            long valueLen = entry.readStopBit();
+            final Bytes value = entry.createSlice(0, valueLen);
+            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp, valueLen, this.entrySize);
         }
 
     }
@@ -397,9 +394,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         long valueLenPos = entry.position();
 
                         long entryEndAddr = entry.positionAddr() + valueLen;
-                        V prevValue = null;
-                        if (!putReturnsNull)
-                            prevValue = readValue(entry, null, valueLen);
+
 
                         // putValue may relocate entry and change offset
                         putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
@@ -756,3 +751,4 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     }
 }
+
