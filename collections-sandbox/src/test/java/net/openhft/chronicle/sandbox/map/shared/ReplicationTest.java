@@ -42,8 +42,8 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
 
         map1.put(1, "EXAMPLE");
 
@@ -51,14 +51,11 @@ public class ReplicationTest {
         // allow time for the recompilation to resolve
         Thread.sleep(10);
 
-
         assertEquals(map1, map2);
         assertTrue(!map2.isEmpty());
         System.out.print(map1);
 
     }
-
-    // todo occasionally this will fail, at the moment, I have no idea why but we have to get to the bottom of this
 
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
@@ -66,36 +63,36 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(10, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(10, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
+        final SegmentModificationIterator segmentModificationIterator1 = new SegmentModificationIterator((byte) 1);
+        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(10, segmentModificationIterator1, map1ToMap2, map2ToMap1, (byte) 1);
+
+        final SegmentModificationIterator segmentModificationIterator2 = new SegmentModificationIterator((byte) 2);
+        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(10, segmentModificationIterator2, map2ToMap1, map1ToMap2, (byte) 2);
 
         for (int i = 1; i < 1000000; i++) {
 
-            final ConcurrentMap map = (Math.random() > 0.5) ? map1 : map2;
+            final ConcurrentMap<Integer, Integer> map = (Math.random() > 0.5) ? map1 : map2;
 
             switch ((int) (Math.random() * 2)) {
                 case 0:
-                    map.put((int) (Math.random() * 25), (int) (Math.random() * 25));
+                    map.put((int) (Math.random() * 100), (int) (Math.random() * 25));
                     break;
                 case 1:
-                    map.remove((Integer) ((int) (Math.random() * 25)));
+                    map.remove((int) (Math.random() * 78));
                     break;
-
-
             }
         }
 
-
+        // we will check 10 times that there all the work queues are empty
         int i = 0;
-        for (; i < 100; i++) {
-            if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty()) {
+        for (; i < 10; i++) {
+            if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
                 i = 0;
             }
-            Thread.sleep(1);
+            Thread.yield();
         }
 
         // allow time for the recompilation to resolve
-
 
         assertEquals(map1, map2);
         System.out.print(map1);

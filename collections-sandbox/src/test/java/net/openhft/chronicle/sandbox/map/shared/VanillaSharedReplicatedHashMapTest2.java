@@ -74,8 +74,8 @@ public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(size, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(size, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
 
         return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
 
@@ -88,8 +88,8 @@ public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<CharSequence, CharSequence> map1 = Builder.newShmStringString(size, new SegmentModificationIterator(), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<CharSequence, CharSequence> map2 = Builder.newShmStringString(size, new SegmentModificationIterator(), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<CharSequence, CharSequence> map1 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<CharSequence, CharSequence> map2 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
 
         return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 

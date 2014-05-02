@@ -34,6 +34,7 @@ public class QueueReplicator<K, V> {
 
     public static final int STOPBIT = 1;
     public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
+    private double localIdentifier;
 
 
     public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
@@ -42,8 +43,9 @@ public class QueueReplicator<K, V> {
                            @NotNull final BlockingQueue<byte[]> output,
                            @NotNull final Executor e,
                            @NotNull final Alignment alignment,
-                           final int entrySize) {
+                           final int entrySize, byte localIdentifier) {
 
+        this.localIdentifier = localIdentifier;
 
         // in bound
         e.execute(new Runnable() {
@@ -73,7 +75,6 @@ public class QueueReplicator<K, V> {
                             // process that entry
                             final ByteBufferBytes slice = bufferBytes.createSlice(0, entrySize);
 
-
                             replicatedMap.onUpdate(slice);
 
                             // skip onto the next entry
@@ -101,16 +102,29 @@ public class QueueReplicator<K, V> {
                 final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
-                final SegmentModificationIterator.EntryProcessor entryProcessor = new SegmentModificationIterator.EntryProcessor() {
+                final SegmentModificationIterator.EntryCallback entryCallback = new SegmentModificationIterator.EntryCallback() {
 
+
+                    /**
+                     *
+                     * @param entry the entry you will receive
+                     * @return false if this entry should be ignored because the {@code identifier} is not from one of our changes, WARNING even though we check the {@code identifier} in the SegmentModificationIterator the entry may have been updated.
+                     */
                     @Override
-                    public void onEntry(NativeBytes entry) {
+                    public boolean onEntry(NativeBytes entry) {
 
                         long keyLen = entry.readStopBit();
                         entry.skip(keyLen);
 
-                        // timestamp + and id, but not the deleted flag
-                        entry.skip(9);
+                        // skip the timestamp + and id, but not the deleted flag
+                        entry.skip(8);
+
+
+                        // we have to check the id again, as it may have changes since we last walked the bit-set
+                        // this use case can occur when a remote node update this entry.
+
+                        if (entry.readByte() != QueueReplicator.this.localIdentifier)
+                            return false;
 
                         final boolean isDeleted = entry.readBoolean();
                         long valueLen = isDeleted ? 0 : entry.readStopBit();
@@ -126,21 +140,22 @@ public class QueueReplicator<K, V> {
                         buffer.write(entry.position(0).limit(position));
 
                         if (isDeleted)
-                            return;
+                            return true;
 
-                        // what we are doing here is skipping the alignment, as this wont work when we send the data over the wire.
+                        // skipping the alignment, as alignment wont work when we send the data over the wire.
                         entry.position(position);
                         alignment.alignPositionAddr(entry);
                         entry.limit(entry.position() + valueLen);
 
                         buffer.write(entry);
 
+                        return true;
                     }
                 };
 
                 for (; ; ) {
 
-                    final boolean wasDataRead = segmentModificationIterator.nextEntry(entryProcessor);
+                    final boolean wasDataRead = segmentModificationIterator.nextEntry(entryCallback);
 
                     if (wasDataRead)
                         count++;
@@ -167,17 +182,19 @@ public class QueueReplicator<K, V> {
                         // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
 
-                        // if we are not reading the MAX_NUMBER_OF_ENTRIES_PER_CHUNK then we'll sleep before doing the next one
+                        // if we are not reading the MAX_NUMBER_OF_ENTRIES_PER_CHUNK then we'll sleep before re-polling
                         if (count != MAX_NUMBER_OF_ENTRIES_PER_CHUNK) {
                             try {
-                                Thread.sleep(1);
+                                Thread.sleep(10);
                             } catch (InterruptedException e1) {
-                                //
+                                e1.printStackTrace();
                             }
                         }
 
                         count = 0;
 
+                    } else {
+                        Thread.yield();
                     }
 
                 }

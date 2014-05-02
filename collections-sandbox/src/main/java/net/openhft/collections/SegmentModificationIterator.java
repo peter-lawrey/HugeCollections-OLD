@@ -18,7 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.Bytes;
@@ -33,6 +32,7 @@ import static java.util.Arrays.asList;
 import static java.util.EnumSet.copyOf;
 import static net.openhft.collections.SegmentModificationIterator.State.PUT;
 import static net.openhft.collections.SegmentModificationIterator.State.REMOVE;
+import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
  * Once a change occurs to a map, map replication requires that these changes are picked up by another thread,
@@ -60,18 +60,13 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
     private final int identifier;
 
 
-    public SegmentModificationIterator() {
-        this(null, 1);
+    public SegmentModificationIterator(byte identifier) {
+
+        this.notifier = null;
+        this.identifier = identifier;
+        this.watchList = EnumSet.allOf(State.class);
     }
 
-
-    /**
-     * @param notifier  if not NULL, notifyAll() is called on this object when ever an item is added to the watchlist
-     * @param watchList if you don't provide a {@code watchList} all the items are deemed to be in the watchlist
-     */
-    public SegmentModificationIterator(@Nullable final Object notifier, final State... watchList) {
-        this(null, 1, watchList);
-    }
 
     /**
      * @param notifier   if not NULL, notifyAll() is called on this object when ever an item is added to the watchlist
@@ -136,7 +131,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
 
     }
 
-    private long position = DirectBitSet.NOT_FOUND;
+    private long position = NOT_FOUND;
 
     /**
      * you can continue to poll hasNext() until data becomes available.
@@ -144,39 +139,33 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      * @return true if there is an entry
      */
     public boolean hasNext() {
-
-        long oldOffset = position;
-
-        final long offset0 = changes.nextSetBit(oldOffset + 1);
-
-        if (offset0 == DirectBitSet.NOT_FOUND) {
-            if (oldOffset == DirectBitSet.NOT_FOUND)
-                return false;
-            position = -1;
-            return hasNext();
-        }
-        return true;
+        return !(changes.nextSetBit(position + 1) == NOT_FOUND && changes.nextSetBit(0) == NOT_FOUND);
     }
 
-    interface EntryProcessor {
-        void onEntry(final NativeBytes entry);
+    interface EntryCallback {
+        /**
+         * call this to get an entry, this class will take care of the locking
+         *
+         * @param entry the entry you will receive
+         * @return if this entry should be ignored
+         */
+        boolean onEntry(final NativeBytes entry);
     }
 
 
     /**
-     * @param entryProcessor
+     * @param entryCallback call this to get an entry, this class will take care of the locking
      * @return true if an entry was processed
      */
-    public boolean nextEntry(@NotNull final EntryProcessor entryProcessor) {
+    public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
 
         long oldOffset = position;
         position = changes.nextSetBit(position + 1);
 
-        if (position != DirectBitSet.NOT_FOUND)
-            changes.clear(position);
+        if (position == NOT_FOUND)
+            return oldOffset != NOT_FOUND && nextEntry(entryCallback);
 
-        if (position == DirectBitSet.NOT_FOUND)
-            return oldOffset != DirectBitSet.NOT_FOUND && nextEntry(entryProcessor);
+        changes.clear(position);
 
         final int segmentIndex = (int) (position / segmentInfoProvider.getEntriesPerSegment());
         final SharedSegment segment = segmentInfoProvider.getSegments()[segmentIndex];
@@ -187,8 +176,10 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
         try {
 
             final NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
-            entryProcessor.onEntry(entry);
-            return true;
+
+            // if the entry should be ignored, we'll move the next entry
+            return entryCallback.onEntry(entry) || nextEntry(entryCallback);
+
         } finally {
             segment.unlock();
         }

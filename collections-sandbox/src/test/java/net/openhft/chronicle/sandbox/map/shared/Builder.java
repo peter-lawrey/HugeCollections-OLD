@@ -56,7 +56,7 @@ public class Builder {
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize());
+        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 
@@ -75,7 +75,7 @@ public class Builder {
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize());
+        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 
@@ -96,7 +96,7 @@ public class Builder {
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize());
+        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 

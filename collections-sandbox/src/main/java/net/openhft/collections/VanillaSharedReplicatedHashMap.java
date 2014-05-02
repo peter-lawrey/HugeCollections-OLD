@@ -258,7 +258,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 MultiStoreBytes entry = tmpBytes;
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
-                    if (canReplicate && shouldTerminate(entry, timestamp))
+                    if (canReplicate && shouldTerminate(entry, timestamp, localIdentifier))
                         return null;
                     // skip the is deleted flag
                     entry.skip(1);
@@ -313,7 +313,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     long timeStampPos = 0;
 
                     timeStampPos = entry.position();
-                    if (shouldTerminate(entry, timestamp))
+                    if (shouldTerminate(entry, timestamp, identifier))
                         return null;
                     // skip the is deleted flag
                     entry.skip(1);
@@ -375,7 +375,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     boolean wasDeleted;
 
                     final long timeStampPos = entry.positionAddr();
-                    if (shouldTerminate(entry, timestamp))
+                    if (shouldTerminate(entry, timestamp, identifier))
                         return;
 
                     wasDeleted = entry.readBoolean();
@@ -391,7 +391,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         long valueLenPos = entry.position();
 
                         long entryEndAddr = entry.positionAddr() + valueLen;
-
 
                         // putValue may relocate entry and change offset
                         putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
@@ -456,7 +455,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         boolean wasDeleted = false;
                         if (canReplicate) {
                             final long timeStampPos = entry.positionAddr();
-                            if (shouldTerminate(entry, timestamp))
+                            if (shouldTerminate(entry, timestamp, identifier))
                                 return null;
 
                             wasDeleted = entry.readBoolean();
@@ -483,7 +482,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         if (!canReplicate)
                             return putReturnsNull ? null : readValue(entry, null);
 
-                        if (shouldTerminate(entry, timestamp))
+                        if (shouldTerminate(entry, timestamp, identifier))
                             return null;
 
                         final boolean wasDeleted = entry.readBoolean();
@@ -504,9 +503,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 incrementSize();
                 notifyPut(offset, true, key, value, posFromOffset(offset));
                 return null;
-            } finally
-
-            {
+            } finally {
                 unlock();
             }
         }
@@ -519,16 +516,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * when comparing times stamps with remote systems
          *
          * @param entry
-         * @param providedTimestamp
+         * @param providedTimestamp the time the entry was created or updated
+         * @param identifier
          * @return
          */
-        private boolean shouldTerminate(NativeBytes entry, long providedTimestamp) {
+        private boolean shouldTerminate(NativeBytes entry, long providedTimestamp, byte identifier) {
 
             final long lastModifiedTimeStamp = entry.readLong();
 
             // if the readTimeStamp is newer then we'll reject this put()
             // or they are the same and have a larger id
-
             if (lastModifiedTimeStamp < providedTimestamp) {
                 entry.skip(1); // skip the byte used for the identifier
                 return false;
@@ -537,7 +534,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             if (lastModifiedTimeStamp > providedTimestamp)
                 return true;
 
-            return entry.readByte() > localIdentifier;
+            // check the identifier
+            return entry.readByte() > identifier;
 
         }
 
@@ -626,7 +624,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     long timeStampPos = 0;
                     if (canReplicate) {
                         timeStampPos = entry.position();
-                        if (shouldTerminate(entry, timestamp))
+                        if (shouldTerminate(entry, timestamp, identifier))
                             return null;
                         // skip the is deleted flag
                         entry.skip(1);
@@ -688,7 +686,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         continue;
                     // key is found
                     entry.skip(keyLen);
-                    if (canReplicate && shouldTerminate(entry, timestamp)) {
+                    if (canReplicate && shouldTerminate(entry, timestamp, localIdentifier)) {
                         return null;
                     }
 
