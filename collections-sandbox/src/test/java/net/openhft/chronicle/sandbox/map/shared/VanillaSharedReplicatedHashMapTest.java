@@ -73,6 +73,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
+                .identifier((byte)1)
                 .canReplicate(canReplicate)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
@@ -101,6 +102,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
+                .identifier((byte)1)
                 .canReplicate(canReplicate)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
@@ -111,6 +113,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .canReplicate(canReplicate)
+                .identifier((byte)1)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }

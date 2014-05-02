@@ -100,6 +100,7 @@ public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .canReplicate(canReplicate)
+                .identifier((byte)1)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
