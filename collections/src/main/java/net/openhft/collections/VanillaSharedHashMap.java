@@ -650,7 +650,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        public long offsetFromPos(int pos) {
+        public long offsetFromPos(long pos) {
             return entriesOffset + pos * entrySize;
         }
 
@@ -1209,7 +1209,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             hashLookup.forEach(entryConsumer);
         }
 
-        public Entry<K, V> getEntry(int pos) {
+        public Entry<K, V> getEntry(long pos) {
             long offset = offsetFromPos(pos);
             NativeBytes entry = entry(offset);
             entry.readStopBit();

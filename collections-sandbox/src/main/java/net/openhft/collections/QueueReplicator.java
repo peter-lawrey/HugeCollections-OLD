@@ -43,10 +43,10 @@ public class QueueReplicator<K, V> {
                            @NotNull final BlockingQueue<byte[]> output,
                            @NotNull final Executor e,
                            @NotNull final Alignment alignment,
-                           final int entrySize, byte localIdentifier) {
+                           final int _entrySize, byte localIdentifier) {
 
         this.localIdentifier = localIdentifier;
-
+        final int entrySize = _entrySize + 128;
         // in bound
         e.execute(new Runnable() {
 
@@ -65,6 +65,8 @@ public class QueueReplicator<K, V> {
                         item = input.take();
 
                         final ByteBufferBytes bufferBytes = new ByteBufferBytes(ByteBuffer.wrap(item));
+
+                        //todo remove this
                         int numberOfEntries = bufferBytes.readShort();
 
 
@@ -116,9 +118,8 @@ public class QueueReplicator<K, V> {
                         long keyLen = entry.readStopBit();
                         entry.skip(keyLen);
 
-                        // skip the timestamp + and id, but not the deleted flag
-                        entry.skip(8);
-
+                        //  timestamp, readLong is faster than skip(8)
+                        entry.readLong();
 
                         // we have to check the id again, as it may have changes since we last walked the bit-set
                         // this use case can occur when a remote node update this entry.
@@ -147,6 +148,7 @@ public class QueueReplicator<K, V> {
                         alignment.alignPositionAddr(entry);
                         entry.limit(entry.position() + valueLen);
 
+                        // writes the value into the buffer
                         buffer.write(entry);
 
                         return true;
@@ -159,6 +161,14 @@ public class QueueReplicator<K, V> {
 
                     if (wasDataRead)
                         count++;
+                    else if (count == 0)
+                        continue;
+                     /*   try {
+                     //       Thread.sleep(1);
+                            continue;
+                        } catch (InterruptedException e1) {
+                            e1.printStackTrace();
+                        }*/
 
 
                     if (count == MAX_NUMBER_OF_ENTRIES_PER_CHUNK || (!wasDataRead && count > 0)) {
@@ -169,6 +179,8 @@ public class QueueReplicator<K, V> {
                         final byte[] dest = new byte[length + 2];
 
                         // lets write out the number of entries in this chunk
+
+                        // todo remove the number of records in the chuck as its not worth having
                         dest[0] = (byte) (count & 0xff);
                         dest[1] = (byte) ((count >> 8) & 0xff);
 
@@ -181,20 +193,10 @@ public class QueueReplicator<K, V> {
 
                         // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
-
-                        // if we are not reading the MAX_NUMBER_OF_ENTRIES_PER_CHUNK then we'll sleep before re-polling
-                        if (count != MAX_NUMBER_OF_ENTRIES_PER_CHUNK) {
-                            try {
-                                Thread.sleep(10);
-                            } catch (InterruptedException e1) {
-                                e1.printStackTrace();
-                            }
-                        }
-
                         count = 0;
 
                     } else {
-                        Thread.yield();
+                        // Thread.yield();
                     }
 
                 }

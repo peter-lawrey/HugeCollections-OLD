@@ -19,6 +19,7 @@
 package net.openhft.chronicle.sandbox.map.shared;
 
 import net.openhft.collections.*;
+import net.openhft.lang.values.IntValue;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,11 +66,35 @@ public class Builder {
     static VanillaSharedReplicatedHashMap<Integer, Integer> newShmIntInt(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
+                .entries(1)
+                .entrySize(24)
+                .actualSegments(2)
                 .identifier(identifier)
                 .eventListener(segmentModificationIterator);
 
         final VanillaSharedReplicatedHashMap<Integer, Integer> result = builder.create(getPersistenceFile(), Integer.class, Integer.class);
+
+        segmentModificationIterator.setSegmentInfoProvider(result);
+
+        final Executor e = Executors.newFixedThreadPool(2);
+
+        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
+
+        return result;
+
+    }
+
+
+    static VanillaSharedReplicatedHashMap<IntValue, IntValue> newShmIntValueIntValue(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+
+        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
+                .entries(size)
+                .entrySize(24)
+                .actualSegments(2)
+                .identifier(identifier)
+                .eventListener(segmentModificationIterator);
+
+        final VanillaSharedReplicatedHashMap<IntValue, IntValue> result = builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
 
         segmentModificationIterator.setSegmentInfoProvider(result);
 

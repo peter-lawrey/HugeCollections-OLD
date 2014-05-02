@@ -30,7 +30,7 @@ import java.util.Map;
 
     void lock();
 
-    Map.Entry<K, V> getEntry(int pos);
+    Map.Entry<K, V> getEntry(long pos);
 
     void unlock();
 
@@ -38,6 +38,6 @@ import java.util.Map;
 
     int getIndex();
 
-    long offsetFromPos(int pos);
+    long offsetFromPos(long pos);
 
 }

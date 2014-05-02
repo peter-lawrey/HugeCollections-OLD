@@ -154,7 +154,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (isDeleted)
             segment(segmentNum).remoteRemove(keyBytes, segmentHash, timeStamp, identifier);
         else {
-
             long valueLen = entry.readStopBit();
             final Bytes value = entry.createSlice(0, valueLen);
             segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp, valueLen, this.entrySize);
@@ -295,8 +294,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @param identifier
          * @return
          */
-        private V remoteRemove(Bytes keyBytes, int hash2,
-                               final long timestamp, final byte identifier) {
+        private void remoteRemove(Bytes keyBytes, int hash2,
+                                  final long timestamp, final byte identifier) {
             lock();
             try {
                 long keyLen = keyBytes.remaining();
@@ -307,21 +306,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
                         continue;
+
                     // key is found
                     entry.skip(keyLen);
 
-                    long timeStampPos = 0;
+                    long timeStampPos = entry.position();
 
-                    timeStampPos = entry.position();
                     if (shouldTerminate(entry, timestamp, identifier))
-                        return null;
+                        return;
+
                     // skip the is deleted flag
                     entry.skip(1);
-
-
-                    long valueLen = readValueLen(entry);
-                    long entryEndAddr = entry.positionAddr() + valueLen;
-
 
                     hashLookupLiveOnly.removePrevPos();
                     decrementSize();
@@ -331,13 +326,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     entry.writeByte(identifier);
                     // was deleted
                     entry.writeBoolean(true);
+
                     // set the value len to zero
                     //entry.writeStopBit(0);
 
-
                 }
-                // key is not found
-                return null;
+
+                return;
             } finally {
                 unlock();
             }
@@ -742,7 +737,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @return a null value if the entry has been deleted
          */
         @Nullable
-        public Entry<K, V> getEntry(int pos) {
+        public Entry<K, V> getEntry(long pos) {
             long offset = offsetFromPos(pos);
             NativeBytes entry = entry(offset);
             entry.readStopBit();

@@ -18,7 +18,7 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.SingleThreadedDirectBitSet;
+import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
@@ -53,7 +53,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
     public enum State {PUT, REMOVE}
 
     private SegmentInfoProvider segmentInfoProvider;
-    private SingleThreadedDirectBitSet changes;
+    private ATSDirectBitSet changes;
 
     private final EnumSet<State> watchList;
 
@@ -61,7 +61,6 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
 
 
     public SegmentModificationIterator(byte identifier) {
-
         this.notifier = null;
         this.identifier = identifier;
         this.watchList = EnumSet.allOf(State.class);
@@ -170,7 +169,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
         final int segmentIndex = (int) (position / segmentInfoProvider.getEntriesPerSegment());
         final SharedSegment segment = segmentInfoProvider.getSegments()[segmentIndex];
 
-        final int segmentPos = (int) position - (segmentInfoProvider.getEntriesPerSegment() * segmentIndex);
+        final long segmentPos = position - (segmentInfoProvider.getEntriesPerSegment() * segmentIndex);
 
         segment.lock();
         try {
@@ -193,7 +192,7 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      */
     public void setSegmentInfoProvider(@NotNull final SegmentInfoProvider segmentInfoProvider) {
         this.segmentInfoProvider = segmentInfoProvider;
-        changes = new SingleThreadedDirectBitSet(new ByteBufferBytes(
+        changes = new ATSDirectBitSet(new ByteBufferBytes(
                 ByteBuffer.allocate(1 + (int) ((segmentInfoProvider.getEntriesPerSegment() * segmentInfoProvider.getSegments().length) / 8.0))));
     }
 }

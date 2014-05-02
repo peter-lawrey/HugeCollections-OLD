@@ -23,6 +23,7 @@ import net.openhft.collections.SharedHashMap;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentMap;
 
@@ -57,43 +58,50 @@ public class ReplicationTest {
 
     }
 
+
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
+
 
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
         final SegmentModificationIterator segmentModificationIterator1 = new SegmentModificationIterator((byte) 1);
-        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(10, segmentModificationIterator1, map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(20000, segmentModificationIterator1, map2ToMap1, map1ToMap2, (byte) 1);
 
         final SegmentModificationIterator segmentModificationIterator2 = new SegmentModificationIterator((byte) 2);
-        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(10, segmentModificationIterator2, map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(20000, segmentModificationIterator2, map1ToMap2, map2ToMap1, (byte) 2);
 
-        for (int i = 1; i < 1000000; i++) {
+        for (int j = 1; j < 1000; j++) {
+            Random rnd = new Random(j);
+              for (int i = 1; i < 1000; i++) {
 
-            final ConcurrentMap<Integer, Integer> map = (Math.random() > 0.5) ? map1 : map2;
+                  final int select = rnd.nextInt(2);
+                  final ConcurrentMap<Integer, Integer> map = select > 0 ? map1 : map2;
 
-            switch ((int) (Math.random() * 2)) {
-                case 0:
-                    map.put((int) (Math.random() * 100), (int) (Math.random() * 25));
-                    break;
-                case 1:
-                    map.remove((int) (Math.random() * 78));
-                    break;
+                switch (rnd.nextInt(2)) {
+                    case 0:
+                        map.put(rnd.nextInt(101) /* + select * 100 */, i);
+                        break;
+                    case 1:
+//                         map.remove(rnd.nextInt(8) /*+ select * 100 */);
+                        break;
             }
-        }
-
-        // allow time for the recompilation to resolve
-        // we will check 10 times that there all the work queues are empty
-        int i = 0;
-        for (; i < 10; i++) {
-            if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
-                i = 0;
             }
-            Thread.sleep(1);
-        }
 
-        assertEquals(map1, map2);
+            // allow time for the recompilation to resolve
+            // we will check 10 times that there all the work queues are empty
+            int i = 0;
+            for (; i < 10; i++) {
+                if (!map2ToMap1.isEmpty() || !map1ToMap2.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
+                    i = 0;
+                }
+                Thread.sleep(1);
+            }
+
+
+            assertEquals("j=" + j, map1, map2);
+        }
 
     }
 
