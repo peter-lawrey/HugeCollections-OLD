@@ -83,19 +83,17 @@ public class ReplicationTest {
             }
         }
 
+        // allow time for the recompilation to resolve
         // we will check 10 times that there all the work queues are empty
         int i = 0;
         for (; i < 10; i++) {
             if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
                 i = 0;
             }
-            Thread.yield();
+            Thread.sleep(1);
         }
 
-        // allow time for the recompilation to resolve
-
         assertEquals(map1, map2);
-        System.out.print(map1);
 
     }
 
