@@ -28,7 +28,7 @@ import java.io.IOException;
 public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
 
     public static final int META_BYTES_SIZE = 16;
-    private byte identifier = 1;
+    private byte identifier = Byte.MIN_VALUE;
 
     boolean canReplicate = true;
 
@@ -242,11 +242,16 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     }
 
     public byte identifier() {
+
+        if (identifier == Byte.MIN_VALUE)
+            throw new IllegalStateException("identifier is not set.");
+
         return identifier;
     }
 
-    public void identifier(byte identifier) {
+    public VanillaSharedReplicatedHashMapBuilder identifier(byte identifier) {
         this.identifier = identifier;
+        return this;
     }
 
 }

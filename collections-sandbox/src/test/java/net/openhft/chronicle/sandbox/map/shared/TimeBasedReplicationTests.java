@@ -54,6 +54,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -82,6 +83,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -111,6 +113,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -143,6 +146,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -172,6 +176,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -200,6 +205,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -228,6 +234,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -253,9 +260,11 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
     @Test
     public void testIgnoreWithRemotePut() throws IOException {
 
+
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -285,6 +294,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -312,6 +322,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
+                .identifier((byte)1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);

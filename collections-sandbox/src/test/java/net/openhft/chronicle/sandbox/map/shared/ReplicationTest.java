@@ -18,64 +18,83 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
-import net.openhft.collections.*;
-import org.junit.Ignore;
+import net.openhft.collections.SegmentModificationIterator;
+import net.openhft.collections.SharedHashMap;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Rob Austin.
  */
 public class ReplicationTest {
 
-    private static File getPersistenceFile() {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + System.nanoTime());
-        file.delete();
-        file.deleteOnExit();
-        return file;
-    }
 
-    SharedHashMap<Integer, CharSequence> newShmIntString(int size, final SegmentModificationIterator segmentModificationIterator) throws IOException {
-
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .eventListener(segmentModificationIterator);
+    @Test
+    public void test() throws IOException, InterruptedException {
 
 
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        segmentModificationIterator.setSegmentInfoProvider(result);
+        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+
+        map1.put(1, "EXAMPLE");
 
 
-        // final CharSequence result = map.put(1, "one");
+        // allow time for the recompilation to resolve
+        Thread.sleep(10);
 
-        final BlockingQueue<byte[]> input = new ArrayBlockingQueue<byte[]>(100);
-        //final Queue<byte[]> output = new ConcurrentLinkedQueue<byte[]>();
-        final Executor e = Executors.newFixedThreadPool(2);
-
-        new QueueBasedReplicator(result, segmentModificationIterator, input, input, e, builder.alignment(), builder.entrySize());
-
-        return result;
+        assertEquals(map1, map2);
+        assertTrue(!map2.isEmpty());
+        System.out.print(map1);
 
     }
 
     @Test
-    @Ignore
-    public void test() throws IOException, InterruptedException {
+    public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map = newShmIntString(10, new SegmentModificationIterator());
+        final SegmentModificationIterator segmentModificationIterator1 = new SegmentModificationIterator((byte) 1);
+        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(10, segmentModificationIterator1, map1ToMap2, map2ToMap1, (byte) 1);
 
-        map.put(1, "EXAMPLE");
+        final SegmentModificationIterator segmentModificationIterator2 = new SegmentModificationIterator((byte) 2);
+        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(10, segmentModificationIterator2, map2ToMap1, map1ToMap2, (byte) 2);
 
-        Thread.sleep(10000);
+        for (int i = 1; i < 1000000; i++) {
+
+            final ConcurrentMap<Integer, Integer> map = (Math.random() > 0.5) ? map1 : map2;
+
+            switch ((int) (Math.random() * 2)) {
+                case 0:
+                    map.put((int) (Math.random() * 100), (int) (Math.random() * 25));
+                    break;
+                case 1:
+                    map.remove((int) (Math.random() * 78));
+                    break;
+            }
+        }
+
+        // allow time for the recompilation to resolve
+        // we will check 10 times that there all the work queues are empty
+        int i = 0;
+        for (; i < 10; i++) {
+            if (!map1ToMap2.isEmpty() || !map2ToMap1.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
+                i = 0;
+            }
+            Thread.sleep(1);
+        }
+
+        assertEquals(map1, map2);
+
     }
 
 

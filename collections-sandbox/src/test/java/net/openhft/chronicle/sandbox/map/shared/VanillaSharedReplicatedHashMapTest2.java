@@ -19,6 +19,7 @@
 package net.openhft.chronicle.sandbox.map.shared;
 
 import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
+import net.openhft.collections.SegmentModificationIterator;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.Test;
@@ -28,6 +29,7 @@ import org.junit.runners.Parameterized;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import static org.junit.Assert.*;
 
@@ -40,7 +42,7 @@ import static org.junit.Assert.*;
  */
 
 @RunWith(value = Parameterized.class)
-public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
+public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
 
     boolean canReplicate;
 
@@ -50,14 +52,12 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         return Arrays.asList(new Object[][]{
                 {
                         Boolean.TRUE
-                },
-                {
-                        Boolean.FALSE
                 }
+
         });
     }
 
-    public VanillaSharedReplicatedHashMapTest(Boolean canReplicate) {
+    public VanillaSharedReplicatedHashMapTest2(Boolean canReplicate) {
         this.canReplicate = canReplicate;
     }
 
@@ -71,40 +71,27 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
     SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier((byte)1)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
+
+        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+
+        return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
+
 
     }
 
-    SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
-
-    }
-
-
-    SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
-
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
-
-    }
 
     SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier((byte)1)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
+
+        final SharedHashMap<CharSequence, CharSequence> map1 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<CharSequence, CharSequence> map2 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+
+        return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 
     }
 
@@ -118,13 +105,6 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
     }
 
-    SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), BI.class, Boolean.class);
-
-    }
 
     /**
      * Returns a new map from Integers 1-5 to Strings "A"-"E".

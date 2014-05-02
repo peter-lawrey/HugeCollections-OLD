@@ -49,4 +49,18 @@ public class ByteUtils {
         builder.append("]");
         return builder.toString();
     }
+
+    public static CharSequence toCharSequence(@NotNull final ByteBuffer buffer) {
+
+        final ByteBuffer slice = buffer.slice();
+        final StringBuilder builder = new StringBuilder();
+
+        while (slice.hasRemaining()) {
+            final byte b = slice.get();
+            builder.append((char)b);
+        }
+
+
+        return builder.toString();
+    }
 }
