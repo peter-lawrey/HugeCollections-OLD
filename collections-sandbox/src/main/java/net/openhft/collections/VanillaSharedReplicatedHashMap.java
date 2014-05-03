@@ -156,7 +156,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         else {
             long valueLen = entry.readStopBit();
             final Bytes value = entry.createSlice(0, valueLen);
-            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp, valueLen, this.entrySize);
+            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp);
         }
 
     }
@@ -257,11 +257,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 MultiStoreBytes entry = tmpBytes;
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
-                    if (canReplicate && shouldTerminate(entry, timestamp, localIdentifier))
-                        return null;
-                    // skip the is deleted flag
-                    entry.skip(1);
-
+                    if (canReplicate) {
+                        if (shouldTerminate(entry, timestamp, localIdentifier))
+                            return null;
+                        // skip the is deleted flag
+                        entry.skip(1);
+                    }
                     return onKeyPresentOnAcquire(key, usingValue, offset, entry);
                 } else {
                     usingValue = tryObtainUsingValueOnAcquire(keyBytes, key, usingValue, create);
@@ -298,18 +299,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                   final long timestamp, final byte identifier) {
             lock();
             try {
-                long keyLen = keyBytes.remaining();
-                hashLookupLiveOnly.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
-                    long offset = offsetFromPos(pos);
-                    NativeBytes entry = entry(offset);
-                    if (!keyEquals(keyBytes, keyLen, entry))
-                        continue;
-
-                    // key is found
-                    entry.skip(keyLen);
-
+                MultiStoreBytes entry = tmpBytes;
+                if (searchKey(keyBytes, hash2, entry, hashLookupLiveOnly) >= 0L) {
                     long timeStampPos = entry.position();
 
                     if (shouldTerminate(entry, timestamp, identifier))
@@ -329,10 +320,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     // set the value len to zero
                     //entry.writeStopBit(0);
-
                 }
-
-                return;
             } finally {
                 unlock();
             }
@@ -343,23 +331,19 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * called from a remote node as part of replication
          *
          * @param keyBytes
-         * @param value
+         * @param valueBytes
          * @param hash2
          * @param identifier
          * @param timestamp
-         * @param valueLen
-         * @param entrySize1
          * @return
          */
-        private void replicatingPut(Bytes keyBytes, Bytes value, int hash2,
-                                    final byte identifier, final long timestamp, final long valueLen, final long entrySize1) {
+        private void replicatingPut(Bytes keyBytes, Bytes valueBytes, int hash2,
+                                    final byte identifier, final long timestamp) {
             lock();
-
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookupLiveAndDeleted.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookupLiveAndDeleted.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookupLiveAndDeleted.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -367,60 +351,46 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     // key is found
                     entry.skip(keyLen);
 
-                    boolean wasDeleted;
-
                     final long timeStampPos = entry.positionAddr();
                     if (shouldTerminate(entry, timestamp, identifier))
                         return;
 
-                    wasDeleted = entry.readBoolean();
+                    boolean wasDeleted = entry.readBoolean();
                     entry.positionAddr(timeStampPos);
                     entry.writeLong(timestamp);
                     entry.writeByte(identifier);
                     // deleted flag
                     entry.writeBoolean(false);
 
-
-                    // replaceValueOnPut
-                    {
-                        long valueLenPos = entry.position();
-
-                        long entryEndAddr = entry.positionAddr() + valueLen;
-
-                        // putValue may relocate entry and change offset
-                        putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
-
-                    }
-
+                    long valueLenPos = entry.position();
+                    long valueLen = readValueLen(entry);
+                    long entryEndAddr = entry.positionAddr() + valueLen;
+                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, valueBytes);
 
                     if (wasDeleted) {
                         // remove() would have got rid of this so we have to add it back in
                         hashLookupLiveOnly.put(hash2, pos);
                         incrementSize();
-
                     }
                     return;
-
-
                 }
-
                 // key is not found
-                //   long offset = putEntry(keyBytes, hash2, value, identifier);
-
-                pos = alloc(inBlocks(entrySize1));
+                long valueLen = valueBytes.remaining();
+                int pos = alloc(inBlocks(entrySize(keyLen, valueLen)));
                 long offset = offsetFromPos(pos);
                 clearMetaData(offset);
                 NativeBytes entry = entry(offset);
 
                 entry.writeStopBit(keyLen);
                 entry.write(keyBytes);
+
                 entry.writeLong(timestamp);
                 entry.writeByte(identifier);
                 entry.writeBoolean(false);
 
                 entry.writeStopBit(valueLen);
                 alignment.alignPositionAddr(entry);
-                entry.write(value);
+                entry.write(valueBytes);
 
                 hashLookupLiveAndDeleted.putAfterFailedSearch(pos);
                 hashLookupLiveOnly.put(hash2, pos);
@@ -473,24 +443,20 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         }
 
                     } else {
+                        if (canReplicate) {
+                            if (shouldTerminate(entry, timestamp, identifier))
+                                return null;
 
-                        if (!canReplicate)
-                            return putReturnsNull ? null : readValue(entry, null);
+                            final boolean wasDeleted = entry.readBoolean();
 
-                        if (shouldTerminate(entry, timestamp, identifier))
-                            return null;
-
-                        final boolean wasDeleted = entry.readBoolean();
-
-                        if (wasDeleted) {
-                            // remove would have got rid of this so we have to add it back in
-                            hashLookupLiveOnly.put(hash2, pos);
-                            incrementSize();
-                            return null;
+                            if (wasDeleted) {
+                                // remove would have got rid of this so we have to add it back in
+                                hashLookupLiveOnly.put(hash2, pos);
+                                incrementSize();
+                                return null;
+                            }
                         }
-
                         return putReturnsNull ? null : readValue(entry, null);
-
                     }
                 }
                 // key is not found
@@ -607,8 +573,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookupLiveOnly.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookupLiveOnly.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -673,21 +638,19 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             try {
                 long keyLen = keyBytes.remaining();
                 hashLookupLiveOnly.startSearch(hash2);
-                int pos;
-                while ((pos = hashLookupLiveOnly.nextPos()) >= 0) {
+                for (int pos; (pos = hashLookupLiveOnly.nextPos()) >= 0; ) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
-                    if (canReplicate && shouldTerminate(entry, timestamp, localIdentifier)) {
-                        return null;
+                    if (canReplicate) {
+                        if (shouldTerminate(entry, timestamp, localIdentifier))
+                            return null;
+                        // skip the is deleted flag
+                        entry.skip(1);
                     }
-
-                    // skip the is deleted flag
-                    entry.skip(1);
-
                     return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry);
                 }
                 // key is not found

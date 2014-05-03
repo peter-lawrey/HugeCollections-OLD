@@ -742,7 +742,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                 long offset = offsetFromPos(pos);
                 reuse(entry, offset);
-                if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
+                if (!keyEquals(keyBytes, keyLen, entry))
                     continue;
                 // key is found
                 entry.skip(keyLen);
@@ -778,20 +778,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     ((Byteable) usingValue).bytes(null, 0);
                 return usingValue = notifyMissed(keyBytes, key, usingValue);
             }
-        }
-
-        /**
-         * Who needs this? Why only in acquire()?
-         */
-        private boolean keyEqualsForAcquire(Bytes keyBytes, long keyLen, Bytes entry) {
-            if (!LOGGER.isLoggable(Level.FINE))
-                return keyEquals(keyBytes, keyLen, entry);
-            final long start0 = System.nanoTime();
-            boolean result = keyEquals(keyBytes, keyLen, entry);
-            final long time0 = System.nanoTime() - start0;
-            if (time0 > 1e6) // 1 million nanoseconds = 1 millisecond
-                LOGGER.fine("startsWith took " + time0 / 100000 / 10.0 + " ms.");
-            return result;
         }
 
         private long putEntryConsideringByteableValue(Bytes keyBytes, V value) {
