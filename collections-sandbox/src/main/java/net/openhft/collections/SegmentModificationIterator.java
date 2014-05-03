@@ -158,13 +158,11 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
      */
     public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
 
-        long oldOffset = position;
-        position = changes.nextSetBit(position + 1);
+        long oldPosition = position;
+        position = changes.clearNextSetBit(position + 1);
 
         if (position == NOT_FOUND)
-            return oldOffset != NOT_FOUND && nextEntry(entryCallback);
-
-        changes.clear(position);
+            return oldPosition != NOT_FOUND && nextEntry(entryCallback);
 
         final int segmentIndex = (int) (position / segmentInfoProvider.getEntriesPerSegment());
         final SharedSegment segment = segmentInfoProvider.getSegments()[segmentIndex];
