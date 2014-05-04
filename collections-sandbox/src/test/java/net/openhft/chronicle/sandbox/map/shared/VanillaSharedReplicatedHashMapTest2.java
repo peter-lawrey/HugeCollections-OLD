@@ -19,9 +19,7 @@
 package net.openhft.chronicle.sandbox.map.shared;
 
 import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
-import net.openhft.collections.SegmentModificationIterator;
-import net.openhft.collections.SharedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+import net.openhft.collections.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -74,8 +72,10 @@ public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<Integer, CharSequence> map1 =
+                Builder.newShmIntString(size, map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 =
+                Builder.newShmIntString(size, map2ToMap1, map1ToMap2, (byte) 2);
 
         return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
 
@@ -88,8 +88,10 @@ public class VanillaSharedReplicatedHashMapTest2 extends SharedJSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<CharSequence, CharSequence> map1 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<CharSequence, CharSequence> map2 = Builder.newShmStringString(size, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<CharSequence, CharSequence> map1 =
+                Builder.newShmStringString(size, map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<CharSequence, CharSequence> map2 =
+                Builder.newShmStringString(size, map2ToMap1, map1ToMap2, (byte) 2);
 
         return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 

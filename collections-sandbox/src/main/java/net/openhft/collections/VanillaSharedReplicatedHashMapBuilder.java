@@ -18,9 +18,16 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.*;
+
+import static net.openhft.collections.ReplicatedSharedHashMap.EventType;
+
 
 /**
  * @author Rob Austin.
@@ -28,9 +35,11 @@ import java.io.IOException;
 public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
 
     public static final int META_BYTES_SIZE = 16;
-    private byte identifier = Byte.MIN_VALUE;
 
-    boolean canReplicate = true;
+    private byte identifier = Byte.MIN_VALUE;
+    private boolean canReplicate = true;
+    private EnumSet<EventType> watchList = EnumSet.allOf(EventType.class);
+    private @Nullable Object notifier = null;
 
     public boolean canReplicate() {
         return canReplicate;
@@ -66,6 +75,65 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
         return new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+    }
+
+    /**
+     * Returns a set of event types which should be replicated.
+     *
+     * <p>Default watch list is all possible event types
+     * (all {@link ReplicatedSharedHashMap.EventType} constants).
+     *
+     * <p>Ignored if {@link #canReplicate()} is {@code false}.
+     *
+     * @return a set of event types which should be replicated
+     */
+    public Set<EventType> watchList() {
+        return Collections.unmodifiableSet(watchList);
+    }
+
+    /**
+     * Specifies the list of event types to replicate.
+     *
+     * <p>{@code first} event type and {@code restWatchList} are separated to forbid
+     * providing an empty watch list.
+     *
+     * @return this builder object back
+     */
+    public VanillaSharedReplicatedHashMapBuilder watchList(
+            @NotNull EventType first, @NotNull EventType... restWatchList) {
+        watchList = EnumSet.of(first, restWatchList);
+        return this;
+    }
+
+    /**
+     * Returns the object which should be notified on replication events.
+     *
+     * <p>I. e. <pre>{@code
+     * synchronized (notifier) {
+     *     notifier.notifyAll();
+     * }}</pre>
+     * is called on watched replication events (see {@link #watchList()}).
+     *
+     * <p>By default returns {@code null} - no object should be notified.
+     *
+     * @return the object which should be notified on replication events
+     */
+    @Nullable
+    public Object notifier() {
+        return notifier;
+    }
+
+    /**
+     * Specifies the object which should be notified on watched replication events (see
+     * {@link #notifier()} how).
+     *
+     * @param notifier the object which should be notified on watched replication events,
+     * or {@code null} if no object should be notified
+     * @return this builder object back
+     */
+    public VanillaSharedReplicatedHashMapBuilder notifier(@Nullable Object notifier) {
+        this.notifier = notifier;
+        return this;
     }
 
 

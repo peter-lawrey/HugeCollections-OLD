@@ -45,7 +45,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
 }
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
-        implements SharedHashMap<K, V>, SegmentInfoProvider {
+        implements SharedHashMap<K, V> {
     private static final Logger LOGGER =
             Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
 
@@ -76,17 +76,21 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int metaDataBytes;
     Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    private MappedStore ms;
+    MappedStore ms;
     final Hasher hasher;
 
     private final int replicas;
     final int entrySize;
     final Alignment alignment;
-    private final int entriesPerSegment;
+    final int entriesPerSegment;
     final int hashMask;
 
     private final SharedMapErrorListener errorListener;
-    private final SharedMapEventListener<K, V, AbstractVanillaSharedHashMap<K, V>> eventListener;
+
+    /**
+     * Non-final because could be changed in VanillaSharedReplicatedHashMap constructor.
+     */
+    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
 
@@ -130,7 +134,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.segments = ss;
     }
 
-    void createMappedStoreAndSegments(File file) throws IOException {
+    long createMappedStoreAndSegments(File file) throws IOException {
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
                 sizeInBytes());
 
@@ -140,6 +144,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             this.segments[i] = createSegment(ms.createSlice(offset, segmentSize), i);
             offset += segmentSize;
         }
+        return offset;
     }
 
     Segment createSegment(NativeBytes bytes, int index) {
@@ -191,7 +196,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     long sizeInBytes() {
         return SharedHashMapBuilder.HEADER_SIZE +
-                segments.length * segmentSize();
+                segments.length * segmentSize() +
+                additionalSize();
+    }
+
+    /**
+     * For VanillaSharedReplicatedHashMap.ModificationsIterator
+     */
+    long additionalSize() {
+        return 0L;
     }
 
     long sizeOfMultiMap() {
@@ -226,14 +239,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return align64((long) entriesPerSegment * entrySize);
     }
 
-    public int getEntriesPerSegment() {
-        return entriesPerSegment;
-    }
-
     /**
      * Cache line alignment, assuming 64-byte cache lines.
      */
-    private static long align64(long l) {
+    static long align64(long l) {
         return (l + 63) & ~63;
     }
 
@@ -247,10 +256,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         ms.free();
         segments = null;
         ms = null;
-    }
-
-    public SharedSegment[] getSegments() {
-        return segments;
     }
 
     private DirectBytes acquireBufferForKey() {
@@ -1145,6 +1150,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     }
                     // RELOCATION
                     free(pos, oldSizeInBlocks);
+                    eventListener.onRelocation(pos, this);
                     int prevPos = pos;
                     pos = alloc(newSizeInBlocks);
                     // putValue() is called from put() and replace()

@@ -82,4 +82,8 @@ public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V>
                          int pos, SharedSegment segment) {
         // do nothing
     }
+
+    void onRelocation(int pos, SharedSegment segment) {
+        // do nothing
+    }
 }

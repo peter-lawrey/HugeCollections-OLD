@@ -19,7 +19,7 @@
 package net.openhft.chronicle.sandbox.map.replication.socket;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
-import net.openhft.collections.SegmentModificationIterator;
+import net.openhft.collections.ReplicatedSharedHashMap;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
@@ -50,8 +50,8 @@ public class MapSocketWriter {
                            @NotNull final String name,
                            @NotNull final ByteBuffer buffer,
                            @NotNull final Object notifier,
-                           @NotNull final SegmentModificationIterator liveItems,
-                           @NotNull final SegmentModificationIterator deletedItems) {
+                           @NotNull final ReplicatedSharedHashMap.ModificationIterator liveItems,
+                           @NotNull final ReplicatedSharedHashMap.ModificationIterator deletedItems) {
 
         this.name = name;
 

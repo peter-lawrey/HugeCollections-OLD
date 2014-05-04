@@ -44,63 +44,69 @@ public class Builder {
     }
 
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newShmIntString(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newShmIntString(
+            int size, final ArrayBlockingQueue<byte[]> input,
+            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
+        final VanillaSharedReplicatedHashMapBuilder builder =
+                new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
-                .identifier(identifier)
-                .eventListener(segmentModificationIterator);
+                .identifier(identifier);
 
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
+                builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
+        new QueueReplicator(result, result.getModificationIterator(),
+                input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 
     }
 
-    static VanillaSharedReplicatedHashMap<Integer, Integer> newShmIntInt(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+    static VanillaSharedReplicatedHashMap<Integer, Integer> newShmIntInt(
+            int size, final ArrayBlockingQueue<byte[]> input,
+            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
+        final VanillaSharedReplicatedHashMapBuilder builder =
+                new VanillaSharedReplicatedHashMapBuilder()
                 .entries(1)
                 .entrySize(24)
                 .actualSegments(2)
-                .identifier(identifier)
-                .eventListener(segmentModificationIterator);
+                .identifier(identifier);
 
-        final VanillaSharedReplicatedHashMap<Integer, Integer> result = builder.create(getPersistenceFile(), Integer.class, Integer.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
+        final VanillaSharedReplicatedHashMap<Integer, Integer> result =
+                builder.create(getPersistenceFile(), Integer.class, Integer.class);
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
+        new QueueReplicator(result, result.getModificationIterator(),
+                input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 
     }
 
 
-    static VanillaSharedReplicatedHashMap<IntValue, IntValue> newShmIntValueIntValue(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+    static VanillaSharedReplicatedHashMap<IntValue, IntValue> newShmIntValueIntValue(
+            int size, final ArrayBlockingQueue<byte[]> input,
+            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
+        final VanillaSharedReplicatedHashMapBuilder builder =
+                new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
                 .entrySize(24)
                 .actualSegments(2)
-                .identifier(identifier)
-                .eventListener(segmentModificationIterator);
+                .identifier(identifier);
 
-        final VanillaSharedReplicatedHashMap<IntValue, IntValue> result = builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
+        final VanillaSharedReplicatedHashMap<IntValue, IntValue> result =
+                builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
+        new QueueReplicator(result, result.getModificationIterator(),
+                input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 
@@ -108,20 +114,22 @@ public class Builder {
 
 
 
-    static VanillaSharedReplicatedHashMap<CharSequence, CharSequence> newShmStringString(int size, final SegmentModificationIterator segmentModificationIterator, final ArrayBlockingQueue<byte[]> input, final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+    static VanillaSharedReplicatedHashMap<CharSequence, CharSequence> newShmStringString(
+            int size, final ArrayBlockingQueue<byte[]> input,
+            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
-        final VanillaSharedReplicatedHashMapBuilder builder = new VanillaSharedReplicatedHashMapBuilder()
+        final VanillaSharedReplicatedHashMapBuilder builder =
+                new VanillaSharedReplicatedHashMapBuilder()
                 .entries(size)
-                .identifier(identifier)
-                .eventListener(segmentModificationIterator);
+                .identifier(identifier);
 
-        final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result = builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
-
-        segmentModificationIterator.setSegmentInfoProvider(result);
+        final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result =
+                builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, segmentModificationIterator, input, output, e, builder.alignment(), builder.entrySize(), identifier);
+        new QueueReplicator(result, result.getModificationIterator(),
+                input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
         return result;
 

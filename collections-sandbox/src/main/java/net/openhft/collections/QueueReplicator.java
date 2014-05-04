@@ -38,7 +38,7 @@ public class QueueReplicator<K, V> {
 
 
     public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
-                           @NotNull final SegmentModificationIterator segmentModificationIterator,
+                           @NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            @NotNull final Executor e,
@@ -104,13 +104,14 @@ public class QueueReplicator<K, V> {
                 final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
-                final SegmentModificationIterator.EntryCallback entryCallback = new SegmentModificationIterator.EntryCallback() {
+                final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
+                        new VanillaSharedReplicatedHashMap.EntryCallback() {
 
 
                     /**
                      *
                      * @param entry the entry you will receive
-                     * @return false if this entry should be ignored because the {@code identifier} is not from one of our changes, WARNING even though we check the {@code identifier} in the SegmentModificationIterator the entry may have been updated.
+                     * @return false if this entry should be ignored because the {@code identifier} is not from one of our changes, WARNING even though we check the {@code identifier} in the ModificationIterator the entry may have been updated.
                      */
                     @Override
                     public boolean onEntry(NativeBytes entry) {
@@ -157,7 +158,7 @@ public class QueueReplicator<K, V> {
 
                 for (; ; ) {
 
-                    final boolean wasDataRead = segmentModificationIterator.nextEntry(entryCallback);
+                    final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
                     if (wasDataRead)
                         count++;

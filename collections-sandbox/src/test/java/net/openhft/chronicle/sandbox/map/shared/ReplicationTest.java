@@ -18,8 +18,7 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
-import net.openhft.collections.SegmentModificationIterator;
-import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.*;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -43,8 +42,10 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 1), map1ToMap2, map2ToMap1, (byte) 1);
-        final SharedHashMap<Integer, CharSequence> map2 = Builder.newShmIntString(10, new SegmentModificationIterator((byte) 2), map2ToMap1, map1ToMap2, (byte) 2);
+        final SharedHashMap<Integer, CharSequence> map1 =
+                Builder.newShmIntString(10, map1ToMap2, map2ToMap1, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map2 =
+                Builder.newShmIntString(10, map2ToMap1, map1ToMap2, (byte) 2);
 
         map1.put(1, "EXAMPLE");
 
@@ -66,11 +67,16 @@ public class ReplicationTest {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SegmentModificationIterator segmentModificationIterator1 = new SegmentModificationIterator((byte) 1);
-        final SharedHashMap<Integer, Integer> map1 = Builder.newShmIntInt(20000, segmentModificationIterator1, map2ToMap1, map1ToMap2, (byte) 1);
 
-        final SegmentModificationIterator segmentModificationIterator2 = new SegmentModificationIterator((byte) 2);
-        final SharedHashMap<Integer, Integer> map2 = Builder.newShmIntInt(20000, segmentModificationIterator2, map1ToMap2, map2ToMap1, (byte) 2);
+        final ReplicatedSharedHashMap<Integer, Integer> map1 =
+                Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1);
+        ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator1 =
+                map1.getModificationIterator();
+
+        final ReplicatedSharedHashMap<Integer, Integer> map2 =
+                Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2);
+        ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator2 =
+                map2.getModificationIterator();
 
         for (int j = 1; j < 1000; j++) {
             Random rnd = new Random(j);
@@ -93,7 +99,9 @@ public class ReplicationTest {
             // we will check 10 times that there all the work queues are empty
             int i = 0;
             for (; i < 10; i++) {
-                if (!map2ToMap1.isEmpty() || !map1ToMap2.isEmpty() || segmentModificationIterator1.hasNext() || segmentModificationIterator2.hasNext()) {
+                if (!map2ToMap1.isEmpty() || !map1ToMap2.isEmpty() ||
+                        segmentModificationIterator1.hasNext() ||
+                        segmentModificationIterator2.hasNext()) {
                     i = 0;
                 }
                 Thread.sleep(1);

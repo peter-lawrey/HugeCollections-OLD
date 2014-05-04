@@ -19,12 +19,12 @@
 package net.openhft.collections;
 
 import net.openhft.lang.io.AbstractBytes;
+import net.openhft.lang.io.NativeBytes;
 
 /**
  * @author Rob Austin.
  */
-interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, SegmentInfoProvider {
-
+public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
     /**
      * Used in conjunction with map replication, all put() events that originate from a remote node will be processed using this method
@@ -96,4 +96,36 @@ interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V>, SegmentInfo
      * @return used to identify which replicating node made the change
      */
     byte getIdentifier();
+
+    // TODO doc
+    ModificationIterator getModificationIterator();
+
+    /**
+     * Event types which should be replicated.
+     *
+     * @see VanillaSharedReplicatedHashMapBuilder#watchList()
+     * @see VanillaSharedReplicatedHashMapBuilder#watchList(EventType, EventType...)
+     */
+    public enum EventType {
+        /**
+         * For entry insertions and value updates (when the key is already present in the map).
+         */
+        PUT,
+
+        /**
+         * For entry removals.
+         */
+        REMOVE
+    }
+
+    // TODO doc
+    public interface ModificationIterator {
+        boolean hasNext();
+        boolean nextEntry(EntryCallback callback);
+    }
+
+    // TODO doc
+    public interface EntryCallback {
+        boolean onEntry(final NativeBytes entry);
+    }
 }

@@ -54,7 +54,7 @@ public class SegmentModificationIteratorTest {
         final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator(PUT);
         final SharedHashMap<CharSequence, LongValue> sharedMap = getSharedMap(5, 128, 24, NO_ALIGNMENT, segmentModificationIterator);
 
-        segmentModificationIterator.setSegmentInfoProvider((SegmentInfoProvider) sharedMap);
+        segmentModificationIterator.setSegmentInfoProvider(sharedMap);
 
         final LongValue value = DataValueClasses.newInstance(LongValue.class);
         final int initialCapacity = 1000;
@@ -97,7 +97,7 @@ public class SegmentModificationIteratorTest {
         final SegmentModificationIterator segmentModificationIterator = new SegmentModificationIterator(null, PUT);
         final SharedHashMap<CharSequence, LongValue> sharedMap = getSharedMap(5, 128, 24, NO_ALIGNMENT, segmentModificationIterator);
 
-        segmentModificationIterator.setSegmentInfoProvider((SegmentInfoProvider) sharedMap);
+        segmentModificationIterator.setSegmentInfoProvider( sharedMap);
 
         final LongValue value = DataValueClasses.newInstance(LongValue.class);
         final int initialCapacity = 1000;
