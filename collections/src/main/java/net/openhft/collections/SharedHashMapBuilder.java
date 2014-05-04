@@ -42,8 +42,8 @@ public class SharedHashMapBuilder implements Cloneable {
     private boolean transactional = false;
     private long lockTimeOutMS = 1000;
     private int metaDataBytes = 0;
-    private SharedMapEventListener eventListener = SharedMapEventListeners.NOP;
-    private SharedMapErrorListener errorListener = SharedMapErrorListeners.LOGGING;
+    private SharedMapEventListener eventListener = SharedMapEventListeners.nop();
+    private SharedMapErrorListener errorListener = SharedMapErrorListeners.logging();
     private boolean putReturnsNull = false;
     private boolean removeReturnsNull = false;
     private boolean generatedKeyType = false;

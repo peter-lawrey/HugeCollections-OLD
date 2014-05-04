@@ -45,8 +45,8 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  *
  * @author Rob Austin.
  */
-public class SegmentModificationIterator<K, V> implements SharedMapEventListener<K, V, ReplicatedSharedHashMap<K, V>> {
-
+public class SegmentModificationIterator<K, V>
+        extends SharedMapEventListener<K, V, ReplicatedSharedHashMap<K, V>> {
 
     private final Object notifier;
 
@@ -76,24 +76,6 @@ public class SegmentModificationIterator<K, V> implements SharedMapEventListener
         this.notifier = notifier;
         this.identifier = identifier;
         this.watchList = (watchList.length == 0) ? EnumSet.allOf(State.class) : copyOf(asList(watchList));
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public V onGetMissing(ReplicatedSharedHashMap<K, V> map, Bytes keyBytes, K key, V usingValue) {
-        // do nothing
-        return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onGetFound(ReplicatedSharedHashMap<K, V> map, Bytes entry, int metaDataBytes, K key, V value) {
-        // do nothing
     }
 
     /**
