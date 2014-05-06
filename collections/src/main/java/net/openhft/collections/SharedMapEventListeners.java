@@ -20,29 +20,25 @@ import net.openhft.lang.io.Bytes;
 
 import java.util.logging.Logger;
 
-public enum SharedMapEventListeners implements SharedMapEventListener {
-    NOP {
-        @Override
-        public Object onGetMissing(SharedHashMap map, Bytes keyBytes, Object key, Object usingValue) {
-            return null;
-        }
+public final class SharedMapEventListeners {
 
-        @Override
-        public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value) {
-        }
+    /**
+     * Factories a more flexible than public static instances.
+     * We can add some configuration-on-the-first-call in the future.
+     */
 
-        @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
-        }
+    static final SharedMapEventListener NOP = new SharedMapEventListener() {};
 
-        @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
-        }
-    }, BYTES_LOGGING {
+    public static <K, V, M extends SharedHashMap<K, V>>  SharedMapEventListener<K, V, M> nop() {
+        return NOP;
+    }
+
+    private static final SharedMapEventListener BYTES_LOGGING = new SharedMapEventListener() {
         public final Logger LOGGER = Logger.getLogger(getClass().getName());
 
         @Override
-        public Object onGetMissing(SharedHashMap map, Bytes keyBytes, Object key, Object usingValue) {
+        public Object onGetMissing(SharedHashMap map, Bytes keyBytes,
+                                   Object key, Object usingValue) {
             StringBuilder sb = new StringBuilder();
             sb.append(map.file()).append(" missed ");
 
@@ -53,7 +49,8 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value) {
+        public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes,
+                               Object key, Object value) {
             logOperation(map, entry, metaDataBytes, " get ");
         }
 
@@ -77,36 +74,54 @@ public enum SharedMapEventListeners implements SharedMapEventListener {
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added,
+                          Object key, Object value, long pos, SharedSegment segment) {
             logOperation(map, entry, metaDataBytes, added ? " +put " : " put ");
         }
 
         @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
+        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes,
+                             Object key, Object value, int pos, SharedSegment segment) {
             logOperation(map, entry, metaDataBytes, " remove ");
         }
-    }, KEY_VALUE_LOGGING {
+    };
+
+    public static <K, V, M extends SharedHashMap<K, V>> SharedMapEventListener<K, V, M> bytesLogging() {
+        return BYTES_LOGGING;
+    }
+
+    private static final SharedMapEventListener KEY_VALUE_LOGGING = new SharedMapEventListener() {
         public final Logger LOGGER = Logger.getLogger(getClass().getName());
 
         @Override
-        public Object onGetMissing(SharedHashMap map, Bytes keyBytes, Object key, Object usingValue) {
+        public Object onGetMissing(SharedHashMap map, Bytes keyBytes,
+                                   Object key, Object usingValue) {
             LOGGER.info(map.file() + " missed " + key);
             return null;
         }
 
         @Override
-        public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value) {
+        public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes,
+                               Object key, Object value) {
             LOGGER.info(map.file() + " get " + key + " => " + value);
         }
 
         @Override
-        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added, Object key, Object value, long pos, SharedSegment segment) {
+        public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added,
+                          Object key, Object value, long pos, SharedSegment segment) {
             LOGGER.info(map.file() + " put " + key + " = " + value);
         }
 
         @Override
-        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes, Object key, Object value, int pos, SharedSegment segment) {
+        public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes,
+                             Object key, Object value, int pos, SharedSegment segment) {
             LOGGER.info(map.file() + " remove " + key + " was " + value);
         }
+    };
+
+    public static <K, V, M extends SharedHashMap<K, V>> SharedMapEventListener<K, V, M> keyValueLogging() {
+        return KEY_VALUE_LOGGING;
     }
+
+    private SharedMapEventListeners() {}
 }

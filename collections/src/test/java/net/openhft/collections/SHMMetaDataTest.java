@@ -32,11 +32,8 @@ public class SHMMetaDataTest {
     public void testAccessTimes() throws IOException {
         File file = new File(TMP, "testAccessTimes");
         final AtomicLong timeStamps = new AtomicLong(1);
-        SharedMapEventListener<String, String, SharedHashMap<String, String>> listener = new SharedMapEventListener<String, String,SharedHashMap<String, String>>() {
-            @Override
-            public String onGetMissing(SharedHashMap<String, String> map, Bytes keyBytes, String key, String usingValue) {
-                return null;
-            }
+        SharedMapEventListener<String, String, SharedHashMap<String, String>> listener =
+                new SharedMapEventListener<String, String,SharedHashMap<String, String>>() {
 
             @Override
             public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {

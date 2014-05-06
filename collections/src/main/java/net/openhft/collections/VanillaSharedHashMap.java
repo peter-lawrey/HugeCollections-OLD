@@ -45,7 +45,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
 }
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
-        implements SharedHashMap<K, V>, SegmentInfoProvider {
+        implements SharedHashMap<K, V> {
     private static final Logger LOGGER =
             Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
 
@@ -76,17 +76,21 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int metaDataBytes;
     Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    private MappedStore ms;
+    MappedStore ms;
     final Hasher hasher;
 
     private final int replicas;
     final int entrySize;
     final Alignment alignment;
-    private final int entriesPerSegment;
+    final int entriesPerSegment;
     final int hashMask;
 
     private final SharedMapErrorListener errorListener;
-    private final SharedMapEventListener<K, V, AbstractVanillaSharedHashMap<K, V>> eventListener;
+
+    /**
+     * Non-final because could be changed in VanillaSharedReplicatedHashMap constructor.
+     */
+    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
 
@@ -130,7 +134,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.segments = ss;
     }
 
-    void createMappedStoreAndSegments(File file) throws IOException {
+    long createMappedStoreAndSegments(File file) throws IOException {
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
                 sizeInBytes());
 
@@ -140,6 +144,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             this.segments[i] = createSegment(ms.createSlice(offset, segmentSize), i);
             offset += segmentSize;
         }
+        return offset;
     }
 
     Segment createSegment(NativeBytes bytes, int index) {
@@ -191,7 +196,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     long sizeInBytes() {
         return SharedHashMapBuilder.HEADER_SIZE +
-                segments.length * segmentSize();
+                segments.length * segmentSize() +
+                additionalSize();
+    }
+
+    /**
+     * For VanillaSharedReplicatedHashMap.ModificationsIterator
+     */
+    long additionalSize() {
+        return 0L;
     }
 
     long sizeOfMultiMap() {
@@ -226,14 +239,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return align64((long) entriesPerSegment * entrySize);
     }
 
-    public int getEntriesPerSegment() {
-        return entriesPerSegment;
-    }
-
     /**
      * Cache line alignment, assuming 64-byte cache lines.
      */
-    private static long align64(long l) {
+    static long align64(long l) {
         return (l + 63) & ~63;
     }
 
@@ -247,10 +256,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         ms.free();
         segments = null;
         ms = null;
-    }
-
-    public SharedSegment[] getSegments() {
-        return segments;
     }
 
     private DirectBytes acquireBufferForKey() {
@@ -742,7 +747,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             for (int pos; (pos = hashLookup.nextPos()) >= 0; ) {
                 long offset = offsetFromPos(pos);
                 reuse(entry, offset);
-                if (!keyEqualsForAcquire(keyBytes, keyLen, entry))
+                if (!keyEquals(keyBytes, keyLen, entry))
                     continue;
                 // key is found
                 entry.skip(keyLen);
@@ -778,20 +783,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     ((Byteable) usingValue).bytes(null, 0);
                 return usingValue = notifyMissed(keyBytes, key, usingValue);
             }
-        }
-
-        /**
-         * Who needs this? Why only in acquire()?
-         */
-        private boolean keyEqualsForAcquire(Bytes keyBytes, long keyLen, Bytes entry) {
-            if (!LOGGER.isLoggable(Level.FINE))
-                return keyEquals(keyBytes, keyLen, entry);
-            final long start0 = System.nanoTime();
-            boolean result = keyEquals(keyBytes, keyLen, entry);
-            final long time0 = System.nanoTime() - start0;
-            if (time0 > 1e6) // 1 million nanoseconds = 1 millisecond
-                LOGGER.fine("startsWith took " + time0 / 100000 / 10.0 + " ms.");
-            return result;
         }
 
         private long putEntryConsideringByteableValue(Bytes keyBytes, V value) {
@@ -1159,6 +1150,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     }
                     // RELOCATION
                     free(pos, oldSizeInBlocks);
+                    eventListener.onRelocation(pos, this);
                     int prevPos = pos;
                     pos = alloc(newSizeInBlocks);
                     // putValue() is called from put() and replace()
