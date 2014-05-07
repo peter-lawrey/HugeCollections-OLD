@@ -575,9 +575,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                 incrementSize();
                                 notifyPut(offset, true, key, value, posFromOffset(offset));
                                 return null;
-                            }
+                            } else
+                                // call by putIfAbsent(), gets here when not absent.
+                                return readValue(entry, null);
                         }
-                        notifyPut(offset, true, key, value, posFromOffset(offset));
+
                         return putReturnsNull ? null : readValue(entry, null);
                     }
                 }
