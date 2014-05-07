@@ -22,7 +22,6 @@ import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.TimeProvider;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -257,7 +256,7 @@ public class MultiMapTimeBaseReplicationTest {
 
     private void waitTillFinished() throws InterruptedException {
         int i = 0;
-        for (; i < 10; i++) {
+        for (; i < 3; i++) {
             if (!(map2ToMap1.isEmpty() && map2ToMap1.isEmpty() && !segmentModificationIterator1.hasNext() && !segmentModificationIterator2.hasNext() && mapP1.isQueueEmpty() && mapP2.isQueueEmpty())) {
                 i = 0;
             }
@@ -266,12 +265,12 @@ public class MultiMapTimeBaseReplicationTest {
     }
 
 
-    @Ignore
+   // @Ignore
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
 
-        for (int j = 1; j < 100000; j++) {
+        for (int j = 1; j < 200; j++) {
             System.out.println(j);
             Random rnd = new Random(j);
             for (int i = 1; i < 10; i++) {
@@ -282,7 +281,7 @@ public class MultiMapTimeBaseReplicationTest {
 
                 switch (rnd.nextInt(2)) {
                     case 0:
-                        map.put(rnd.nextInt(101) /* + select * 100 */, i);
+                        map.put(rnd.nextInt(10) /* + select * 100 */, i);
                         break;
                     case 1:
                         map.remove(rnd.nextInt(8) /*+ select * 100 */);
