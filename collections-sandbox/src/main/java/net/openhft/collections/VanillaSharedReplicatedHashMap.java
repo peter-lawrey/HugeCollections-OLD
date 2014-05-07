@@ -793,8 +793,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     notifyRemoved(offset, key, valueRemoved, pos);
                     return valueRemoved;
                 }
-                //  System.out.println("remove key - not found!");
-                // key is not found
+
+
                 return null;
             } finally {
                 unlock();

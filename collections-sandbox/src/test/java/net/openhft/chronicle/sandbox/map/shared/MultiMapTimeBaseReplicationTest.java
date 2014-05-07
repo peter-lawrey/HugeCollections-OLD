@@ -22,6 +22,7 @@ import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.TimeProvider;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -35,7 +36,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * @author Rob Austin.
  */
-public class MultiMapTimeBaseRepliactionTest {
+public class MultiMapTimeBaseReplicationTest {
 
     private ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator2;
     private ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator1;
@@ -106,7 +107,7 @@ public class MultiMapTimeBaseRepliactionTest {
 
 
     @Test
-    public void testPut1Remove2() throws IOException, InterruptedException {
+    public void testRemove1put2() throws IOException, InterruptedException {
 
         map2.remove(1, null, (byte) 2, 1399459457425L);
         waitTillFinished();
@@ -121,7 +122,7 @@ public class MultiMapTimeBaseRepliactionTest {
 
 
     @Test
-    public void testPut1Remove2Flip() throws IOException, InterruptedException {
+    public void testRemove1put2Flip() throws IOException, InterruptedException {
 
         map1.remove(1, null, (byte) 1, 1399459457425L);
         waitTillFinished();
@@ -193,6 +194,67 @@ public class MultiMapTimeBaseRepliactionTest {
     }
 
 
+    @Test
+    public void testRemovePut() throws IOException, InterruptedException {
+
+
+        map2.remove(1, null, (byte) 2, 1399459457425L);
+        waitTillFinished();
+        map1.put(1, 1, (byte) 1, 1399459457425L);
+
+        waitTillFinished();
+
+        assertEquals(new TreeMap(map1), new TreeMap(map2));
+
+    }
+
+
+    @Test
+    public void testRemovePutFlip() throws IOException, InterruptedException {
+
+
+        map1.remove(1, null, (byte) 1, 1399459457425L);
+        waitTillFinished();
+        map2.put(1, 1, (byte) 2, 1399459457425L);
+        waitTillFinished();
+        // we will check 10 times that there all the work queues are empty
+
+        assertEquals(new TreeMap(map1), new TreeMap(map2));
+
+
+    }
+
+
+    @Test
+    public void testPutRemove() throws IOException, InterruptedException {
+
+
+        map2.put(1, 1, (byte) 2, 1399459457425L);
+        waitTillFinished();
+        map1.remove(1, null, (byte) 1, 1399459457425L);
+        waitTillFinished();
+        // we will check 10 times that there all the work queues are empty
+
+        assertEquals(new TreeMap(map1), new TreeMap(map2));
+
+    }
+
+
+    @Test
+    public void testPutRemoveFilp() throws IOException, InterruptedException {
+
+
+        map1.put(1, 1, (byte) 1, 1399459457425L);
+        waitTillFinished();
+        map2.remove(1, null, (byte) 2, 1399459457425L);
+        waitTillFinished();
+        // we will check 10 times that there all the work queues are empty
+
+        assertEquals(new TreeMap(map1), new TreeMap(map2));
+
+    }
+
+
     private void waitTillFinished() throws InterruptedException {
         int i = 0;
         for (; i < 10; i++) {
@@ -204,6 +266,7 @@ public class MultiMapTimeBaseRepliactionTest {
     }
 
 
+    @Ignore
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
@@ -211,7 +274,7 @@ public class MultiMapTimeBaseRepliactionTest {
         for (int j = 1; j < 100000; j++) {
             System.out.println(j);
             Random rnd = new Random(j);
-            for (int i = 1; i < 900; i++) {
+            for (int i = 1; i < 10; i++) {
 
                 final int select = rnd.nextInt(2);
                 final ReplicatedSharedHashMap<Integer, Integer> map = select > 0 ? map1 : map2;
