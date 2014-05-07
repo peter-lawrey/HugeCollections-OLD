@@ -163,32 +163,47 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public void onUpdate(AbstractBytes entry) {
+        final long limit = entry.limit();
 
         if (!canReplicate)
             throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
 
         final long keyLen = entry.readStopBit();
-        final Bytes keyBytes = entry.createSlice(0, keyLen);
+
+        final long keyPosition = entry.position();
         entry.skip(keyLen);
+
+
+        final long keyLimit = entry.position();
+
+        entry.limit(keyLimit);
+        entry.position(keyPosition);
+
+        long hash = Hasher.hash(entry);
+
+
+        entry.position(keyLimit);
+
+        // set the limit back to where it should be
+        entry.limit(limit);
+
 
         final long timeStamp = entry.readLong();
         final byte identifier = entry.readByte();
         final boolean isDeleted = entry.readBoolean();
 
-        long hash = Hasher.hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
 
         if (isDeleted) {
-
-            segment(segmentNum).remoteRemove(keyBytes, segmentHash, timeStamp, identifier);
+            // this wont create an object, its just modifying the existing entry
+            final Bytes key = entry.position(keyPosition).limit(keyLimit);
+            segment(segmentNum).remoteRemove(key, segmentHash, timeStamp, identifier);
         } else {
-            long valueLen = entry.readStopBit();
-            final Bytes value = entry.createSlice(0, valueLen);
-
-            value.position(0);
-
-            segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp);
+            final long valueLen = entry.readStopBit();
+            final long valuePosition = entry.position();
+            final long valueLimit = valuePosition + valueLen;
+            segment(segmentNum).replicatingPut(entry, segmentHash, identifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
         }
 
     }
@@ -390,23 +405,29 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * called from a remote node as part of replication
          *
-         * @param keyBytes
-         * @param valueBytes
          * @param hash2
          * @param identifier
          * @param timestamp
+         * @param keyPosition
+         * @param keyLimit
          * @return
          */
-        private void replicatingPut(Bytes keyBytes, Bytes valueBytes, int hash2,
-                                    final byte identifier, final long timestamp) {
+        private void replicatingPut(Bytes inBytes, int hash2,
+                                    final byte identifier, final long timestamp, long valuePos, long valueLimit, long keyPosition, long keyLimit) {
             lock();
             try {
-                long keyLen = keyBytes.remaining();
+
+                final long keyLen = keyLimit - keyPosition;
+
                 hashLookupLiveAndDeleted.startSearch(hash2);
                 for (int pos; (pos = hashLookupLiveAndDeleted.nextPos()) >= 0; ) {
+
+                    inBytes.limit(keyLimit);
+                    inBytes.position(keyPosition);
+
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
-                    if (!keyEquals(keyBytes, keyLen, entry))
+                    if (!keyEquals(inBytes, keyLen, entry))
                         continue;
                     // key is found
                     entry.skip(keyLen);
@@ -417,10 +438,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     entry.positionAddr(timeStampPos);
 
                     if (shouldTerminate(entry, timestamp, identifier)) {
-
                         entry.positionAddr(timeStampPos);
-
-
                         return;
                     }
 
@@ -439,7 +457,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     long valueLenPos = entry.position();
                     long valueLen = readValueLen(entry);
                     long entryEndAddr = entry.positionAddr() + valueLen;
-                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, valueBytes);
+
+                    // write the value
+                    inBytes.limit(valueLimit);
+                    inBytes.position(valuePos);
+
+                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, inBytes);
 
                     if (wasDeleted) {
                         // remove() would have got rid of this so we have to add it back in
@@ -449,14 +472,21 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     return;
                 }
                 // key is not found
-                long valueLen = valueBytes.remaining();
+                long valueLen = valueLimit - valuePos;
                 int pos = alloc(inBlocks(entrySize(keyLen, valueLen)));
                 long offset = offsetFromPos(pos);
                 clearMetaData(offset);
                 NativeBytes entry = entry(offset);
 
                 entry.writeStopBit(keyLen);
-                entry.write(keyBytes);
+
+                // write the key
+
+                inBytes.limit(keyLimit);
+                inBytes.position(keyPosition);
+
+                entry.write(inBytes);
+
 
                 entry.writeLong(timestamp);
                 entry.writeByte(identifier);
@@ -464,7 +494,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                 entry.writeStopBit(valueLen);
                 alignment.alignPositionAddr(entry);
-                entry.write(valueBytes);
+
+                // write the value
+                inBytes.limit(valueLimit);
+                inBytes.position(valuePos);
+
+                entry.write(inBytes);
+
 
                 hashLookupLiveAndDeleted.putAfterFailedSearch(pos);
                 hashLookupLiveOnly.put(hash2, pos);
@@ -838,12 +874,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      * Once a change occurs to a map, map replication requires
      * that these changes are picked up by another thread,
      * this class provides an iterator like interface to poll for such changes.
-     *
+     * <p/>
      * In most cases the thread that adds data to the node is unlikely to be the same thread
      * that replicates the data over to the other nodes,
      * so data will have to be marshaled between the main thread storing data to the map,
      * and the thread running the replication.
-     *
+     * <p/>
      * One way to perform this marshalling, would be to pipe the data into a queue. However,
      * This class takes another approach. It uses a bit set, and marks bits
      * which correspond to the indexes of the entries that have changed.

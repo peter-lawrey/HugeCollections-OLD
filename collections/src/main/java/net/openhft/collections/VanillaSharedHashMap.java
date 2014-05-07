@@ -513,7 +513,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         static long hash(Bytes bytes) {
             long h = 0;
-            int i = 0;
+            long i =  bytes.position();
             long limit = bytes.limit(); // clustering.
             for (; i < limit - 7; i += 8)
                 h = 1011001110001111L * h + bytes.readLong(i);

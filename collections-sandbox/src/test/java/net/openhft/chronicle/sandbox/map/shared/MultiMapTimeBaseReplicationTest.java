@@ -153,9 +153,9 @@ public class MultiMapTimeBaseReplicationTest {
     @Test
     public void testPut1Put1SameTimes() throws IOException, InterruptedException {
 
-        map1.put(1, 894, (byte) 1, 0L);
+        map1.put(1, 10, (byte) 1, 0L);
         waitTillFinished();
-        map2.put(1, 895, (byte) 2, 0L);
+        map2.put(1, 20, (byte) 2, 0L);
 
         // we will check 10 times that there all the work queues are empty
         waitTillFinished();
@@ -270,7 +270,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
 
-        for (int j = 1; j < 200; j++) {
+        for (int j = 1; j < 50; j++) {
             System.out.println(j);
             Random rnd = new Random(j);
             for (int i = 1; i < 10; i++) {

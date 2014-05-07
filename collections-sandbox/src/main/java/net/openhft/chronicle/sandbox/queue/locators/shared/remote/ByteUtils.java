@@ -18,6 +18,7 @@
 
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
+import net.openhft.lang.io.Bytes;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
@@ -53,11 +54,34 @@ public class ByteUtils {
     public static CharSequence toCharSequence(@NotNull final ByteBuffer buffer) {
 
         final ByteBuffer slice = buffer.slice();
+        slice.limit(buffer.limit());
+        slice.position(buffer.position());
+
         final StringBuilder builder = new StringBuilder();
 
         while (slice.hasRemaining()) {
             final byte b = slice.get();
-            builder.append((char)b);
+            builder.append((char) b);
+        }
+
+
+        return builder.toString();
+    }
+
+    public static CharSequence toCharSequence(@NotNull final Bytes buffer) {
+
+        final Bytes slice = buffer.createSlice();
+
+     //   slice.limit(buffer.limit());
+       // slice.position(buffer.position());
+        slice.position(0);
+        slice.limit(buffer.limit()-buffer.position());
+
+        final StringBuilder builder = new StringBuilder();
+
+        while (slice.remaining() > 0) {
+            final byte b = slice.readByte();
+            builder.append((char) b);
         }
 
 

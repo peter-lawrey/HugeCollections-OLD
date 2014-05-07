@@ -100,11 +100,14 @@ public class QueueReplicator<K, V> {
 
                                 final long entrySize = bufferBytes.readStopBit();
 
-                                // process that entry
-                                final ByteBufferBytes slice = bufferBytes.createSlice(0, entrySize);
+                                final long position = bufferBytes.position();
+                                final long limit = bufferBytes.limit();
 
-                                replicatedMap.onUpdate(slice);
+                                bufferBytes.limit(position+entrySize);
+                                replicatedMap.onUpdate(bufferBytes);
 
+                                bufferBytes.position(position);
+                                bufferBytes.limit(limit);
 
                                 // skip onto the next entry
                                 bufferBytes.skip(entrySize);
@@ -279,3 +282,4 @@ public class QueueReplicator<K, V> {
     }
 
 }
+
