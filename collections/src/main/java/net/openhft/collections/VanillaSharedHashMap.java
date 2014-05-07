@@ -29,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;

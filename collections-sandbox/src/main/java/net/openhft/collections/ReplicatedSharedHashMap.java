@@ -41,7 +41,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @param value      value to be associated with the specified key
      * @param identifier a unique identifier for a replicating node
      * @param timeStamp  timestamp in milliseconds, that the put() occurred
-     * @return
+     * @return the previous value
      * @throws UnsupportedOperationException if the <tt>put</tt> operation
      *                                       is not supported by this map
      * @throws ClassCastException            if the class of the specified key or value
@@ -106,7 +106,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @see VanillaSharedReplicatedHashMapBuilder#watchList()
      * @see VanillaSharedReplicatedHashMapBuilder#watchList(EventType, EventType...)
      */
-    public enum EventType {
+    enum EventType {
         /**
          * For entry insertions and value updates (when the key is already present in the map).
          */
@@ -119,13 +119,20 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     }
 
     // TODO doc
-    public interface ModificationIterator {
+    interface ModificationIterator {
         boolean hasNext();
+
         boolean nextEntry(EntryCallback callback);
     }
 
     // TODO doc
-    public interface EntryCallback {
+    interface EntryCallback {
         boolean onEntry(final NativeBytes entry);
+
+        void onAfterEntry();
+
+        void onBeforeEntry();
     }
+
+
 }

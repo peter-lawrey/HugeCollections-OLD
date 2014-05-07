@@ -19,7 +19,7 @@
 package net.openhft.collections;
 
 /**
- * TimeProvider was created initially  to support testing of VanillaSharedReplicatedHashMap, with the aim of possibly later providing and optimization to System.currentTimeMillis() on every call to put(), get() and remove()
+ * TimeProvider was created initially to support testing of VanillaSharedReplicatedHashMap, with the aim of possibly later providing and optimization to System.currentTimeMillis() on every call to put(), get() and remove()
  *
  * @author Rob Austin.
  */

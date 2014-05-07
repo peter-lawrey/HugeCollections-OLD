@@ -18,7 +18,9 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
-import net.openhft.collections.*;
+import net.openhft.collections.QueueReplicator;
+import net.openhft.collections.VanillaSharedReplicatedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import net.openhft.lang.values.IntValue;
 
 import java.io.File;
@@ -50,8 +52,8 @@ public class Builder {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier(identifier);
+                        .entries(size)
+                        .identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
@@ -65,26 +67,46 @@ public class Builder {
 
     }
 
-    static VanillaSharedReplicatedHashMap<Integer, Integer> newShmIntInt(
+    interface MapProvider<T> {
+        T getMap();
+
+        boolean isQueueEmpty();
+    }
+
+    static MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> newShmIntInt(
             int size, final ArrayBlockingQueue<byte[]> input,
             final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
-                .entries(1)
-                .entrySize(24)
-                .actualSegments(2)
-                .identifier(identifier);
+                        .entries(size)
+                        .entrySize(24)
+                        .actualSegments(2)
+                        .identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<Integer, Integer> result =
                 builder.create(getPersistenceFile(), Integer.class, Integer.class);
 
         final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, result.getModificationIterator(),
+        final QueueReplicator q = new QueueReplicator(result, result.getModificationIterator(),
                 input, output, e, builder.alignment(), builder.entrySize(), identifier);
 
-        return result;
+
+        return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
+
+            @Override
+            public VanillaSharedReplicatedHashMap<Integer, Integer> getMap() {
+                return result;
+            }
+
+            @Override
+            public boolean isQueueEmpty() {
+                return q.isEmpty();
+            }
+
+        };
+
 
     }
 
@@ -95,10 +117,10 @@ public class Builder {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .entrySize(24)
-                .actualSegments(2)
-                .identifier(identifier);
+                        .entries(size)
+                        .entrySize(24)
+                        .actualSegments(2)
+                        .identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<IntValue, IntValue> result =
                 builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
@@ -113,15 +135,14 @@ public class Builder {
     }
 
 
-
     static VanillaSharedReplicatedHashMap<CharSequence, CharSequence> newShmStringString(
             int size, final ArrayBlockingQueue<byte[]> input,
             final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier(identifier);
+                        .entries(size)
+                        .identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result =
                 builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
