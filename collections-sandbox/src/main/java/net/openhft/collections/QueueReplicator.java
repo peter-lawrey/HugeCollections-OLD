@@ -24,7 +24,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,7 +47,6 @@ public class QueueReplicator<K, V> {
                            @NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
-                           @NotNull final Executor e,
                            @NotNull final Alignment alignment,
                            final int _entrySize, byte localIdentifier) {
 
@@ -67,7 +65,6 @@ public class QueueReplicator<K, V> {
             }
 
         }).execute(new Runnable() {
-
 
             @Override
             public void run() {

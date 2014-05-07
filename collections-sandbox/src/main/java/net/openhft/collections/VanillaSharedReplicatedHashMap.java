@@ -186,11 +186,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             long valueLen = entry.readStopBit();
             final Bytes value = entry.createSlice(0, valueLen);
 
-     /*       StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < valueLen; i++) {
-                builder.append((char) entry.readByte());
-            }*/
-            //    System.out.println("new-value=" + builder);
             value.position(0);
 
             segment(segmentNum).replicatingPut(keyBytes, value, segmentHash, identifier, timeStamp);
@@ -365,8 +360,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         return;
                     }
 
-                    // if !wasDeleted
-                    if (!entry.readBoolean())
+                    //      System.out.println("Status=OK");
+                    // skip the is deleted flag
+                    boolean wasDeleted = entry.readBoolean();
+
+
+                    if (!wasDeleted)
                         hashLookupLiveOnly.remove(hash2, pos);
 
                     decrementSize();
@@ -414,7 +413,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     final long timeStampPos = entry.positionAddr();
 
+
+                    entry.positionAddr(timeStampPos);
+
                     if (shouldTerminate(entry, timestamp, identifier)) {
+
+                        entry.positionAddr(timeStampPos);
+
+
                         return;
                     }
 
@@ -525,8 +531,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             if (shouldTerminate(entry, timestamp, identifier))
                                 return null;
 
-                            // if was deleted
-                            if (entry.readBoolean()) {
+                            boolean wasDeleted = entry.readBoolean();
+
+                            if (wasDeleted) {
                                 // remove would have got rid of this so we have to add it back in
                                 hashLookupLiveOnly.put(hash2, pos);
                                 incrementSize();
@@ -689,8 +696,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                             // was deleted
                             entry.writeBoolean(true);
-                            notifyRemoved(offset, key, null, pos);
 
+
+                            notifyRemoved(offset, key, null, pos);
                             return null;
                         }
                     }
@@ -830,12 +838,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      * Once a change occurs to a map, map replication requires
      * that these changes are picked up by another thread,
      * this class provides an iterator like interface to poll for such changes.
-     * <p/>
+     *
      * In most cases the thread that adds data to the node is unlikely to be the same thread
      * that replicates the data over to the other nodes,
      * so data will have to be marshaled between the main thread storing data to the map,
      * and the thread running the replication.
-     * <p/>
+     *
      * One way to perform this marshalling, would be to pipe the data into a queue. However,
      * This class takes another approach. It uses a bit set, and marks bits
      * which correspond to the indexes of the entries that have changed.
