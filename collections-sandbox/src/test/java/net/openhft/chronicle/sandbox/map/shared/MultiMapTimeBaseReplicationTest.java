@@ -72,6 +72,10 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut2Remove2Remove2Put1() throws IOException, InterruptedException {
 
 
+        map2.clear();
+        map1.clear();
+        waitTillFinished();
+
         map2.put(1, 1, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457426L);
@@ -260,12 +264,12 @@ public class MultiMapTimeBaseReplicationTest {
             if (!(map2ToMap1.isEmpty() && map2ToMap1.isEmpty() && !segmentModificationIterator1.hasNext() && !segmentModificationIterator2.hasNext() && mapP1.isQueueEmpty() && mapP2.isQueueEmpty())) {
                 i = 0;
             }
-            Thread.sleep(1);
+            Thread.sleep(2);
         }
     }
 
 
-   // @Ignore
+    // @Ignore
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
