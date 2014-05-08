@@ -103,7 +103,7 @@ public class QueueReplicator<K, V> {
                                 final long position = bufferBytes.position();
                                 final long limit = bufferBytes.limit();
 
-                                bufferBytes.limit(position+entrySize);
+                                bufferBytes.limit(position + entrySize);
                                 replicatedMap.onUpdate(bufferBytes);
 
                                 bufferBytes.position(position);
@@ -151,9 +151,7 @@ public class QueueReplicator<K, V> {
 
 
                             /**
-                             *
-                             * @param entry the entry you will receive
-                             * @return false if this entry should be ignored because the {@code identifier} is not from one of our changes, WARNING even though we check the {@code identifier} in the ModificationIterator the entry may have been updated.
+                             * {@inheritDoc}
                              */
                             @Override
                             public boolean onEntry(NativeBytes entry) {
@@ -197,11 +195,17 @@ public class QueueReplicator<K, V> {
                                 return true;
                             }
 
+                            /**
+                             * {@inheritDoc}
+                             */
                             @Override
                             public void onAfterEntry() {
                                 isWritingEntry.set(false);
                             }
 
+                            /**
+                             * {@inheritDoc}
+                             */
                             @Override
                             public void onBeforeEntry() {
                                 isWritingEntry.set(true);

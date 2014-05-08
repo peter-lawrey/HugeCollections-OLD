@@ -35,7 +35,27 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.REMOVE;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
-
+/**
+ * A Replicating Multi Master HashMap
+ *
+ * Each remote hash-map, mirrors its changes over to another remote hash map, neither hash map is considered the master store of data, each hash map uses timestamps to reconcile changes.
+ * We refer to in instance of a remote hash-map as a node. A node will be connected to any number of other nodes, for the first implementation the maximum number of nodes will be fixed.
+ * The data that is stored locally in each node will become eventually consistent. So changes made to one node, for example by calling put() will be replicated over to the other node.
+ * To achieve a high level of performance and throughput, the call to put() won’t block, with concurrentHashMap,
+ * It is typical to check the return code of some methods to obtain the old value for example remove().
+ * Due to the loose coupling and lock free nature of this multi master implementation,  this return value will only be the old value on the nodes local data store.
+ * In other words the nodes are only concurrent locally. Its worth realising that another node performing exactly the same operation may return a different value.
+ * However reconciliation will ensure the maps themselves become eventually consistent.
+ *
+ * Reconciliation
+ *
+ * If two ( or more nodes ) were to receive a change to their maps for the same key but different values, say by a user of the maps, calling the put(<key>,<value>). Then, initially each node will update its local store and each local store will hold a different value, but the aim of multi master replication is to provide eventual consistency across the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change. We will refer to this notification as an event. The event will hold a timestamp indicating the time the change occurred, it will also hold the state transition, in this case it was a put with a key and value.
+ * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be applied to the local node, otherwise the event will be ignored.
+ * However there is an edge case that we have to concern ourselves with, If two nodes update their map at the same time with different values, we have to deterministically resolve which update wins, because of eventual consistency both nodes should end up locally holding the same data. Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same key, we have to handle this edge case, its therefore important not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp should win, but in this example both timestamps are the same, and the decision made to one node should be identical to the decision made to the other. We resolve this simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node with the smallest identifier wins.
+ *
+ * @param <K>
+ * @param <V>
+ */
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V> {
     private static final Logger LOGGER =
@@ -118,6 +138,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
+
+    /**
+     * @param key              key with which the specified value is associated
+     * @param value            value expected to be associated with the specified key
+     * @param replaceIfPresent set to false for putIfAbsent()
+     * @param identifier       used to identify which replicating node made the change
+     * @param timeStamp        the time that that change was made, this is used for replication
+     * @return the value that was replaced
+     */
     private V put0(K key, V value, boolean replaceIfPresent,
                    final byte identifier, long timeStamp) {
         checkKey(key);
@@ -130,6 +159,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 identifier, timeStamp);
     }
 
+    /**
+     * @param segmentNum a unique index of the segment
+     * @return the segment associated with the {@code segmentNum}
+     */
     private Segment segment(int segmentNum) {
         return (Segment) segments[segmentNum];
     }
@@ -160,7 +193,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void onUpdate(AbstractBytes entry) {
         final long limit = entry.limit();
@@ -208,7 +243,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public ReplicatedSharedHashMap.ModificationIterator getModificationIterator() {
         if (!canReplicate)
@@ -216,6 +253,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return (ReplicatedSharedHashMap.ModificationIterator) eventListener;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public byte getIdentifier() {
         return localIdentifier;
@@ -264,6 +304,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
 
     class Segment extends VanillaSharedHashMap<K, V>.Segment implements SharedSegment {
+
         private volatile IntIntMultiMap hashLookupLiveAndDeleted;
         private volatile IntIntMultiMap hashLookupLiveOnly;
 
@@ -403,7 +444,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
 
         /**
-         * called from a remote node as part of replication
+         * called from a remote node when it wishes to propagate a remove event
          *
          * @param hash2
          * @param identifier
@@ -412,8 +453,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @param keyLimit
          * @return
          */
-        private void replicatingPut(Bytes inBytes, int hash2,
-                                    final byte identifier, final long timestamp, long valuePos, long valueLimit, long keyPosition, long keyLimit) {
+        private void replicatingPut(@NotNull final Bytes inBytes,
+                                    int hash2,
+                                    final byte identifier,
+                                    final long timestamp,
+                                    long valuePos,
+                                    long valueLimit,
+                                    long keyPosition,
+                                    long keyLimit) {
             lock();
             try {
 
@@ -579,7 +626,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                 // call by putIfAbsent(), gets here when not absent.
                                 return readValue(entry, null);
                         }
-
+                        //  notifyPut(offset, true, key, value, posFromOffset(offset));
                         return putReturnsNull ? null : readValue(entry, null);
                     }
                 }
@@ -624,7 +671,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         }
 
-
+        /**
+         * @param keyBytes
+         * @param hash2
+         * @param value
+         * @param remoteIdentifier
+         * @param timestamp
+         * @return
+         */
         private long putEntry(Bytes keyBytes, int hash2, V value, final int remoteIdentifier, long timestamp) {
             return putEntry(keyBytes, hash2, value, false, remoteIdentifier,
                     timestamp, hashLookupLiveAndDeleted);
@@ -786,7 +840,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * @see net.openhft.collections.VanillaSharedHashMap.Segment#remove(net.openhft.lang.io.Bytes, Object, Object, int)
          */
-
         public V replace(Bytes keyBytes, K key, V expectedValue, V newValue, int hash2,
                          long timestamp) {
             lock();
@@ -822,12 +875,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             hashLookupLiveOnly.replace(hash, prevPos, pos);
         }
 
+        /**
+         * removes all the entries
+         */
         void clear() {
             lock();
             try {
 
-                // todo improve how we do this, this its going to be slow,
-                // we have to make sure that every calls notifys on remove, so that the replicators can pick it up, but there must be a quicker
+                // we have to make sure that every calls notifies on remove, so that the replicators can pick it up, but there must be a quicker
                 // way to do it than this.
                 if (canReplicate) {
                     for (K k : keySet()) {

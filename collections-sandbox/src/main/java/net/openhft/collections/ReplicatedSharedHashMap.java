@@ -93,7 +93,16 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     void onUpdate(AbstractBytes entry);
 
     /**
-     * @return used to identify which replicating node made the change
+     * Identifies which replicating node made the change
+     * <p/>
+     * If two nodes update their map at the same time with different values, we have to deterministically resolve which update wins,
+     * because of eventual consistency both nodes should end up locally holding the same data.
+     * Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same key, we have to handle this edge case,
+     * its therefore important not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp should win,
+     * but in this example both timestamps are the same, and the decision made to one node should be identical to the decision made to the other.
+     * We resolve this simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node with the smallest identifier wins.
+     *
+     * @return identifies which replicating node made the change
      */
     byte getIdentifier();
 
@@ -125,12 +134,32 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         boolean nextEntry(EntryCallback callback);
     }
 
-    // TODO doc
+    /**
+     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes entry) } which will get called whenever a put() or remove() has occurred to the map
+     */
     interface EntryCallback {
+
+        /**
+         * Called whenever a put() or remove() has occurred to the map, provided the {@code entry}, used typically by a replicator, which may indirectly via a socket connection pass it
+         * on to another replicating maps {@see #onUpdate(AbstractBytes entry)} method.
+         *
+         * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from the caller.
+         * @return false if this entry should be ignored because the {@code identifier} is not from
+         * one of our changes, WARNING even though we check the {@code identifier} in the
+         * ModificationIterator the entry may have been updated.
+         */
         boolean onEntry(final NativeBytes entry);
 
+        /**
+         * called just after {@see #onEntry(NativeBytes entry)}
+         *
+         * @see #onEntry(NativeBytes entry);
+         */
         void onAfterEntry();
 
+        /**
+         * called just before {@see #onEntry(NativeBytes entry)}
+         */
         void onBeforeEntry();
     }
 
