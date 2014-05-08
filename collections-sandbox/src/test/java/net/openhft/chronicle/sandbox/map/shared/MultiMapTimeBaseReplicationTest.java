@@ -270,7 +270,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
 
-        for (int j = 1; j < 1000; j++) {
+        for (int j = 1; j < 200; j++) {
             System.out.println(j);
             Random rnd = new Random(j);
             for (int i = 1; i < 10; i++) {
