@@ -382,6 +382,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             try {
                 bytes.storePositionAndSize(store, pos * smallEntrySize, smallEntrySize);
                 K key = getKey();
+                key = key instanceof CharSequence ? (K) key.toString() : key;
                 if (bytesMarshallable) {
                     V value = (V) NativeBytes.UNSAFE.allocateInstance(vClass);
                     ((BytesMarshallable) value).readMarshallable(bytes);

@@ -19,7 +19,6 @@ package net.openhft.collections;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -471,8 +470,10 @@ public class HugeHashMapTest {
         org.junit.Assert.assertTrue(entrySet.isEmpty());
         org.junit.Assert.assertTrue(keySet.isEmpty());
         org.junit.Assert.assertTrue(values.isEmpty());
-    }@Test
-     public void clearMapViaEntryIteratorRemoves() {
+    }
+
+    @Test
+    public void clearMapViaEntryIteratorRemoves() {
         int noOfElements = 16 * 1024;
         HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
 
@@ -544,6 +545,25 @@ public class HugeHashMapTest {
         assertValues(map.values(), new String[]{"B"});
     }
 
+    @Test
+    public void charSequenceMapIssue() {
+        int noOfElements = 16 * 1024;
+        HugeHashMap<CharSequence, CharSequence> map = new HugeHashMap<CharSequence, CharSequence>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                CharSequence.class,
+                CharSequence.class
+        );
+
+        for (int i = 0; i < noOfElements; i++) {
+            String string = "string" + i;
+            map.put(string, string);
+        }
+
+        for (Map.Entry<CharSequence, CharSequence> entry : map.entrySet()) {
+            org.junit.Assert.assertEquals(entry.getKey(), entry.getValue());
+        }
+    }
+
     private HugeHashMap<Integer, String> getViewTestMap(int noOfElements) {
         HugeHashMap<Integer, String> map = new HugeHashMap<Integer, String>(
                 HugeConfig.DEFAULT.clone().setSegments(16),
@@ -560,8 +580,8 @@ public class HugeHashMapTest {
             expectedValues[i - 1] = value;
         }
 
-//        assertEntrySet(map.entrySet(), expectedKeys, expectedValues); //todo
-//        assertKeySet(map.keySet(), expectedKeys);
+        assertEntrySet(map.entrySet(), expectedKeys, expectedValues); 
+        assertKeySet(map.keySet(), expectedKeys);
         assertValues(map.values(), expectedValues);
 
         return map;
