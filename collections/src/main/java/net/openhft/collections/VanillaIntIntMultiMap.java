@@ -62,7 +62,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         capacity = Maths.nextPower2(minCapacity, 16);
         capacityMask = capacity - 1;
         capacityMask2 = indexToPos(capacity - 1);
-        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).createSlice();
+        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).bytes();
         clear();
     }
 

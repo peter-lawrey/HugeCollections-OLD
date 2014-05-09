@@ -79,7 +79,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             eventListener =
                     new ModificationIterator(builder.notifier(),
                             builder.watchList(),
-                            ms.createSlice(modIterBitSetOffset, modIterBitSetSizeInBytes())
+                            ms.bytes(modIterBitSetOffset, modIterBitSetSizeInBytes())
                     );
         }
     }

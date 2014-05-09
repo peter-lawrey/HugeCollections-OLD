@@ -254,7 +254,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             store = new DirectStore(bmf, smallEntrySize * entriesPerSegment, false);
             usedSet = new BitSet(config.getEntriesPerSegment());
             smallMap = new VanillaIntIntMultiMap(entriesPerSegment * 2);
-            tmpBytes = new DirectStore(bmf, 64 * smallEntrySize, false).createSlice();
+            tmpBytes = new DirectStore(bmf, 64 * smallEntrySize, false).bytes();
             offHeapUsed = tmpBytes.capacity() + store.size();
             sbKey = csKey ? new StringBuilder() : null;
         }
