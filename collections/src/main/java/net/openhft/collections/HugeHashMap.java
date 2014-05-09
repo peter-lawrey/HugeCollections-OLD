@@ -412,7 +412,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             if (csKey) {
                 sbKey.setLength(0);
                 bytes.readUTFΔ(sbKey);
-                return (K) sbKey;
+                return (K) sbKey.toString();
             }
             return (K) bytes.readObject();
         }
