@@ -37,7 +37,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
  * A Replicating Multi Master HashMap
- *
+ * <p/>
  * Each remote hash-map, mirrors its changes over to another remote hash map, neither hash map is considered the master store of data, each hash map uses timestamps to reconcile changes.
  * We refer to in instance of a remote hash-map as a node. A node will be connected to any number of other nodes, for the first implementation the maximum number of nodes will be fixed.
  * The data that is stored locally in each node will become eventually consistent. So changes made to one node, for example by calling put() will be replicated over to the other node.
@@ -46,9 +46,9 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * Due to the loose coupling and lock free nature of this multi master implementation,  this return value will only be the old value on the nodes local data store.
  * In other words the nodes are only concurrent locally. Its worth realising that another node performing exactly the same operation may return a different value.
  * However reconciliation will ensure the maps themselves become eventually consistent.
- *
+ * <p/>
  * Reconciliation
- *
+ * <p/>
  * If two ( or more nodes ) were to receive a change to their maps for the same key but different values, say by a user of the maps, calling the put(<key>,<value>). Then, initially each node will update its local store and each local store will hold a different value, but the aim of multi master replication is to provide eventual consistency across the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change. We will refer to this notification as an event. The event will hold a timestamp indicating the time the change occurred, it will also hold the state transition, in this case it was a put with a key and value.
  * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be applied to the local node, otherwise the event will be ignored.
  * However there is an edge case that we have to concern ourselves with, If two nodes update their map at the same time with different values, we have to deterministically resolve which update wins, because of eventual consistency both nodes should end up locally holding the same data. Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same key, we have to handle this edge case, its therefore important not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp should win, but in this example both timestamps are the same, and the decision made to one node should be identical to the decision made to the other. We resolve this simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node with the smallest identifier wins.
@@ -573,17 +573,21 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         continue;
                     // key is found
                     entry.skip(keyLen);
-                    if (replaceIfPresent) {
-                        boolean wasDeleted = false;
+                    final long timeStampPos = entry.positionAddr();
+                    boolean wasDeleted = false;
+
+                    if (canReplicate) {
+
+                        if (shouldTerminate(entry, timestamp, identifier))
+                            return null;
+                        wasDeleted = entry.readBoolean();
+                    }
+
+                    // if wasDeleted==true then we even if replaceIfPresent==false we can treat it the same way as replaceIfPresent true
+                    if (replaceIfPresent || wasDeleted) {
+
                         if (canReplicate) {
-                            final long timeStampPos = entry.positionAddr();
 
-                            if (shouldTerminate(entry, timestamp, identifier)) {
-
-                                return null;
-                            }
-
-                            wasDeleted = entry.readBoolean();
                             entry.positionAddr(timeStampPos);
                             entry.writeLong(timestamp);
                             entry.writeByte(identifier);
@@ -591,9 +595,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             entry.writeBoolean(false);
                         }
 
-                        final V result = replaceValueOnPut(key, value, entry, pos, offset);
-
-                        notifyPut(offset, true, key, value, posFromOffset(offset));
+                        final V prevValue = replaceValueOnPut(key, value, entry, pos, offset);
 
                         if (wasDeleted) {
                             // remove() would have got rid of this so we have to add it back in
@@ -601,41 +603,49 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             incrementSize();
                             return null;
                         } else {
-
-                            return result;
+                            return prevValue;
                         }
 
-                    } else {
-                        if (canReplicate) {
-
-                            if (identifier <= 0)
-                                throw new IllegalStateException("identifier=" + identifier);
-
-                            if (shouldTerminate(entry, timestamp, identifier))
-                                return null;
-
-                            boolean wasDeleted = entry.readBoolean();
-
-                            if (wasDeleted) {
-                                // remove would have got rid of this so we have to add it back in
-                                hashLookupLiveOnly.put(hash2, pos);
-                                incrementSize();
-                                notifyPut(offset, true, key, value, posFromOffset(offset));
-                                return null;
-                            } else
-                                // call by putIfAbsent(), gets here when not absent.
-                                return readValue(entry, null);
-                        }
-                        //  notifyPut(offset, true, key, value, posFromOffset(offset));
-                        return putReturnsNull ? null : readValue(entry, null);
                     }
+
+                    long valueLenPos = entry.positionAddr();
+
+                    // this is the case where we wont replaceIfPresent and the entry is not deleted
+                    final long valueLen = readValueLen(entry);
+                    final V prevValue = readValue(entry, value, valueLen);
+
+                    if (prevValue != null)
+                        // as we already have a previous value then we will return this and do nothing.
+                        return prevValue;
+
+                    // so we don't have a previous value, lets add one.
+
+                    if (canReplicate) {
+                        entry.positionAddr(timeStampPos);
+                        entry.writeLong(timestamp);
+                        entry.writeByte(identifier);
+                        // deleted flag
+                        entry.writeBoolean(false);
+                    }
+
+                    long entryEndAddr = entry.positionAddr() + valueLen;
+                    offset = putValue(pos, offset, entry, valueLenPos,
+                            entryEndAddr, getValueAsBytes(value));
+                    notifyPut(offset, true, key, value, posFromOffset(offset));
+
+                    // putIfAbsent() when the entry is NOT absent, so we return null as the prevValue
+                    return null;
+
                 }
+
                 // key is not found
                 long offset = putEntry(keyBytes, hash2, value, identifier, timestamp);
                 incrementSize();
                 notifyPut(offset, true, key, value, posFromOffset(offset));
                 return null;
-            } finally {
+            } finally
+
+            {
                 unlock();
             }
         }

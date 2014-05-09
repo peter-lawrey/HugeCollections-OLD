@@ -43,8 +43,11 @@ public class MultiMapTimeBaseReplicationTest {
     private Builder.MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> mapP2;
     private VanillaSharedReplicatedHashMap<Integer, Integer> map2;
     private VanillaSharedReplicatedHashMap<Integer, Integer> map1;
+
+
     private ArrayBlockingQueue<byte[]> map1ToMap2;
     private ArrayBlockingQueue<byte[]> map2ToMap1;
+    private static int maxt;
 
     @Before
     public void setup() throws IOException {
@@ -71,24 +74,17 @@ public class MultiMapTimeBaseReplicationTest {
     @Test
     public void testPut2Remove2Remove2Put1() throws IOException, InterruptedException {
 
-
-        map2.clear();
-        map1.clear();
-        waitTillFinished();
-
         map2.put(1, 1, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457426L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.put(1, 895, (byte) 1, 1399459457426L);
 
 
         // we will check 10 times that there all the work queues are empty
         waitTillFinished();
 
-
         assertEquals(new TreeMap(map1), new TreeMap(map2));
-
 
     }
 
@@ -97,7 +93,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut1Remove2Remove2() throws IOException, InterruptedException {
 
         map1.put(1, 895, (byte) 1, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.remove(1, null, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457426L);
 
@@ -113,7 +109,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testRemove1put2() throws IOException, InterruptedException {
 
         map2.remove(1, null, (byte) 2, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.put(1, 895, (byte) 1, 1399459457425L);
 
         // we will check 10 times that there all the work queues are empty
@@ -128,7 +124,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testRemove1put2Flip() throws IOException, InterruptedException {
 
         map1.remove(1, null, (byte) 1, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.put(1, 895, (byte) 2, 1399459457425L);
 
         // we will check 10 times that there all the work queues are empty
@@ -143,7 +139,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut1Put1CrazyTimes() throws IOException, InterruptedException {
 
         map1.put(1, 894, (byte) 1, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.put(1, 895, (byte) 2, 0L);
 
         // we will check 10 times that there all the work queues are empty
@@ -158,7 +154,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut1Put1SameTimes() throws IOException, InterruptedException {
 
         map1.put(1, 10, (byte) 1, 0L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.put(1, 20, (byte) 2, 0L);
 
         // we will check 10 times that there all the work queues are empty
@@ -172,7 +168,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut1Put1SameTimesFlip() throws IOException, InterruptedException {
 
         map2.put(1, 894, (byte) 2, 0L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.put(1, 895, (byte) 1, 0L);
 
         // we will check 10 times that there all the work queues are empty
@@ -186,7 +182,7 @@ public class MultiMapTimeBaseReplicationTest {
     public void testPut1Put1CrazyTimesMapFlip() throws IOException, InterruptedException {
 
         map2.put(1, 894, (byte) 2, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.put(1, 895, (byte) 1, 0L);
 
         // we will check 10 times that there all the work queues are empty
@@ -202,7 +198,7 @@ public class MultiMapTimeBaseReplicationTest {
 
 
         map2.remove(1, null, (byte) 2, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.put(1, 1, (byte) 1, 1399459457425L);
 
         waitTillFinished();
@@ -217,7 +213,7 @@ public class MultiMapTimeBaseReplicationTest {
 
 
         map1.remove(1, null, (byte) 1, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.put(1, 1, (byte) 2, 1399459457425L);
         waitTillFinished();
         // we will check 10 times that there all the work queues are empty
@@ -233,7 +229,7 @@ public class MultiMapTimeBaseReplicationTest {
 
 
         map2.put(1, 1, (byte) 2, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map1.remove(1, null, (byte) 1, 1399459457425L);
         waitTillFinished();
         // we will check 10 times that there all the work queues are empty
@@ -248,7 +244,7 @@ public class MultiMapTimeBaseReplicationTest {
 
 
         map1.put(1, 1, (byte) 1, 1399459457425L);
-        waitTillFinished();
+        waitTillFinished0();
         map2.remove(1, null, (byte) 2, 1399459457425L);
         waitTillFinished();
         // we will check 10 times that there all the work queues are empty
@@ -258,14 +254,27 @@ public class MultiMapTimeBaseReplicationTest {
     }
 
 
-    private void waitTillFinished() throws InterruptedException {
+    private void waitTillFinished0() throws InterruptedException {
         int i = 0;
-        for (; i < 3; i++) {
+        for (; i < 2; i++) {
             if (!(map2ToMap1.isEmpty() && map2ToMap1.isEmpty() && !segmentModificationIterator1.hasNext() && !segmentModificationIterator2.hasNext() && mapP1.isQueueEmpty() && mapP2.isQueueEmpty())) {
                 i = 0;
             }
-            Thread.sleep(2);
+            Thread.sleep(1);
         }
+    }
+
+    private void waitTillFinished() throws InterruptedException {
+        int t = 0;
+        for (; t < 5000; t++) {
+            waitTillFinished0();
+            if (new TreeMap(map1).equals(new TreeMap(map2)))
+                break;
+            Thread.sleep(1);
+        }
+
+        if (t > maxt)
+            maxt = t;
     }
 
 
@@ -273,9 +282,10 @@ public class MultiMapTimeBaseReplicationTest {
     @Test
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
 
-
-        for (int j = 1; j < 200; j++) {
-            System.out.println(j);
+        System.out.print("SoakTesting ");
+        for (int j = 1; j < 100; j++) {
+            if (j % 10 == 0)
+                System.out.print(".");
             Random rnd = new Random(j);
             for (int i = 1; i < 10; i++) {
 
@@ -293,11 +303,13 @@ public class MultiMapTimeBaseReplicationTest {
                 }
             }
 
-
             waitTillFinished();
 
             assertEquals("j=" + j, new TreeMap(map1), new TreeMap(map2));
+
+
         }
+        System.out.println("");
 
     }
 
