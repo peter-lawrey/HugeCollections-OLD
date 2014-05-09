@@ -70,12 +70,7 @@ public class ByteUtils {
 
     public static CharSequence toCharSequence(@NotNull final Bytes buffer) {
 
-        final Bytes slice = buffer.createSlice();
-
-     //   slice.limit(buffer.limit());
-       // slice.position(buffer.position());
-        slice.position(0);
-        slice.limit(buffer.limit()-buffer.position());
+        final Bytes slice = buffer.slice();
 
         final StringBuilder builder = new StringBuilder();
 

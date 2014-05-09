@@ -62,7 +62,7 @@ public final class SharedMapEventListeners {
                 entry.toString(sb, 0L, 0L, metaDataBytes);
                 sb.append(" | ");
             }
-            Bytes slice = entry.createSlice(metaDataBytes, entry.limit() - metaDataBytes);
+            Bytes slice = entry.slice(metaDataBytes, entry.limit() - metaDataBytes);
             long keyLength = slice.readStopBit();
             slice.toString(sb, slice.position(), 0L, slice.position() + keyLength);
             slice.position(slice.position() + keyLength);

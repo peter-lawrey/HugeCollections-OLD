@@ -79,7 +79,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             eventListener =
                     new ModificationIterator(builder.notifier(),
                             builder.watchList(),
-                            ms.createSlice(modIterBitSetOffset, modIterBitSetSizeInBytes())
+                            ms.bytes(modIterBitSetOffset, modIterBitSetSizeInBytes())
                     );
         }
     }
@@ -1084,30 +1084,29 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 SharedSegment segment = segment((int) (position >>> segmentIndexShift));
                 segment.lock();
                 try {
-
-                    entryCallback.onBeforeEntry();
-
                     if (changes.clearIfSet(position)) {
 
                         if (changes.get(position)) {
                             throw new IllegalStateException("position should be null.");
                         }
 
+                        entryCallback.onBeforeEntry();
+
                         long segmentPos = position & posMask;
                         NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
 
                         // if the entry should be ignored, we'll move the next entry
-                        if (entryCallback.onEntry(entry)) {
+                        boolean success = entryCallback.onEntry(entry);
+                        entryCallback.onAfterEntry();
+                        if (success) {
                             return true;
                         }
                     }
 
-
                     // if the position was already cleared by another thread
                     // while we were trying to obtain segment lock (for example, in onReplication()),
-                    // go to pick up next
+                    // go to pick up next (next iteration in while (true) loop)
                 } finally {
-                    entryCallback.onAfterEntry();
                     segment.unlock();
                 }
             }

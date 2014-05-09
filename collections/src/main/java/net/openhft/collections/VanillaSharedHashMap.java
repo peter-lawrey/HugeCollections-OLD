@@ -140,7 +140,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         long offset = SharedHashMapBuilder.HEADER_SIZE;
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = createSegment(ms.createSlice(offset, segmentSize), i);
+            this.segments[i] = createSegment(ms.bytes(offset, segmentSize), i);
             offset += segmentSize;
         }
         return offset;
@@ -261,7 +261,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         DirectBytes buffer = localBufferForKeys.get();
         if (buffer == null) {
             buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).createSlice();
+                    entrySize * bufferAllocationFactor, false).bytes();
             localBufferForKeys.set(buffer);
         } else {
             buffer.clear();
@@ -273,7 +273,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         DirectBytes buffer = localBufferForValues.get();
         if (buffer == null) {
             buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).createSlice();
+                    entrySize * bufferAllocationFactor, false).bytes();
             localBufferForValues.set(buffer);
         } else {
             buffer.clear();

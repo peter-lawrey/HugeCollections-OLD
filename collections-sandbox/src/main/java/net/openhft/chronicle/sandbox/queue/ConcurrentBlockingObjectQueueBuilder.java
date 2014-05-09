@@ -120,11 +120,11 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
             int storeLen = capacity * align(maxSize, 4);
 
             final MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, ringIndexLocationsLen + storeLen);
-            final DirectBytes ringIndexSlice = ms.createSlice(ringIndexLocationsStart, ringIndexLocationsLen);
+            final DirectBytes ringIndexSlice = ms.bytes(ringIndexLocationsStart, ringIndexLocationsLen);
             ringIndex = new SharedRingIndex(ringIndexSlice);
 
             // provides an index to the data in the ring buffer, the size of this index is proportional to the capacity of the ring buffer
-            final DirectBytes storeSlice = ms.createSlice(ringIndexLocationsLen, storeLen);
+            final DirectBytes storeSlice = ms.bytes(ringIndexLocationsLen, storeLen);
             dataLocator = new SharedLocalDataLocator(capacity, maxSize, storeSlice, clazz);
 
         } else if (type == Type.REMOTE_PRODUCER || type == Type.REMOTE_CONSUMER) {
@@ -137,8 +137,8 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                     clazz,
                     capacity,
                     maxSize,
-                    byteBufferBytes.createSlice(),
-                    byteBufferBytes.createSlice());
+                    byteBufferBytes.slice(),
+                    byteBufferBytes.slice());
 
             if (type == Type.REMOTE_PRODUCER) {
 
