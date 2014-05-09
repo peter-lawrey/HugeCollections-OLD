@@ -1081,22 +1081,18 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 }
 
                 this.position = position;
-                SharedSegment segment = segment((int) (position >>> segmentIndexShift));
+                final SharedSegment segment = segment((int) (position >>> segmentIndexShift));
                 segment.lock();
                 try {
                     if (changes.clearIfSet(position)) {
 
-                        if (changes.get(position)) {
-                            throw new IllegalStateException("position should be null.");
-                        }
-
                         entryCallback.onBeforeEntry();
 
-                        long segmentPos = position & posMask;
-                        NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
+                        final long segmentPos = position & posMask;
+                        final NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
 
                         // if the entry should be ignored, we'll move the next entry
-                        boolean success = entryCallback.onEntry(entry);
+                        final boolean success = entryCallback.onEntry(entry);
                         entryCallback.onAfterEntry();
                         if (success) {
                             return true;

@@ -77,7 +77,7 @@ public class MultiMapTimeBaseReplicationTest {
         map2.put(1, 1, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457425L);
         map2.remove(1, null, (byte) 2, 1399459457426L);
-        waitTillFinished0();
+     //   waitTillFinished0();
         map1.put(1, 895, (byte) 1, 1399459457426L);
 
 
