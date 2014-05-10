@@ -27,8 +27,15 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static java.lang.System.arraycopy;
 
 /**
+ * This class replicates data from one ReplicatedShareHashMap to another using a queue
+ * it was originally written to test the logic in the {@code VanillaSharedReplicatedHashMap}
+ *
  * @author Rob Austin.
  */
 
@@ -43,19 +50,26 @@ public class QueueReplicator<K, V> {
     private AtomicBoolean isReadingEntry = new AtomicBoolean(true);
     private volatile short count;
 
+
+    private static final Logger LOGGER =
+            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+
+
     public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
                            @NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            @NotNull final Alignment alignment,
-                           final int _entrySize, byte localIdentifier) {
+                           final int entrySize, byte localIdentifier) {
 
 
         this.replicatedMap = replicatedMap;
         this.localIdentifier = localIdentifier;
-        final int entrySize = _entrySize + 128;
-        // in bound
 
+        //todo HCOLL-71 fix the 128 padding
+        final int entrySize0 = entrySize + 128;
+
+        // in bound
 
         Executors.newSingleThreadExecutor(new ThreadFactory() {
 
@@ -93,10 +107,7 @@ public class QueueReplicator<K, V> {
 
                             final ByteBufferBytes bufferBytes = new ByteBufferBytes(ByteBuffer.wrap(item));
 
-                            //todo remove this
-                            int numberOfEntries = bufferBytes.readShort();
-
-                            for (int i = 1; i <= numberOfEntries; i++) {
+                            while (bufferBytes.remaining() > 0) {
 
                                 final long entrySize = bufferBytes.readStopBit();
 
@@ -116,13 +127,12 @@ public class QueueReplicator<K, V> {
                             isReadingEntry.set(false);
 
                         } catch (InterruptedException e1) {
-                            e1.printStackTrace();
+                            LOGGER.log(Level.SEVERE, "", e1);
                         }
 
                     }
                 } catch (Exception e) {
-
-                    e.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "", e);
                 }
 
             }
@@ -130,20 +140,13 @@ public class QueueReplicator<K, V> {
         });
 
         // out bound
-        Executors.newSingleThreadExecutor(new ThreadFactory() {
-
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r, "writer-map" + replicatedMap.getIdentifier());
-            }
-
-        }).execute(new Runnable() {
+        Executors.newSingleThreadExecutor().execute(new Runnable() {
 
 
             @Override
             public void run() {
 
-                final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
+                final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
                 final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
@@ -195,13 +198,6 @@ public class QueueReplicator<K, V> {
                                 return true;
                             }
 
-                            /**
-                             * {@inheritDoc}
-                             */
-                            @Override
-                            public void onAfterEntry() {
-                                isWritingEntry.set(false);
-                            }
 
                             /**
                              * {@inheritDoc}
@@ -210,58 +206,54 @@ public class QueueReplicator<K, V> {
                             public void onBeforeEntry() {
                                 isWritingEntry.set(true);
                             }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            @Override
+                            public void onAfterEntry() {
+
+                            }
+
+
                         };
 
                 try {
                     for (; ; ) {
 
-                        isWritingEntry.set(false);
                         final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-                        if (wasDataRead)
+                        if (wasDataRead) {
                             count++;
-                        else if (count == 0)
+                            isWritingEntry.set(false);
+                        } else if (count == 0) {
+                            isWritingEntry.set(false);
                             continue;
-                     /*   try {
-                     //       Thread.sleep(1);
-                            continue;
-                        } catch (InterruptedException e1) {
-                            e1.printStackTrace();
-                        }*/
-
-
-                        if (count == MAX_NUMBER_OF_ENTRIES_PER_CHUNK || (!wasDataRead && count > 0)) {
-
-                            // we are going to create an byte[] so that the buffer can be copied into this.
-                            final byte[] source = buffer.buffer().array();
-                            final int length = (int) buffer.position();
-                            final byte[] dest = new byte[length + 2];
-
-                            // lets write out the number of entries in this chunk
-
-                            // todo remove the number of records in the chuck as its not worth having
-                            dest[0] = (byte) (count & 0xff);
-                            dest[1] = (byte) ((count >> 8) & 0xff);
-
-                            System.arraycopy(source, 0, dest, 2, length);
-                            try {
-                                output.put(dest);
-                            } catch (InterruptedException e1) {
-                                //
-                            }
-
-
-                            // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-                            buffer.clear();
-                            count = 0;
-
-                        } else {
-                            // Thread.yield();
                         }
 
+                        if (count != MAX_NUMBER_OF_ENTRIES_PER_CHUNK && ((wasDataRead || count <= 0)))
+                            continue;
+
+                        // we are going to create an byte[] so that the buffer can be copied into this.
+                        final byte[] source = buffer.buffer().array();
+                        final int length = (int) buffer.position();
+                        final byte[] dest = new byte[length];
+
+                        arraycopy(source, 0, dest, 0, length);
+
+                        try {
+                            output.put(dest);
+                        } catch (InterruptedException e1) {
+                            LOGGER.log(Level.SEVERE, "", e1);
+                            break;
+                        }
+
+                        // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
+                        buffer.clear();
+                        count = 0;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "", e);
                 }
             }
 
@@ -272,16 +264,11 @@ public class QueueReplicator<K, V> {
     }
 
 
+    /**
+     * @return true indicates that all the data has been processed ( it lock free so can not be relied upon )
+     */
     public boolean isEmpty() {
-
-        final byte identifier = replicatedMap.getIdentifier();
         final boolean b = isWritingEntry.get() || isReadingEntry.get();
-       /* if (b == true && identifier == 1) {
-            int i = 1;
-        } else {
-            int i = 2;
-        }*/
-
         return !b && count == 0;
     }
 
