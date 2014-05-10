@@ -30,7 +30,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps
+ * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
+ * <p/>
+ * {@see net.openhft.collections.InSocketReplicator}
  *
  * @author Rob Austin.
  */
@@ -47,7 +49,8 @@ public class OutSocketReplicator {
 
 
     public OutSocketReplicator(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
-                               final byte localIdentifier, final int entrySize,
+                               final byte localIdentifier,
+                               final int entrySize,
                                @NotNull final Alignment alignment,
                                @NotNull final SocketChannelProvider socketChannelProvider) {
         this.modificationIterator = modificationIterator;
@@ -143,7 +146,9 @@ public class OutSocketReplicator {
 
                     for (; ; ) {
 
-                        // this is a blocking call
+                        //todo if count is zero then it would make sence to call a blocking verion of modificationIterator.nextEntry(entryCallback);
+
+                        // this is not a blocking call
                         final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
                         if (wasDataRead) {
@@ -151,6 +156,7 @@ public class OutSocketReplicator {
                             isWritingEntry.set(false);
                         } else if (count == 0) {
                             isWritingEntry.set(false);
+                            Thread.sleep(1);
                             continue;
                         }
 
@@ -160,14 +166,19 @@ public class OutSocketReplicator {
                         buffer.flip();
 
                         final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-                        socketChannel.write(buffer.buffer());
+                        final ByteBuffer buffer1 = buffer.buffer();
+                        buffer1.limit((int) buffer.limit());
+                        buffer1.position((int) buffer.position());
+
+
+                        final int written = socketChannel.write(buffer1);
 
                         // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
                         count = 0;
 
-
                     }
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

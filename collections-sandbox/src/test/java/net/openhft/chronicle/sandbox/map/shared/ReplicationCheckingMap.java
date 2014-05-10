@@ -38,7 +38,6 @@ public class ReplicationCheckingMap<K, V> implements SharedHashMap<K, V> {
     SharedHashMap<K, V> map1;
     SharedHashMap<K, V> map2;
 
-
     public ReplicationCheckingMap(SharedHashMap map1, SharedHashMap map2) {
         this.map1 = map1;
         this.map2 = map2;
@@ -74,7 +73,6 @@ public class ReplicationCheckingMap<K, V> implements SharedHashMap<K, V> {
     @Override
     public int size() {
 
-
         return check(new Call<K, V>() {
                          @Override
                          public Object method(ConcurrentMap<K, V> map) {
@@ -87,9 +85,7 @@ public class ReplicationCheckingMap<K, V> implements SharedHashMap<K, V> {
 
 
     interface Call<K, V> {
-
         Object method(ConcurrentMap<K, V> map);
-
     }
 
     public <R> R check(Call instance) {

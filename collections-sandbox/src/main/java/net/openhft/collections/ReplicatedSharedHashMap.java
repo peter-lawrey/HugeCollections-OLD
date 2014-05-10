@@ -20,6 +20,7 @@ package net.openhft.collections;
 
 import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.NativeBytes;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Rob Austin.
@@ -27,8 +28,8 @@ import net.openhft.lang.io.NativeBytes;
 public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
     /**
-     * Used in conjunction with map replication, all put() events that originate from a remote node will be processed using this method
-     * <p/>
+     * Used in conjunction with map replication, all put() events that originate from a remote node will be processed
+     * using this method
      * <p/>
      * Associates the specified value with the specified key in this map
      * (optional operation).  If the map previously contained a mapping for
@@ -57,7 +58,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     V put(K key, V value, byte identifier, long timeStamp);
 
     /**
-     * Used in conjunction with map replication, all remove() events that originate from a remote node will be processed using this method
+     * Used in conjunction with map replication, all remove() events that originate from a remote node will be processed
+     * using this method
      * <p/>
      * Removes the entry for a key only if currently mapped to a given value.
      * This is equivalent to
@@ -86,7 +88,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
 
     /**
-     * called when we receive a remote replication event
+     * called when we receive a remote replication event,
+     * the event could originate from either a remote {@code put(K key, V value)} or  {@code remove(Object key)}
      *
      * @param entry the entry bytes of the remote node
      */
@@ -95,12 +98,14 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     /**
      * Identifies which replicating node made the change
      * <p/>
-     * If two nodes update their map at the same time with different values, we have to deterministically resolve which update wins,
-     * because of eventual consistency both nodes should end up locally holding the same data.
-     * Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same key, we have to handle this edge case,
-     * its therefore important not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp should win,
-     * but in this example both timestamps are the same, and the decision made to one node should be identical to the decision made to the other.
-     * We resolve this simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node with the smallest identifier wins.
+     * If two nodes update their map at the same time with different values, we have to deterministically resolve which
+     * update wins, because of eventual consistency both nodes should end up locally holding the same data.
+     * Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same
+     * key, we have to handle this edge case, its therefore important not to rely on timestamps alone to reconcile the
+     * updates. Typically the update with the newest timestamp should win,  but in this example both timestamps are the
+     * same, and the decision made to one node should be identical to the decision made to the other. We resolve this
+     * simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node
+     * with the smallest identifier wins.
      *
      * @return identifies which replicating node made the change
      */
@@ -127,23 +132,36 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         REMOVE
     }
 
-    // TODO doc
+    /**
+     * a thread safe iterator like interface, that iterators via a blocking call to
+     * {@link #nextEntry(EntryCallback callback)} the entries that have change.
+     */
     interface ModificationIterator {
+
         boolean hasNext();
 
-        boolean nextEntry(EntryCallback callback);
+        /**
+         * a blocking call that provides that provides the entry that has changed to {@code callback.onEntry()}
+         *
+         * @param callback a call back interface, which will be called when a new entry becomes available.
+         * @return true if the entry was accepted by the {@code callback.onEntry()} method
+         */
+        boolean nextEntry(@NotNull final EntryCallback callback);
     }
 
     /**
-     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes entry) } which will get called whenever a put() or remove() has occurred to the map
+     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes entry) }
+     * which will get called whenever a put() or remove() has occurred to the map
      */
     interface EntryCallback {
 
         /**
-         * Called whenever a put() or remove() has occurred to the map, provided the {@code entry}, used typically by a replicator, which may indirectly via a socket connection pass it
+         * Called whenever a put() or remove() has occurred to the map, provided the {@code entry}, used typically by a
+         * replicator, which may indirectly via a socket connection pass it
          * on to another replicating maps {@see #onUpdate(AbstractBytes entry)} method.
          *
-         * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from the caller.
+         * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from
+         *              the caller.
          * @return false if this entry should be ignored because the {@code identifier} is not from
          * one of our changes, WARNING even though we check the {@code identifier} in the
          * ModificationIterator the entry may have been updated.

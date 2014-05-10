@@ -31,14 +31,14 @@ import java.util.logging.Logger;
 /**
  * Created by Rob Austin
  */
-public class ConsumerSocketChannelProvider implements SocketChannelProvider {
+public class ClientSocketChannelProvider implements SocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(ConsumerSocketChannelProvider.class.getName());
+    private static Logger LOG = Logger.getLogger(ClientSocketChannelProvider.class.getName());
     private final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
     private final CountDownLatch latch = new CountDownLatch(1);
 
-    public ConsumerSocketChannelProvider(final int port, @NotNull final String host) {
+    public ClientSocketChannelProvider(final int port, @NotNull final String host) {
 
         new Thread(new Runnable() {
             @Override
@@ -46,7 +46,18 @@ public class ConsumerSocketChannelProvider implements SocketChannelProvider {
 
                 SocketChannel result = null;
                 try {
-                    result = SocketChannel.open(new InetSocketAddress(host, port));
+                    for (; ; ) {
+                        try {
+                            result = SocketChannel.open(new InetSocketAddress(host, port));
+                            break;
+                        } catch (Exception e) {
+                            Thread.sleep(1000);
+                            continue;
+                        }
+                    }
+
+                    LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
+
                     result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
 
                     socketChannel.set(result);

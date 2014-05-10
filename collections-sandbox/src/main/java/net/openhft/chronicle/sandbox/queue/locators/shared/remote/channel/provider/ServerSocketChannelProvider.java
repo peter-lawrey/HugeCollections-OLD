@@ -30,14 +30,14 @@ import java.util.logging.Logger;
 /**
  * Created by Rob Austin
  */
-public class ProducerSocketChannelProvider implements SocketChannelProvider {
+public class ServerSocketChannelProvider implements SocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(ProducerSocketChannelProvider.class.getName());
+    private static Logger LOG = Logger.getLogger(ServerSocketChannelProvider.class.getName());
     private final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
     private final CountDownLatch latch = new CountDownLatch(1);
 
-    public ProducerSocketChannelProvider(final int port) {
+    public ServerSocketChannelProvider(final int port) {
 
         new Thread(new Runnable() {
             @Override
@@ -57,12 +57,12 @@ public class ProducerSocketChannelProvider implements SocketChannelProvider {
                     socketChannel.set(result);
                     latch.countDown();
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.log(Level.SEVERE, "port=" + port, e);
                     if (serverSocket != null) {
                         try {
                             serverSocket.close();
                         } catch (IOException e1) {
-
+                            LOG.log(Level.SEVERE, "port=" + port, e);
 
                         }
                     }

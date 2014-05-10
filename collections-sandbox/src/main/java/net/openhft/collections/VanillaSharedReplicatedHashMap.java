@@ -22,8 +22,8 @@ import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.model.Byteable;
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -208,7 +208,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         final long keyPosition = entry.position();
         entry.skip(keyLen);
 
-
         final long keyLimit = entry.position();
 
         entry.limit(keyLimit);
@@ -216,12 +215,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         long hash = Hasher.hash(entry);
 
-
         entry.position(keyLimit);
 
         // set the limit back to where it should be
         entry.limit(limit);
-
 
         final long timeStamp = entry.readLong();
         final byte identifier = entry.readByte();
@@ -433,9 +430,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     entry.writeByte(identifier);
                     // was deleted
                     entry.writeBoolean(true);
-
-                    // set the value len to zero
-                    //entry.writeStopBit(0);
                 }
             } finally {
                 unlock();
@@ -481,7 +475,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     final long timeStampPos = entry.positionAddr();
 
-
                     entry.positionAddr(timeStampPos);
 
                     if (shouldTerminate(entry, timestamp, identifier)) {
@@ -518,6 +511,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     }
                     return;
                 }
+
                 // key is not found
                 long valueLen = valueLimit - valuePos;
                 int pos = alloc(inBlocks(entrySize(keyLen, valueLen)));
@@ -528,12 +522,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 entry.writeStopBit(keyLen);
 
                 // write the key
-
                 inBytes.limit(keyLimit);
                 inBytes.position(keyPosition);
 
                 entry.write(inBytes);
-
 
                 entry.writeLong(timestamp);
                 entry.writeByte(identifier);
@@ -548,7 +540,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                 entry.write(inBytes);
 
-
                 hashLookupLiveAndDeleted.putAfterFailedSearch(pos);
                 hashLookupLiveOnly.put(hash2, pos);
 
@@ -559,6 +550,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
+        /**
+         * todo doc
+         * @param keyBytes
+         * @param key
+         * @param value
+         * @param hash2
+         * @param replaceIfPresent
+         * @param identifier
+         * @param timestamp
+         * @return
+         */
         V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent,
               final byte identifier, final long timestamp) {
             lock();
@@ -660,9 +662,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @param entry
          * @param providedTimestamp the time the entry was created or updated
          * @param identifier
-         * @return
+         * @return true if the entry should not be processed
          */
-        private boolean shouldTerminate(NativeBytes entry, long providedTimestamp, byte identifier) {
+        private boolean shouldTerminate(@NotNull final NativeBytes entry, final long providedTimestamp, final byte identifier) {
 
             final long lastModifiedTimeStamp = entry.readLong();
 

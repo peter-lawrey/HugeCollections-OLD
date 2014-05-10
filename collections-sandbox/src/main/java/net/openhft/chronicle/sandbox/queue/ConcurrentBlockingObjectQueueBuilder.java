@@ -28,8 +28,8 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Consumer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Producer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ConsumerSocketChannelProvider;
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ProducerSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ClientSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ServerSocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.DirectBytes;
@@ -142,13 +142,13 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             if (type == Type.REMOTE_PRODUCER) {
 
-                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ProducerSocketChannelProvider(port), bytesDataLocator, buffer);
+                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ServerSocketChannelProvider(port), bytesDataLocator, buffer);
                 ringIndex = producer;
                 dataLocator = producer;
 
             } else {
 
-                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host), buffer);
+                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ClientSocketChannelProvider(port, host), buffer);
                 dataLocator = bytesDataLocator;
             }
 
