@@ -288,7 +288,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     /**
      * {@inheritDoc}
      */
-    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -552,6 +552,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         /**
          * todo doc
+         *
          * @param keyBytes
          * @param key
          * @param value
