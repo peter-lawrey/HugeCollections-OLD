@@ -20,7 +20,9 @@ package net.openhft.chronicle.sandbox.map.shared;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ClientSocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ServerSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.collections.*;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -52,7 +54,9 @@ public class SocketReplicationTest {
 
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final int size,
-            final byte identifier, final String remoteHost, final int inPort, final int outPort) throws IOException {
+            final byte identifier,
+            @NotNull final SocketChannelProvider socketChannelProvider,
+            @NotNull final SocketChannelProvider clientSocketChannelProvider) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
@@ -62,11 +66,11 @@ public class SocketReplicationTest {
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        new InSocketReplicator(identifier, builder.entrySize(), new ServerSocketChannelProvider(outPort), result);
+        new InSocketReplicator(identifier, builder.entrySize(), socketChannelProvider, result);
 
         new OutSocketReplicator(result.getModificationIterator(),
                 identifier, builder.entrySize(),
-                builder.alignment(), new ClientSocketChannelProvider(inPort, remoteHost), 1024);
+                builder.alignment(), clientSocketChannelProvider, 1024);
 
         return result;
 
@@ -74,8 +78,11 @@ public class SocketReplicationTest {
 
     @Before
     public void setup() throws IOException {
-        map1 = newSocketShmIntString(10, (byte) 1, "localhost", 8076, 8077);
-        map2 = newSocketShmIntString(10, (byte) 2, "localhost", 8077, 8076);
+        final ServerSocketChannelProvider serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
+        final ClientSocketChannelProvider clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
+
+        map1 = newSocketShmIntString(10, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
+        map2 = newSocketShmIntString(10, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
     }
 
 
