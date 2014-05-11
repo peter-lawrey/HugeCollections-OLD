@@ -24,6 +24,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provid
 import net.openhft.collections.*;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -70,7 +71,7 @@ public class SocketReplicationTest {
 
         new OutSocketReplicator(result.getModificationIterator(),
                 identifier, builder.entrySize(),
-                builder.alignment(), clientSocketChannelProvider, 1024);
+                builder.alignment(), clientSocketChannelProvider, 1024 * 8);
 
         return result;
 
@@ -110,6 +111,7 @@ public class SocketReplicationTest {
 
 
     @Test
+    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
