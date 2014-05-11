@@ -157,7 +157,7 @@ public class OutSocketReplicator {
                             final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
                             for (; ; ) {
 
-                                //todo if count is zero then it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
+                                //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
 
                                 // this is not a blocking call
                                 final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
