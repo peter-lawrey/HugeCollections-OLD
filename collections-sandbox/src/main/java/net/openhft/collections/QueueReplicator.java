@@ -51,7 +51,7 @@ public class QueueReplicator<K, V> {
     private volatile short count;
 
 
-    private static final Logger LOGGER =
+    private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
 
@@ -127,12 +127,12 @@ public class QueueReplicator<K, V> {
                             isReadingEntry.set(false);
 
                         } catch (InterruptedException e1) {
-                            LOGGER.log(Level.SEVERE, "", e1);
+                            LOG.log(Level.SEVERE, "", e1);
                         }
 
                     }
                 } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "", e);
+                    LOG.log(Level.SEVERE, "", e);
                 }
 
             }
@@ -244,7 +244,7 @@ public class QueueReplicator<K, V> {
                         try {
                             output.put(dest);
                         } catch (InterruptedException e1) {
-                            LOGGER.log(Level.SEVERE, "", e1);
+                            LOG.log(Level.SEVERE, "", e1);
                             break;
                         }
 
@@ -253,7 +253,7 @@ public class QueueReplicator<K, V> {
                         count = 0;
                     }
                 } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "", e);
+                    LOG.log(Level.SEVERE, "", e);
                 }
             }
 

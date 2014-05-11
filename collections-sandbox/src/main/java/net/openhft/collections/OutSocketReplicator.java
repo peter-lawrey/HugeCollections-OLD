@@ -28,6 +28,8 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
@@ -38,11 +40,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class OutSocketReplicator {
 
+    private static final Logger LOG =
+            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+
     @NotNull
     final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
 
 
-    public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
     private volatile short count;
 
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
@@ -52,12 +56,19 @@ public class OutSocketReplicator {
                                final byte localIdentifier,
                                final int entrySize,
                                @NotNull final Alignment alignment,
-                               @NotNull final SocketChannelProvider socketChannelProvider) {
+                               @NotNull final SocketChannelProvider socketChannelProvider,
+                               int packetSizeInBytes) {
         this.modificationIterator = modificationIterator;
 
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
+
+        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
+        int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
+
+
+        final int maxNumberOfEntriesPerChunk = (maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ? maxNumberOfEntriesPerChunk0 : maxNumberOfEntriesPerChunk0 + 1;
 
         // out bound
         Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -74,12 +85,11 @@ public class OutSocketReplicator {
             public void run() {
                 try {
 
-                    final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
+                    final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * maxNumberOfEntriesPerChunk));
 
                     // this is used in nextEntry() below, its what could be described as callback method
                     final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
                             new VanillaSharedReplicatedHashMap.EntryCallback() {
-
 
                                 /**
                                  * {@inheritDoc}
@@ -143,60 +153,65 @@ public class OutSocketReplicator {
                                 }
                             };
 
-
                     for (; ; ) {
+                        try {
+                            final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+                            for (; ; ) {
 
-                        //todo if count is zero then it would make sence to call a blocking verion of modificationIterator.nextEntry(entryCallback);
+                                //todo if count is zero then it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
 
-                        // this is not a blocking call
-                        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+                                // this is not a blocking call
+                                final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-                        if (wasDataRead) {
-                            count++;
-                            isWritingEntry.set(false);
-                        } else if (count == 0) {
-                            isWritingEntry.set(false);
-                            Thread.sleep(1);
-                            continue;
+                                if (wasDataRead) {
+                                    count++;
+                                    isWritingEntry.set(false);
+                                } else if (count == 0) {
+                                    isWritingEntry.set(false);
+                                    Thread.sleep(1);
+                                    continue;
+                                }
+
+                                if (count != maxNumberOfEntriesPerChunk && ((wasDataRead || count <= 0)))
+                                    continue;
+
+                                buffer.flip();
+
+
+                                final ByteBuffer buffer1 = buffer.buffer();
+                                buffer1.limit((int) buffer.limit());
+                                buffer1.position((int) buffer.position());
+
+
+                                socketChannel.write(buffer1);
+
+                                // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
+                                buffer.clear();
+                                count = 0;
+
+                            }
+
+                        } catch (Exception e) {
+                            LOG.log(Level.SEVERE, "", e);
                         }
-
-                        if (count != MAX_NUMBER_OF_ENTRIES_PER_CHUNK && ((wasDataRead || count <= 0)))
-                            continue;
-
-                        buffer.flip();
-
-                        final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-                        final ByteBuffer buffer1 = buffer.buffer();
-                        buffer1.limit((int) buffer.limit());
-                        buffer1.position((int) buffer.position());
-
-
-                        final int written = socketChannel.write(buffer1);
-
-                        // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-                        buffer.clear();
-                        count = 0;
-
                     }
-
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.log(Level.SEVERE, "", e);
                 }
+
+
+            }
+        });
+    }
+
+            /**
+             * @return true indicates that all the data has been processed at the time it was called
+             */
+
+            public boolean isEmpty() {
+                final boolean b = isWritingEntry.get();
+                return !b && count == 0;
             }
 
 
-        });
-
-
-    }
-
-    /**
-     * @return true indicates that all the data has been processed at the time it was called
-     */
-    public boolean isEmpty() {
-        final boolean b = isWritingEntry.get();
-        return !b && count == 0;
-    }
-
-
-}
+        }

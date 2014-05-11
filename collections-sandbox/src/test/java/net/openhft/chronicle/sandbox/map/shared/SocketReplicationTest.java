@@ -66,7 +66,7 @@ public class SocketReplicationTest {
 
         new OutSocketReplicator(result.getModificationIterator(),
                 identifier, builder.entrySize(),
-                builder.alignment(), new ClientSocketChannelProvider(inPort, remoteHost));
+                builder.alignment(), new ClientSocketChannelProvider(inPort, remoteHost), 1024);
 
         return result;
 
