@@ -95,44 +95,52 @@ public class OutSocketReplicator {
                                  */
                                 @Override
                                 public boolean onEntry(NativeBytes entry) {
+                                    try {
+                                        long keyLen = entry.readStopBit();
+                                        entry.skip(keyLen);
 
-                                    long keyLen = entry.readStopBit();
-                                    entry.skip(keyLen);
+                                        //  timestamp, readLong is faster than skip(8)
+                                        entry.readLong();
 
-                                    //  timestamp, readLong is faster than skip(8)
-                                    entry.readLong();
+                                        // we have to check the id again, as it may have changes since we last walked the bit-set
+                                        // this case can occur when a remote node update this entry.
 
-                                    // we have to check the id again, as it may have changes since we last walked the bit-set
-                                    // this case can occur when a remote node update this entry.
+                                        if (entry.readByte() != localIdentifier)
+                                            return false;
 
-                                    if (entry.readByte() != localIdentifier)
-                                        return false;
+                                        final boolean isDeleted = entry.readBoolean();
+                                        long valueLen = isDeleted ? 0 : entry.readStopBit();
 
-                                    final boolean isDeleted = entry.readBoolean();
-                                    long valueLen = isDeleted ? 0 : entry.readStopBit();
+                                        // set the limit on the entry to the length ( in bytes ) of our entry
+                                        final long position = entry.position();
 
-                                    // set the limit on the entry to the length ( in bytes ) of our entry
-                                    final long position = entry.position();
+                                        // write the entry size
+                                        final long length = position + valueLen;
+                                        buffer.writeStopBit(length);
 
-                                    // write the entry size
-                                    final long length = position + valueLen;
-                                    buffer.writeStopBit(length);
+                                        // we are going to write the first part of the entry
+                                        buffer.write(entry.position(0).limit(position));
 
-                                    // we are going to write the first part of the entry
-                                    buffer.write(entry.position(0).limit(position));
+                                        if (isDeleted)
+                                            return true;
 
-                                    if (isDeleted)
+                                        // skipping the alignment, as alignment wont work when we send the data over the wire.
+                                        entry.position(position);
+                                        alignment.alignPositionAddr(entry);
+                                        entry.limit(entry.position() + valueLen);
+
+                                        // writes the value into the buffer
+
+                                        buffer.write(entry);
+
+                                        return true;
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                        System.out.println(buffer);
+                                        int i = 1;
                                         return true;
 
-                                    // skipping the alignment, as alignment wont work when we send the data over the wire.
-                                    entry.position(position);
-                                    alignment.alignPositionAddr(entry);
-                                    entry.limit(entry.position() + valueLen);
-
-                                    // writes the value into the buffer
-                                    buffer.write(entry);
-
-                                    return true;
+                                    }
                                 }
 
                                 /**
@@ -155,6 +163,7 @@ public class OutSocketReplicator {
                     for (; ; ) {
                         try {
                             final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
+
                             for (; ; ) {
 
                                 //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
@@ -176,15 +185,15 @@ public class OutSocketReplicator {
                                 buffer.flip();
 
 
-                                final ByteBuffer buffer1 = buffer.buffer();
-                                buffer1.limit((int) buffer.limit());
-                                buffer1.position((int) buffer.position());
+                                final ByteBuffer byteBuffer = buffer.buffer();
+                                byteBuffer.limit((int) buffer.limit());
+                                byteBuffer.position((int) buffer.position());
 
-
-                                socketChannel.write(buffer1);
+                                socketChannel.write(byteBuffer);
 
                                 // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                                 buffer.clear();
+                                byteBuffer.clear();
 
                             }
 

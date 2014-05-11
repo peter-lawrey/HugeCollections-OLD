@@ -81,8 +81,8 @@ public class SocketReplicationTest {
         final ServerSocketChannelProvider serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
         final ClientSocketChannelProvider clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
 
-        map1 = newSocketShmIntString(10, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
-        map2 = newSocketShmIntString(10, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
+        map1 = newSocketShmIntString(10000, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
+        map2 = newSocketShmIntString(10000, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
     }
 
 
@@ -99,6 +99,22 @@ public class SocketReplicationTest {
         map1.remove(2);
         map2.remove(3);
         map1.remove(3);
+
+        // allow time for the recompilation to resolve
+        waitTillEqual(5000);
+
+        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertTrue(!map2.isEmpty());
+
+    }
+
+
+    @Test
+    public void testBufferOverflow() throws IOException, InterruptedException {
+
+        for (int i = 0; i < 1024; i++) {
+            map1.put(i, "EXAMPLE-1");
+        }
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
