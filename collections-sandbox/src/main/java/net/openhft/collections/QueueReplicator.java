@@ -43,16 +43,16 @@ public class QueueReplicator<K, V> {
 
 
     public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
-    private final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap;
+
     private double localIdentifier;
 
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
     private AtomicBoolean isReadingEntry = new AtomicBoolean(true);
-    private volatile short count;
 
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+    private ByteBufferBytes buffer;
 
 
     public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
@@ -63,7 +63,7 @@ public class QueueReplicator<K, V> {
                            final int entrySize, byte localIdentifier) {
 
 
-        this.replicatedMap = replicatedMap;
+
         this.localIdentifier = localIdentifier;
 
         //todo HCOLL-71 fix the 128 padding
@@ -146,7 +146,7 @@ public class QueueReplicator<K, V> {
             @Override
             public void run() {
 
-                final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
+                buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
                 final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
@@ -224,14 +224,14 @@ public class QueueReplicator<K, V> {
                         final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
                         if (wasDataRead) {
-                            count++;
+
                             isWritingEntry.set(false);
-                        } else if (count == 0) {
+                        } else if (buffer.position() == 0) {
                             isWritingEntry.set(false);
                             continue;
                         }
 
-                        if (count != MAX_NUMBER_OF_ENTRIES_PER_CHUNK && ((wasDataRead || count <= 0)))
+                        if (buffer.remaining() <= entrySize0 && ((wasDataRead || buffer.position() == 0)))
                             continue;
 
                         // we are going to create an byte[] so that the buffer can be copied into this.
@@ -250,7 +250,7 @@ public class QueueReplicator<K, V> {
 
                         // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
-                        count = 0;
+
                     }
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
@@ -269,7 +269,7 @@ public class QueueReplicator<K, V> {
      */
     public boolean isEmpty() {
         final boolean b = isWritingEntry.get() || isReadingEntry.get();
-        return !b && count == 0;
+        return !b && buffer.position() == 0;
     }
 
 }

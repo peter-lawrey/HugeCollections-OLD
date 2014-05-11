@@ -47,9 +47,8 @@ public class OutSocketReplicator {
     final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
 
 
-    private volatile short count;
-
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
+    private final ByteBufferBytes buffer;
 
 
     public OutSocketReplicator(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
@@ -65,10 +64,11 @@ public class OutSocketReplicator {
         final int entrySize0 = entrySize + 128;
 
         final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
-        int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
+        final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
 
 
         final int maxNumberOfEntriesPerChunk = (maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ? maxNumberOfEntriesPerChunk0 : maxNumberOfEntriesPerChunk0 + 1;
+        buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * maxNumberOfEntriesPerChunk));
 
         // out bound
         Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -85,7 +85,6 @@ public class OutSocketReplicator {
             public void run() {
                 try {
 
-                    final ByteBufferBytes buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * maxNumberOfEntriesPerChunk));
 
                     // this is used in nextEntry() below, its what could be described as callback method
                     final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
@@ -164,15 +163,14 @@ public class OutSocketReplicator {
                                 final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
                                 if (wasDataRead) {
-                                    count++;
                                     isWritingEntry.set(false);
-                                } else if (count == 0) {
+                                } else if (buffer.position() == 0) {
                                     isWritingEntry.set(false);
                                     Thread.sleep(1);
                                     continue;
                                 }
 
-                                if (count != maxNumberOfEntriesPerChunk && ((wasDataRead || count <= 0)))
+                                if (buffer.remaining() > entrySize0 && (wasDataRead || buffer.position() == 0))
                                     continue;
 
                                 buffer.flip();
@@ -187,7 +185,6 @@ public class OutSocketReplicator {
 
                                 // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                                 buffer.clear();
-                                count = 0;
 
                             }
 
@@ -204,14 +201,14 @@ public class OutSocketReplicator {
         });
     }
 
-            /**
-             * @return true indicates that all the data has been processed at the time it was called
-             */
+    /**
+     * @return true indicates that all the data has been processed at the time it was called
+     */
 
-            public boolean isEmpty() {
-                final boolean b = isWritingEntry.get();
-                return !b && count == 0;
-            }
+    public boolean isEmpty() {
+        final boolean b = isWritingEntry.get();
+        return !b && buffer.position() == 0;
+    }
 
 
-        }
+}
