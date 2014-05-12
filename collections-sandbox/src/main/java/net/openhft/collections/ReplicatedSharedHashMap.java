@@ -18,7 +18,7 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.AbstractBytes;
+import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
@@ -86,14 +86,6 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      */
     V remove(K key, V value, byte identifier, long timeStamp);
 
-
-    /**
-     * called when we receive a remote replication event,
-     * the event could originate from either a remote {@code put(K key, V value)} or  {@code remove(Object key)}
-     *
-     * @param entry the entry bytes of the remote node
-     */
-    void onUpdate(AbstractBytes entry);
 
     /**
      * Identifies which replicating node made the change
@@ -181,5 +173,26 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         void onBeforeEntry();
     }
 
+    interface EntryExternalizable {
+
+        /**
+         * The map implements the {@link #writeExternalEntry(NativeBytes entry, Bytes destination)} method to save
+         * its contents.
+         *
+         * @param entry       the byte location of the entry to be stored
+         * @param destination a buffer the the entry will be written to
+         * @return true if successful, the segment may reject this operation and return false, this can occur,
+         * if the identifier in the entry did not match the maps local identifier
+         */
+        boolean writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
+
+        /**
+         * The map implements the readExternal method to restore its contents. The readExternalEntry method must read
+         * the values in the same sequence and with the same types as were written by writeExternalEntry.
+         * This method is typically called when we receive a remote replication event,
+         * this event could originate from either a remote {@code put(K key, V value)} or {@code remove(Object key)}
+         */
+        void readExternalEntry(@NotNull Bytes source);
+    }
 
 }

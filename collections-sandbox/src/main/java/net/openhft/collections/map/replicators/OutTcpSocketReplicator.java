@@ -16,13 +16,17 @@
  * limitations under the License.
  */
 
-package net.openhft.collections;
+package net.openhft.collections.map.replicators;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
+import net.openhft.collections.ReplicatedSharedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executors;
@@ -38,7 +42,7 @@ import java.util.logging.Logger;
  *
  * @author Rob Austin.
  */
-public class OutSocketReplicator {
+public class OutTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
@@ -46,26 +50,25 @@ public class OutSocketReplicator {
     @NotNull
     final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
 
-
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
     private final ByteBufferBytes buffer;
+    private SocketChannelProvider socketChannelProvider;
 
+    public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
+                                  final byte localIdentifier,
+                                  final int entrySize,
+                                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                  @NotNull final SocketChannelProvider socketChannelProvider,
+                                  int packetSizeInBytes) {
 
-    public OutSocketReplicator(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
-                               final byte localIdentifier,
-                               final int entrySize,
-                               @NotNull final Alignment alignment,
-                               @NotNull final SocketChannelProvider socketChannelProvider,
-                               int packetSizeInBytes) {
         this.modificationIterator = modificationIterator;
-
+        this.socketChannelProvider = socketChannelProvider;
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
 
         final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
         final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
-
 
         final int maxNumberOfEntriesPerChunk = (maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ? maxNumberOfEntriesPerChunk0 : maxNumberOfEntriesPerChunk0 + 1;
         buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * maxNumberOfEntriesPerChunk));
@@ -85,7 +88,6 @@ public class OutSocketReplicator {
             public void run() {
                 try {
 
-
                     // this is used in nextEntry() below, its what could be described as callback method
                     final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
                             new VanillaSharedReplicatedHashMap.EntryCallback() {
@@ -95,52 +97,7 @@ public class OutSocketReplicator {
                                  */
                                 @Override
                                 public boolean onEntry(NativeBytes entry) {
-                                    try {
-                                        long keyLen = entry.readStopBit();
-                                        entry.skip(keyLen);
-
-                                        //  timestamp, readLong is faster than skip(8)
-                                        entry.readLong();
-
-                                        // we have to check the id again, as it may have changes since we last walked the bit-set
-                                        // this case can occur when a remote node update this entry.
-
-                                        if (entry.readByte() != localIdentifier)
-                                            return false;
-
-                                        final boolean isDeleted = entry.readBoolean();
-                                        long valueLen = isDeleted ? 0 : entry.readStopBit();
-
-                                        // set the limit on the entry to the length ( in bytes ) of our entry
-                                        final long position = entry.position();
-
-                                        // write the entry size
-                                        final long length = position + valueLen;
-                                        buffer.writeStopBit(length);
-
-                                        // we are going to write the first part of the entry
-                                        buffer.write(entry.position(0).limit(position));
-
-                                        if (isDeleted)
-                                            return true;
-
-                                        // skipping the alignment, as alignment wont work when we send the data over the wire.
-                                        entry.position(position);
-                                        alignment.alignPositionAddr(entry);
-                                        entry.limit(entry.position() + valueLen);
-
-                                        // writes the value into the buffer
-
-                                        buffer.write(entry);
-
-                                        return true;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                        System.out.println(buffer);
-                                        int i = 1;
-                                        return true;
-
-                                    }
+                                    return externalizable.writeExternalEntry(entry, buffer);
                                 }
 
                                 /**
@@ -156,7 +113,6 @@ public class OutSocketReplicator {
                                  */
                                 @Override
                                 public void onAfterEntry() {
-
                                 }
                             };
 
@@ -183,7 +139,6 @@ public class OutSocketReplicator {
                                     continue;
 
                                 buffer.flip();
-
 
                                 final ByteBuffer byteBuffer = buffer.buffer();
                                 byteBuffer.limit((int) buffer.limit());
@@ -213,11 +168,14 @@ public class OutSocketReplicator {
     /**
      * @return true indicates that all the data has been processed at the time it was called
      */
-
     public boolean isEmpty() {
         final boolean b = isWritingEntry.get();
         return !b && buffer.position() == 0;
     }
 
 
+    @Override
+    public void close() throws IOException {
+        socketChannelProvider.close();
+    }
 }

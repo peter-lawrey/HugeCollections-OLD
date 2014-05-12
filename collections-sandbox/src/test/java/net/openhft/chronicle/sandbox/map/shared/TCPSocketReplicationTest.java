@@ -21,10 +21,14 @@ package net.openhft.chronicle.sandbox.map.shared;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ClientSocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ServerSocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
-import net.openhft.collections.*;
+import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+import net.openhft.collections.map.replicators.InTcpSocketReplicator;
+import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
 import org.jetbrains.annotations.NotNull;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -35,15 +39,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
+ * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
+ *
  * @author Rob Austin.
  */
-public class SocketReplicationTest {
-
+public class TCPSocketReplicationTest {
 
     // added to ensure uniqueness
     static int count;
+
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
+    private ServerSocketChannelProvider serverSocketChannelProvider;
+    private ClientSocketChannelProvider clientSocketChannelProvider;
+
 
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
@@ -53,7 +62,7 @@ public class SocketReplicationTest {
         return file;
     }
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
+    VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final int size,
             final byte identifier,
             @NotNull final SocketChannelProvider socketChannelProvider,
@@ -67,11 +76,17 @@ public class SocketReplicationTest {
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        new InSocketReplicator(identifier, builder.entrySize(), socketChannelProvider, result);
+        new InTcpSocketReplicator(identifier, builder.entrySize(), socketChannelProvider, result);
 
-        new OutSocketReplicator(result.getModificationIterator(),
-                identifier, builder.entrySize(),
-                builder.alignment(), clientSocketChannelProvider, 1024 * 8);
+
+        //    VanillaSharedReplicatedHashMap.WireFormat w =     VanillaSharedReplicatedHashMap.result.WireFormat();
+        new OutTcpSocketReplicator(
+                result.getModificationIterator(),
+                identifier,
+                builder.entrySize(),
+                result,
+                clientSocketChannelProvider,
+                1024 * 8);
 
         return result;
 
@@ -79,11 +94,26 @@ public class SocketReplicationTest {
 
     @Before
     public void setup() throws IOException {
-        final ServerSocketChannelProvider serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
-        final ClientSocketChannelProvider clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
+        serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
+        clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
 
         map1 = newSocketShmIntString(10000, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
         map2 = newSocketShmIntString(10000, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
+    }
+
+    @After
+    public void tearDown() {
+        try {
+            serverSocketChannelProvider.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            clientSocketChannelProvider.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
 
@@ -111,7 +141,6 @@ public class SocketReplicationTest {
 
 
     @Test
-    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
@@ -141,9 +170,7 @@ public class SocketReplicationTest {
             Thread.sleep(1);
         }
 
-
     }
-
 
 }
 

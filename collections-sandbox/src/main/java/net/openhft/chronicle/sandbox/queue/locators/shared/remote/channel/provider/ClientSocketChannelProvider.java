@@ -23,20 +23,17 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
  */
-public class ClientSocketChannelProvider implements SocketChannelProvider {
+public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
     private static Logger LOG = Logger.getLogger(ClientSocketChannelProvider.class.getName());
-    private final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
-    private final CountDownLatch latch = new CountDownLatch(1);
+    private volatile boolean closed;
 
     public ClientSocketChannelProvider(final int port, @NotNull final String host) {
 
@@ -46,7 +43,7 @@ public class ClientSocketChannelProvider implements SocketChannelProvider {
 
                 SocketChannel result = null;
                 try {
-                    for (; ; ) {
+                    while (!closed) {
                         try {
                             result = SocketChannel.open(new InetSocketAddress(host, port));
                             break;
@@ -68,22 +65,22 @@ public class ClientSocketChannelProvider implements SocketChannelProvider {
                         try {
                             result.close();
                         } catch (IOException e1) {
-                            e1.printStackTrace();
+                            LOG.log(Level.SEVERE, "", e);
                         }
                 }
             }
         }).start();
     }
 
-
-    @Override
-    public SocketChannel getSocketChannel() throws IOException, InterruptedException {
-
+    /**
+     * @inhre
+     * @throws IOException
+     */
+    public void close() throws IOException {
+        closed = true;
         final SocketChannel result = socketChannel.get();
         if (result != null)
-            return result;
-
-        latch.await();
-        return socketChannel.get();
+            result.close();
     }
+
 }

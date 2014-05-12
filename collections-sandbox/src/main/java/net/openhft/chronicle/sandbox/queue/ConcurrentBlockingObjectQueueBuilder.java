@@ -141,13 +141,10 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                     byteBufferBytes.slice());
 
             if (type == Type.REMOTE_PRODUCER) {
-
                 final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ServerSocketChannelProvider(port), bytesDataLocator, buffer);
                 ringIndex = producer;
                 dataLocator = producer;
-
             } else {
-
                 ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ClientSocketChannelProvider(port, host), buffer);
                 dataLocator = bytesDataLocator;
             }
@@ -165,15 +162,23 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
         return new SocketChannelProvider() {
 
+            ServerSocketChannel serverSocket = null;
+
             @Override
             public SocketChannel getSocketChannel() throws IOException {
-                ServerSocketChannel serverSocket = ServerSocketChannel.open();
+                serverSocket = ServerSocketChannel.open();
                 serverSocket.socket().setReuseAddress(true);
                 serverSocket.socket().bind(new InetSocketAddress(port));
                 serverSocket.configureBlocking(true);
                 LOG.info("Server waiting for client on port " + port);
                 serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
                 return serverSocket.accept();
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (serverSocket != null)
+                    serverSocket.close();
             }
         };
     }

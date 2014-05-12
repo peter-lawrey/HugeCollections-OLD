@@ -16,12 +16,15 @@
  * limitations under the License.
  */
 
-package net.openhft.collections;
+package net.openhft.collections.map.replicators;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
+import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ThreadFactory;
@@ -37,27 +40,28 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class InSocketReplicator {
+public class InTcpSocketReplicator implements Closeable {
 
-
-    private static final Logger LOGGER = Logger.getLogger(InSocketReplicator.class.getName());
-
-
+    private static final Logger LOGGER = Logger.getLogger(InTcpSocketReplicator.class.getName());
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
+
+    @NotNull
+    private final SocketChannelProvider socketChannelProvider;
 
     /**
      * todo doc
      *
      * @param localIdentifier
      * @param entrySize
-     * @param socketChannelProvider
-     * @param targetMap
+     * @param socketChannelProvider provides the SocketChannel
+     * @param externalizable        provides the ability to read and write entries from the map
      */
-    public InSocketReplicator(final byte localIdentifier,
-                              final int entrySize,
-                              @NotNull final SocketChannelProvider socketChannelProvider,
-                              final ReplicatedSharedHashMap targetMap) {
+    public InTcpSocketReplicator(final byte localIdentifier,
+                                 final int entrySize,
+                                 @NotNull final SocketChannelProvider socketChannelProvider,
+                                 final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
+        this.socketChannelProvider = socketChannelProvider;
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
@@ -78,20 +82,17 @@ public class InSocketReplicator {
             public void run() {
 
                 // this is used in nextEntry() below, its what could be described as callback method
+                SocketChannel socketChannel = null;
 
                 try {
 
-                    byteBuffer.clear();
+                    socketChannel = socketChannelProvider.getSocketChannel();
 
+                    byteBuffer.clear();
                     bytes.position(0);
                     bytes.limit(0);
 
-
                     for (; ; ) {
-
-                        final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-
-
 
                         if (byteBuffer.position() > 0 && byteBuffer.remaining() <= entrySize0) {
                             byteBuffer.compact();
@@ -111,7 +112,6 @@ public class InSocketReplicator {
                         if (entrySize <= 0)
                             throw new IllegalStateException("invalid entrySize=" + entrySize);
 
-
                         while (bytes.remaining() < entrySize) {
                             final int read = socketChannel.read(byteBuffer);
                             bytes.limit(byteBuffer.position());
@@ -121,13 +121,14 @@ public class InSocketReplicator {
 
                         final long limit = bytes.position() + entrySize;
                         bytes.limit(limit);
-                        targetMap.onUpdate(bytes);
+                        externalizable.readExternalEntry(bytes);
 
                         // skip onto the next entry
                         bytes.position(limit);
                     }
                 } catch (Exception e1) {
-                    LOGGER.log(Level.SEVERE, "", e1);
+                    if (socketChannel != null && socketChannel.isOpen())
+                        LOGGER.log(Level.SEVERE, "", e1);
                 }
 
             }
@@ -135,4 +136,8 @@ public class InSocketReplicator {
         });
     }
 
+    @Override
+    public void close() throws IOException {
+        socketChannelProvider.close();
+    }
 }

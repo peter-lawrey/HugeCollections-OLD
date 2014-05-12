@@ -22,64 +22,74 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
  */
-public class ServerSocketChannelProvider implements SocketChannelProvider {
+public class ServerSocketChannelProvider extends AbstractSocketChannelProvider implements SocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
     private static Logger LOG = Logger.getLogger(ServerSocketChannelProvider.class.getName());
-    private final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
-    private final CountDownLatch latch = new CountDownLatch(1);
+    private volatile ServerSocketChannel serverSocket;
+    volatile boolean closed;
+    private final Thread thread;
 
     public ServerSocketChannelProvider(final int port) {
 
-        new Thread(new Runnable() {
+        thread = new Thread(new Runnable() {
+
             @Override
             public void run() {
-                ServerSocketChannel serverSocket = null;
+                while (!closed) {
 
+                    try {
+                        if (closed)
+                            return;
 
-                try {
-                    serverSocket = ServerSocketChannel.open();
-                    serverSocket.socket().setReuseAddress(true);
-                    serverSocket.socket().bind(new InetSocketAddress(port));
-                    serverSocket.configureBlocking(true);
-                    LOG.info("Server waiting for client on port " + port);
-                    serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
-                    final SocketChannel result = serverSocket.accept();
+                        serverSocket = ServerSocketChannel.open();
+                        serverSocket.socket().setReuseAddress(true);
+                        serverSocket.socket().bind(new InetSocketAddress(port));
+                        serverSocket.configureBlocking(true);
+                        LOG.info("Server waiting for client on port " + port);
+                        serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
+                        final SocketChannel result = serverSocket.accept();
 
-                    socketChannel.set(result);
-                    latch.countDown();
-                } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "port=" + port, e);
-                    if (serverSocket != null) {
-                        try {
-                            serverSocket.close();
-                        } catch (IOException e1) {
-                            LOG.log(Level.SEVERE, "port=" + port, e);
-
+                        socketChannel.set(result);
+                        latch.countDown();
+                        return;
+                    } catch (Exception e) {
+                        if (closed)
+                            return;
+                        LOG.log(Level.SEVERE, "port=" + port, e);
+                        if (serverSocket != null) {
+                            try {
+                                serverSocket.close();
+                            } catch (IOException e1) {
+                                LOG.log(Level.SEVERE, "port=" + port, e);
+                            }
                         }
+                    }
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        LOG.log(Level.SEVERE, "port=" + port, e);
                     }
                 }
             }
-        }).start();
+
+        });
+        thread.start();
+
     }
 
 
-    @Override
-    public SocketChannel getSocketChannel() throws IOException, InterruptedException {
-
-        final SocketChannel result = socketChannel.get();
-        if (result != null)
-            return result;
-
-        latch.await();
-        return socketChannel.get();
+    public void close() throws IOException {
+        closed = true;
+        thread.interrupt();
+        if (serverSocket != null) {
+            serverSocket.close();
+        }
     }
 }

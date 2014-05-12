@@ -20,7 +20,10 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.io.*;
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.io.DirectBytes;
+import net.openhft.lang.io.MultiStoreBytes;
+import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -57,17 +60,20 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V>
  */
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V> {
-    private static final Logger LOGGER =
+        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable {
+
+    private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
 
-    public VanillaSharedReplicatedHashMap(VanillaSharedReplicatedHashMapBuilder builder,
-                                          File file,
-                                          Class<K> kClass, Class<V> vClass) throws IOException {
+
+    public VanillaSharedReplicatedHashMap(@NotNull VanillaSharedReplicatedHashMapBuilder builder,
+                                          @NotNull File file,
+                                          @NotNull Class<K> kClass,
+                                          @NotNull Class<V> vClass) throws IOException {
         super(builder, kClass, vClass);
         this.canReplicate = builder.canReplicate();
         this.timeProvider = builder.timeProvider();
@@ -193,11 +199,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onUpdate(AbstractBytes entry) {
+    private void onUpdate(Bytes entry) {
         final long limit = entry.limit();
 
         if (!canReplicate)
@@ -1111,6 +1113,57 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
     }
+
+
+    @Override
+    public boolean writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
+
+        long keyLen = entry.readStopBit();
+        entry.skip(keyLen);
+
+        //  timestamp, readLong is faster than skip(8)
+        entry.readLong();
+
+        // we have to check the id again, as it may have changes since we last walked the bit-set
+        // this case can occur when a remote node update this entry.
+
+        if (entry.readByte() != localIdentifier)
+            return false;
+
+        final boolean isDeleted = entry.readBoolean();
+        long valueLen = isDeleted ? 0 : entry.readStopBit();
+
+        // set the limit on the entry to the length ( in bytes ) of our entry
+        final long position = entry.position();
+
+        // write the entry size
+        final long length = position + valueLen;
+        destination.writeStopBit(length);
+
+        // we are going to write the first part of the entry
+        destination.write(entry.position(0).limit(position));
+
+        if (isDeleted)
+            return true;
+
+        // skipping the alignment, as alignment wont work when we send the data over the wire.
+        entry.position(position);
+        alignment.alignPositionAddr(entry);
+        entry.limit(entry.position() + valueLen);
+
+        // writes the value into the buffer
+
+        destination.write(entry);
+
+        return true;
+    }
+
+    @Override
+    public void readExternalEntry(@NotNull Bytes source) {
+        VanillaSharedReplicatedHashMap.this.onUpdate(source);
+    }
+
+
 }
 
 

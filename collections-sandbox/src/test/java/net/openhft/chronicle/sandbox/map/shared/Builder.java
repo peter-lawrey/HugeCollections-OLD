@@ -61,7 +61,7 @@ public class Builder {
         final Executor e = Executors.newFixedThreadPool(2);
 
         new QueueReplicator(result, result.getModificationIterator(),
-                input, output, builder.alignment(), builder.entrySize(), identifier);
+                input, output, builder.entrySize(), result);
 
         return result;
 
@@ -88,7 +88,7 @@ public class Builder {
                 builder.create(getPersistenceFile(), Integer.class, Integer.class);
 
         final QueueReplicator q = new QueueReplicator(result, result.getModificationIterator(),
-                input, output, builder.alignment(), builder.entrySize(), identifier);
+                input, output, builder.entrySize(), result);
 
 
         return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
@@ -126,7 +126,7 @@ public class Builder {
         final Executor e = Executors.newFixedThreadPool(2);
 
         new QueueReplicator(result, result.getModificationIterator(),
-                input, output, builder.alignment(), builder.entrySize(), identifier);
+                input, output, builder.entrySize(), result);
 
         return result;
 
@@ -148,7 +148,7 @@ public class Builder {
         final Executor e = Executors.newFixedThreadPool(2);
 
         new QueueReplicator(result, result.getModificationIterator(),
-                input, output, builder.alignment(), builder.entrySize(), identifier);
+                input, output, builder.entrySize(), result);
 
         return result;
 
