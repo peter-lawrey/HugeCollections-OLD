@@ -226,8 +226,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 + sizeOfMultiMap() * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
-        assert (ss & 63) == 0;
-        return ss; // the actual entries used.
+        if ((ss & 63) != 0)
+            throw new AssertionError();
+        // if segment size in cache lines is a multiple of 2,
+        // segment headers will fall into the same L1 cache bucket set on architecture
+        // with 2-way associative L1 cache (L2 and L3 are 4, 8 and 16 way on all
+        // modern architectures).
+        // We break this up, making segment size odd in cache lines
+        ss |= 64;
+        return ss;
     }
 
     int multiMapsPerSegment() {
