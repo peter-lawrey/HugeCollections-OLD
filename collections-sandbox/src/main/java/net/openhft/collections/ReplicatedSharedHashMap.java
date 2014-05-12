@@ -125,18 +125,21 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     }
 
     /**
-     * a thread safe iterator like interface, that iterators via a blocking call to
-     * {@link #nextEntry(EntryCallback callback)} the entries that have change.
+     * non blocking iterator which iterates over changes to a segment
      */
     interface ModificationIterator {
 
+        /**
+         * @return true if the is another entry to be received via {@link #nextEntry(EntryCallback callback);}
+         */
         boolean hasNext();
 
         /**
-         * a blocking call that provides that provides the entry that has changed to {@code callback.onEntry()}
+         * a non blocking call that provides that provides the entry that has changed to {@code callback.onEntry()}
          *
          * @param callback a call back interface, which will be called when a new entry becomes available.
-         * @return true if the entry was accepted by the {@code callback.onEntry()} method
+         * @return true if the entry was accepted by the {@code callback.onEntry()} method,
+         * false if the entry was not accepted or was not available
          */
         boolean nextEntry(@NotNull final EntryCallback callback);
     }
@@ -148,9 +151,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     interface EntryCallback {
 
         /**
-         * Called whenever a put() or remove() has occurred to the map, provided the {@code entry}, used typically by a
-         * replicator, which may indirectly via a socket connection pass it
-         * on to another replicating maps {@see #onUpdate(AbstractBytes entry)} method.
+         * Called whenever a put() or remove() has occurred to a replicating map
+         * <p/>
          *
          * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from
          *              the caller.
@@ -198,8 +200,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         /**
          * The number of bytes that will be used to write the entry vai {@link #writeExternalEntry(NativeBytes entry, Bytes destination)}
          * <p/>
-         * This method is used in conjunction with {@link #writeExternalEntry(NativeBytes entry, Bytes destination)} to determine
-         * the number of bytes that will be written to the {@code destination}
+         * This method is used in conjunction with {@link #writeExternalEntry(NativeBytes entry, Bytes destination)},
+         * this id the number of bytes that will be written to {@code destination}
          *
          * @param entry a pointer to the entry
          * @return the number of bytes which will be written or ZERO if the entry should be ignored.

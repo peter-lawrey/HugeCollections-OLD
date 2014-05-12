@@ -29,13 +29,12 @@ import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.TreeMap;
 
+import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -46,22 +45,12 @@ import static org.junit.Assert.assertTrue;
  */
 public class TCPSocketReplicationTest {
 
-    // added to ensure uniqueness
-    static int count;
 
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
     private ServerSocketChannelProvider serverSocketChannelProvider;
     private ClientSocketChannelProvider clientSocketChannelProvider;
 
-
-    private static File getPersistenceFile() {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
-        file.delete();
-        file.deleteOnExit();
-        return file;
-    }
 
     VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final int size,
@@ -92,7 +81,7 @@ public class TCPSocketReplicationTest {
 
     }
 
-    int i;
+    volatile int i;
 
     @Before
     public void setup() throws IOException {
@@ -123,7 +112,6 @@ public class TCPSocketReplicationTest {
 
 
     @Test
-
     public void test() throws IOException, InterruptedException {
 
         map1.put(1, "EXAMPLE-1");
@@ -147,7 +135,6 @@ public class TCPSocketReplicationTest {
 
 
     @Test
-    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {

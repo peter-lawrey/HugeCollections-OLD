@@ -21,7 +21,6 @@ package net.openhft.collections.map.replicators;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,6 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
  * <p/>
@@ -42,36 +43,31 @@ import java.util.logging.Logger;
  *
  * @author Rob Austin.
  */
-public class OutTcpSocketReplicator implements Closeable {
+public class OutTcpSocketReplicator extends AbstractQueueReplicator implements Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
     @NotNull
-    final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
-
+    private final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
-    private final ByteBufferBytes buffer;
     private SocketChannelProvider socketChannelProvider;
+    private final int adjustedEntrySize;
+    private final ReplicatedSharedHashMap.EntryCallback entryCallback;
 
     public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
                                   final byte localIdentifier,
                                   final int entrySize,
-                                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                  @NotNull final EntryExternalizable externalizable,
                                   @NotNull final SocketChannelProvider socketChannelProvider,
                                   int packetSizeInBytes) {
 
+        super(entrySize + 128, toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize));
+
+        this.adjustedEntrySize = entrySize + 128;
         this.modificationIterator = modificationIterator;
         this.socketChannelProvider = socketChannelProvider;
-
-        //todo HCOLL-71 fix the 128 padding
-        final int entrySize0 = entrySize + 128;
-
-        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
-        final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
-
-        final int maxNumberOfEntriesPerChunk = (maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ? maxNumberOfEntriesPerChunk0 : maxNumberOfEntriesPerChunk0 + 1;
-        buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * maxNumberOfEntriesPerChunk));
+        this.entryCallback = new EntryCallback(externalizable);
 
         // out bound
         Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -83,107 +79,65 @@ public class OutTcpSocketReplicator implements Closeable {
 
         }).execute(new Runnable() {
 
-
             @Override
             public void run() {
-                try {
+                // this is used in nextEntry() below, its what could be described as callback method
+                for (; ; ) {
+                    try {
+                        final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
 
-                    // this is used in nextEntry() below, its what could be described as callback method
-                    final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
-                            new VanillaSharedReplicatedHashMap.EntryCallback() {
-
-                                /**
-                                 * {@inheritDoc}
-                                 */
-                                @Override
-                                public boolean onEntry(NativeBytes entry) {
-
-                                    final long limit = buffer.limit();
-                                    final long entryStart = entry.position();
-
-                                    final long length = externalizable.entryLength(entry);
-                                    if (length == 0)
-                                        return false;
-
-                                    // we are now going to write the entry len
-                                    buffer.writeStopBit(length);
-                                    final long end = buffer.position() + length;
-                                    buffer.limit(end);
-
-                                    entry.position(entryStart);
-
-                                    // and now the entry
-                                    externalizable.writeExternalEntry(entry, buffer);
-
-                                    buffer.limit(limit);
-                                    buffer.position(end);
-
-                                    return true;
-                                }
-
-                                /**
-                                 * {@inheritDoc}
-                                 */
-                                @Override
-                                public void onBeforeEntry() {
-                                    isWritingEntry.set(true);
-                                }
-
-                                /**
-                                 * {@inheritDoc}
-                                 */
-                                @Override
-                                public void onAfterEntry() {
-                                }
-                            };
-
-                    for (; ; ) {
-                        try {
-                            final SocketChannel socketChannel = socketChannelProvider.getSocketChannel();
-
-                            for (; ; ) {
-
-                                //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
-
-                                // this is not a blocking call
-                                final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
-
-                                if (wasDataRead) {
-                                    isWritingEntry.set(false);
-                                } else if (buffer.position() == 0) {
-                                    isWritingEntry.set(false);
-                                    Thread.sleep(1);
-                                    continue;
-                                }
-
-                                if (buffer.remaining() > entrySize0 && (wasDataRead || buffer.position() == 0))
-                                    continue;
-
-                                buffer.flip();
-
-                                final ByteBuffer byteBuffer = buffer.buffer();
-                                byteBuffer.limit((int) buffer.limit());
-                                byteBuffer.position((int) buffer.position());
-
-                                socketChannel.write(byteBuffer);
-
-                                // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-                                buffer.clear();
-                                byteBuffer.clear();
-
-                            }
-
-                        } catch (Exception e) {
-                            LOG.log(Level.SEVERE, "", e);
+                        for (; ; ) {
+                            readNextEntry(socketChannel);
                         }
+
+                    } catch (Exception e) {
+                        LOG.log(Level.SEVERE, "", e);
                     }
-                } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
                 }
-
-
             }
         });
+    }
+
+
+    /**
+     * reads an entry from the socket
+     * <p/>
+     * A blocking call to process and read the next entry
+     *
+     * @param socketChannel
+     * @return
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    private void readNextEntry(@NotNull final SocketChannel socketChannel) throws InterruptedException, IOException {
+        //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
+
+        // this is not a blocking call
+        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+
+        if (wasDataRead) {
+            isWritingEntry.set(false);
+        } else if (buffer.position() == 0) {
+            isWritingEntry.set(false);
+            Thread.sleep(1);
+            return;
+        }
+
+        if (buffer.remaining() > adjustedEntrySize && (wasDataRead || buffer.position() == 0))
+            return;
+
+        buffer.flip();
+
+        final ByteBuffer byteBuffer = buffer.buffer();
+        byteBuffer.limit((int) buffer.limit());
+        byteBuffer.position((int) buffer.position());
+
+        socketChannel.write(byteBuffer);
+
+        // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
+        buffer.clear();
+        byteBuffer.clear();
+
     }
 
     /**
@@ -195,8 +149,54 @@ public class OutTcpSocketReplicator implements Closeable {
     }
 
 
+    private static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
+
+        //todo HCOLL-71 fix the 128 padding
+        final double entrySize0 = entrySize + 128;
+
+        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
+        final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
+
+        return (short) ((maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ?
+                maxNumberOfEntriesPerChunk0 :
+                maxNumberOfEntriesPerChunk0 + 1);
+    }
+
+    class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
+
+        private final EntryExternalizable externalizable;
+
+        EntryCallback(@NotNull final EntryExternalizable externalizable) {
+            this.externalizable = externalizable;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean onEntry(NativeBytes entry) {
+            return OutTcpSocketReplicator.this.onEntry(entry, externalizable);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void onBeforeEntry() {
+            isWritingEntry.set(true);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void onAfterEntry() {
+        }
+    }
+
     @Override
     public void close() throws IOException {
         socketChannelProvider.close();
     }
+
 }

@@ -18,6 +18,7 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
+
 import net.openhft.collections.QueueReplicator;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
@@ -37,7 +38,7 @@ public class Builder {
     // added to ensure uniqueness
     static int count;
 
-    private static File getPersistenceFile() {
+    public static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
         file.delete();
