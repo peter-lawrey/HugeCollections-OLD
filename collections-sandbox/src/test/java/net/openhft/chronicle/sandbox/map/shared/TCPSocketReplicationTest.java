@@ -92,10 +92,13 @@ public class TCPSocketReplicationTest {
 
     }
 
+    int i;
+
     @Before
     public void setup() throws IOException {
-        serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
-        clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
+        i++;
+        serverSocketChannelProvider = new ServerSocketChannelProvider(8076 + i);
+        clientSocketChannelProvider = new ClientSocketChannelProvider(8076 + i, "localhost");
 
         map1 = newSocketShmIntString(10000, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
         map2 = newSocketShmIntString(10000, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
@@ -103,6 +106,8 @@ public class TCPSocketReplicationTest {
 
     @After
     public void tearDown() {
+
+        // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
         try {
             serverSocketChannelProvider.close();
         } catch (IOException e) {

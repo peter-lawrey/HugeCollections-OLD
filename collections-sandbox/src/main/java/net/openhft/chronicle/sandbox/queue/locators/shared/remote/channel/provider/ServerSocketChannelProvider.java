@@ -90,6 +90,12 @@ public class ServerSocketChannelProvider extends AbstractSocketChannelProvider i
         thread.interrupt();
         if (serverSocket != null) {
             serverSocket.close();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                LOG.log(Level.SEVERE, "", e);
+            }
         }
+
     }
 }

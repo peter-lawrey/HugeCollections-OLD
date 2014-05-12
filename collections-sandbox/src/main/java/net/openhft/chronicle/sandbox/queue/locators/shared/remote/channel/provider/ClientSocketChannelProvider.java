@@ -73,14 +73,21 @@ public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
     }
 
     /**
-     * @inhre
      * @throws IOException
+     * @inhre
      */
     public void close() throws IOException {
         closed = true;
         final SocketChannel result = socketChannel.get();
-        if (result != null)
+        if (result != null) {
             result.close();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                LOG.log(Level.SEVERE, "", e);
+            }
+        }
+
     }
 
 }
