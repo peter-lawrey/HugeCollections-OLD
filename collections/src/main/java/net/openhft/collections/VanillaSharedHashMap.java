@@ -228,12 +228,20 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
             throw new AssertionError();
-        // if segment size in cache lines is a multiple of 2,
-        // segment headers will fall into the same L1 cache bucket set on architecture
-        // with 2-way associative L1 cache (L2 and L3 are 4, 8 and 16 way on all
-        // modern architectures).
-        // We break this up, making segment size odd in cache lines
-        ss |= 64;
+        // Say, there is 32 KB L1 cache with 2(4, 8) way set associativity, 64-byte lines.
+        // It means there are 32 * 1024 / 64 / 2(4, 8) = 256(128, 64) sets,
+        // i. e. each way (bank) contains 256(128, 64) lines. (L2 and L3 caches has more sets.)
+        // If segment size in lines multiplied by 2^n is divisible by set size,
+        // every 2^n-th segment header fall into the same set.
+        // To break this up we make segment size odd in lines, in this case only each
+        // 256(126, 64)-th segment header fall into the same set.
+        int minTargetCacheSets = 64;
+        long segmentSizeInLines = ss / 64;
+        int segmentsAssociativityMultiple =
+                minTargetCacheSets >> Long.numberOfTrailingZeros(segmentSizeInLines);
+        if (segmentsAssociativityMultiple < segments.length) {
+            ss |= 64;
+        }
         return ss;
     }
 
