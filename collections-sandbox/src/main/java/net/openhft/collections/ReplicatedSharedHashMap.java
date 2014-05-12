@@ -184,7 +184,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * @return true if successful, the segment may reject this operation and return false, this can occur,
          * if the identifier in the entry did not match the maps local identifier
          */
-        boolean writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
+        void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
 
         /**
          * The map implements the readExternal method to restore its contents. The readExternalEntry method must read
@@ -193,6 +193,18 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * this event could originate from either a remote {@code put(K key, V value)} or {@code remove(Object key)}
          */
         void readExternalEntry(@NotNull Bytes source);
+
+
+        /**
+         * The number of bytes that will be used to write the entry vai {@link #writeExternalEntry(NativeBytes entry, Bytes destination)}
+         * <p/>
+         * This method is used in conjunction with {@link #writeExternalEntry(NativeBytes entry, Bytes destination)} to determine
+         * the number of bytes that will be written to the {@code destination}
+         *
+         * @param entry a pointer to the entry
+         * @return the number of bytes which will be written or ZERO if the entry should be ignored.
+         */
+        long entryLength(@NotNull NativeBytes entry);
     }
 
 }

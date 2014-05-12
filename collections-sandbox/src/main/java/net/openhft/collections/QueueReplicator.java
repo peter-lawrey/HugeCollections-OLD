@@ -62,7 +62,7 @@ public class QueueReplicator<K, V> {
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            final int entrySize,
-                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable entryExternalizable) {
+                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
@@ -112,7 +112,7 @@ public class QueueReplicator<K, V> {
                                 final long limit = bufferBytes.limit();
 
                                 bufferBytes.limit(position + entrySize);
-                                entryExternalizable.readExternalEntry(bufferBytes);
+                                externalizable.readExternalEntry(bufferBytes);
 
                                 bufferBytes.position(position);
                                 bufferBytes.limit(limit);
@@ -155,7 +155,28 @@ public class QueueReplicator<K, V> {
                              */
                             @Override
                             public boolean onEntry(NativeBytes entry) {
-                                return entryExternalizable.writeExternalEntry(entry, buffer);
+
+                                final long limit = buffer.limit();
+                                final long entryStart = entry.position();
+
+                                final long length = externalizable.entryLength(entry);
+                                if (length == 0)
+                                    return false;
+
+                                // we are now going to write the entry len
+                                buffer.writeStopBit(length);
+                                final long end = buffer.position() + length;
+                                buffer.limit(end);
+
+                                entry.position(entryStart);
+
+                                // and now the entry
+                                externalizable.writeExternalEntry(entry, buffer);
+
+                                buffer.limit(limit);
+                                buffer.position(end);
+
+                                return true;
                             }
 
 

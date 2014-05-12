@@ -199,49 +199,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
-    private void onUpdate(Bytes entry) {
-        final long limit = entry.limit();
-
-        if (!canReplicate)
-            throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
-
-        final long keyLen = entry.readStopBit();
-
-        final long keyPosition = entry.position();
-        entry.skip(keyLen);
-
-        final long keyLimit = entry.position();
-
-        entry.limit(keyLimit);
-        entry.position(keyPosition);
-
-        long hash = Hasher.hash(entry);
-
-        entry.position(keyLimit);
-
-        // set the limit back to where it should be
-        entry.limit(limit);
-
-        final long timeStamp = entry.readLong();
-        final byte identifier = entry.readByte();
-        final boolean isDeleted = entry.readBoolean();
-
-        int segmentNum = hasher.getSegment(hash);
-        int segmentHash = hasher.segmentHash(hash);
-
-        if (isDeleted) {
-            // this wont create an object, its just modifying the existing entry
-            final Bytes key = entry.position(keyPosition).limit(keyLimit);
-            segment(segmentNum).remoteRemove(key, segmentHash, timeStamp, identifier);
-        } else {
-            final long valueLen = entry.readStopBit();
-            final long valuePosition = entry.position();
-            final long valueLimit = valuePosition + valueLen;
-            segment(segmentNum).replicatingPut(entry, segmentHash, identifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
-        }
-
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -1114,10 +1071,65 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public boolean writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
+    public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
 
+        long start = entry.position();
+        long keyLen = entry.readStopBit();
+        entry.skip(keyLen);
+        final long limit = entry.limit();
+
+        //  timestamp, readLong is faster than skip(8)
+        entry.readLong();
+
+        // we have to check the id again, as it may have changes since we last walked the bit-set
+        // this case can occur when a remote node update this entry.
+
+        final byte id = entry.readByte();
+        if (id != localIdentifier) {
+            //  throw new IllegalStateException("this should not be called if the entry.readByte() != localIdentifier");
+        }
+
+        final boolean isDeleted = entry.readBoolean();
+        long valueLen = isDeleted ? 0 : entry.readStopBit();
+
+        // set the limit on the entry to the length ( in bytes ) of our entry
+        final long position = entry.position();
+
+        // write the entry size
+        final long length = position + valueLen;
+        // destination.writeStopBit(length);
+
+        entry.limit(position);
+        entry.position(start);
+
+        // we are going to write the first part of the entry
+        destination.write(entry);
+
+        if (isDeleted || valueLen == 0)
+            return;
+
+        // skipping the alignment, as alignment wont work when we send the data over the wire.
+        entry.position(position);
+        entry.limit(limit);
+        alignment.alignPositionAddr(entry);
+        entry.limit(entry.position() + valueLen);
+
+        // writes the value into the buffer
+
+        destination.write(entry);
+
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long entryLength(@NotNull NativeBytes entry) {
+        final long start = entry.position();
         long keyLen = entry.readStopBit();
         entry.skip(keyLen);
 
@@ -1128,39 +1140,69 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         // this case can occur when a remote node update this entry.
 
         if (entry.readByte() != localIdentifier)
-            return false;
+            return 0;
 
         final boolean isDeleted = entry.readBoolean();
+        if (isDeleted)
+            return entry.position() - start;
+
         long valueLen = isDeleted ? 0 : entry.readStopBit();
 
+        alignment.alignPositionAddr(entry);
+
         // set the limit on the entry to the length ( in bytes ) of our entry
-        final long position = entry.position();
 
         // write the entry size
-        final long length = position + valueLen;
-        destination.writeStopBit(length);
-
-        // we are going to write the first part of the entry
-        destination.write(entry.position(0).limit(position));
-
-        if (isDeleted)
-            return true;
-
-        // skipping the alignment, as alignment wont work when we send the data over the wire.
-        entry.position(position);
-        alignment.alignPositionAddr(entry);
-        entry.limit(entry.position() + valueLen);
-
-        // writes the value into the buffer
-
-        destination.write(entry);
-
-        return true;
+        final long position = entry.position();
+        return position + valueLen - start;
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
-        VanillaSharedReplicatedHashMap.this.onUpdate(source);
+        final long limit = source.limit();
+
+        if (!canReplicate)
+            throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
+
+        final long keyLen = source.readStopBit();
+
+        final long keyPosition = source.position();
+        source.skip(keyLen);
+
+        final long keyLimit = source.position();
+
+        source.limit(keyLimit);
+        source.position(keyPosition);
+
+        long hash = Hasher.hash(source);
+
+        source.position(keyLimit);
+
+        // set the limit back to where it should be
+        source.limit(limit);
+
+        final long timeStamp = source.readLong();
+        final byte identifier = source.readByte();
+        final boolean isDeleted = source.readBoolean();
+
+        int segmentNum = hasher.getSegment(hash);
+        int segmentHash = hasher.segmentHash(hash);
+
+        if (isDeleted) {
+            // this wont create an object, its just modifying the existing entry
+            final Bytes key = source.position(keyPosition).limit(keyLimit);
+            segment(segmentNum).remoteRemove(key, segmentHash, timeStamp, identifier);
+        } else {
+            final long valueLen = source.readStopBit();
+            final long valuePosition = source.position();
+            final long valueLimit = valuePosition + valueLen;
+            segment(segmentNum).replicatingPut(source, segmentHash, identifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
+        }
+
     }
 
 

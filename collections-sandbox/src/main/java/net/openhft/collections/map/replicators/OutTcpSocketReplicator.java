@@ -97,7 +97,28 @@ public class OutTcpSocketReplicator implements Closeable {
                                  */
                                 @Override
                                 public boolean onEntry(NativeBytes entry) {
-                                    return externalizable.writeExternalEntry(entry, buffer);
+
+                                    final long limit = buffer.limit();
+                                    final long entryStart = entry.position();
+
+                                    final long length = externalizable.entryLength(entry);
+                                    if (length == 0)
+                                        return false;
+
+                                    // we are now going to write the entry len
+                                    buffer.writeStopBit(length);
+                                    final long end = buffer.position() + length;
+                                    buffer.limit(end);
+
+                                    entry.position(entryStart);
+
+                                    // and now the entry
+                                    externalizable.writeExternalEntry(entry, buffer);
+
+                                    buffer.limit(limit);
+                                    buffer.position(end);
+
+                                    return true;
                                 }
 
                                 /**

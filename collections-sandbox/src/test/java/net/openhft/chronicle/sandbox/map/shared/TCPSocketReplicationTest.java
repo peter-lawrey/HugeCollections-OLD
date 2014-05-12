@@ -29,6 +29,7 @@ import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -78,7 +79,6 @@ public class TCPSocketReplicationTest {
 
         new InTcpSocketReplicator(identifier, builder.entrySize(), socketChannelProvider, result);
 
-
         //    VanillaSharedReplicatedHashMap.WireFormat w =     VanillaSharedReplicatedHashMap.result.WireFormat();
         new OutTcpSocketReplicator(
                 result.getModificationIterator(),
@@ -123,6 +123,7 @@ public class TCPSocketReplicationTest {
 
 
     @Test
+
     public void test() throws IOException, InterruptedException {
 
         map1.put(1, "EXAMPLE-1");
@@ -146,6 +147,7 @@ public class TCPSocketReplicationTest {
 
 
     @Test
+    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
