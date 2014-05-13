@@ -42,12 +42,16 @@ interface IntIntMultiMap {
      */
     boolean remove(int key, int value);
 
+    boolean replace(int key, int oldValue, int newValue);
+
     /**
      * Used for start a search for a given key
      *
      * @return normalized key value, better to be used in subsequent calls
      */
     int startSearch(int key);
+
+    int getSearchHash();
 
     /**
      * Used for getting the next position for a given key

@@ -32,9 +32,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static net.openhft.collections.Alignment.NO_ALIGNMENT;
-import static net.openhft.collections.Alignment.OF_4_BYTES;
-import static net.openhft.collections.Alignment.OF_8_BYTES;
+import static net.openhft.collections.Alignment.*;
 import static org.junit.Assert.*;
 
 @SuppressWarnings({"unchecked", "ResultOfMethodCallIgnored"})
@@ -1128,7 +1126,7 @@ public class SharedHashMapTest {
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
 
-        assertMap(map, new int[] {1}, new CharSequence[] {"A"});
+        assertMap(map, new int[]{1}, new CharSequence[]{"A"});
         assertEntrySet(entrySet, new int[]{1}, new CharSequence[]{"A"});
         assertKeySet(keySet, new int[]{1});
         assertValues(values, new String[]{"A"});
@@ -1188,12 +1186,14 @@ public class SharedHashMapTest {
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
                         builder.create(getPersistenceFile(),
-                                CharSequence.class, CharSequence.class));
+                                CharSequence.class, CharSequence.class)
+        );
         builder.entryAndValueAlignment(OF_8_BYTES);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
                         builder.create(getPersistenceFile(),
-                                CharSequence.class, CharSequence.class));
+                                CharSequence.class, CharSequence.class)
+        );
     }
 
     public void testOversizeEntriesPutRemoveReplace(

@@ -28,8 +28,8 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.SharedRingIndex;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Consumer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.Producer;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ConsumerSocketChannelProvider;
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ProducerSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ClientSocketChannelProvider;
+import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.ServerSocketChannelProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.DirectBytes;
@@ -120,11 +120,11 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
             int storeLen = capacity * align(maxSize, 4);
 
             final MappedStore ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE, ringIndexLocationsLen + storeLen);
-            final DirectBytes ringIndexSlice = ms.createSlice(ringIndexLocationsStart, ringIndexLocationsLen);
+            final DirectBytes ringIndexSlice = ms.bytes(ringIndexLocationsStart, ringIndexLocationsLen);
             ringIndex = new SharedRingIndex(ringIndexSlice);
 
             // provides an index to the data in the ring buffer, the size of this index is proportional to the capacity of the ring buffer
-            final DirectBytes storeSlice = ms.createSlice(ringIndexLocationsLen, storeLen);
+            final DirectBytes storeSlice = ms.bytes(ringIndexLocationsLen, storeLen);
             dataLocator = new SharedLocalDataLocator(capacity, maxSize, storeSlice, clazz);
 
         } else if (type == Type.REMOTE_PRODUCER || type == Type.REMOTE_CONSUMER) {
@@ -137,18 +137,15 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                     clazz,
                     capacity,
                     maxSize,
-                    byteBufferBytes.createSlice(),
-                    byteBufferBytes.createSlice());
+                    byteBufferBytes.slice(),
+                    byteBufferBytes.slice());
 
             if (type == Type.REMOTE_PRODUCER) {
-
-                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ProducerSocketChannelProvider(port), bytesDataLocator, buffer);
+                final Producer producer = new Producer<E, ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ServerSocketChannelProvider(port), bytesDataLocator, buffer);
                 ringIndex = producer;
                 dataLocator = producer;
-
             } else {
-
-                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ConsumerSocketChannelProvider(port, host), buffer);
+                ringIndex = new Consumer<ByteBufferBytes>(new LocalRingIndex(), bytesDataLocator, bytesDataLocator, new ClientSocketChannelProvider(port, host), buffer);
                 dataLocator = bytesDataLocator;
             }
 
@@ -165,15 +162,23 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
         return new SocketChannelProvider() {
 
+            ServerSocketChannel serverSocket = null;
+
             @Override
             public SocketChannel getSocketChannel() throws IOException {
-                ServerSocketChannel serverSocket = ServerSocketChannel.open();
+                serverSocket = ServerSocketChannel.open();
                 serverSocket.socket().setReuseAddress(true);
                 serverSocket.socket().bind(new InetSocketAddress(port));
                 serverSocket.configureBlocking(true);
                 LOG.info("Server waiting for client on port " + port);
                 serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
                 return serverSocket.accept();
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (serverSocket != null)
+                    serverSocket.close();
             }
         };
     }

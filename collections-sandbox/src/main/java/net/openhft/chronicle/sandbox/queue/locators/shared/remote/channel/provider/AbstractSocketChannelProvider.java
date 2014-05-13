@@ -18,17 +18,31 @@
 
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Created by Rob Austin
+ * @author Rob Austin.
  */
-public interface SocketChannelProvider extends Closeable {
+abstract class AbstractSocketChannelProvider implements SocketChannelProvider {
 
-    SocketChannel getSocketChannel() throws IOException, InterruptedException;
+    final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
+    final CountDownLatch latch = new CountDownLatch(1);
 
+    public SocketChannel getSocketChannel() throws InterruptedException {
+
+        final SocketChannel result = socketChannel.get();
+        if (result != null)
+            return result;
+
+        latch.await();
+        return socketChannel.get();
+    }
+
+    @Override
+    public abstract void close() throws IOException;
 
 
 }

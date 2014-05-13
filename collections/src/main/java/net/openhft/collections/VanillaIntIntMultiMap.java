@@ -62,7 +62,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         capacity = Maths.nextPower2(minCapacity, 16);
         capacityMask = capacity - 1;
         capacityMask2 = indexToPos(capacity - 1);
-        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).createSlice();
+        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).bytes();
         clear();
     }
 
@@ -122,6 +122,28 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
             return false;
         removePos(posToRemove);
         return true;
+    }
+
+    @Override
+    public boolean replace(int key, int oldValue, int newValue) {
+        if (key == UNSET_KEY)
+            key = HASH_INSTEAD_OF_UNSET_KEY;
+        long pos = indexToPos(key & capacityMask);
+        for (int i = 0; i <= capacityMask; i++) {
+            long entry = bytes.readLong(pos);
+            int hash2 = (int) (entry >> 32);
+            if (hash2 == key) {
+                int value2 = (int) entry;
+                if (value2 == oldValue) {
+                    bytes.writeLong(pos, (((long) key) << 32) | (newValue & 0xFFFFFFFFL));
+                    return true;
+                }
+            } else if (hash2 == UNSET_KEY) {
+                break;
+            }
+            pos = (pos + ENTRY_SIZE) & capacityMask2;
+        }
+        return false;
     }
 
     private void removePos(long posToRemove) {
@@ -197,10 +219,16 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         bytes.writeLong(prevPos, entry);
     }
 
+
     @Override
     public void putAfterFailedSearch(int value) {
         long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
         bytes.writeLong(searchPos, entry);
+    }
+
+
+    public int getSearchHash() {
+        return searchHash;
     }
 
     @Override

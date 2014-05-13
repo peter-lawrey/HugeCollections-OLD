@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.nio.channels.SocketChannel;
+package net.openhft.collections;
 
 /**
- * Created by Rob Austin
+ * TimeProvider was created initially to support testing of VanillaSharedReplicatedHashMap,
+ * with the aim of possibly later providing and optimization to System.currentTimeMillis()
+ * on every call to put(), get() and remove()
+ *
+ * @author Rob Austin.
  */
-public interface SocketChannelProvider extends Closeable {
+public class TimeProvider {
 
-    SocketChannel getSocketChannel() throws IOException, InterruptedException;
-
-
+    public long currentTimeMillis() {
+        return System.currentTimeMillis();
+    }
 
 }

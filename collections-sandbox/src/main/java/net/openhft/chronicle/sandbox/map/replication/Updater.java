@@ -16,19 +16,16 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
+package net.openhft.chronicle.sandbox.map.replication;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.ByteBuffer;
 
 /**
- * Created by Rob Austin
+ * @author Rob Austin.
  */
-public interface SocketChannelProvider extends Closeable {
+public interface Updater {
 
-    SocketChannel getSocketChannel() throws IOException, InterruptedException;
-
-
+    // the data that is send over the socket
+    public ByteBuffer getNextPayload(ByteBuffer targetBuffer) throws InterruptedException;
 
 }

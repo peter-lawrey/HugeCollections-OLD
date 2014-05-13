@@ -19,13 +19,20 @@ package net.openhft.collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public enum SharedMapErrorListeners implements SharedMapErrorListener {
-    LOGGING {
+public final class SharedMapErrorListeners {
+
+    /**
+     * Factories a more flexible than public static instances.
+     * We can add some configuration-on-the-first-call in the future.
+     */
+
+    private static final SharedMapErrorListener LOGGING = new SharedMapErrorListener() {
         @Override
         public void onLockTimeout(long threadId) throws IllegalStateException {
             Logger logger = Logger.getLogger(getClass().getName());
             if (threadId > 1L << 32)
-                logger.severe("Grabbing lock held by processId: " + (threadId >>> 33) + ", threadId: " + (threadId & 0xFFFFFFFFL));
+                logger.severe("Grabbing lock held by processId: " +
+                        (threadId >>> 33) + ", threadId: " + (threadId & 0xFFFFFFFFL));
             else
                 logger.severe("Grabbing lock held by threadId: " + threadId);
         }
@@ -34,7 +41,13 @@ public enum SharedMapErrorListeners implements SharedMapErrorListener {
         public void errorOnUnlock(IllegalMonitorStateException e) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Failed to unlock as expected", e);
         }
-    }, ERROR {
+    };
+
+    public static SharedMapErrorListener logging() {
+        return LOGGING;
+    }
+
+    private static final SharedMapErrorListener ERROR = new SharedMapErrorListener() {
         @Override
         public void onLockTimeout(long threadId) throws IllegalStateException {
             throw new IllegalStateException("Unable to acquire lock held by threadId: " + threadId);
@@ -44,5 +57,9 @@ public enum SharedMapErrorListeners implements SharedMapErrorListener {
         public void errorOnUnlock(IllegalMonitorStateException e) {
             throw e;
         }
+    };
+
+    public static SharedMapErrorListener error() {
+        return ERROR;
     }
 }

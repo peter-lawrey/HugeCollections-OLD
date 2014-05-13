@@ -32,11 +32,8 @@ public class SHMMetaDataTest {
     public void testAccessTimes() throws IOException {
         File file = new File(TMP, "testAccessTimes");
         final AtomicLong timeStamps = new AtomicLong(1);
-        SharedMapEventListener<String, String> listener = new SharedMapEventListener<String, String>() {
-            @Override
-            public String onGetMissing(SharedHashMap<String, String> map, Bytes keyBytes, String key, String usingValue) {
-                return null;
-            }
+        SharedMapEventListener<String, String, SharedHashMap<String, String>> listener =
+                new SharedMapEventListener<String, String,SharedHashMap<String, String>>() {
 
             @Override
             public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
@@ -45,7 +42,7 @@ public class SHMMetaDataTest {
             }
 
             @Override
-            public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value) {
+            public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value, long pos, SharedSegment segment) {
                 assertEquals(8, metaDataBytes);
                 if (added)
                     assertEquals(0, entry.readLong());
@@ -53,7 +50,7 @@ public class SHMMetaDataTest {
             }
 
             @Override
-            public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
+            public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value, int pos, SharedSegment segment) {
                 assertEquals(8, metaDataBytes);
                 System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
             }

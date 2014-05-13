@@ -23,22 +23,19 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
  */
-public class ConsumerSocketChannelProvider implements SocketChannelProvider {
+public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(ConsumerSocketChannelProvider.class.getName());
-    private final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
-    private final CountDownLatch latch = new CountDownLatch(1);
+    private static Logger LOG = Logger.getLogger(ClientSocketChannelProvider.class.getName());
+    private volatile boolean closed;
 
-    public ConsumerSocketChannelProvider(final int port, @NotNull final String host) {
+    public ClientSocketChannelProvider(final int port, @NotNull final String host) {
 
         new Thread(new Runnable() {
             @Override
@@ -46,7 +43,18 @@ public class ConsumerSocketChannelProvider implements SocketChannelProvider {
 
                 SocketChannel result = null;
                 try {
-                    result = SocketChannel.open(new InetSocketAddress(host, port));
+                    while (!closed) {
+                        try {
+                            result = SocketChannel.open(new InetSocketAddress(host, port));
+                            break;
+                        } catch (Exception e) {
+                            Thread.sleep(1000);
+                            continue;
+                        }
+                    }
+
+                    LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
+
                     result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
 
                     socketChannel.set(result);
@@ -57,22 +65,29 @@ public class ConsumerSocketChannelProvider implements SocketChannelProvider {
                         try {
                             result.close();
                         } catch (IOException e1) {
-                            e1.printStackTrace();
+                            LOG.log(Level.SEVERE, "", e);
                         }
                 }
             }
         }).start();
     }
 
-
-    @Override
-    public SocketChannel getSocketChannel() throws IOException, InterruptedException {
-
+    /**
+     * @throws IOException
+     * @inhre
+     */
+    public void close() throws IOException {
+        closed = true;
         final SocketChannel result = socketChannel.get();
-        if (result != null)
-            return result;
+        if (result != null) {
+            result.close();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                LOG.log(Level.SEVERE, "", e);
+            }
+        }
 
-        latch.await();
-        return socketChannel.get();
     }
+
 }

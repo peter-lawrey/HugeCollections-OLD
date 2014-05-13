@@ -16,19 +16,28 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
+package net.openhft.collections;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import net.openhft.lang.io.NativeBytes;
+
+import java.util.Map;
 
 /**
- * Created by Rob Austin
+ * Allow access to the Segments that user used to make up the shared map, these methods should be used with exceptional caution
+ * and were initially introduce to facilitate remote map replication.
  */
-public interface SocketChannelProvider extends Closeable {
+ interface SharedSegment<K, V> {
 
-    SocketChannel getSocketChannel() throws IOException, InterruptedException;
+    void lock();
 
+    Map.Entry<K, V> getEntry(long pos);
 
+    void unlock();
+
+    NativeBytes entry(long pos);
+
+    int getIndex();
+
+    long offsetFromPos(long pos);
 
 }

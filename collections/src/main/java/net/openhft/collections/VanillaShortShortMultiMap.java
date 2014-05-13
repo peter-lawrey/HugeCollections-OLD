@@ -54,7 +54,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         capacity = Maths.nextPower2(minCapacity, 16);
         capacityMask = capacity - 1;
         capacityMask2 = (capacity - 1) * ENTRY_SIZE;
-        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).createSlice();
+        bytes = new DirectStore(null, capacity * ENTRY_SIZE, false).bytes();
         clear();
     }
 
@@ -94,6 +94,8 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public boolean remove(int key, int value) {
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
+        else checkKey(key);
+        checkValue(value);
         int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
         int posToRemove = -1;
         for (int i = 0; i <= capacityMask; i++) {
@@ -116,6 +118,31 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             return false;
         removePos(posToRemove);
         return true;
+    }
+
+    @Override
+    public boolean replace(int key, int oldValue, int newValue) {
+        if (key == UNSET_KEY)
+            key = HASH_INSTEAD_OF_UNSET_KEY;
+        else checkKey(key);
+        checkValue(oldValue);
+        checkValue(newValue);
+        int pos = (key & capacityMask) << ENTRY_SIZE_SHIFT;
+        for (int i = 0; i <= capacityMask; i++) {
+            int entry = bytes.readInt(pos);
+            int hash2 = entry >>> 16;
+            if (hash2 == key) {
+                int value2 = entry & 0xFFFF;
+                if (value2 == oldValue) {
+                    bytes.writeInt(pos, ((key << 16) | newValue));
+                    return true;
+                }
+            } else if (hash2 == UNSET_KEY) {
+                break;
+            }
+            pos = (pos + ENTRY_SIZE) & capacityMask2;
+        }
+        return false;
     }
 
     private void removePos(int posToRemove) {
@@ -180,7 +207,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     @Override
     public void replacePrevPos(int newValue) {
         checkValue(newValue);
-        int prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
+        int prevPos = (((int) searchPos - ENTRY_SIZE) & capacityMask2);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
         bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
@@ -190,6 +217,10 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public void putAfterFailedSearch(int value) {
         checkValue(value);
         bytes.writeInt(searchPos, ((searchHash << 16) | value));
+    }
+
+    public int getSearchHash() {
+        return searchHash;
     }
 
     @Override

@@ -19,7 +19,6 @@ package net.openhft.collections;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -471,7 +470,9 @@ public class HugeHashMapTest {
         org.junit.Assert.assertTrue(entrySet.isEmpty());
         org.junit.Assert.assertTrue(keySet.isEmpty());
         org.junit.Assert.assertTrue(values.isEmpty());
-    }@Test
+    }
+
+    @Test
      public void clearMapViaEntryIteratorRemoves() {
         int noOfElements = 16 * 1024;
         HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
@@ -542,6 +543,25 @@ public class HugeHashMapTest {
         assertKeySet(map.keySet(), new int[]{1});
         assertValues(values, new String[]{"B"});
         assertValues(map.values(), new String[]{"B"});
+    }
+
+    @Test
+    public void charSequenceMapIssue() {
+        int noOfElements = 16 * 1024;
+        HugeHashMap<CharSequence, CharSequence> map = new HugeHashMap<CharSequence, CharSequence>(
+                HugeConfig.DEFAULT.clone().setSegments(16),
+                CharSequence.class,
+                CharSequence.class
+        );
+
+        for (int i = 0; i < noOfElements; i++) {
+            String string = "string" + i;
+            map.put(string, string);
+        }
+
+        for (Map.Entry<CharSequence, CharSequence> entry : map.entrySet()) {
+            org.junit.Assert.assertEquals(entry.getKey(), entry.getValue());
+        }
     }
 
     private HugeHashMap<Integer, String> getViewTestMap(int noOfElements) {
