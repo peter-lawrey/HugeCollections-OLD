@@ -1071,26 +1071,32 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
     }
 
+
+
+
     /**
      * {@inheritDoc}
      */
-    @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
 
+
+        long limt = entry.limit();
         long start = entry.position();
         long keyLen = entry.readStopBit();
-        entry.skip(keyLen);
-        final long limit = entry.limit();
+
+        final long keyPosition = entry.position();
+        entry.skip(keyLen)  ;
+        final long keyLimit = entry.position();
 
         //  timestamp, readLong is faster than skip(8)
-        entry.readLong();
+        final long timeStamp = entry.readLong();
 
         // we have to check the id again, as it may have changes since we last walked the bit-set
         // this case can occur when a remote node update this entry.
 
         final byte id = entry.readByte();
         if (id != localIdentifier) {
-            //  throw new IllegalStateException("this should not be called if the entry.readByte() != localIdentifier");
+            return;
         }
 
         final boolean isDeleted = entry.readBoolean();
@@ -1099,62 +1105,33 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         // set the limit on the entry to the length ( in bytes ) of our entry
         final long position = entry.position();
 
-        // write the entry size
-        final long length = position + valueLen;
-        // destination.writeStopBit(length);
+        destination.writeStopBit(keyLen);
+        destination.writeStopBit(valueLen);
+        destination.writeStopBit(timeStamp);
 
-        entry.limit(position);
-        entry.position(start);
+        // we store the isDeleted flag in the identifier ( when the identifier is negative is it is deleted )
+        if (isDeleted)
+            destination.writeByte(-id);
+        else
+            destination.writeByte(id);
 
-        // we are going to write the first part of the entry
+        // write the key
+        entry.limit(keyLimit);
+        entry.position(keyPosition);
         destination.write(entry);
 
         if (isDeleted || valueLen == 0)
             return;
 
         // skipping the alignment, as alignment wont work when we send the data over the wire.
+        entry.limit(limt);
         entry.position(position);
-        entry.limit(limit);
+
         alignment.alignPositionAddr(entry);
+
+        // writes the value
         entry.limit(entry.position() + valueLen);
-
-        // writes the value into the buffer
-
         destination.write(entry);
-
-
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long entryLength(@NotNull NativeBytes entry) {
-        final long start = entry.position();
-        long keyLen = entry.readStopBit();
-        entry.skip(keyLen);
-
-        //  timestamp, readLong is faster than skip(8)
-        entry.readLong();
-
-        // we have to check the id again, as it may have changes since we last walked the bit-set
-        // this case can occur when a remote node update this entry.
-
-        if (entry.readByte() != localIdentifier)
-            return 0;
-
-        final boolean isDeleted = entry.readBoolean();
-        if (isDeleted)
-            return entry.position() - start;
-
-        long valueLen = isDeleted ? 0 : entry.readStopBit();
-
-        alignment.alignPositionAddr(entry);
-
-        // set the limit on the entry to the length ( in bytes ) of our entry
-
-        // write the entry size
-        final long position = entry.position();
-        return position + valueLen - start;
     }
 
 
@@ -1163,45 +1140,41 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
-        final long limit = source.limit();
-
-        if (!canReplicate)
-            throw new IllegalStateException("This method should not be called if canReplicate is FALSE");
 
         final long keyLen = source.readStopBit();
+        final long valueLen = source.readStopBit();
+        final long timeStamp = source.readStopBit();
+        final byte id = source.readByte();
+
+        final byte identifier;
+        final boolean isDeleted;
+
+        if (id < 0) {
+            isDeleted = true;
+            identifier = (byte) -id;
+        } else {
+            isDeleted = false;
+            identifier = id;
+        }
 
         final long keyPosition = source.position();
-        source.skip(keyLen);
-
-        final long keyLimit = source.position();
+        final long keyLimit = source.position() + keyLen;
 
         source.limit(keyLimit);
-        source.position(keyPosition);
 
         long hash = Hasher.hash(source);
-
-        source.position(keyLimit);
-
-        // set the limit back to where it should be
-        source.limit(limit);
-
-        final long timeStamp = source.readLong();
-        final byte identifier = source.readByte();
-        final boolean isDeleted = source.readBoolean();
 
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
 
         if (isDeleted) {
-            // this wont create an object, its just modifying the existing entry
-            final Bytes key = source.position(keyPosition).limit(keyLimit);
-            segment(segmentNum).remoteRemove(key, segmentHash, timeStamp, identifier);
-        } else {
-            final long valueLen = source.readStopBit();
-            final long valuePosition = source.position();
-            final long valueLimit = valuePosition + valueLen;
-            segment(segmentNum).replicatingPut(source, segmentHash, identifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
+            segment(segmentNum).remoteRemove(source, segmentHash, timeStamp, identifier);
+            return;
         }
+
+        final long valuePosition = keyLimit;
+        final long valueLimit = valuePosition + valueLen;
+        segment(segmentNum).replicatingPut(source, segmentHash, identifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
 
     }
 

@@ -32,11 +32,12 @@ abstract class AbstractQueueReplicator {
 
     final ByteBuffer byteBuffer;
     final ByteBufferBytes buffer;
-
+    private final ByteBufferBytes entryBuffer;
 
     public AbstractQueueReplicator(int entrySize, short maxNumberOfEntriesPerChunk) {
         byteBuffer = ByteBuffer.allocateDirect(entrySize * maxNumberOfEntriesPerChunk);
         buffer = new ByteBufferBytes(byteBuffer);
+        entryBuffer = new ByteBufferBytes(ByteBuffer.allocateDirect(entrySize));
     }
 
 
@@ -52,25 +53,18 @@ abstract class AbstractQueueReplicator {
      */
     boolean onEntry(final NativeBytes entry, final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
-        final long limit = buffer.limit();
-        final long entryStart = entry.position();
+        entryBuffer.clear();
+        externalizable.writeExternalEntry(entry, entryBuffer);
 
-        final long length = externalizable.entryLength(entry);
-        if (length == 0)
+        if (entryBuffer.position() == 0)
             return false;
 
-        // we are now going to write the entry len
-        buffer.writeStopBit(length);
-        final long end = buffer.position() + length;
-        buffer.limit(end);
+        //  write the entry len
+        buffer.writeStopBit(entryBuffer.position());
 
-        entry.position(entryStart);
-
-        // and now the entry
-        externalizable.writeExternalEntry(entry, buffer);
-
-        buffer.limit(limit);
-        buffer.position(end);
+        //  write the entry
+        entryBuffer.flip();
+        buffer.write(entryBuffer);
 
         return true;
     }

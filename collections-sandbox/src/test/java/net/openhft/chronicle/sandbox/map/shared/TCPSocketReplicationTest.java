@@ -29,6 +29,7 @@ import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -81,13 +82,13 @@ public class TCPSocketReplicationTest {
 
     }
 
-    volatile int i;
+    static int i;
 
     @Before
     public void setup() throws IOException {
         i++;
-        serverSocketChannelProvider = new ServerSocketChannelProvider(8076 + i);
-        clientSocketChannelProvider = new ClientSocketChannelProvider(8076 + i, "localhost");
+        serverSocketChannelProvider = new ServerSocketChannelProvider(8076);
+        clientSocketChannelProvider = new ClientSocketChannelProvider(8076, "localhost");
 
         map1 = newSocketShmIntString(10000, (byte) 1, serverSocketChannelProvider, serverSocketChannelProvider);
         map2 = newSocketShmIntString(10000, (byte) 2, clientSocketChannelProvider, clientSocketChannelProvider);
@@ -112,6 +113,7 @@ public class TCPSocketReplicationTest {
 
 
     @Test
+    @Ignore
     public void test() throws IOException, InterruptedException {
 
         map1.put(1, "EXAMPLE-1");

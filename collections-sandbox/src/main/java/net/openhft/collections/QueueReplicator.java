@@ -55,6 +55,7 @@ public class QueueReplicator<K, V> {
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
     private ByteBufferBytes buffer;
+    private ByteBufferBytes entryBuffer;
 
     //    / @NotNull final ReplicatedSharedHashMap.WireFormat result.getWireFormat()
     public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
@@ -66,6 +67,7 @@ public class QueueReplicator<K, V> {
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
+        entryBuffer = new ByteBufferBytes(ByteBuffer.allocateDirect(entrySize0));
 
         // in bound
         Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -156,25 +158,18 @@ public class QueueReplicator<K, V> {
                             @Override
                             public boolean onEntry(NativeBytes entry) {
 
-                                final long limit = buffer.limit();
-                                final long entryStart = entry.position();
+                                entryBuffer.clear();
+                                externalizable.writeExternalEntry(entry, entryBuffer);
 
-                                final long length = externalizable.entryLength(entry);
-                                if (length == 0)
+                                if (entryBuffer.position() == 0)
                                     return false;
 
-                                // we are now going to write the entry len
-                                buffer.writeStopBit(length);
-                                final long end = buffer.position() + length;
-                                buffer.limit(end);
+                                //  write the entry len
+                                buffer.writeStopBit(entryBuffer.position());
 
-                                entry.position(entryStart);
-
-                                // and now the entry
-                                externalizable.writeExternalEntry(entry, buffer);
-
-                                buffer.limit(limit);
-                                buffer.position(end);
+                                //  write the entry
+                                entryBuffer.flip();
+                                buffer.write(entryBuffer);
 
                                 return true;
                             }

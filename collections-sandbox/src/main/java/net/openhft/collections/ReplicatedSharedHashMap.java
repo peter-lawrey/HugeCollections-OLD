@@ -182,8 +182,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * its contents.
          *
          * @param entry       the byte location of the entry to be stored
-         * @param destination a buffer the the entry will be written to
-         * @return true if successful, the segment may reject this operation and return false, this can occur,
+         * @param destination a buffer the the entry will be written to, the segment may reject this operation and add zeroBytes,
          * if the identifier in the entry did not match the maps local identifier
          */
         void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
@@ -196,17 +195,6 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          */
         void readExternalEntry(@NotNull Bytes source);
 
-
-        /**
-         * The number of bytes that will be used to write the entry vai {@link #writeExternalEntry(NativeBytes entry, Bytes destination)}
-         * <p/>
-         * This method is used in conjunction with {@link #writeExternalEntry(NativeBytes entry, Bytes destination)},
-         * this id the number of bytes that will be written to {@code destination}
-         *
-         * @param entry a pointer to the entry
-         * @return the number of bytes which will be written or ZERO if the entry should be ignored.
-         */
-        long entryLength(@NotNull NativeBytes entry);
     }
 
 }
