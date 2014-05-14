@@ -142,7 +142,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         long offset = SharedHashMapBuilder.HEADER_SIZE;
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = createSegment(vmf.sliceAt(offset, segmentSize), i);
+            this.segments[i] = createSegment(vmf.bytes(offset, segmentSize), i);
             offset += segmentSize;
         }
         return offset;
