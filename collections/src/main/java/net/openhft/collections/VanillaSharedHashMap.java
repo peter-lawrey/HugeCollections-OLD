@@ -24,12 +24,13 @@ import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.*;
-import java.util.logging.Logger;
+import java.util.*;;
 
 import static java.lang.Thread.currentThread;
 
@@ -45,8 +46,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         implements SharedHashMap<K, V> {
-    private static final Logger LOGGER =
-            Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractVanillaSharedHashMap.class);
 
 
     /**

@@ -19,12 +19,12 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
 
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(ClientSocketChannelProvider.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(ClientSocketChannelProvider.class);
     private volatile boolean closed;
 
     public ClientSocketChannelProvider(final int port, @NotNull final String host) {
@@ -53,19 +53,19 @@ public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
                         }
                     }
 
-                    LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
+                    LOG.info("successfully connected to host={} , port={}", host, port);
 
                     result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
 
                     socketChannel.set(result);
                     latch.countDown();
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.warn("", e);
                     if (result != null)
                         try {
                             result.close();
                         } catch (IOException e1) {
-                            LOG.log(Level.SEVERE, "", e);
+                            LOG.warn("", e);
                         }
                 }
             }
@@ -84,7 +84,7 @@ public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                LOG.log(Level.SEVERE, "", e);
+                LOG.warn("", e);
             }
         }
 

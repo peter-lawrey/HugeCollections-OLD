@@ -22,14 +22,14 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provid
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ThreadFactory;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 
@@ -42,7 +42,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  */
 public class InTcpSocketReplicator implements Closeable {
 
-    private static final Logger LOGGER = Logger.getLogger(InTcpSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(InTcpSocketReplicator.class);
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
 
     @NotNull
@@ -128,7 +128,7 @@ public class InTcpSocketReplicator implements Closeable {
                     }
                 } catch (Exception e1) {
                     if (socketChannel != null && socketChannel.isOpen())
-                        LOGGER.log(Level.SEVERE, "", e1);
+                        LOG.warn("", e1);
                 }
 
             }

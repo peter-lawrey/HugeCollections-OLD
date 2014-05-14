@@ -23,6 +23,8 @@ import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,8 +33,6 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 
@@ -45,8 +45,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
  */
 public class OutTcpSocketReplicator extends AbstractQueueReplicator implements Closeable {
 
-    private static final Logger LOG =
-            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
     @NotNull
     private final ReplicatedSharedHashMap.ModificationIterator modificationIterator;
@@ -91,7 +90,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
                         }
 
                     } catch (Exception e) {
-                        LOG.log(Level.SEVERE, "", e);
+                        LOG.warn("", e);
                     }
                 }
             }
