@@ -18,12 +18,13 @@
 
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
@@ -31,7 +32,7 @@ import java.util.logging.Logger;
 public class ServerSocketChannelProvider extends AbstractSocketChannelProvider implements SocketChannelProvider {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(ServerSocketChannelProvider.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(ServerSocketChannelProvider.class);
     private volatile ServerSocketChannel serverSocket;
     volatile boolean closed;
     private final Thread thread;
@@ -62,19 +63,19 @@ public class ServerSocketChannelProvider extends AbstractSocketChannelProvider i
                     } catch (Exception e) {
                         if (closed)
                             return;
-                        LOG.log(Level.SEVERE, "port=" + port, e);
+                        LOG.warn("port={}", port, e);
                         if (serverSocket != null) {
                             try {
                                 serverSocket.close();
                             } catch (IOException e1) {
-                                LOG.log(Level.SEVERE, "port=" + port, e);
+                                LOG.warn("port={}", port, e);
                             }
                         }
                     }
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
-                        LOG.log(Level.SEVERE, "port=" + port, e);
+                        LOG.warn("port={}", port, e);
                     }
                 }
             }
@@ -93,7 +94,7 @@ public class ServerSocketChannelProvider extends AbstractSocketChannelProvider i
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                LOG.log(Level.SEVERE, "", e);
+                LOG.warn("", e);
             }
         }
 

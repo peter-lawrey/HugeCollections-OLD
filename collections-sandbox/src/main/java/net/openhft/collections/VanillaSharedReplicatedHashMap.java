@@ -27,12 +27,13 @@ import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.REMOVE;
@@ -63,7 +64,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable {
 
     private static final Logger LOG =
-            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+            LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;

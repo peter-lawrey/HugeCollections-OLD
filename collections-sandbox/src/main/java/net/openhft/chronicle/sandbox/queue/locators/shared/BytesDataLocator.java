@@ -21,8 +21,8 @@ package net.openhft.chronicle.sandbox.queue.locators.shared;
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.lang.io.AbstractBytes;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * similar to LocalDataLocator.class but works with AbstractBytes
@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 public class BytesDataLocator<E, BYTES extends AbstractBytes> implements DataLocator<E>, OffsetProvider, SliceProvider<BYTES> {
 
     public static final int ALIGN = 4;
-    private static Logger LOG = Logger.getLogger(BytesDataLocator.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(BytesDataLocator.class);
     protected final int valueMaxSize;
     @NotNull
     final BYTES readerSlice;

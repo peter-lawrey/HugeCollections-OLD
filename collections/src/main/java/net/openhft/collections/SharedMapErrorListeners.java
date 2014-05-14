@@ -16,8 +16,8 @@
 
 package net.openhft.collections;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class SharedMapErrorListeners {
 
@@ -27,19 +27,20 @@ public final class SharedMapErrorListeners {
      */
 
     private static final SharedMapErrorListener LOGGING = new SharedMapErrorListener() {
+        final Logger LOG = LoggerFactory.getLogger(getClass());
         @Override
         public void onLockTimeout(long threadId) throws IllegalStateException {
-            Logger logger = Logger.getLogger(getClass().getName());
-            if (threadId > 1L << 32)
-                logger.severe("Grabbing lock held by processId: " +
-                        (threadId >>> 33) + ", threadId: " + (threadId & 0xFFFFFFFFL));
-            else
-                logger.severe("Grabbing lock held by threadId: " + threadId);
+            if (threadId > 1L << 32) {
+                LOG.warn("Grabbing lock held by processId: {}, threadId: {}",
+                    (threadId >>> 33), (threadId & 0xFFFFFFFFL));
+            } else {
+                LOG.warn("Grabbing lock held by threadId: {}",threadId);
+            }
         }
 
         @Override
         public void errorOnUnlock(IllegalMonitorStateException e) {
-            Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Failed to unlock as expected", e);
+            LOG.warn("Failed to unlock as expected", e);
         }
     };
 

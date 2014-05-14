@@ -22,13 +22,13 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.Index;
 import net.openhft.chronicle.sandbox.queue.locators.shared.OffsetProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Starts a thread and reads of the socket
@@ -36,7 +36,7 @@ import java.util.logging.Logger;
 public class SocketReader implements Runnable {
 
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
-    private static Logger LOG = Logger.getLogger(SocketReader.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(SocketReader.class);
     private final Index ringIndex;
 
     @NotNull
@@ -130,7 +130,7 @@ public class SocketReader implements Runnable {
             }
 
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, "", e);
+            LOG.warn("", e);
         }
     }
 
