@@ -24,7 +24,9 @@ import net.openhft.lang.model.constraints.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType;
 
@@ -39,7 +41,10 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     private byte identifier = Byte.MIN_VALUE;
     private boolean canReplicate = true;
     private EnumSet<EventType> watchList = EnumSet.allOf(EventType.class);
-    private @Nullable Object notifier = null;
+    private
+    @Nullable
+    Object notifier = null;
+    private byte[] externalIdentifiers;
 
     public boolean canReplicate() {
         return canReplicate;
@@ -79,10 +84,10 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     /**
      * Returns a set of event types which should be replicated.
-     *
+     * <p/>
      * <p>Default watch list is all possible event types
      * (all {@link ReplicatedSharedHashMap.EventType} constants).
-     *
+     * <p/>
      * <p>Ignored if {@link #canReplicate()} is {@code false}.
      *
      * @return a set of event types which should be replicated
@@ -93,7 +98,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     /**
      * Specifies the list of event types to replicate.
-     *
+     * <p/>
      * <p>{@code first} event type and {@code restWatchList} are separated to forbid
      * providing an empty watch list.
      *
@@ -107,13 +112,13 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     /**
      * Returns the object which should be notified on replication events.
-     *
+     * <p/>
      * <p>I. e. <pre>{@code
      * synchronized (notifier) {
      *     notifier.notifyAll();
      * }}</pre>
      * is called on watched replication events (see {@link #watchList()}).
-     *
+     * <p/>
      * <p>By default returns {@code null} - no object should be notified.
      *
      * @return the object which should be notified on replication events
@@ -128,7 +133,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
      * {@link #notifier()} how).
      *
      * @param notifier the object which should be notified on watched replication events,
-     * or {@code null} if no object should be notified
+     *                 or {@code null} if no object should be notified
      * @return this builder object back
      */
     public VanillaSharedReplicatedHashMapBuilder notifier(@Nullable Object notifier) {
@@ -211,7 +216,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         super.actualEntriesPerSegment(actualEntriesPerSegment);
         return this;
     }
-
 
     public VanillaSharedReplicatedHashMapBuilder actualSegments(int actualSegments) {
         super.actualSegments(actualSegments);
@@ -322,4 +326,20 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return this;
     }
 
+
+    public VanillaSharedReplicatedHashMapBuilder externalIdentifiers(byte... externalIdentifiers) {
+
+        for (byte externalIdentifier : externalIdentifiers) {
+            if (externalIdentifier < 0 || externalIdentifier > 127)
+                throw new IllegalArgumentException("externalIdentifiers=" + externalIdentifier + ", is should be between 1 to 127");
+        }
+
+        this.externalIdentifiers = externalIdentifiers;
+        return this;
+    }
+
+
+    public byte[] externalIdentifiers() {
+        return this.externalIdentifiers;
+    }
 }

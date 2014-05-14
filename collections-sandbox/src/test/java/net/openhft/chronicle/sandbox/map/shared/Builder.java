@@ -27,8 +27,6 @@ import net.openhft.lang.values.IntValue;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 /**
  * @author Rob Austin.
@@ -49,19 +47,18 @@ public class Builder {
 
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newShmIntString(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
-                        .identifier(identifier);
+                        .identifier(localIdentifier)
+                        .externalIdentifiers(externalIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        final Executor e = Executors.newFixedThreadPool(2);
-
-        new QueueReplicator(result, result.getModificationIterator(),
+        new QueueReplicator(result.getModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
 
         return result;
@@ -76,21 +73,21 @@ public class Builder {
 
     static MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> newShmIntInt(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
                         .entrySize(24)
                         .actualSegments(2)
-                        .identifier(identifier);
+                        .externalIdentifiers(externalIdentifier)
+                        .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, Integer> result =
                 builder.create(getPersistenceFile(), Integer.class, Integer.class);
 
-        final QueueReplicator q = new QueueReplicator(result, result.getModificationIterator(),
+        final QueueReplicator q = new QueueReplicator(result.getModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
-
 
         return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
 
@@ -112,23 +109,22 @@ public class Builder {
 
     static VanillaSharedReplicatedHashMap<IntValue, IntValue> newShmIntValueIntValue(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
                         .entrySize(24)
                         .actualSegments(2)
-                        .identifier(identifier);
+                        .externalIdentifiers(externalIdentifier)
+                        .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<IntValue, IntValue> result =
                 builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
 
-        final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, result.getModificationIterator(),
+        new QueueReplicator(result.getModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
-
         return result;
 
     }
@@ -136,19 +132,21 @@ public class Builder {
 
     static VanillaSharedReplicatedHashMap<CharSequence, CharSequence> newShmStringString(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte identifier) throws IOException {
+            final ArrayBlockingQueue<byte[]> output,
+            final byte localIdentifier,
+            byte externalIdentifier) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
-                        .identifier(identifier);
+                        .externalIdentifiers(externalIdentifier)
+                        .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result =
                 builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
-        final Executor e = Executors.newFixedThreadPool(2);
 
-        new QueueReplicator(result, result.getModificationIterator(),
+        new QueueReplicator(result.getModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
 
         return result;

@@ -103,8 +103,13 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      */
     byte getIdentifier();
 
-    // TODO doc
-    ModificationIterator getModificationIterator();
+    /**
+     * gets the modification identifier based a unique remote identifier
+     *
+     * @param identifier the identifier relating to the ModificationIterator provided
+     * @return the ModificationIterator corresponding to the {@code identifier }
+     */
+    ModificationIterator getModificationIterator(byte identifier);
 
     /**
      * Event types which should be replicated.
@@ -183,7 +188,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          *
          * @param entry       the byte location of the entry to be stored
          * @param destination a buffer the the entry will be written to, the segment may reject this operation and add zeroBytes,
-         * if the identifier in the entry did not match the maps local identifier
+         *                    if the identifier in the entry did not match the maps local identifier
          */
         void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
 

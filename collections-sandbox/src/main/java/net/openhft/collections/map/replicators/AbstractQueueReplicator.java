@@ -53,18 +53,19 @@ abstract class AbstractQueueReplicator {
      */
     boolean onEntry(final NativeBytes entry, final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
-        entryBuffer.clear();
-        externalizable.writeExternalEntry(entry, entryBuffer);
 
-        if (entryBuffer.position() == 0)
+        buffer.skip(2);
+        long start = (int) buffer.position();
+        externalizable.writeExternalEntry(entry, buffer);
+
+        if (buffer.position() - start == 0) {
+            buffer.position(buffer.position() - 2);
             return false;
+        }
 
-        //  write the entry len
-        buffer.writeStopBit(entryBuffer.position());
 
-        //  write the entry
-        entryBuffer.flip();
-        buffer.write(entryBuffer);
+        // write the len, just before the start
+        buffer.writeUnsignedShort(start - 2L, (int) (buffer.position() - start));
 
         return true;
     }

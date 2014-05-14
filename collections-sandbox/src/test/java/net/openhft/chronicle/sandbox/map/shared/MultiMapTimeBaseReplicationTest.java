@@ -57,14 +57,14 @@ public class MultiMapTimeBaseReplicationTest {
         map2ToMap1 = new ArrayBlockingQueue<byte[]>(10000);
 
 
-        mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1);
+        mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1, (byte)2);
         map1 = mapP1.getMap();
-        segmentModificationIterator1 = map1.getModificationIterator();
+        segmentModificationIterator1 = map1.getModificationIterator((byte)2);
 
-        mapP2 = Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2);
+        mapP2 = Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2, (byte)1);
         map2 = mapP2.getMap();
 
-        segmentModificationIterator2 = map2.getModificationIterator();
+        segmentModificationIterator2 = map2.getModificationIterator((byte)1);
 
         Mockito.when(timeProvider.currentTimeMillis()).thenReturn((long) 1);
     }

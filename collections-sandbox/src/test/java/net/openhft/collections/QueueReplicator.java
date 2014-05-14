@@ -31,6 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.lang.System.arraycopy;
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
  * This class replicates data from one ReplicatedShareHashMap to another using a queue
@@ -57,9 +58,12 @@ public class QueueReplicator<K, V> {
     private ByteBufferBytes buffer;
     private ByteBufferBytes entryBuffer;
 
-    //    / @NotNull final ReplicatedSharedHashMap.WireFormat result.getWireFormat()
-    public QueueReplicator(@NotNull final ReplicatedSharedHashMap<Integer, CharSequence> replicatedMap,
-                           @NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator,
+
+
+
+
+        //    / @NotNull final ReplicatedSharedHashMap.WireFormat result.getWireFormat()
+    public QueueReplicator(@NotNull final   ModificationIterator modificationIterator,
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            final int entrySize,
@@ -74,7 +78,7 @@ public class QueueReplicator<K, V> {
 
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(r, "reader-map" + replicatedMap.getIdentifier());
+                return new Thread(r, "reader-map" + externalizable);
             }
 
         }).execute(new Runnable() {

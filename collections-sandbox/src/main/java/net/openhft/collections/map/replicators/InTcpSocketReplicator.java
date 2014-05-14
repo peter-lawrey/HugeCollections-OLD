@@ -18,17 +18,15 @@
 
 package net.openhft.collections.map.replicators;
 
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Closeable;
-import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.ThreadFactory;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -40,28 +38,41 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class InTcpSocketReplicator implements Closeable {
+public class InTcpSocketReplicator {
 
     private static final Logger LOGGER = Logger.getLogger(InTcpSocketReplicator.class.getName());
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
 
-    @NotNull
-    private final SocketChannelProvider socketChannelProvider;
+
+    public static class ClientPort {
+        final String host;
+        final int port;
+
+        public ClientPort(int port, String host) {
+            this.host = host;
+            this.port = port;
+        }
+
+        @Override
+        public String toString() {
+            return "host=" + host +
+                    ", port=" + port;
+
+        }
+    }
 
     /**
      * todo doc
      *
      * @param localIdentifier
      * @param entrySize
-     * @param socketChannelProvider provides the SocketChannel
-     * @param externalizable        provides the ability to read and write entries from the map
+     * @param externalizable  provides the ability to read and write entries from the map
      */
     public InTcpSocketReplicator(final byte localIdentifier,
                                  final int entrySize,
-                                 @NotNull final SocketChannelProvider socketChannelProvider,
+                                 @NotNull final InTcpSocketReplicator.ClientPort clientPort,
                                  final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
-        this.socketChannelProvider = socketChannelProvider;
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
@@ -69,24 +80,44 @@ public class InTcpSocketReplicator implements Closeable {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         final ByteBufferBytes bytes = new ByteBufferBytes(byteBuffer);
 
-        newSingleThreadExecutor(new ThreadFactory() {
+        // todo this should not be set to zero but it should be the last messages timestamp
+        final long timeStampOfLastMessage = 0;
 
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r, "InSocketReplicator-" + localIdentifier);
-            }
-
-        }).execute(new Runnable() {
+        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
 
             @Override
             public void run() {
-
-                // this is used in nextEntry() below, its what could be described as callback method
-                SocketChannel socketChannel = null;
-
                 try {
 
-                    socketChannel = socketChannelProvider.getSocketChannel();
+                    SocketChannel socketChannel;
+                    // this is used in nextEntry() below, its what could be described as callback method
+
+                    for (; ; ) {
+                        try {
+                            socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
+                            LOGGER.info("successfully connected to " + clientPort);
+
+
+                            socketChannel.socket().setReceiveBufferSize(8 * 1024);
+
+                            break;
+                        } catch (ConnectException e) {
+
+                            // todo add better backoff logic
+                            Thread.sleep(100);
+                        }
+                    }
+
+                    //LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
+
+                    bytes.clear();
+                    byteBuffer.clear();
+
+                    // this is notification message that we will send the remote server to ask for data for our identifier
+                    bytes.writeByte(localIdentifier);
+                    bytes.writeLong(timeStampOfLastMessage);
+                    byteBuffer.limit((int) bytes.position());
+                    socketChannel.write(byteBuffer);
 
                     byteBuffer.clear();
                     bytes.position(0);
@@ -105,10 +136,10 @@ public class InTcpSocketReplicator implements Closeable {
                             final int read = socketChannel.read(byteBuffer);
                             bytes.limit(byteBuffer.position());
                             if (read == 0)
-                                Thread.sleep(1);
+                                Thread.sleep(100);
                         }
 
-                        final long entrySize = bytes.readStopBit();
+                        final long entrySize = bytes.readUnsignedShort();
                         if (entrySize <= 0)
                             throw new IllegalStateException("invalid entrySize=" + entrySize);
 
@@ -116,7 +147,7 @@ public class InTcpSocketReplicator implements Closeable {
                             final int read = socketChannel.read(byteBuffer);
                             bytes.limit(byteBuffer.position());
                             if (read == 0)
-                                Thread.sleep(1);
+                                Thread.sleep(100);
                         }
 
                         final long limit = bytes.position() + entrySize;
@@ -125,19 +156,17 @@ public class InTcpSocketReplicator implements Closeable {
 
                         // skip onto the next entry
                         bytes.position(limit);
-                    }
-                } catch (Exception e1) {
-                    if (socketChannel != null && socketChannel.isOpen())
-                        LOGGER.log(Level.SEVERE, "", e1);
-                }
 
+
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
 
         });
     }
 
-    @Override
-    public void close() throws IOException {
-        socketChannelProvider.close();
-    }
+
 }

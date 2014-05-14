@@ -68,7 +68,7 @@ public class ByteUtils {
         return builder.toString();
     }
 
-    public static CharSequence toCharSequence(@NotNull final Bytes buffer) {
+    public static String toCharSequence(@NotNull final Bytes buffer) {
 
         final Bytes slice = buffer.slice();
 

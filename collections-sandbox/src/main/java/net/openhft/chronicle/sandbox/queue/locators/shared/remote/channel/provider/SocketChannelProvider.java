@@ -29,6 +29,4 @@ public interface SocketChannelProvider extends Closeable {
 
     SocketChannel getSocketChannel() throws IOException, InterruptedException;
 
-
-
 }
