@@ -41,6 +41,7 @@ import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
@@ -55,18 +56,17 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
     @NotNull
     private final ReplicatedSharedHashMap map;
-    private final byte localIdentifier;
+
     private final int port;
 
     @NotNull
-
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
 
     private final int adjustedEntrySize;
     private final ReplicatedSharedHashMap.EntryCallback entryCallback;
     private final ByteBufferBytes headerBytesBuffer;
     private final ByteBuffer headerBB;
-    private ServerSocketChannel serverChannel;
+    private final ServerSocketChannel serverChannel;
 
     public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                   final byte localIdentifier,
@@ -80,7 +80,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
         super(entrySize + 128, toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize));
 
         this.map = map;
-        this.localIdentifier = localIdentifier;
+
         this.port = port;
         this.serverChannel = serverChannel;
 
@@ -96,10 +96,8 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
             @Override
             public void run() {
-                // this is used in nextEntry() below, its what could be described as callback method
-
                 try {
-                    server();
+                    process();
                 } catch (Exception e) {
                     LOG.log(Level.SEVERE, "", e);
                 }
@@ -110,7 +108,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
 
     /**
-     * reads an entry from the socket
+     * writes at the entries that have changed to the socket
      * <p/>
      * A blocking call to process and read the next entry
      *
@@ -120,35 +118,38 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
      * @throws InterruptedException
      * @throws IOException
      */
-    private void processNextAvailableEntry(@NotNull final SocketChannel socketChannel,
-                                           final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException, IOException {
+    private void writeAllEntries(@NotNull final SocketChannel socketChannel,
+                                 final ModificationIterator modificationIterator) throws InterruptedException, IOException {
         //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
-          for (;;) {
-              // this is not a blocking call
-              final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+        for (; ; ) {
 
-              if (wasDataRead) {
-                  isWritingEntry.set(false);
-              } else if (buffer.position() == 0) {
-                  isWritingEntry.set(false);
-                  return;
-              }
+            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-              if (buffer.remaining() > adjustedEntrySize && (wasDataRead || buffer.position() == 0))
-                  continue;
+            if (wasDataRead) {
+                isWritingEntry.set(false);
+            } else if (buffer.position() == 0) {
+                isWritingEntry.set(false);
+                return;
+            }
 
-              buffer.flip();
+            if (buffer.remaining() > adjustedEntrySize && (wasDataRead || buffer.position() == 0))
+                continue;
 
-              final ByteBuffer byteBuffer = buffer.buffer();
-              byteBuffer.limit((int) buffer.limit());
-              byteBuffer.position((int) buffer.position());
+            buffer.flip();
 
-              socketChannel.write(byteBuffer);
+            final ByteBuffer byteBuffer = buffer.buffer();
+            byteBuffer.limit((int) buffer.limit());
+            byteBuffer.position((int) buffer.position());
 
-              // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-              buffer.clear();
-              byteBuffer.clear();
-          }
+            socketChannel.write(byteBuffer);
+
+            // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
+            buffer.clear();
+            byteBuffer.clear();
+
+            // we've filled up one buffer lets give another channel a chance to send data
+            return;
+        }
 
     }
 
@@ -214,25 +215,27 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
 
     /**
-     * the server socket implementation
+     * binds to the server socket and process data
+     * This method will block until interrupted
      *
      * @throws Exception
      */
-    public void server()
+    public void process()
             throws Exception {
 
         System.out.println("Listening on port " + port);
 
-        // allocate an unbound server socket channel
+        // allocate an unbound process socket channel
 
         // Get the associated ServerSocket to bind it with
         ServerSocket serverSocket = serverChannel.socket();
+
         // create a new Selector for use below
         Selector selector = Selector.open();
 
         serverSocket.setReuseAddress(true);
 
-        // set the port the server channel will listen to
+        // set the port the process channel will listen to
         serverSocket.bind(new InetSocketAddress(port));
 
         // set non-blocking mode for the listening socket
@@ -240,7 +243,6 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
         // register the ServerSocketChannel with the Selector
         serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-
 
         while (true) {
             // this may block for a long time, upon return the
@@ -260,71 +262,51 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
                 // Is a new connection coming in?
                 if (key.isAcceptable()) {
-                    ServerSocketChannel server =
-                            (ServerSocketChannel) key.channel();
+                    final ServerSocketChannel server = (ServerSocketChannel) key.channel();
                     final SocketChannel channel = server.accept();
-
 
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
-
 
                     // read  remoteIdentifier and time stamp
                     headerBB.clear();
                     headerBytesBuffer.clear();
 
+                    // read from the channel the timestamp and identifier
                     while (headerBB.remaining() > 0) {
                         channel.read(headerBB);
                     }
 
                     headerBytesBuffer.limit(headerBB.position());
-
                     final byte remoteIdentifier = headerBytesBuffer.readByte();
 
                     // todo HCOLL-77 : map replication : back fill missed updates on startup
                     final long remoteTimeStampOfLastMessage = headerBytesBuffer.readStopBit();
-                    System.out.println("Acceptable local=" + localIdentifier + ",remoteIdentifier=" + remoteIdentifier);
 
-
-                    //  key.attach(modificationIterator);
-
-                    // register it with the selector
-                    channel.register(selector, SelectionKey.OP_WRITE, remoteIdentifier);
+                    // register it with the selector and store the ModificationIterator for this key
+                    channel.register(selector, SelectionKey.OP_WRITE, map.getModificationIterator(remoteIdentifier));
                 }
 
                 if (key.isWritable()) {
 
-                    final Byte remoteIdentifier = (Byte) key.attachment();
-
-                  //  System.out.println("Write local=" + localIdentifier + ",remoteIdentifier=" + remoteIdentifier);
-
-                    final ReplicatedSharedHashMap.ModificationIterator modificationIterator = map.getModificationIterator(remoteIdentifier);
-
-                    //       if (attachment != null) {
-//
-                    SocketChannel socketChannel =
-                            (SocketChannel) key.channel();
-
+                    final SocketChannel socketChannel = (SocketChannel) key.channel();
 
                     try {
-                        final ReplicatedSharedHashMap.ModificationIterator attachment1 = modificationIterator;
-                        //      System.out.println("Acceptable local=" + localIdentifier + ", remote=");
-                        processNextAvailableEntry(socketChannel, attachment1);
+                        writeAllEntries(socketChannel, (ModificationIterator) key.attachment());
                     } catch (Exception e) {
-                        System.out.println("Caught '"
-                                + e + "' closing channel");
+
+                        LOG.log(Level.INFO, "closing channel", e);
+
                         // Close channel and nudge selector
                         try {
                             key.channel().close();
                         } catch (IOException ex) {
-                            ex.printStackTrace();
+                            // do nothig
                         }
-
                     }
-                    //  }
-
 
                 }
+
                 // remove key from selected set, it's been handled
                 it.remove();
             }
