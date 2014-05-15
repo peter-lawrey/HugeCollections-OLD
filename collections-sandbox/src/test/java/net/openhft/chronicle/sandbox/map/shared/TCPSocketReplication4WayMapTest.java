@@ -21,6 +21,7 @@ package net.openhft.chronicle.sandbox.map.shared;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+import net.openhft.collections.map.replicators.EntryReader;
 import net.openhft.collections.map.replicators.InTcpSocketReplicator;
 import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
 import org.junit.After;
@@ -73,7 +74,7 @@ public class TCPSocketReplication4WayMapTest {
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
         for (InTcpSocketReplicator.ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
-            new InTcpSocketReplicator(identifier, builder.entrySize(), clientSocketChannelProvider, result);
+            new InTcpSocketReplicator(identifier, clientSocketChannelProvider, new EntryReader(builder.entrySize(), result));
         }
 
         // the server will connect to all the clients, the clients will initiate the connection

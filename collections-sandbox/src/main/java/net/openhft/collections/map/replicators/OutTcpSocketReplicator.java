@@ -80,7 +80,6 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
         super(entrySize + 128, toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize));
 
         this.map = map;
-
         this.port = port;
         this.serverChannel = serverChannel;
 
@@ -88,8 +87,8 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
         this.adjustedEntrySize = entrySize + 128;
         this.entryCallback = new EntryCallback(externalizable);
 
-        headerBB = ByteBuffer.allocateDirect(9);
-        headerBytesBuffer = new ByteBufferBytes(headerBB);
+        this.headerBB = ByteBuffer.allocateDirect(9);
+        this.headerBytesBuffer = new ByteBufferBytes(headerBB);
 
         // out bound
         newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
