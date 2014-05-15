@@ -58,6 +58,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
     private final ReplicatedSharedHashMap map;
 
     private final int port;
+    private final byte localIdentifier;
 
     @NotNull
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
@@ -67,6 +68,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
     private final ByteBufferBytes headerBytesBuffer;
     private final ByteBuffer headerBB;
     private final ServerSocketChannel serverChannel;
+    private final EntryReader entryReader;
 
     public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                   final byte localIdentifier,
@@ -79,6 +81,8 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
         //todo HCOLL-71 fix the 128 padding
         super(entrySize + 128, toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize));
 
+        this.entryReader = new EntryReader(entrySize + 128, externalizable);
+        this.localIdentifier = localIdentifier;
         this.map = map;
         this.port = port;
         this.serverChannel = serverChannel;
@@ -279,33 +283,41 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
                     headerBytesBuffer.limit(headerBB.position());
                     final byte remoteIdentifier = headerBytesBuffer.readByte();
 
+                    final ModificationIterator remoteModificationIterator = map.getModificationIterator(remoteIdentifier);
+
                     // todo HCOLL-77 : map replication : back fill missed updates on startup
-                    final long remoteTimeStampOfLastMessage = headerBytesBuffer.readStopBit();
+                    remoteModificationIterator.dirtyAllEntriesNewerThan(headerBytesBuffer.readStopBit());
 
                     // register it with the selector and store the ModificationIterator for this key
-                    channel.register(selector, SelectionKey.OP_WRITE, map.getModificationIterator(remoteIdentifier));
+
+                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, remoteModificationIterator);
+
+                    // notify remote map to start to receive data for {@code localIdentifier}
+                    // entryReader.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
                 }
+                try {
 
-                if (key.isWritable()) {
-
-                    final SocketChannel socketChannel = (SocketChannel) key.channel();
-
-                    try {
+                    if (key.isWritable()) {
+                        final SocketChannel socketChannel = (SocketChannel) key.channel();
                         writeAllEntries(socketChannel, (ModificationIterator) key.attachment());
-                    } catch (Exception e) {
-
-                        LOG.log(Level.INFO, "closing channel", e);
-
-                        // Close channel and nudge selector
-                        try {
-                            key.channel().close();
-                        } catch (IOException ex) {
-                            // do nothig
-                        }
                     }
 
-                }
+                    if (key.isReadable()) {
+                        final SocketChannel socketChannel = (SocketChannel) key.channel();
+                        entryReader.readEntriesTillSocketEmpty(socketChannel);
+                    }
 
+                } catch (Exception e) {
+
+                    LOG.log(Level.INFO, "closing channel", e);
+
+                    // Close channel and nudge selector
+                    try {
+                        key.channel().close();
+                    } catch (IOException ex) {
+                        // do nothing
+                    }
+                }
                 // remove key from selected set, it's been handled
                 it.remove();
             }

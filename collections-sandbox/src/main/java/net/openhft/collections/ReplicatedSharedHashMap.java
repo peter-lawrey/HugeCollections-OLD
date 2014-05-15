@@ -111,6 +111,17 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      */
     ModificationIterator getModificationIterator(byte identifier);
 
+
+    /**
+     * used in conjunction with replication, to back filling data from a remote node that this node may have missed
+     * while it has not been running
+     *
+     * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
+     */
+    // todo HCOLL-77 : map replication : back fill missed updates on startup
+    long lastModification();
+
+
     /**
      * Event types which should be replicated.
      *
@@ -130,7 +141,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     }
 
     /**
-     * non blocking iterator which iterates over changes to a segment
+     * Holds a record of which entries have modification.
+     * Each remote map supported will require a corresponding ModificationIterator instance
      */
     interface ModificationIterator {
 
@@ -147,6 +159,14 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * false if the entry was not accepted or was not available
          */
         boolean nextEntry(@NotNull final EntryCallback callback);
+
+        /**
+         * Dirties all entries newer and including, that this timestamp to back fill missing entries for a remote map
+         *
+         * @param timeStamp the timestamp ( up to and including ) from which all entries should be dirty
+         */
+        // todo HCOLL-77 : map replication : back fill missed updates on startup
+        void dirtyAllEntriesNewerThan(double timeStamp);
     }
 
     /**

@@ -251,6 +251,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return (ReplicatedSharedHashMap.ModificationIterator) modificationIterator;
     }
 
+    // todo HCOLL-77 : map replication : back fill missed updates on startup
+    @Override
+    public long lastModification() {
+        return 0;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -1229,6 +1235,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     segment.unlock();
                 }
             }
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void dirtyAllEntriesNewerThan(double timeStamp) {
+            //todo
         }
     }
 
