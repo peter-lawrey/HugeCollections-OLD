@@ -223,8 +223,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
      *
      * @throws Exception
      */
-    public void process()
-            throws Exception {
+    public void process() throws Exception {
 
         System.out.println("Listening on port " + port);
 

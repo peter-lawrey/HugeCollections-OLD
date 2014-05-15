@@ -69,6 +69,7 @@ public class EntryReader {
                         return;
                 }
 
+
                 sizeOfNextEntry = bytes.readUnsignedShort();
             }
 
