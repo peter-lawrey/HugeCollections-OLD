@@ -21,7 +21,6 @@ package net.openhft.collections.map.replicators;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
-import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
@@ -50,7 +49,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  *
  * @author Rob Austin.
  */
-public class OutTcpSocketReplicator extends AbstractQueueReplicator implements Closeable {
+public class OutTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
@@ -58,17 +57,16 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
     private final ReplicatedSharedHashMap map;
 
     private final int port;
-    private final byte localIdentifier;
 
     @NotNull
     private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
 
-    private final int adjustedEntrySize;
-    private final ReplicatedSharedHashMap.EntryCallback entryCallback;
+
     private final ByteBufferBytes headerBytesBuffer;
     private final ByteBuffer headerBB;
     private final ServerSocketChannel serverChannel;
     private final EntryReader entryReader;
+    private final EntryWriter entryWriter;
 
     public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                   final byte localIdentifier,
@@ -79,20 +77,21 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
 
         //todo HCOLL-71 fix the 128 padding
-        super(entrySize + 128, toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize));
 
+        final short maxNumberOfEntriesPerChunk = toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize);
         this.entryReader = new EntryReader(entrySize + 128, externalizable);
-        this.localIdentifier = localIdentifier;
+
         this.map = map;
         this.port = port;
         this.serverChannel = serverChannel;
 
         //todo HCOLL-71 fix the 128 padding
-        this.adjustedEntrySize = entrySize + 128;
-        this.entryCallback = new EntryCallback(externalizable);
+
 
         this.headerBB = ByteBuffer.allocateDirect(9);
         this.headerBytesBuffer = new ByteBufferBytes(headerBB);
+
+        this.entryWriter = new EntryWriter(entrySize + 128, maxNumberOfEntriesPerChunk, externalizable);
 
         // out bound
         newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
@@ -110,61 +109,6 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
     }
 
 
-    /**
-     * writes at the entries that have changed to the socket
-     * <p/>
-     * A blocking call to process and read the next entry
-     *
-     * @param socketChannel
-     * @param modificationIterator
-     * @return
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    private void writeAllEntries(@NotNull final SocketChannel socketChannel,
-                                 final ModificationIterator modificationIterator) throws InterruptedException, IOException {
-        //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
-        for (; ; ) {
-
-            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
-
-            if (wasDataRead) {
-                isWritingEntry.set(false);
-            } else if (buffer.position() == 0) {
-                isWritingEntry.set(false);
-                return;
-            }
-
-            if (buffer.remaining() > adjustedEntrySize && (wasDataRead || buffer.position() == 0))
-                continue;
-
-            buffer.flip();
-
-            final ByteBuffer byteBuffer = buffer.buffer();
-            byteBuffer.limit((int) buffer.limit());
-            byteBuffer.position((int) buffer.position());
-
-            socketChannel.write(byteBuffer);
-
-            // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-            buffer.clear();
-            byteBuffer.clear();
-
-            // we've filled up one buffer lets give another channel a chance to send data
-            return;
-        }
-
-    }
-
-    /**
-     * @return true indicates that all the data has been processed at the time it was called
-     */
-    public boolean isEmpty() {
-        final boolean b = isWritingEntry.get();
-        return !b && buffer.position() == 0;
-    }
-
-
     private static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
 
         //todo HCOLL-71 fix the 128 padding
@@ -178,37 +122,6 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
                 maxNumberOfEntriesPerChunk0 + 1);
     }
 
-    class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
-
-        private final EntryExternalizable externalizable;
-
-        EntryCallback(@NotNull final EntryExternalizable externalizable) {
-            this.externalizable = externalizable;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public boolean onEntry(NativeBytes entry) {
-            return OutTcpSocketReplicator.this.onEntry(entry, externalizable);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void onBeforeEntry() {
-            isWritingEntry.set(true);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void onAfterEntry() {
-        }
-    }
 
     @Override
     public void close() throws IOException {
@@ -298,7 +211,7 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
 
                     if (key.isWritable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        writeAllEntries(socketChannel, (ModificationIterator) key.attachment());
+                        entryWriter.writeAll(socketChannel, (ModificationIterator) key.attachment());
                     }
 
                     if (key.isReadable()) {
@@ -317,11 +230,11 @@ public class OutTcpSocketReplicator extends AbstractQueueReplicator implements C
                         // do nothing
                     }
                 }
+
                 // remove key from selected set, it's been handled
                 it.remove();
             }
         }
     }
-
 
 }
