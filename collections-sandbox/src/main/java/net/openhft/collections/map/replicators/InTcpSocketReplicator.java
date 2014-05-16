@@ -65,7 +65,7 @@ public class InTcpSocketReplicator {
      */
     public InTcpSocketReplicator(final byte localIdentifier,
                                  @NotNull final ClientPort clientPort,
-                                 @NotNull final EntryReader entryReader) {
+                                 @NotNull final SocketChannelEntryReader entryReader) {
 
 
         // todo this should not be set to zero but it should be the last messages timestamp

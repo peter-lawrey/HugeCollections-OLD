@@ -31,19 +31,19 @@ import java.nio.channels.SocketChannel;
 /**
  * @author Rob Austin.
  */
-public class EntryWriter {
+public class SocketChannelEntryWriter {
 
-    private final int entrySize;
+    private final int entryMaxSize;
     private final ByteBuffer byteBuffer;
     private final ByteBufferBytes buffer;
     private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
 
-    public EntryWriter(final int entrySize,
-                       final short maxNumberOfEntriesPerChunk,
-                       @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-        this.entrySize = entrySize;
-        byteBuffer = ByteBuffer.allocateDirect(entrySize * maxNumberOfEntriesPerChunk);
+    public SocketChannelEntryWriter(final int entryMaxSize,
+                                    final short maxNumberOfEntriesPerChunk,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+        this.entryMaxSize = entryMaxSize;
+        byteBuffer = ByteBuffer.allocateDirect(entryMaxSize * maxNumberOfEntriesPerChunk);
         buffer = new ByteBufferBytes(byteBuffer);
         this.externalizable = externalizable;
     }
@@ -69,7 +69,7 @@ public class EntryWriter {
             if (!wasDataRead && buffer.position() == 0)
                 return;
 
-            if (buffer.remaining() > entrySize && (wasDataRead || buffer.position() == 0))
+            if (buffer.remaining() > entryMaxSize && (wasDataRead || buffer.position() == 0))
                 continue;
 
             buffer.flip();
@@ -111,7 +111,8 @@ public class EntryWriter {
 
             // write the length of the entry, just before the start, so when we read it back
             // we read the length of the entry first and hence know how many preceding bytes to read
-            buffer.writeUnsignedShort(start - 2L, (int) (buffer.position() - start));
+            final int entrySize = (int) (buffer.position() - start);
+            buffer.writeUnsignedShort(start - 2L, entrySize);
 
             return true;
         }

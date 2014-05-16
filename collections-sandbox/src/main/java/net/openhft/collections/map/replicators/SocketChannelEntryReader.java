@@ -31,7 +31,7 @@ import java.nio.channels.SocketChannel;
  *
  * @author Rob Austin.
  */
-public class EntryReader {
+public class SocketChannelEntryReader {
 
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
     private ReplicatedSharedHashMap.EntryExternalizable externalizable;
@@ -43,7 +43,7 @@ public class EntryReader {
 
     private long sizeOfNextEntry = Long.MIN_VALUE;
 
-    public EntryReader(int entrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+    public SocketChannelEntryReader(int entrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable) {
         this.entrySize0 = entrySize + 128;
         byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         this.externalizable = externalizable;
@@ -68,7 +68,6 @@ public class EntryReader {
                     if (bytes.remaining() < 8)
                         return;
                 }
-
 
                 sizeOfNextEntry = bytes.readUnsignedShort();
             }
@@ -102,7 +101,9 @@ public class EntryReader {
         }
     }
 
-    void sendWelcomeMessage(@NotNull final SocketChannel socketChannel, final long timeStampOfLastMessage, final int localIdentifier1) throws IOException {
+    void sendWelcomeMessage(@NotNull final SocketChannel socketChannel,
+                            final long timeStampOfLastMessage,
+                            final int localIdentifier1) throws IOException {
 
         bytes.clear();
         byteBuffer.clear();

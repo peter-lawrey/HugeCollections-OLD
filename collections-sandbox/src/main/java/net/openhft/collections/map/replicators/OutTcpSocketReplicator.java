@@ -34,7 +34,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -53,20 +52,14 @@ public class OutTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
-    @NotNull
+
     private final ReplicatedSharedHashMap map;
-
     private final int port;
-
-    @NotNull
-    private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
-
-
     private final ByteBufferBytes headerBytesBuffer;
     private final ByteBuffer headerBB;
     private final ServerSocketChannel serverChannel;
-    private final EntryReader entryReader;
-    private final EntryWriter entryWriter;
+    private final SocketChannelEntryReader socketChannelEntryReader;
+    private final SocketChannelEntryWriter socketChannelEntryWriter;
 
     public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                   final byte localIdentifier,
@@ -75,21 +68,18 @@ public class OutTcpSocketReplicator implements Closeable {
                                   int packetSizeInBytes,
                                   int port, final ServerSocketChannel serverChannel) {
 
-
         //todo HCOLL-71 fix the 128 padding
+        final int adjustedEntrySize = entrySize + 128;
+        final short maxNumberOfEntriesPerChunk = toMaxNumberOfEntriesPerChunk(packetSizeInBytes, adjustedEntrySize);
 
-        final short maxNumberOfEntriesPerChunk = toMaxNumberOfEntriesPerChunk(packetSizeInBytes, entrySize);
-        this.entryReader = new EntryReader(entrySize + 128, externalizable);
-
+        this.socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, externalizable);
         this.map = map;
         this.port = port;
         this.serverChannel = serverChannel;
-
-        //todo HCOLL-71 fix the 128 padding
         this.headerBB = ByteBuffer.allocateDirect(9);
         this.headerBytesBuffer = new ByteBufferBytes(headerBB);
 
-        this.entryWriter = new EntryWriter(entrySize + 128, maxNumberOfEntriesPerChunk, externalizable);
+        this.socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, externalizable);
 
         // out bound
         newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
@@ -106,13 +96,9 @@ public class OutTcpSocketReplicator implements Closeable {
         });
     }
 
-
     private static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
 
-        //todo HCOLL-71 fix the 128 padding
-        final double entrySize0 = entrySize + 128;
-
-        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize0;
+        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize;
         final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
 
         return (short) ((maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ?
@@ -120,13 +106,11 @@ public class OutTcpSocketReplicator implements Closeable {
                 maxNumberOfEntriesPerChunk0 + 1);
     }
 
-
     @Override
     public void close() throws IOException {
         if (serverChannel != null)
             serverChannel.close();
     }
-
 
     /**
      * binds to the server socket and process data
@@ -202,18 +186,18 @@ public class OutTcpSocketReplicator implements Closeable {
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, remoteModificationIterator);
 
                     // notify remote map to start to receive data for {@code localIdentifier}
-                    // entryReader.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
+                    // socketChannelEntryReader.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
                 }
                 try {
 
                     if (key.isWritable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        entryWriter.writeAll(socketChannel, (ModificationIterator) key.attachment());
+                        socketChannelEntryWriter.writeAll(socketChannel, (ModificationIterator) key.attachment());
                     }
 
                     if (key.isReadable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        entryReader.readAll(socketChannel);
+                        socketChannelEntryReader.readAll(socketChannel);
                     }
 
                 } catch (Exception e) {
