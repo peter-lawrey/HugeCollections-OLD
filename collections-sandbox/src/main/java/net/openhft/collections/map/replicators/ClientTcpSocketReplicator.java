@@ -18,6 +18,7 @@
 
 package net.openhft.collections.map.replicators;
 
+import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,9 +37,9 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class InTcpSocketReplicator {
+public class ClientTcpSocketReplicator {
 
-    private static final Logger LOGGER = Logger.getLogger(InTcpSocketReplicator.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
 
     public static class ClientPort {
         final String host;
@@ -60,18 +61,16 @@ public class InTcpSocketReplicator {
     /**
      * todo doc
      *
-     * @param localIdentifier
      * @param entryReader
+     * @param socketChannelEntryWriter
+     * @param map
      */
-    public InTcpSocketReplicator(final byte localIdentifier,
-                                 @NotNull final ClientPort clientPort,
-                                 @NotNull final SocketChannelEntryReader entryReader) {
+    public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
+                                     @NotNull final SocketChannelEntryReader entryReader,
+                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
+                                     @NotNull final ReplicatedSharedHashMap map) {
 
-
-        // todo this should not be set to zero but it should be the last messages timestamp
-        final long timeStampOfLastMessage = 0;
-
-        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
+        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true)).execute(new Runnable() {
 
             @Override
             public void run() {
@@ -94,11 +93,13 @@ public class InTcpSocketReplicator {
                         }
                     }
 
-                    entryReader.sendWelcomeMessage(socketChannel, timeStampOfLastMessage, localIdentifier);
+                    socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
+          //          final SocketChannelEntryReader.WelcomeMessage welcomeMessage = entryReader.readWelcomeMessage(socketChannel);
 
                     for (; ; ) {
                         entryReader.readAll(socketChannel);
                     }
+
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "", e);
                 }

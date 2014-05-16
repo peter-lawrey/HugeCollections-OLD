@@ -21,9 +21,10 @@ package net.openhft.chronicle.sandbox.map.shared;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
-import net.openhft.collections.map.replicators.InTcpSocketReplicator;
-import net.openhft.collections.map.replicators.OutTcpSocketReplicator;
+import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
+import net.openhft.collections.map.replicators.ServerTcpSocketReplicator;
 import net.openhft.collections.map.replicators.SocketChannelEntryReader;
+import net.openhft.collections.map.replicators.SocketChannelEntryWriter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,10 +50,10 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    private InTcpSocketReplicator.ClientPort clientSocketChannelProviderMap1;
-    private InTcpSocketReplicator.ClientPort clientSocketChannelProviderMap2;
-    private InTcpSocketReplicator.ClientPort clientSocketChannelProviderMap3;
-    private InTcpSocketReplicator.ClientPort clientSocketChannelProviderMap4;
+    private ClientTcpSocketReplicator.ClientPort clientSocketChannelProviderMap1;
+    private ClientTcpSocketReplicator.ClientPort clientSocketChannelProviderMap2;
+    private ClientTcpSocketReplicator.ClientPort clientSocketChannelProviderMap3;
+    private ClientTcpSocketReplicator.ClientPort clientSocketChannelProviderMap4;
     private ServerSocketChannel serverChannel4;
     private ServerSocketChannel serverChannel3;
     private ServerSocketChannel serverChannel2;
@@ -62,7 +63,7 @@ public class TCPSocketReplication4WayMapTest {
             final int size,
             final byte identifier,
             final int serverPort, final byte[] externalIdentifiers, final ServerSocketChannel serverChannel,
-            InTcpSocketReplicator.ClientPort... clientSocketChannelProviderMaps) throws IOException {
+            ClientTcpSocketReplicator.ClientPort... clientSocketChannelProviderMaps) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
@@ -73,18 +74,22 @@ public class TCPSocketReplication4WayMapTest {
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        for (InTcpSocketReplicator.ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
-            new InTcpSocketReplicator(identifier, clientSocketChannelProvider, new SocketChannelEntryReader(builder.entrySize(), result));
-        }
+
+        final int adjustedEntrySize = builder.entrySize() + 128;
+        final short maxNumberOfEntriesPerChunk = ServerTcpSocketReplicator.toMaxNumberOfEntriesPerChunk(1024 * 8, adjustedEntrySize);
 
         // the server will connect to all the clients, the clients will initiate the connection
-        new OutTcpSocketReplicator(
+        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
+
+        for (ClientTcpSocketReplicator.ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
+            new ClientTcpSocketReplicator(clientSocketChannelProvider, new SocketChannelEntryReader(builder.entrySize(), result), socketChannelEntryWriter, result);
+        }
+
+        new ServerTcpSocketReplicator(
                 result,
-                identifier,
-                builder.entrySize(),
+                adjustedEntrySize,
                 result,
-                1024 * 8,
-                serverPort, serverChannel);
+                serverPort, serverChannel, socketChannelEntryWriter, maxNumberOfEntriesPerChunk);
 
         return result;
     }
@@ -93,10 +98,10 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
 
-        clientSocketChannelProviderMap1 = new InTcpSocketReplicator.ClientPort(8076, "localhost");
-        clientSocketChannelProviderMap2 = new InTcpSocketReplicator.ClientPort(8077, "localhost");
-        clientSocketChannelProviderMap3 = new InTcpSocketReplicator.ClientPort(8078, "localhost");
-        clientSocketChannelProviderMap4 = new InTcpSocketReplicator.ClientPort(8079, "localhost");
+        clientSocketChannelProviderMap1 = new ClientTcpSocketReplicator.ClientPort(8076, "localhost");
+        clientSocketChannelProviderMap2 = new ClientTcpSocketReplicator.ClientPort(8077, "localhost");
+        clientSocketChannelProviderMap3 = new ClientTcpSocketReplicator.ClientPort(8078, "localhost");
+        clientSocketChannelProviderMap4 = new ClientTcpSocketReplicator.ClientPort(8079, "localhost");
 
 
         serverChannel1 = ServerSocketChannel.open();
@@ -140,7 +145,7 @@ public class TCPSocketReplication4WayMapTest {
 
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000);
+        waitTillEqual(50000000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
         assertEquals(new TreeMap(map1), new TreeMap(map3));

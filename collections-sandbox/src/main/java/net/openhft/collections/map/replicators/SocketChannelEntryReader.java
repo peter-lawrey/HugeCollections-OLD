@@ -48,6 +48,12 @@ public class SocketChannelEntryReader {
         byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         this.externalizable = externalizable;
         bytes = new ByteBufferBytes(byteBuffer);
+
+        // read  remoteIdentifier and time stamp
+        byteBuffer.clear();
+
+        bytes.limit(0);
+        bytes.position(0);
     }
 
     /**
@@ -101,22 +107,35 @@ public class SocketChannelEntryReader {
         }
     }
 
-    void sendWelcomeMessage(@NotNull final SocketChannel socketChannel,
-                            final long timeStampOfLastMessage,
-                            final int localIdentifier1) throws IOException {
 
-        bytes.clear();
+    static class WelcomeMessage {
+        public final long timeStamp;
+        public final byte identifier;
+
+        WelcomeMessage(long timeStamp, byte identifier) {
+            this.timeStamp = timeStamp;
+            this.identifier = identifier;
+        }
+    }
+
+    WelcomeMessage readWelcomeMessage(SocketChannel channel) throws IOException {
+        // read  remoteIdentifier and time stamp
         byteBuffer.clear();
 
-        // send a welcome message to the remote server to ask for data for our localIdentifier
-        // and any missed messages
-        bytes.writeByte(localIdentifier1);
-        bytes.writeLong(timeStampOfLastMessage);
-        byteBuffer.limit((int) bytes.position());
-        socketChannel.write(byteBuffer);
-
-        byteBuffer.clear();
-        bytes.position(0);
         bytes.limit(0);
+        bytes.position(0);
+
+        // read from the channel the timestamp and identifier
+        while (bytes.remaining() < 9) {
+            channel.read(byteBuffer);
+            bytes.limit(byteBuffer.position());
+        }
+
+
+        final byte id = bytes.readByte();
+        final long timeStamp = bytes.readLong();
+
+        return new WelcomeMessage(timeStamp, id);
+
     }
 }

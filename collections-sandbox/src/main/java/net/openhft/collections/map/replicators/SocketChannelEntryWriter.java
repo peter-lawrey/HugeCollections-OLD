@@ -35,7 +35,7 @@ public class SocketChannelEntryWriter {
 
     private final int entryMaxSize;
     private final ByteBuffer byteBuffer;
-    private final ByteBufferBytes buffer;
+    private final ByteBufferBytes bytes;
     private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
 
@@ -44,7 +44,7 @@ public class SocketChannelEntryWriter {
                                     @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
         this.entryMaxSize = entryMaxSize;
         byteBuffer = ByteBuffer.allocateDirect(entryMaxSize * maxNumberOfEntriesPerChunk);
-        buffer = new ByteBufferBytes(byteBuffer);
+        bytes = new ByteBufferBytes(byteBuffer);
         this.externalizable = externalizable;
     }
 
@@ -61,30 +61,30 @@ public class SocketChannelEntryWriter {
                   final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
 
-        //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
+        //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-            if (!wasDataRead && buffer.position() == 0)
+            if (!wasDataRead && bytes.position() == 0)
                 return;
 
-            if (buffer.remaining() > entryMaxSize && (wasDataRead || buffer.position() == 0))
+            if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == 0))
                 continue;
 
-            buffer.flip();
+            bytes.flip();
 
-            final ByteBuffer byteBuffer = buffer.buffer();
-            byteBuffer.limit((int) buffer.limit());
-            byteBuffer.position((int) buffer.position());
+            final ByteBuffer byteBuffer = bytes.buffer();
+            byteBuffer.limit((int) bytes.limit());
+            byteBuffer.position((int) bytes.position());
 
             socketChannel.write(byteBuffer);
 
-            // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
-            buffer.clear();
+            // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
+            bytes.clear();
             byteBuffer.clear();
 
-            // we've filled up one buffer lets give another channel a chance to send data
+            // we've filled up one bytes lets give another channel a chance to send data
             return;
         }
 
@@ -100,19 +100,19 @@ public class SocketChannelEntryWriter {
          */
         public boolean onEntry(final NativeBytes entry) {
 
-            buffer.skip(2);
-            final long start = (int) buffer.position();
-            externalizable.writeExternalEntry(entry, buffer);
+            bytes.skip(2);
+            final long start = (int) bytes.position();
+            externalizable.writeExternalEntry(entry, bytes);
 
-            if (buffer.position() - start == 0) {
-                buffer.position(buffer.position() - 2);
+            if (bytes.position() - start == 0) {
+                bytes.position(bytes.position() - 2);
                 return false;
             }
 
             // write the length of the entry, just before the start, so when we read it back
             // we read the length of the entry first and hence know how many preceding bytes to read
-            final int entrySize = (int) (buffer.position() - start);
-            buffer.writeUnsignedShort(start - 2L, entrySize);
+            final int entrySize = (int) (bytes.position() - start);
+            bytes.writeUnsignedShort(start - 2L, entrySize);
 
             return true;
         }
@@ -132,6 +132,23 @@ public class SocketChannelEntryWriter {
         public void onBeforeEntry() {
 
         }
+    }
+
+    public void sendWelcomeMessage(@NotNull final SocketChannel socketChannel,
+                                   final long timeStampOfLastMessage,
+                                   final int localIdentifier1) throws IOException {
+        bytes.clear();
+        byteBuffer.clear();
+
+        // send a welcome message to the remote server to ask for data for our localIdentifier
+        // and any missed messages
+        bytes.writeByte(localIdentifier1);
+        bytes.writeLong(timeStampOfLastMessage);
+        byteBuffer.limit((int) bytes.position());
+        socketChannel.write(byteBuffer);
+
+        bytes.clear();
+        byteBuffer.clear();
     }
 
 

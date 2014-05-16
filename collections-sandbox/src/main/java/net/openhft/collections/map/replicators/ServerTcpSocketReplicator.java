@@ -20,7 +20,6 @@ package net.openhft.collections.map.replicators;
 
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,7 +27,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -40,46 +38,45 @@ import java.util.logging.Logger;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.map.replicators.SocketChannelEntryReader.WelcomeMessage;
 
 /**
- * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
+ * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the
+ * maps using na nio, non blocking, server socket connection
  * <p/>
  * {@see net.openhft.collections.InSocketReplicator}
  *
  * @author Rob Austin.
  */
-public class OutTcpSocketReplicator implements Closeable {
+public class ServerTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
     private final ReplicatedSharedHashMap map;
     private final int port;
-    private final ByteBufferBytes headerBytesBuffer;
-    private final ByteBuffer headerBB;
     private final ServerSocketChannel serverChannel;
-    private final SocketChannelEntryReader socketChannelEntryReader;
+
     private final SocketChannelEntryWriter socketChannelEntryWriter;
+    private final byte localIdentifier;
+    private final EntryExternalizable externalizable;
+    private final int entrySize;
 
-    public OutTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
-                                  final byte localIdentifier,
-                                  final int entrySize,
-                                  @NotNull final EntryExternalizable externalizable,
-                                  int packetSizeInBytes,
-                                  int port, final ServerSocketChannel serverChannel) {
 
-        //todo HCOLL-71 fix the 128 padding
-        final int adjustedEntrySize = entrySize + 128;
-        final short maxNumberOfEntriesPerChunk = toMaxNumberOfEntriesPerChunk(packetSizeInBytes, adjustedEntrySize);
+    public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
+                                     final int entrySize,
+                                     @NotNull final EntryExternalizable externalizable,
+                                     int port, final ServerSocketChannel serverChannel,
+                                     SocketChannelEntryWriter socketChannelEntryWriter, final short maxNumberOfEntriesPerChunk) {
 
-        this.socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, externalizable);
+        this.externalizable = externalizable;
         this.map = map;
         this.port = port;
         this.serverChannel = serverChannel;
-        this.headerBB = ByteBuffer.allocateDirect(9);
-        this.headerBytesBuffer = new ByteBufferBytes(headerBB);
+        this.localIdentifier = map.getIdentifier();
+        this.socketChannelEntryWriter = socketChannelEntryWriter;
+        this.entrySize = entrySize;
 
-        this.socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, externalizable);
 
         // out bound
         newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
@@ -96,7 +93,7 @@ public class OutTcpSocketReplicator implements Closeable {
         });
     }
 
-    private static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
+    public static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
 
         final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize;
         final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
@@ -120,7 +117,7 @@ public class OutTcpSocketReplicator implements Closeable {
      */
     public void process() throws Exception {
 
-        System.out.println("Listening on port " + port);
+        LOG.info("Listening on port " + port);
 
         // allocate an unbound process socket channel
 
@@ -159,45 +156,38 @@ public class OutTcpSocketReplicator implements Closeable {
 
                 // Is a new connection coming in?
                 if (key.isAcceptable()) {
+
                     final ServerSocketChannel server = (ServerSocketChannel) key.channel();
                     final SocketChannel channel = server.accept();
 
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    // read  remoteIdentifier and time stamp
-                    headerBB.clear();
-                    headerBytesBuffer.clear();
+                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize, this.externalizable);
+                    final WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(channel);
 
-                    // read from the channel the timestamp and identifier
-                    while (headerBB.remaining() > 0) {
-                        channel.read(headerBB);
-                    }
-
-                    headerBytesBuffer.limit(headerBB.position());
-                    final byte remoteIdentifier = headerBytesBuffer.readByte();
-
-                    final ModificationIterator remoteModificationIterator = map.getModificationIterator(remoteIdentifier);
-
-                    // todo HCOLL-77 : map replication : back fill missed updates on startup
-                    remoteModificationIterator.dirtyEntriesFrom(headerBytesBuffer.readStopBit());
+                    final ModificationIterator remoteModificationIterator = map.getModificationIterator(welcomeMessage.identifier);
+                    remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
 
                     // register it with the selector and store the ModificationIterator for this key
-                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, remoteModificationIterator);
+                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);
+                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, attached);
 
                     // notify remote map to start to receive data for {@code localIdentifier}
-                    // socketChannelEntryReader.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
+//                    socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
                 }
                 try {
 
                     if (key.isWritable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        socketChannelEntryWriter.writeAll(socketChannel, (ModificationIterator) key.attachment());
+                        final Attached attachment = (Attached) key.attachment();
+                        socketChannelEntryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
                     }
 
                     if (key.isReadable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        socketChannelEntryReader.readAll(socketChannel);
+                        final Attached attachment = (Attached) key.attachment();
+                        attachment.socketChannelEntryReader.readAll(socketChannel);
                     }
 
                 } catch (Exception e) {
@@ -218,4 +208,17 @@ public class OutTcpSocketReplicator implements Closeable {
         }
     }
 
+    private static class Attached {
+
+        final SocketChannelEntryReader socketChannelEntryReader;
+        final ModificationIterator remoteModificationIterator;
+
+        Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator) {
+            this.socketChannelEntryReader = socketChannelEntryReader;
+            this.remoteModificationIterator = remoteModificationIterator;
+        }
+    }
+
 }
+
+
