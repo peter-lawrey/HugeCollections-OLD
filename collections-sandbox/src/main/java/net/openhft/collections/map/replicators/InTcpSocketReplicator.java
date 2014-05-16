@@ -40,7 +40,6 @@ public class InTcpSocketReplicator {
 
     private static final Logger LOGGER = Logger.getLogger(InTcpSocketReplicator.class.getName());
 
-
     public static class ClientPort {
         final String host;
         final int port;
@@ -98,7 +97,7 @@ public class InTcpSocketReplicator {
                     entryReader.sendWelcomeMessage(socketChannel, timeStampOfLastMessage, localIdentifier);
 
                     for (; ; ) {
-                        entryReader.readEntriesTillSocketEmpty(socketChannel);
+                        entryReader.readAll(socketChannel);
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "", e);

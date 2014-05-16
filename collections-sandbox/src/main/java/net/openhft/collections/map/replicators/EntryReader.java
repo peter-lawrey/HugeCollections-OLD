@@ -57,7 +57,7 @@ public class EntryReader {
      * @throws IOException
      * @throws InterruptedException
      */
-    void readEntriesTillSocketEmpty(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
+    void readAll(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
         for (; ; ) {
 
             // its set to MIN_VALUE when it should be read again

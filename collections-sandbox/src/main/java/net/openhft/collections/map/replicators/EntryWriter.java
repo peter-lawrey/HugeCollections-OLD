@@ -33,49 +33,19 @@ import java.nio.channels.SocketChannel;
  */
 public class EntryWriter {
 
-
     private final int entrySize;
-    final ByteBuffer byteBuffer;
-    final ByteBufferBytes buffer;
+    private final ByteBuffer byteBuffer;
+    private final ByteBufferBytes buffer;
+    private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+    private final EntryCallback entryCallback = new EntryCallback();
 
-    private final EntryCallback entryCallback;
-
-    public EntryWriter(int entrySize, short maxNumberOfEntriesPerChunk, final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+    public EntryWriter(final int entrySize,
+                       final short maxNumberOfEntriesPerChunk,
+                       @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
         this.entrySize = entrySize;
         byteBuffer = ByteBuffer.allocateDirect(entrySize * maxNumberOfEntriesPerChunk);
-        //     this.entryBuffer = new ByteBufferBytes(ByteBuffer.allocateDirect(entrySize));
         buffer = new ByteBufferBytes(byteBuffer);
-        this.entryCallback = new EntryCallback(externalizable);
-    }
-
-
-    /**
-     * Called whenever a put() or remove() has occurred to a replicating map
-     * <p/>
-     *
-     * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from
-     *              the caller.
-     * @return false if this entry should be ignored because the {@code identifier} is not from
-     * one of our changes, WARNING even though we check the {@code identifier} in the
-     * ModificationIterator the entry may have been updated.
-     */
-    boolean onEntry(final NativeBytes entry, final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-
-
-        buffer.skip(2);
-        long start = (int) buffer.position();
-        externalizable.writeExternalEntry(entry, buffer);
-
-        if (buffer.position() - start == 0) {
-            buffer.position(buffer.position() - 2);
-            return false;
-        }
-
-
-        // write the len, just before the start
-        buffer.writeUnsignedShort(start - 2L, (int) (buffer.position() - start));
-
-        return true;
+        this.externalizable = externalizable;
     }
 
 
@@ -90,17 +60,14 @@ public class EntryWriter {
     void writeAll(@NotNull final SocketChannel socketChannel,
                   final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
+
         //todo if buffer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-            if (wasDataRead) {
-                //  isWritingEntry.set(false);
-            } else if (buffer.position() == 0) {
-                //  isWritingEntry.set(false);
+            if (!wasDataRead && buffer.position() == 0)
                 return;
-            }
 
             if (buffer.remaining() > entrySize && (wasDataRead || buffer.position() == 0))
                 continue;
@@ -123,29 +90,30 @@ public class EntryWriter {
 
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
 
-        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
-
-        EntryCallback(@NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-            this.externalizable = externalizable;
-        }
-
         /**
          * {@inheritDoc}
          */
-        @Override
-        public boolean onEntry(NativeBytes entry) {
-            return EntryWriter.this.onEntry(entry, externalizable);
-        }
+        public boolean onEntry(final NativeBytes entry) {
 
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void onBeforeEntry() {
-            //  isWritingEntry.set(true);
+            buffer.skip(2);
+            final long start = (int) buffer.position();
+            externalizable.writeExternalEntry(entry, buffer);
+
+            if (buffer.position() - start == 0) {
+                buffer.position(buffer.position() - 2);
+                return false;
+            }
+
+            // write the length of the entry, just before the start, so when we read it back
+            // we read the length of the entry first and hence know how many preceding bytes to read
+            buffer.writeUnsignedShort(start - 2L, (int) (buffer.position() - start));
+
+            return true;
         }
 
         /**
@@ -153,7 +121,17 @@ public class EntryWriter {
          */
         @Override
         public void onAfterEntry() {
+
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void onBeforeEntry() {
+
         }
     }
+
 
 }

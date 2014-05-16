@@ -86,8 +86,6 @@ public class OutTcpSocketReplicator implements Closeable {
         this.serverChannel = serverChannel;
 
         //todo HCOLL-71 fix the 128 padding
-
-
         this.headerBB = ByteBuffer.allocateDirect(9);
         this.headerBytesBuffer = new ByteBufferBytes(headerBB);
 
@@ -162,14 +160,14 @@ public class OutTcpSocketReplicator implements Closeable {
         while (true) {
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
-            int n = selector.select();
+            final int n = selector.select();
 
             if (n == 0) {
                 continue;    // nothing to do
             }
 
             // get an iterator over the set of selected keys
-            Iterator it = selector.selectedKeys().iterator();
+            final Iterator it = selector.selectedKeys().iterator();
 
             // look at each key in the selected set
             while (it.hasNext()) {
@@ -198,10 +196,9 @@ public class OutTcpSocketReplicator implements Closeable {
                     final ModificationIterator remoteModificationIterator = map.getModificationIterator(remoteIdentifier);
 
                     // todo HCOLL-77 : map replication : back fill missed updates on startup
-                    remoteModificationIterator.dirtyAllEntriesNewerThan(headerBytesBuffer.readStopBit());
+                    remoteModificationIterator.dirtyEntriesFrom(headerBytesBuffer.readStopBit());
 
                     // register it with the selector and store the ModificationIterator for this key
-
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, remoteModificationIterator);
 
                     // notify remote map to start to receive data for {@code localIdentifier}
@@ -216,7 +213,7 @@ public class OutTcpSocketReplicator implements Closeable {
 
                     if (key.isReadable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        entryReader.readEntriesTillSocketEmpty(socketChannel);
+                        entryReader.readAll(socketChannel);
                     }
 
                 } catch (Exception e) {

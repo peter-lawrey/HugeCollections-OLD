@@ -1241,7 +1241,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * {@inheritDoc}
          */
         @Override
-        public void dirtyAllEntriesNewerThan(double timeStamp) {
+        public void dirtyEntriesFrom(double timeStamp) {
             //todo
         }
     }

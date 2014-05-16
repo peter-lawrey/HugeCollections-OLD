@@ -166,7 +166,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * @param timeStamp the timestamp ( up to and including ) from which all entries should be dirty
          */
         // todo HCOLL-77 : map replication : back fill missed updates on startup
-        void dirtyAllEntriesNewerThan(double timeStamp);
+        void dirtyEntriesFrom(double timeStamp);
     }
 
     /**
