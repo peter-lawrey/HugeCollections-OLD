@@ -115,7 +115,7 @@ public class ServerTcpSocketReplicator implements Closeable {
      *
      * @throws Exception
      */
-    public void process() throws Exception {
+    private void process() throws Exception {
 
         LOG.info("Listening on port " + port);
 
@@ -174,7 +174,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, attached);
 
                     // notify remote map to start to receive data for {@code localIdentifier}
-//                    socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
+                    socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
                 }
                 try {
 

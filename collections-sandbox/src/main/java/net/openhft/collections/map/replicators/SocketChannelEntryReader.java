@@ -112,7 +112,7 @@ public class SocketChannelEntryReader {
         public final long timeStamp;
         public final byte identifier;
 
-        WelcomeMessage(long timeStamp, byte identifier) {
+        WelcomeMessage(byte identifier, long timeStamp) {
             this.timeStamp = timeStamp;
             this.identifier = identifier;
         }
@@ -131,11 +131,7 @@ public class SocketChannelEntryReader {
             bytes.limit(byteBuffer.position());
         }
 
-
-        final byte id = bytes.readByte();
-        final long timeStamp = bytes.readLong();
-
-        return new WelcomeMessage(timeStamp, id);
+        return new WelcomeMessage(bytes.readByte(), bytes.readLong());
 
     }
 }

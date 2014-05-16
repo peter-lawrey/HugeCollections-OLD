@@ -94,7 +94,8 @@ public class ClientTcpSocketReplicator {
                     }
 
                     socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
-          //          final SocketChannelEntryReader.WelcomeMessage welcomeMessage = entryReader.readWelcomeMessage(socketChannel);
+                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = entryReader.readWelcomeMessage(socketChannel);
+                    // todo implement the writing side on the client
 
                     for (; ; ) {
                         entryReader.readAll(socketChannel);
