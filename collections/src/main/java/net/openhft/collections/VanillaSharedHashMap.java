@@ -21,13 +21,14 @@ import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
+import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -75,7 +76,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int metaDataBytes;
     Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    MappedStore ms;
+    private VanillaMappedFile vmf;
     final Hasher hasher;
 
     private final int replicas;
@@ -83,7 +84,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final Alignment alignment;
     final int entriesPerSegment;
     final int hashMask;
-
+    
+    private final BytesMarshallerFactory bytesMarshallerFactory;
     private final SharedMapErrorListener errorListener;
 
     /**
@@ -125,22 +127,22 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
         this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
-
+        this.bytesMarshallerFactory = new VanillaBytesMarshallerFactory();
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
         Segment[] ss = (Segment[]) new AbstractVanillaSharedHashMap.Segment[segments];
         this.segments = ss;
+        this.vmf = null;
     }
 
     long createMappedStoreAndSegments(File file) throws IOException {
-        this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes());
+        this.vmf = VanillaMappedFile.readWrite(file,sizeInBytes());
 
         long offset = SharedHashMapBuilder.HEADER_SIZE;
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = createSegment(ms.bytes(offset, segmentSize), i);
+            this.segments[i] = createSegment(vmf.bytes(offset, segmentSize), i);
             offset += segmentSize;
         }
         return offset;
@@ -152,7 +154,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     @Override
     public File file() {
-        return ms.file();
+        return new File(vmf.path());
     }
 
     @Override
@@ -271,18 +273,25 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     @Override
     public void close() {
-        if (ms == null)
+        if (vmf == null)
             return;
-        ms.free();
+
+        try {
+            vmf.close();
+        } catch(IOException e) {
+            LOGGER.warning(e.getMessage());
+        }
+
         segments = null;
-        ms = null;
+        vmf = null;
     }
 
     private DirectBytes acquireBufferForKey() {
         DirectBytes buffer = localBufferForKeys.get();
         if (buffer == null) {
-            buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).bytes();
+            buffer = new DirectStore(this.bytesMarshallerFactory, 
+                entrySize * bufferAllocationFactor, false).bytes();
+            
             localBufferForKeys.set(buffer);
         } else {
             buffer.clear();
@@ -293,8 +302,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private DirectBytes acquireBufferForValue() {
         DirectBytes buffer = localBufferForValues.get();
         if (buffer == null) {
-            buffer = new DirectStore(ms.bytesMarshallerFactory(),
-                    entrySize * bufferAllocationFactor, false).bytes();
+            buffer = new DirectStore(this.bytesMarshallerFactory,
+                entrySize * bufferAllocationFactor, false).bytes();
+            
             localBufferForValues.set(buffer);
         } else {
             buffer.clear();

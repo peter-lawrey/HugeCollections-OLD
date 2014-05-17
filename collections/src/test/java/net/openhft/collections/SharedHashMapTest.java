@@ -45,7 +45,8 @@ public class SharedHashMapTest {
         for (int expectedKey : expectedKeys) {
             expectedSet.add(expectedKey);
         }
-        org.junit.Assert.assertEquals(expectedSet, keySet);
+
+        assertEquals(expectedSet, keySet);
     }
 
     static void assertValues(Collection<CharSequence> values, CharSequence[] expectedValues) {
@@ -61,7 +62,7 @@ public class SharedHashMapTest {
         }
         Collections.sort(actualList);
 
-        org.junit.Assert.assertEquals(expectedList, actualList);
+        assertEquals(expectedList, actualList);
     }
 
     static void assertEntrySet(Set<Map.Entry<Integer, CharSequence>> entrySet, int[] expectedKeys, CharSequence[] expectedValues) {
@@ -69,13 +70,14 @@ public class SharedHashMapTest {
         for (int i = 0; i < expectedKeys.length; i++) {
             expectedSet.add(new AbstractMap.SimpleEntry<Integer, CharSequence>(expectedKeys[i], expectedValues[i]));
         }
-        org.junit.Assert.assertEquals(expectedSet, entrySet);
+
+        assertEquals(expectedSet, entrySet);
     }
 
     static void assertMap(Map<Integer, CharSequence> map, int[] expectedKeys, CharSequence[] expectedValues) {
         assertEquals(expectedKeys.length, map.size());
         for (int i = 0; i < expectedKeys.length; i++) {
-            org.junit.Assert.assertEquals("On position " + i, expectedValues[i], map.get(expectedKeys[i]));
+            assertEquals("On position " + i, expectedValues[i], map.get(expectedKeys[i]));
         }
     }
 
