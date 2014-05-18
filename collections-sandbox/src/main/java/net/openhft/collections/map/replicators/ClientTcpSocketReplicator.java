@@ -28,6 +28,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -41,9 +42,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  */
 public class ClientTcpSocketReplicator {
 
-    private static final Logger LOGGER = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
-    public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
-
+    private static final Logger LOG = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
 
     public static class ClientPort {
         final String host;
@@ -76,12 +75,11 @@ public class ClientTcpSocketReplicator {
                 try {
 
                     SocketChannel socketChannel;
-                    // this is used in nextEntry() below, its what could be described as callback method
 
                     for (; ; ) {
                         try {
                             socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
-                            LOGGER.info("successfully connected to " + clientPort);
+                            LOG.info("successfully connected to " + clientPort);
 
 
                             socketChannel.socket().setReceiveBufferSize(8 * 1024);
@@ -99,6 +97,8 @@ public class ClientTcpSocketReplicator {
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.getModificationIterator(welcomeMessage.identifier);
                     remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
+
+                    // we start this connection in blocking mode ( to do the hand-shacking ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);
 
                     final Selector selector = Selector.open();
@@ -134,7 +134,7 @@ public class ClientTcpSocketReplicator {
 
 
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.log(Level.SEVERE, "", e);
                 }
             }
 
