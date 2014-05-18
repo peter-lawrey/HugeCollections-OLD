@@ -104,8 +104,6 @@ public class ClientTcpSocketReplicator {
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ);
 
-                    // todo implement the writing side on the client
-
                     while (true) {
                         // this may block for a long time, upon return the
                         // selected set contains keys of the ready channels
