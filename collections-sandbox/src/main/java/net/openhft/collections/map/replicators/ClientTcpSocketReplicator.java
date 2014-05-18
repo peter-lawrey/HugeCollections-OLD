@@ -19,14 +19,15 @@
 package net.openhft.collections.map.replicators;
 
 import net.openhft.collections.ReplicatedSharedHashMap;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
 import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -61,21 +62,14 @@ public class ClientTcpSocketReplicator {
         }
     }
 
-    /**
-     * todo doc
-     *
-     * @param localIdentifier
-     * @param entrySize
-     * @param externalizable  provides the ability to read and write entries from the map
-     */
+
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
-                                      @NotNull final SocketChannelEntryReader socketChannelEntryReader,
-                                      @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
-                                      @NotNull final ReplicatedSharedHashMap map) {
+                                     @NotNull final SocketChannelEntryReader socketChannelEntryReader,
+                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
+                                     @NotNull final ReplicatedSharedHashMap map) {
 
 
-
-        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-"  , true)).execute(new Runnable() {
+        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-", true)).execute(new Runnable() {
 
             @Override
             public void run() {
@@ -91,7 +85,6 @@ public class ClientTcpSocketReplicator {
 
 
                             socketChannel.socket().setReceiveBufferSize(8 * 1024);
-
                             break;
                         } catch (ConnectException e) {
 
@@ -100,23 +93,47 @@ public class ClientTcpSocketReplicator {
                         }
                     }
 
-                    //LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
-
-
 
                     socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.getModificationIterator(welcomeMessage.identifier);
                     remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
+                    socketChannel.configureBlocking(false);
 
+                    final Selector selector = Selector.open();
+                    socketChannel.register(selector, SelectionKey.OP_READ);
 
+                    // todo implement the writing side on the client
 
-                    for (; ; ) {
+                    while (true) {
+                        // this may block for a long time, upon return the
+                        // selected set contains keys of the ready channels
+                        int n = selector.select();
 
-                        socketChannelEntryReader.readAll(socketChannel);
+                        if (n == 0) {
+                            continue;    // nothing to do
+                        }
 
+                        // get an iterator over the set of selected keys
+                        final Iterator it = selector.selectedKeys().iterator();
+
+                        // look at each key in the selected set
+                        while (it.hasNext()) {
+                            SelectionKey key = (SelectionKey) it.next();
+
+                            // is there data to read on this channel?
+                            if (key.isReadable()) {
+                                socketChannelEntryReader.readAll(socketChannel);
+                            } else if (key.isWritable()) {
+                                socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
+                            }
+
+                            // remove key from selected set, it's been handled
+                            it.remove();
+                        }
                     }
+
 
                 } catch (Exception e) {
                     e.printStackTrace();
