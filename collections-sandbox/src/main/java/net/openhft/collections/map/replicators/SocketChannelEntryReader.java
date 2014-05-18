@@ -64,7 +64,7 @@ public class SocketChannelEntryReader {
      * @throws InterruptedException
      */
     void readAll(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
-        for (; ; ) {
+
 
             // its set to MIN_VALUE when it should be read again
             if (sizeOfNextEntry == Long.MIN_VALUE) {
@@ -104,7 +104,7 @@ public class SocketChannelEntryReader {
 
             // to allow the sizeOfNextEntry to be read the next time around
             sizeOfNextEntry = Long.MIN_VALUE;
-        }
+
     }
 
 

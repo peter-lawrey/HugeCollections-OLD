@@ -19,14 +19,16 @@
 package net.openhft.collections.map.replicators;
 
 import net.openhft.collections.ReplicatedSharedHashMap;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -38,10 +40,9 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class ClientTcpSocketReplicator {
+public class ClientTcpSocketReplicator2 {
 
-    private static final Logger LOGGER = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
-    public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
+    private static final Logger LOGGER = Logger.getLogger(ClientTcpSocketReplicator2.class.getName());
 
 
     public static class ClientPort {
@@ -64,45 +65,40 @@ public class ClientTcpSocketReplicator {
     /**
      * todo doc
      *
-     * @param localIdentifier
-     * @param entrySize
-     * @param externalizable  provides the ability to read and write entries from the map
+     * @param socketChannelEntryReader
+     * @param socketChannelEntryWriter
+     * @param map
      */
-    public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
+    public ClientTcpSocketReplicator2(@NotNull final ClientPort clientPort,
                                       @NotNull final SocketChannelEntryReader socketChannelEntryReader,
                                       @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
                                       @NotNull final ReplicatedSharedHashMap map) {
 
-
-
-        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-"  , true)).execute(new Runnable() {
+        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true)).execute(new Runnable() {
 
             @Override
             public void run() {
                 try {
 
                     SocketChannel socketChannel;
-                    // this is used in nextEntry() below, its what could be described as callback method
-
+                    Selector selector;
                     for (; ; ) {
                         try {
+
                             socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
+                            socketChannel.configureBlocking(false);
                             LOGGER.info("successfully connected to " + clientPort);
-
-
                             socketChannel.socket().setReceiveBufferSize(8 * 1024);
-
+                            selector = Selector.open();
+                            socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_CONNECT);
                             break;
+
                         } catch (ConnectException e) {
 
-                            // todo add better backoff logic
+                            // todo add better back off logic
                             Thread.sleep(100);
                         }
                     }
-
-                    //LOG.log(Level.INFO, "successfully connected to host=" + host + ", port=" + port);
-
-
 
                     socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(socketChannel);
@@ -111,15 +107,37 @@ public class ClientTcpSocketReplicator {
                     remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
 
 
+                    // todo implement the writing side on the client
 
-                    for (; ; ) {
+                    while (true) {
+                        // this may block for a long time, upon return the
+                        // selected set contains keys of the ready channels
+                        int n = selector.select();
 
-                        socketChannelEntryReader.readAll(socketChannel);
+                        if (n == 0) {
+                            continue;    // nothing to do
+                        }
 
+                        // get an iterator over the set of selected keys
+                        final Iterator it = selector.selectedKeys().iterator();
+
+                        // look at each key in the selected set
+                        while (it.hasNext()) {
+                            SelectionKey key = (SelectionKey) it.next();
+
+                            // is there data to read on this channel?
+                            if (key.isReadable()) {
+                                socketChannelEntryReader.readAll(socketChannel);
+                            } else if (key.isWritable()) {
+                //            socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
+                            }
+
+                            // remove key from selected set, it's been handled
+                            it.remove();
+                        }
                     }
-
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "", e);
                 }
             }
 

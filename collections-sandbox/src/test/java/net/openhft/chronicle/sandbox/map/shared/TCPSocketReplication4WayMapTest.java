@@ -78,12 +78,14 @@ public class TCPSocketReplication4WayMapTest {
         final int adjustedEntrySize = builder.entrySize() + 128;
         final short maxNumberOfEntriesPerChunk = ServerTcpSocketReplicator.toMaxNumberOfEntriesPerChunk(1024 * 8, adjustedEntrySize);
 
-        // the server will connect to all the clients, the clients will initiate the connection
-        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
 
         for (ClientTcpSocketReplicator.ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
-            new ClientTcpSocketReplicator(clientSocketChannelProvider, new SocketChannelEntryReader(builder.entrySize(), result), socketChannelEntryWriter, result);
+            final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
+            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(builder.entrySize(), result);
+            new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
         }
+
+        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
 
         new ServerTcpSocketReplicator(
                 result,
@@ -136,7 +138,7 @@ public class TCPSocketReplication4WayMapTest {
     public void test() throws IOException, InterruptedException {
 
         // allow all the TCP connections to establish
-        Thread.sleep(500);
+        Thread.sleep(1000);
 
         map1.put(2, "EXAMPLE-1");
         map2.put(4, "EXAMPLE-2");
@@ -145,12 +147,12 @@ public class TCPSocketReplication4WayMapTest {
 
 
         // allow time for the recompilation to resolve
-        waitTillEqual(50000000);
+        waitTillEqual(1000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertEquals(new TreeMap(map1), new TreeMap(map3));
-        assertEquals(new TreeMap(map1), new TreeMap(map4));
-        assertTrue(!map2.isEmpty());
+        assertEquals("map2",new TreeMap(map1), new TreeMap(map2));
+        assertEquals("map3",new TreeMap(map1), new TreeMap(map3));
+        assertEquals("map4",new TreeMap(map1), new TreeMap(map4));
+        assertTrue("map2.empty",!map2.isEmpty());
 
 
     }
