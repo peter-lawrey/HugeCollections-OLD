@@ -57,7 +57,6 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final ReplicatedSharedHashMap map;
     private final int port;
     private final ServerSocketChannel serverChannel;
-
     private final SocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
@@ -168,7 +167,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                     final WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(channel);
 
                     final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(welcomeMessage.identifier);
-                    remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
+                    remoteModificationIterator.dirtyEntries(welcomeMessage.timeStamp);
 
                     // register it with the selector and store the ModificationIterator for this key
                     final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);

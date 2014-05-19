@@ -170,12 +170,17 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         boolean nextEntry(@NotNull final EntryCallback callback);
 
         /**
-         * Dirties all entries newer and including, that this timestamp to back fill missing entries for a remote map
+         * Dirties all entries with a modification time newer than {@code timeStamp} ( inclusive )
+         * <p/>
+         * This functionality is used to publish recently modified entries to a new remote node as it connects
          *
          * @param timeStamp the timestamp ( up to and including ) from which all entries should be dirty
          */
-        // todo HCOLL-77 : map replication : back fill missed updates on startup
-        void dirtyEntriesFrom(double timeStamp);
+        void dirtyEntries(long timeStamp);
+    }
+
+    interface ReplicatedSharedSegment<K, V> extends SharedSegment<K, V> {
+        void dirtyNewerEntries(long timeStamp, EntryModifiableCallback entryModifiableCallback);
     }
 
     /**
@@ -208,6 +213,22 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          */
         void onBeforeEntry();
     }
+
+    /**
+     * details about when a modification to an entry was made
+     */
+    interface EntryModifiableCallback<K, V> {
+
+        /**
+         * set the bit related to {@code segment} and {@code pos}
+         *
+         * @param segment the segment relating to the bit to set
+         * @param pos     the position relating to the bit to set
+         */
+        void set(SharedSegment segment, int pos);
+
+    }
+
 
     interface EntryExternalizable {
 

@@ -103,7 +103,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(welcomeMessage.identifier);
-                    remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
+                    remoteModificationIterator.dirtyEntries(welcomeMessage.timeStamp);
 
                     // we start this connection in blocking mode ( to do the hand-shacking ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);

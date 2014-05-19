@@ -27,6 +27,7 @@ import net.openhft.lang.model.constraints.NotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.logging.Logger;
@@ -132,8 +133,12 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
-        Segment[] ss = (Segment[]) new AbstractVanillaSharedHashMap.Segment[segments];
+        Segment[] ss = (Segment[]) Array.newInstance(segmentType(), segments);
         this.segments = ss;
+    }
+
+    Class segmentType() {
+        return Segment.class;
     }
 
     long createMappedStoreAndSegments(File file) throws IOException {

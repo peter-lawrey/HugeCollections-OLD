@@ -101,7 +101,7 @@ public class TCPSocketReplication4WayMapTest {
 
         // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
 
-        for (Closeable closeable : new Closeable[]{map1, map2, map3, map4}) {
+        for (final Closeable closeable : new Closeable[]{map1, map2, map3, map4}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -114,18 +114,19 @@ public class TCPSocketReplication4WayMapTest {
     @Test
     public void test() throws IOException, InterruptedException {
 
-        // allow all the TCP connections to establish
+        //todo fix this bug, if we comment this our the test fails
         Thread.sleep(1000);
 
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-2");
         map3.put(3, "EXAMPLE-1");
-    //        map3.remove(2);
-      //  map3.put(3, "EXAMPLE-5");
+        map3.remove(2);
+        //todo fix this bug, if we add this back in the test fails
+        //  map3.put(3, "EXAMPLE-5");
         map4.put(4, "EXAMPLE-5");
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000);
+        waitTillEqual(1000000);
 
         assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
         assertEquals("map3", new TreeMap(map1), new TreeMap(map3));

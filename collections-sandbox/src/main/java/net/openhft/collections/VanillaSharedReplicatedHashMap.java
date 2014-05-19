@@ -91,10 +91,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-
     private final Object modificationIteratorNotifier;
     private final Set<EventType> modificationIteratorWatchList;
-
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
 
     // todo allow for dynamic creation of modificationIterators
@@ -120,6 +118,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return new Segment(bytes, index);
     }
 
+
     @Override
     public VanillaSharedReplicatedHashMapBuilder builder() {
         // todo remove the builder from within the map, the builder should be external is there are a number of ways
@@ -127,6 +126,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         throw new UnsupportedOperationException();
     }
 
+
+    Class segmentType() {
+        return Segment.class;
+    }
 
     @Override
     public int maxEntrySize() {
@@ -245,6 +248,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
             final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
                     modIterBitSetSizeInBytes());
+
             final ModificationIterator newEventListener = new ModificationIterator(
                     modificationIteratorNotifier,
                     modificationIteratorWatchList,
@@ -256,6 +260,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
     }
+
 
     public void addCloseable(Closeable closeable) {
         closeables.add(closeable);
@@ -329,7 +334,25 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    class Segment extends VanillaSharedHashMap<K, V>.Segment implements SharedSegment {
+    /**
+     * returns true if the entry has been modified after ( and including ) the timestamp
+     * <p/>
+     * This functionality was added to support back filling of entries, this occurs when a new node gets
+     * attached to an existing live replicated hash map
+     *
+     * @param entry     the location of the entry
+     * @param timestamp the timestamp from which a entry is considered dirty and subsequently should be republished ( inclusive )
+     * @return true if the entry has been modified after ( and including ) the timestamp
+     */
+
+    public boolean isNewer(NativeBytes entry, long timestamp) {
+        long keyLen = entry.remaining();
+        entry.skip(keyLen);
+        final long entryTimestamp = entry.readLong();
+        return entryTimestamp >= timestamp;
+    }
+
+    class Segment extends VanillaSharedHashMap<K, V>.Segment implements ReplicatedSharedSegment {
 
         private volatile IntIntMultiMap hashLookupLiveAndDeleted;
         private volatile IntIntMultiMap hashLookupLiveOnly;
@@ -379,7 +402,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
                     if (canReplicate) {
-                        if (shouldTerminate(entry, timestamp, localIdentifier))
+                        if (shouldIgnore(entry, timestamp, localIdentifier))
                             return null;
                         // skip the is deleted flag
                         entry.skip(1);
@@ -434,7 +457,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     long timeStampPos = entry.position();
 
-                    if (shouldTerminate(entry, timestamp, identifier)) {
+                    if (shouldIgnore(entry, timestamp, identifier)) {
 
                         // skip the is deleted flag
                         entry.skip(1);
@@ -474,14 +497,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @param keyLimit
          * @return
          */
-        private void replicatingPut(@NotNull final Bytes inBytes,
-                                    int hash2,
-                                    final byte identifier,
-                                    final long timestamp,
-                                    long valuePos,
-                                    long valueLimit,
-                                    long keyPosition,
-                                    long keyLimit) {
+        private void remotePut(@NotNull final Bytes inBytes,
+                               int hash2,
+                               final byte identifier,
+                               final long timestamp,
+                               long valuePos,
+                               long valueLimit,
+                               long keyPosition,
+                               long keyLimit) {
             lock();
             try {
 
@@ -504,7 +527,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     entry.positionAddr(timeStampPos);
 
-                    if (shouldTerminate(entry, timestamp, identifier)) {
+                    if (shouldIgnore(entry, timestamp, identifier)) {
                         entry.positionAddr(timeStampPos);
                         return;
                     }
@@ -608,7 +631,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     if (canReplicate) {
 
-                        if (shouldTerminate(entry, timestamp, identifier))
+                        if (shouldIgnore(entry, timestamp, identifier))
                             return null;
                         wasDeleted = entry.readBoolean();
                     }
@@ -681,29 +704,29 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         /**
-         * used only with replication, it sometimes possible to receive and old ( or stale update ) from a remote system
+         * used only with replication, it sometimes possible to receive and old ( or stale updates ) from a remote map
          * The method is used to determine if we should ignore such updates.
          * <p/>
          * we sometime will reject put() and removes()
          * when comparing times stamps with remote systems
          *
          * @param entry
-         * @param providedTimestamp the time the entry was created or updated
+         * @param timestamp  the time the entry was created or updated
          * @param identifier
          * @return true if the entry should not be processed
          */
-        private boolean shouldTerminate(@NotNull final NativeBytes entry, final long providedTimestamp, final byte identifier) {
+        private boolean shouldIgnore(@NotNull final NativeBytes entry, final long timestamp, final byte identifier) {
 
             final long lastModifiedTimeStamp = entry.readLong();
 
             // if the readTimeStamp is newer then we'll reject this put()
             // or they are the same and have a larger id
-            if (lastModifiedTimeStamp < providedTimestamp) {
+            if (lastModifiedTimeStamp < timestamp) {
                 entry.skip(1); // skip the byte used for the identifier
                 return false;
             }
 
-            if (lastModifiedTimeStamp > providedTimestamp)
+            if (lastModifiedTimeStamp > timestamp)
                 return true;
 
             // check the identifier
@@ -815,7 +838,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         if (identifier <= 0)
                             throw new IllegalStateException("identifier=" + identifier);
 
-                        if (shouldTerminate(entry, timestamp, identifier)) {
+                        if (shouldIgnore(entry, timestamp, identifier)) {
                             return null;
                         }
                         // skip the is deleted flag
@@ -898,7 +921,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     // key is found
                     entry.skip(keyLen);
                     if (canReplicate) {
-                        if (shouldTerminate(entry, timestamp, localIdentifier))
+                        if (shouldIgnore(entry, timestamp, localIdentifier))
                             return null;
                         // skip the is deleted flag
                         entry.skip(1);
@@ -918,6 +941,33 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             int hash = hashLookupLiveAndDeleted.getSearchHash();
             hashLookupLiveOnly.replace(hash, prevPos, pos);
         }
+
+
+        /**
+         * {@inheritDoc}
+         */
+        public void dirtyNewerEntries(final long timeStamp, final EntryModifiableCallback entryModifiableCallback) {
+
+            this.lock();
+            try {
+                hashLookupLiveAndDeleted.forEach(new IntIntMultiMap.EntryConsumer() {
+
+                    @Override
+                    public void accept(int hash, int pos) {
+                        final long offset = offsetFromPos(pos);
+                        final NativeBytes entry = entry(offset);
+                        if (isNewer(entry, timeStamp))
+                            entryModifiableCallback.set(Segment.this, pos);
+                    }
+
+                });
+
+
+            } finally {
+                unlock();
+            }
+        }
+
 
         /**
          * removes all the entries
@@ -967,6 +1017,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
             return new WriteThroughEntry(key, value);
         }
+
 
     }
 
@@ -1070,13 +1121,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
-        segment(segmentNum).replicatingPut(source, segmentHash, remoteIdentifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
+        segment(segmentNum).remotePut(source, segmentHash, remoteIdentifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
 
         // todo change to debug log
         source.position(valuePosition);
         source.limit(valueLimit);
         System.out.println(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
     }
+
 
     /**
      * Once a change occurs to a map, map replication requires
@@ -1099,13 +1151,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             implements ReplicatedSharedHashMap.ModificationIterator {
 
         private final Object notifier;
-        @NotNull
 
+        @NotNull
         private final ATSDirectBitSet changes;
         private final int segmentIndexShift;
         private final long posMask;
         private final EnumSet<EventType> watchList;
         private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
+        private final EntryModifiableCallback entryModifiableCallback = new EntryModifiableCallback();
 
         private volatile long position = -1;
 
@@ -1114,6 +1167,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                     @NotNull final DirectBytes bytes,
                                     @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener) {
             this.notifier = notifier;
+
             this.watchList = EnumSet.copyOf(watchList);
             this.nextListener = nextListener;
             long bitsPerSegment = bitsPerSegmentInModIterBitSet();
@@ -1265,12 +1319,23 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        class EntryModifiableCallback<K, V> implements ReplicatedSharedHashMap.EntryModifiableCallback<K, V> {
+            public void set(SharedSegment segment, int pos) {
+                System.out.println("segment.getIndex()" + segment.getIndex() + ",pos=" + pos);
+                changes.set(combine(segment.getIndex(), pos));
+            }
+        }
+
         @Override
-        public void dirtyEntriesFrom(double timeStamp) {
-            //todo
+        public void dirtyEntries(long timeStamp) {
+
+
+            // iterate over all the segments and mark bit in the modification iterator
+            // that correspond to entries with an older timestamp
+            for (Segment segment : (Segment[]) segments) {
+                segment.dirtyNewerEntries(timeStamp, entryModifiableCallback);
+            }
+
         }
     }
 
