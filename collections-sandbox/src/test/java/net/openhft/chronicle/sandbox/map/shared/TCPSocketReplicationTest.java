@@ -22,7 +22,6 @@ import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -98,7 +97,6 @@ public class TCPSocketReplicationTest {
 
 
     @Test
-    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         // Thread.sleep(1000);

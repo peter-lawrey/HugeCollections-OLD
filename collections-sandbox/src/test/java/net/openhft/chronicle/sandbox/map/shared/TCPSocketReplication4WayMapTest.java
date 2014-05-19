@@ -65,7 +65,7 @@ public class TCPSocketReplication4WayMapTest {
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        final int adjustedEntrySize = builder.entrySize() + 128;
+        final int adjustedEntrySize = result.maxEntrySize();
         final short maxNumberOfEntriesPerChunk = ServerTcpSocketReplicator.toMaxNumberOfEntriesPerChunk(1024 * 8, adjustedEntrySize);
 
         for (ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {

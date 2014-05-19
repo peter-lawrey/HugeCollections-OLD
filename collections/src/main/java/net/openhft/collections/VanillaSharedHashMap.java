@@ -1331,12 +1331,17 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 if (segmentPositions.isEmpty()) {
                     switchToNextSegment();
                 } else {
-                    Segment segment = segments[segmentIndex];
-                    while (!segmentPositions.isEmpty()) {
-                        Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
-                        if (entry != null) {
-                            return entry;
+                    final Segment segment = segments[segmentIndex];
+                    segment.lock();
+                    try {
+                        while (!segmentPositions.isEmpty()) {
+                            Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
+                            if (entry != null) {
+                                return entry;
+                            }
                         }
+                    } finally {
+                        segment.unlock();
                     }
                 }
             }
@@ -1347,7 +1352,13 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             segmentPositions.clear();
             segmentIndex--;
             if (segmentIndex >= 0) {
-                segments[segmentIndex].visit(this);
+                final Segment segment = segments[segmentIndex];
+                segment.lock();
+                try {
+                    segments[segmentIndex].visit(this);
+                } finally {
+                    segment.unlock();
+                }
             }
         }
 
