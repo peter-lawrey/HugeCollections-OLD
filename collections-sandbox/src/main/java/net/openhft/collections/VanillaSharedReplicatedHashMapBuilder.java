@@ -327,19 +327,4 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     }
 
 
-    public VanillaSharedReplicatedHashMapBuilder externalIdentifiers(byte... externalIdentifiers) {
-
-        for (byte externalIdentifier : externalIdentifiers) {
-            if (externalIdentifier < 0 || externalIdentifier > 127)
-                throw new IllegalArgumentException("externalIdentifiers=" + externalIdentifier + ", is should be between 1 to 127");
-        }
-
-        this.externalIdentifiers = externalIdentifiers;
-        return this;
-    }
-
-
-    public byte[] externalIdentifiers() {
-        return this.externalIdentifiers;
-    }
 }

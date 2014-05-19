@@ -22,6 +22,8 @@ import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+
 /**
  * @author Rob Austin.
  */
@@ -88,7 +90,9 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
 
     /**
-     * Identifies which replicating node made the change
+     * Provides the unique Identifier associated with this map instance
+     * <p/>
+     * An identifier is use to determine which which replicating node made the change.
      * <p/>
      * If two nodes update their map at the same time with different values, we have to deterministically resolve which
      * update wins, because of eventual consistency both nodes should end up locally holding the same data.
@@ -99,17 +103,17 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node
      * with the smallest identifier wins.
      *
-     * @return identifies which replicating node made the change
+     * @return the unique Identifier associated with this map instance
      */
     byte getIdentifier();
 
     /**
-     * gets the modification identifier based a unique remote identifier
+     * gets ( if it does not exist, creates a new instance of ModificationIterator ) based on a remoteIdentifier
      *
-     * @param identifier the identifier relating to the ModificationIterator provided
+     * @param remoteIdentifier the identifier relating to the ModificationIterator provided
      * @return the ModificationIterator corresponding to the {@code identifier }
      */
-    ModificationIterator getModificationIterator(byte identifier);
+    ModificationIterator acquireModificationIterator(byte remoteIdentifier) throws IOException;
 
 
     /**

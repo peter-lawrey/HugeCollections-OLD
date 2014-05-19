@@ -52,13 +52,12 @@ public class Builder {
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
-                        .identifier(localIdentifier)
-                        .externalIdentifiers(externalIdentifier);
+                        .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        new QueueReplicator(result.getModificationIterator(externalIdentifier),
+        new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
 
         return result;
@@ -80,13 +79,12 @@ public class Builder {
                         .entries(size)
                         .entrySize(24)
                         .actualSegments(2)
-                        .externalIdentifiers(externalIdentifier)
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, Integer> result =
                 builder.create(getPersistenceFile(), Integer.class, Integer.class);
 
-        final QueueReplicator q = new QueueReplicator(result.getModificationIterator(externalIdentifier),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
 
         return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
@@ -116,14 +114,13 @@ public class Builder {
                         .entries(size)
                         .entrySize(24)
                         .actualSegments(2)
-                        .externalIdentifiers(externalIdentifier)
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<IntValue, IntValue> result =
                 builder.create(getPersistenceFile(), IntValue.class, IntValue.class);
 
 
-        new QueueReplicator(result.getModificationIterator(externalIdentifier),
+        new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
         return result;
 
@@ -139,14 +136,13 @@ public class Builder {
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
-                        .externalIdentifiers(externalIdentifier)
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result =
                 builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
-        new QueueReplicator(result.getModificationIterator(externalIdentifier),
+        new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
                 input, output, builder.entrySize(), result);
 
         return result;

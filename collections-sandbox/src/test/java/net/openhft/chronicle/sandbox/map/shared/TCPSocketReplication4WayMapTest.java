@@ -59,25 +59,23 @@ public class TCPSocketReplication4WayMapTest {
     private ServerSocketChannel serverChannel2;
     private ServerSocketChannel serverChannel1;
 
+
     VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final int size,
             final byte identifier,
-            final int serverPort, final byte[] externalIdentifiers, final ServerSocketChannel serverChannel,
+            final int serverPort, final ServerSocketChannel serverChannel,
             ClientTcpSocketReplicator.ClientPort... clientSocketChannelProviderMaps) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(size)
-                        .externalIdentifiers(externalIdentifiers)
                         .identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
                 builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-
         final int adjustedEntrySize = builder.entrySize() + 128;
         final short maxNumberOfEntriesPerChunk = ServerTcpSocketReplicator.toMaxNumberOfEntriesPerChunk(1024 * 8, adjustedEntrySize);
-
 
         for (ClientTcpSocketReplicator.ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
             final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
@@ -111,10 +109,10 @@ public class TCPSocketReplication4WayMapTest {
         serverChannel3 = ServerSocketChannel.open();
         serverChannel4 = ServerSocketChannel.open();
 
-        map1 = newSocketShmIntString(10000, (byte) 1, 8076, new byte[]{(byte) 2, (byte) 3, (byte) 4}, serverChannel1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap3, clientSocketChannelProviderMap4);
-        map2 = newSocketShmIntString(10000, (byte) 2, 8077, new byte[]{(byte) 1, (byte) 3, (byte) 4}, serverChannel2, clientSocketChannelProviderMap1, clientSocketChannelProviderMap3, clientSocketChannelProviderMap4);
-        map3 = newSocketShmIntString(10000, (byte) 3, 8078, new byte[]{(byte) 1, (byte) 2, (byte) 4}, serverChannel3, clientSocketChannelProviderMap1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap4);
-        map4 = newSocketShmIntString(10000, (byte) 4, 8079, new byte[]{(byte) 1, (byte) 2, (byte) 3}, serverChannel4, clientSocketChannelProviderMap1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap3);
+        map1 = newSocketShmIntString(10000, (byte) 1, 8076, serverChannel1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap3, clientSocketChannelProviderMap4);
+        map2 = newSocketShmIntString(10000, (byte) 2, 8077, serverChannel2, clientSocketChannelProviderMap1, clientSocketChannelProviderMap3, clientSocketChannelProviderMap4);
+        map3 = newSocketShmIntString(10000, (byte) 3, 8078, serverChannel3, clientSocketChannelProviderMap1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap4);
+        map4 = newSocketShmIntString(10000, (byte) 4, 8079, serverChannel4, clientSocketChannelProviderMap1, clientSocketChannelProviderMap2, clientSocketChannelProviderMap3);
 
     }
 
@@ -149,10 +147,10 @@ public class TCPSocketReplication4WayMapTest {
         // allow time for the recompilation to resolve
         waitTillEqual(1000);
 
-        assertEquals("map2",new TreeMap(map1), new TreeMap(map2));
-        assertEquals("map3",new TreeMap(map1), new TreeMap(map3));
-        assertEquals("map4",new TreeMap(map1), new TreeMap(map4));
-        assertTrue("map2.empty",!map2.isEmpty());
+        assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
+        assertEquals("map3", new TreeMap(map1), new TreeMap(map3));
+        assertEquals("map4", new TreeMap(map1), new TreeMap(map4));
+        assertTrue("map2.empty", !map2.isEmpty());
 
 
     }

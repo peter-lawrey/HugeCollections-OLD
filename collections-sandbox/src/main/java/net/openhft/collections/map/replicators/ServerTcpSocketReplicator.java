@@ -166,7 +166,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                     final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize, this.externalizable);
                     final WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(channel);
 
-                    final ModificationIterator remoteModificationIterator = map.getModificationIterator(welcomeMessage.identifier);
+                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(welcomeMessage.identifier);
                     remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
 
                     // register it with the selector and store the ModificationIterator for this key

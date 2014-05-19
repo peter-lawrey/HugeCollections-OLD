@@ -91,11 +91,10 @@ public class ClientTcpSocketReplicator {
                         }
                     }
 
-
                     socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(socketChannel);
 
-                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.getModificationIterator(welcomeMessage.identifier);
+                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(welcomeMessage.identifier);
                     remoteModificationIterator.dirtyEntriesFrom(welcomeMessage.timeStamp);
 
                     // we start this connection in blocking mode ( to do the hand-shacking ) , then move it to non-blocking

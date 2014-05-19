@@ -45,7 +45,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         implements SharedHashMap<K, V> {
-    private static final Logger LOGGER =
+
+    private static final Logger LOG =
             Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
 
 
@@ -195,16 +196,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     long sizeInBytes() {
         return SharedHashMapBuilder.HEADER_SIZE +
-                segments.length * segmentSize() +
-                additionalSize();
+                segments.length * segmentSize();
     }
 
-    /**
-     * For VanillaSharedReplicatedHashMap.ModificationsIterator
-     */
-    long additionalSize() {
-        return 0L;
-    }
 
     long sizeOfMultiMap() {
         int np2 = Maths.nextPower2(entriesPerSegment, 8);
@@ -240,7 +234,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         // If there are 64 sets in L1, it should be 8- or much less likely 4-way, and segments
         // collision by pairs is not so terrible.
         int minTargetCacheSets = 128;
-        
+
         long segmentSizeInLines = ss / 64;
         int segmentsAssociativityMultiple =
                 Math.max(1, minTargetCacheSets >> Long.numberOfTrailingZeros(segmentSizeInLines));
@@ -534,7 +528,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         static long hash(Bytes bytes) {
             long h = 0;
-            long i =  bytes.position();
+            long i = bytes.position();
             long limit = bytes.limit(); // clustering.
             for (; i < limit - 7; i += 8)
                 h = 1011001110001111L * h + bytes.readLong(i);
@@ -948,7 +942,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 nextPosToSearchFrom = fromPos;
         }
 
-          V readValue(NativeBytes entry, V value) {
+        V readValue(NativeBytes entry, V value) {
             return readValue(entry, value, readValueLen(entry));
         }
 

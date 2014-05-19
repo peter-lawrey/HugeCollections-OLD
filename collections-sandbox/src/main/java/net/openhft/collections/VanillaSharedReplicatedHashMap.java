@@ -21,18 +21,17 @@ package net.openhft.collections;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.ByteUtils;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.DirectBytes;
-import net.openhft.lang.io.MultiStoreBytes;
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.*;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.logging.Logger;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
@@ -77,8 +76,8 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * made to the other. We resolve this simple dilemma by using a node identifier, each node will have a unique identifier,
  * the update from the node with the smallest identifier wins.
  *
- * @param <K>
- * @param <V>
+ * @param <K> the entries key type
+ * @param <V> the entries value type
  */
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable {
@@ -89,10 +88,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-    private final int maxNumberOfExternalMaps;
+
+    private final Object modificationIteratorNotifier;
+    private final Set<EventType> modificationIteratorWatchList;
+
 
     // todo allow for dynamic creation of modificationIterators
-    private Object[] modificationIterators = new Object[127];
+    private AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
 
     public VanillaSharedReplicatedHashMap(@NotNull VanillaSharedReplicatedHashMapBuilder builder,
                                           @NotNull File file,
@@ -103,27 +105,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         this.canReplicate = builder.canReplicate();
         this.timeProvider = builder.timeProvider();
         this.localIdentifier = builder.identifier();
-        this.maxNumberOfExternalMaps = builder.externalIdentifiers() == null ? 0 : builder.externalIdentifiers().length;
+        this.modificationIteratorNotifier = builder.notifier();
+        this.modificationIteratorWatchList = builder.watchList();
 
-        long offset = createMappedStoreAndSegments(file);
-        if (canReplicate && builder.externalIdentifiers() != null) {
-
-            // todo allow for dynamic creation of modificationIterators
-
-            // this implantation is flaky, but it allows us to get something working for now
-            for (byte externalIdentifier : builder.externalIdentifiers()) {
-
-                final long length = modIterBitSetSizeInBytes();
-
-                eventListener = new ModificationIterator(builder.notifier(),
-                        builder.watchList(),
-                        ms.bytes(offset, length), eventListener);
-                offset += length;
-                modificationIterators[externalIdentifier] = eventListener;
-            }
-        }
+        createMappedStoreAndSegments(file);
     }
-
 
     @Override
     VanillaSharedHashMap<K, V>.Segment createSegment(NativeBytes bytes, int index) {
@@ -132,13 +118,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public VanillaSharedReplicatedHashMapBuilder builder() {
-        // TODO implement
-        return null;
-    }
-
-    @Override
-    long additionalSize() {
-        return canReplicate ? (modIterBitSetSizeInBytes() * maxNumberOfExternalMaps) : 0L;
+        // todo remove the builder from within the map, the builder should be external is there are a number of ways
+        //    that you can build a  VanillaSharedReplicatedHashMapBuilder for example UDP replication, TCP replication
+        throw new UnsupportedOperationException();
     }
 
     private long modIterBitSetSizeInBytes() {
@@ -234,21 +216,35 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
     /**
-     * todo HCOLL-79 allow for dynamic creation of modificationIterators
      * {@inheritDoc}
      */
     @Override
-    public ReplicatedSharedHashMap.ModificationIterator getModificationIterator(byte identifier) {
+    public ModificationIterator acquireModificationIterator(byte remoteIdentifier) throws IOException {
         if (!canReplicate)
             throw new UnsupportedOperationException();
 
-        final Object modificationIterator = modificationIterators[identifier];
+        final ModificationIterator modificationIterator =  modificationIterators.get(remoteIdentifier);
 
-        if (modificationIterator == null)
-            throw new IllegalStateException("identifier=" + identifier + ", please include this byte in the builder.externalIdentifiers()");
+        if (modificationIterator != null)
+            return modificationIterator;
 
+        final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
 
-        return (ReplicatedSharedHashMap.ModificationIterator) modificationIterator;
+        // create a new modification iterator
+        synchronized (modificationIterators) {
+
+            final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
+                    modIterBitSetSizeInBytes());
+            final ModificationIterator newEventListener = new ModificationIterator(
+                    modificationIteratorNotifier,
+                    modificationIteratorWatchList,
+                    mappedStore.bytes(), eventListener);
+
+            final boolean success = modificationIterators.compareAndSet(remoteIdentifier, null, newEventListener);
+            return (success) ? (ModificationIterator) (eventListener = newEventListener) : acquireModificationIterator(remoteIdentifier);
+
+        }
+
     }
 
     // todo HCOLL-77 : map replication : back fill missed updates on startup
@@ -420,7 +416,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     //      System.out.println("Status=OK");
                     // skip the is deleted flag
                     boolean wasDeleted = entry.readBoolean();
-
 
                     if (!wasDeleted)
                         hashLookupLiveOnly.remove(hash2, pos);
@@ -1100,6 +1095,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             changes = new ATSDirectBitSet(bytes);
         }
 
+        /**
+         * used to merge multiple segments and positions into a single index used by the bit map
+         *
+         * @param segmentIndex the index of the maps segment
+         * @param pos          the position within this {@code segmentIndex}
+         * @return and index the has combined the {@code segmentIndex}  and  {@code pos} into a single value
+         */
         private long combine(int segmentIndex, long pos) {
             return (((long) segmentIndex) << segmentIndexShift) | pos;
         }
@@ -1125,7 +1127,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     notifier.notifyAll();
                 }
             }
-
 
         }
 
