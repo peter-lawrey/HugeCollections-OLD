@@ -125,6 +125,11 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     // todo HCOLL-77 : map replication : back fill missed updates on startup
     long lastModification();
 
+    /**
+     * @return the maximum size that an entry can be
+     */
+    int maxEntrySize();
+
 
     /**
      * Event types which should be replicated.

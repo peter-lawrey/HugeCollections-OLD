@@ -41,6 +41,8 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
         super(builder, kClass, vClass);
         createMappedStoreAndSegments(file);
     }
+
+
 }
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
@@ -146,6 +148,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
         return offset;
     }
+
+
+    /**
+     * @return the maximum size that an entry can be, this includes over sized entries
+     */
+    int maxEntrySize() {
+        return entrySize * 2;
+    }
+
 
     Segment createSegment(NativeBytes bytes, int index) {
         return new Segment(bytes, index);

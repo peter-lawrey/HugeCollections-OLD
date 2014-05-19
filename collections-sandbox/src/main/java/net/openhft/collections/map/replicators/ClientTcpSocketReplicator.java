@@ -22,12 +22,15 @@ import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,9 +43,10 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class ClientTcpSocketReplicator {
+public class ClientTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
+
 
     public static class ClientPort {
         final String host;
@@ -61,6 +65,7 @@ public class ClientTcpSocketReplicator {
         }
     }
 
+    AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
 
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
                                      @NotNull final SocketChannelEntryReader socketChannelEntryReader,
@@ -74,23 +79,23 @@ public class ClientTcpSocketReplicator {
             public void run() {
                 try {
 
-                    SocketChannel socketChannel;
+                    SocketChannel socketChannel = null;
 
                     for (; ; ) {
                         try {
                             socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
                             LOG.info("successfully connected to " + clientPort);
-
-
                             socketChannel.socket().setReceiveBufferSize(8 * 1024);
                             break;
                         } catch (ConnectException e) {
-
-                            // todo add better backoff logic
+                            if (socketChannel != null)
+                                socketChannel.close();
+                            // todo add better back-off logic
                             Thread.sleep(100);
                         }
                     }
 
+                    socketChannelRef.set(socketChannel);
                     socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(socketChannel);
 
@@ -101,7 +106,7 @@ public class ClientTcpSocketReplicator {
                     socketChannel.configureBlocking(false);
 
                     final Selector selector = Selector.open();
-                    socketChannel.register(selector, SelectionKey.OP_READ);
+                    socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
                     while (true) {
                         // this may block for a long time, upon return the
@@ -140,5 +145,12 @@ public class ClientTcpSocketReplicator {
         });
     }
 
+    @Override
+    public void close() throws IOException {
+        final SocketChannel socketChannel = socketChannelRef.get();
+        if (socketChannel != null)
+            socketChannel.close();
+    }
 
 }
+

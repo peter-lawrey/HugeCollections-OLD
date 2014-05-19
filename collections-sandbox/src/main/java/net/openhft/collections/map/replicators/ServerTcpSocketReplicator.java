@@ -64,18 +64,17 @@ public class ServerTcpSocketReplicator implements Closeable {
 
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
-                                     final int entrySize,
                                      @NotNull final EntryExternalizable externalizable,
-                                     int port, final ServerSocketChannel serverChannel,
-                                     SocketChannelEntryWriter socketChannelEntryWriter, final short maxNumberOfEntriesPerChunk) {
+                                     int port,
+                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter) throws IOException {
 
         this.externalizable = externalizable;
         this.map = map;
         this.port = port;
-        this.serverChannel = serverChannel;
+        this.serverChannel = ServerSocketChannel.open();
         this.localIdentifier = map.getIdentifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
-        this.entrySize = entrySize;
+        this.entrySize = map.maxEntrySize();
 
 
         // out bound
@@ -171,7 +170,7 @@ public class ServerTcpSocketReplicator implements Closeable {
 
                     // register it with the selector and store the ModificationIterator for this key
                     final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);
-                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_WRITE, attached);
+                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
                     // notify remote map to start to receive data for {@code localIdentifier}
                     socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);

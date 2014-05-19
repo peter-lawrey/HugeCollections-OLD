@@ -26,12 +26,15 @@ import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
@@ -80,7 +83,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable {
+        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
     private static final Logger LOG =
             Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
@@ -92,6 +95,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     private final Object modificationIteratorNotifier;
     private final Set<EventType> modificationIteratorWatchList;
 
+    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
 
     // todo allow for dynamic creation of modificationIterators
     private AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
@@ -121,6 +125,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         // todo remove the builder from within the map, the builder should be external is there are a number of ways
         //    that you can build a  VanillaSharedReplicatedHashMapBuilder for example UDP replication, TCP replication
         throw new UnsupportedOperationException();
+    }
+
+
+    @Override
+    public int maxEntrySize() {
+        return super.maxEntrySize(); //todo + metada
     }
 
     private long modIterBitSetSizeInBytes() {
@@ -223,7 +233,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (!canReplicate)
             throw new UnsupportedOperationException();
 
-        final ModificationIterator modificationIterator =  modificationIterators.get(remoteIdentifier);
+        final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
 
         if (modificationIterator != null)
             return modificationIterator;
@@ -243,6 +253,24 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             final boolean success = modificationIterators.compareAndSet(remoteIdentifier, null, newEventListener);
             return (success) ? (ModificationIterator) (eventListener = newEventListener) : acquireModificationIterator(remoteIdentifier);
 
+        }
+
+    }
+
+    public void addCloseable(Closeable closeable) {
+        closeables.add(closeable);
+    }
+
+
+    @Override
+    public void close() {
+        super.close();
+        for (Closeable closeable : closeables) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                LOG.log(Level.SEVERE, "", e);
+            }
         }
 
     }
@@ -1038,8 +1066,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         // todo change to debug log
-        final String message = "reading data into local=" + localIdentifier + ", remote=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim();
-
+        final String message = "reading data into local=" + localIdentifier + ", remote=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
