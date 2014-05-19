@@ -92,8 +92,8 @@ public class TCPSocketReplication4WayMapTest {
     public void setup() throws IOException {
         map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
         map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"));
-        map4 = newSocketShmIntString((byte) 4, 8079);
+        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"), new ClientPort(8077, "localhost"));
+        map4 = newSocketShmIntString((byte) 4, 8079, new ClientPort(8078, "localhost"), new ClientPort(8077, "localhost"));
     }
 
     @After
@@ -114,8 +114,6 @@ public class TCPSocketReplication4WayMapTest {
     @Test
     public void test() throws IOException, InterruptedException {
 
-        //todo fix this bug, if we comment this our the test fails
-        Thread.sleep(500);
 
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-2");

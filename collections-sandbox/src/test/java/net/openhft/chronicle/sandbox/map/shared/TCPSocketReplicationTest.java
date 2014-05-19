@@ -74,11 +74,10 @@ public class TCPSocketReplicationTest {
 
 
     @Test
-    @Ignore
     public void test() throws IOException, InterruptedException {
 
         map1.put(1, "EXAMPLE-1");
-      /*  map1.put(2, "EXAMPLE-1");
+        map1.put(2, "EXAMPLE-2");
         map1.put(3, "EXAMPLE-1");
 
         map2.put(1, "EXAMPLE-2");
@@ -86,21 +85,23 @@ public class TCPSocketReplicationTest {
 
         map1.remove(2);
         map2.remove(3);
-        map1.remove(3);*/
+        map1.remove(3);
+        map2.put(5, "EXAMPLE-2");
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertTrue(!map2.isEmpty());
+        assertTrue(!map1.isEmpty());
 
     }
 
 
     @Test
+    @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
-       // Thread.sleep(1000);
+        // Thread.sleep(1000);
         for (int i = 0; i < 1024; i++) {
             map1.put(i, "EXAMPLE-1");
         }
