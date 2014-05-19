@@ -18,69 +18,38 @@
 
 package net.openhft.chronicle.sandbox.map.shared;
 
+import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.util.TreeMap;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
  *
  * @author Rob Austin.
  */
-/*
+
 public class TCPSocketReplicationTest {
 
 
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
-    private SocketChannelProvider clientSocketChannelProvider2;
-    private SocketChannelProvider clientSocketChannelProvider1;
-    private ServerSocketChannel serverChannel1;
-    private ServerSocketChannel serverChannel2;
 
-
-    VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
-            final int size,
-            final byte identifier,
-            final int serverPort, final byte[] externalIdentifiers, final ServerSocketChannel serverChannel,
-            @NotNull final SocketChannelProvider... clientSocketChannelProviders) throws IOException {
-
-        final VanillaSharedReplicatedHashMapBuilder builder =
-                new VanillaSharedReplicatedHashMapBuilder()
-                        .entries(size)
-                        .externalIdentifiers(externalIdentifiers)
-                        .identifier(identifier);
-
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
-                builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
-
-        for (SocketChannelProvider clientSocketChannelProvider : clientSocketChannelProviders) {
-            new InTcpSocketReplicator(identifier, builder.entrySize(), clientSocketChannelProvider, result);
-        }
-
-
-        // the server will connect to all the clients, the clients will initiate the connection
-        new OutTcpSocketReplicator(
-                result,
-                identifier,
-                builder.entrySize(),
-                result,
-                1024 * 8,
-                serverPort, serverChannel);
-
-        return result;
-
-    }
 
     static int i;
 
     @Before
     public void setup() throws IOException {
-
-        clientSocketChannelProvider2 = new ClientSocketChannelProvider(8066, "localhost");
-        clientSocketChannelProvider1 = new ClientSocketChannelProvider(8067, "localhost");
-
-        serverChannel1 = ServerSocketChannel.open();
-        serverChannel2 = ServerSocketChannel.open();
-
-        map1 = newSocketShmIntString(10000, (byte) 1, 8066, new byte[]{(byte) 2}, serverChannel1, clientSocketChannelProvider1);
-        map2 = newSocketShmIntString(10000, (byte) 2, 8067, new byte[]{(byte) 1}, serverChannel2, clientSocketChannelProvider2);
+        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076, new ClientTcpSocketReplicator.ClientPort(8077, "localhost"));
+        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077);
     }
 
     @After
@@ -89,37 +58,27 @@ public class TCPSocketReplicationTest {
         // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
 
         try {
-            clientSocketChannelProvider1.close();
+            map1.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         try {
-            clientSocketChannelProvider2.close();
+            map2.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        try {
-            serverChannel1.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            serverChannel2.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
     }
 
 
     @Test
+    @Ignore
     public void test() throws IOException, InterruptedException {
 
         map1.put(1, "EXAMPLE-1");
-        map1.put(2, "EXAMPLE-1");
+      /*  map1.put(2, "EXAMPLE-1");
         map1.put(3, "EXAMPLE-1");
 
         map2.put(1, "EXAMPLE-2");
@@ -127,7 +86,7 @@ public class TCPSocketReplicationTest {
 
         map1.remove(2);
         map2.remove(3);
-        map1.remove(3);
+        map1.remove(3);*/
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
@@ -141,6 +100,7 @@ public class TCPSocketReplicationTest {
     @Test
     public void testBufferOverflow() throws IOException, InterruptedException {
 
+       // Thread.sleep(1000);
         for (int i = 0; i < 1024; i++) {
             map1.put(i, "EXAMPLE-1");
         }
@@ -153,15 +113,12 @@ public class TCPSocketReplicationTest {
 
     }
 
-
-    */
-/**
-     * waits until map1 and map2 show the same value
+    /**
+     * * waits until map1 and map2 show the same value
      *
      * @param timeOutMs timeout in milliseconds
      * @throws InterruptedException
-     *//*
-
+     */
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
@@ -173,6 +130,6 @@ public class TCPSocketReplicationTest {
     }
 
 }
-*/
+
 
 

@@ -52,7 +52,7 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map4;
 
 
-    VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
+    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final byte identifier,
             final int serverPort,
             ClientPort... clientSocketChannelProviderMaps) throws IOException {
@@ -115,18 +115,17 @@ public class TCPSocketReplication4WayMapTest {
     public void test() throws IOException, InterruptedException {
 
         //todo fix this bug, if we comment this our the test fails
-        Thread.sleep(1000);
+        Thread.sleep(500);
 
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-2");
         map3.put(3, "EXAMPLE-1");
-        map3.remove(2);
-        //todo fix this bug, if we add this back in the test fails
-        //  map3.put(3, "EXAMPLE-5");
+     //   map3.remove(2);
+        map3.put(3, "EXAMPLE-5");
         map4.put(4, "EXAMPLE-5");
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000000);
+        waitTillEqual(1000);
 
         assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
         assertEquals("map3", new TreeMap(map1), new TreeMap(map3));

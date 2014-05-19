@@ -222,10 +222,10 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         /**
          * set the bit related to {@code segment} and {@code pos}
          *
-         * @param segment the segment relating to the bit to set
+         * @param segmentIndex the segment relating to the bit to set
          * @param pos     the position relating to the bit to set
          */
-        void set(SharedSegment segment, int pos);
+        void set(int segmentIndex, int pos);
 
     }
 

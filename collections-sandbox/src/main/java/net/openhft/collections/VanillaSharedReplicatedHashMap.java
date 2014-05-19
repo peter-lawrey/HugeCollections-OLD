@@ -133,7 +133,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public int maxEntrySize() {
-        return super.maxEntrySize(); //todo + metada
+        return super.maxEntrySize() + 128;  // the 128 for the meta data
     }
 
     private long modIterBitSetSizeInBytes() {
@@ -241,11 +241,15 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (modificationIterator != null)
             return modificationIterator;
 
-        final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
-
-        // create a new modification iterator
         synchronized (modificationIterators) {
+            final ModificationIterator modificationIterator0 = modificationIterators.get(remoteIdentifier);
 
+            if (modificationIterator0 != null)
+                return modificationIterator0;
+
+            final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
+
+            // create a new modification iterator
             final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
                     modIterBitSetSizeInBytes());
 
@@ -254,11 +258,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     modificationIteratorWatchList,
                     mappedStore.bytes(), eventListener);
 
-            final boolean success = modificationIterators.compareAndSet(remoteIdentifier, null, newEventListener);
-            return (success) ? (ModificationIterator) (eventListener = newEventListener) : acquireModificationIterator(remoteIdentifier);
-
+            modificationIterators.set(remoteIdentifier, newEventListener);
+            eventListener = newEventListener;
+            return newEventListener;
         }
-
     }
 
 
@@ -950,6 +953,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
             this.lock();
             try {
+                final int index = Segment.this.getIndex();
                 hashLookupLiveAndDeleted.forEach(new IntIntMultiMap.EntryConsumer() {
 
                     @Override
@@ -957,7 +961,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         final long offset = offsetFromPos(pos);
                         final NativeBytes entry = entry(offset);
                         if (isNewer(entry, timeStamp))
-                            entryModifiableCallback.set(Segment.this, pos);
+                            entryModifiableCallback.set(index, pos);
                     }
 
                 });
@@ -1196,6 +1200,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
 
+            System.out.println("onPut- segmentIndex=" + segment.getIndex() + ",pos=" + pos);
+
             nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
 
             if (!watchList.contains(PUT))
@@ -1320,9 +1326,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         class EntryModifiableCallback<K, V> implements ReplicatedSharedHashMap.EntryModifiableCallback<K, V> {
-            public void set(SharedSegment segment, int pos) {
-                System.out.println("segment.getIndex()" + segment.getIndex() + ",pos=" + pos);
-                changes.set(combine(segment.getIndex(), pos));
+
+            @Override
+            public synchronized void set(int segmentIndex, int pos) {
+                changes.set(combine(segmentIndex, pos));
             }
         }
 

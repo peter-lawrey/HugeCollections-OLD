@@ -192,13 +192,14 @@ public class ServerTcpSocketReplicator implements Closeable {
 
                 } catch (Exception e) {
 
-                    LOG.log(Level.INFO, "closing channel", e);
+                    if (!isClosed.get()) {
 
-                    // Close channel and nudge selector
-                    try {
-                        key.channel().close();
-                    } catch (IOException ex) {
-                        // do nothing
+                        // Close channel and nudge selector
+                        try {
+                            key.channel().close();
+                        } catch (IOException ex) {
+                            // do nothing
+                        }
                     }
                 }
 
