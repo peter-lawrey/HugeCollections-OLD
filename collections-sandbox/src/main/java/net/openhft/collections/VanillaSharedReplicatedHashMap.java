@@ -960,8 +960,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     public void accept(int hash, int pos) {
                         final long offset = offsetFromPos(pos);
                         final NativeBytes entry = entry(offset);
-                        if (isNewer(entry, timeStamp))
+                        if (isNewer(entry, timeStamp)) {
+
                             entryModifiableCallback.set(index, pos);
+                        }
                     }
 
                 });
@@ -1200,7 +1202,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
 
-            System.out.println("onPut- segmentIndex=" + segment.getIndex() + ",pos=" + pos);
+
+
+            //System.out.println("onPut- segmentIndex=" + segment.getIndex() + ",pos=" + pos);
 
             nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
 
@@ -1208,6 +1212,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 return;
 
             changes.set(combine(segment.getIndex(), pos));
+
+            final long combine = combine(segment.getIndex(), pos);
+            System.out.println("onPut- combine=" + combine);
 
             if (notifier != null) {
                 synchronized (notifier) {
@@ -1329,7 +1336,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
             @Override
             public synchronized void set(int segmentIndex, int pos) {
-                changes.set(combine(segmentIndex, pos));
+
+                final long combine = combine(segmentIndex, pos);
+                System.out.println("EntryModifiableCallback- combine=" + combine);
+                changes.set(combine);
             }
         }
 

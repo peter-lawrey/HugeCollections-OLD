@@ -127,11 +127,14 @@ public class ClientTcpSocketReplicator implements Closeable {
                         while (it.hasNext()) {
                             SelectionKey key = (SelectionKey) it.next();
 
+
                             // is there data to read on this channel?
                             if (key.isReadable()) {
-                                socketChannelEntryReader.readAll(socketChannel);
+                                final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                                socketChannelEntryReader.readAll(socketChannel0);
                             } else if (key.isWritable()) {
-                                socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
+                                final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                                socketChannelEntryWriter.writeAll(socketChannel0, remoteModificationIterator);
                             }
 
                             // remove key from selected set, it's been handled
