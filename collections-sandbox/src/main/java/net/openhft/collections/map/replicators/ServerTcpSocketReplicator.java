@@ -32,6 +32,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -61,7 +62,7 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
     private final int entrySize;
-
+    private final AtomicBoolean isClosed = new AtomicBoolean();
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
@@ -104,6 +105,7 @@ public class ServerTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
+        isClosed.set(true);
         if (serverChannel != null)
             serverChannel.close();
     }
@@ -137,7 +139,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         // register the ServerSocketChannel with the Selector
         serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-        while (true) {
+        while (!isClosed.get()) {
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
             final int n = selector.select();

@@ -30,6 +30,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -65,7 +66,9 @@ public class ClientTcpSocketReplicator implements Closeable {
         }
     }
 
-    AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
+    private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
+    private final AtomicBoolean isClosed = new AtomicBoolean();
+
 
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
                                      @NotNull final SocketChannelEntryReader socketChannelEntryReader,
@@ -108,7 +111,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-                    while (true) {
+                    while (!isClosed.get()) {
                         // this may block for a long time, upon return the
                         // selected set contains keys of the ready channels
                         int n = selector.select();
@@ -138,7 +141,10 @@ public class ClientTcpSocketReplicator implements Closeable {
 
 
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    // we wont log exceptions that occur due ot the socket being closed
+                    if (!isClosed.get()) {
+                        LOG.log(Level.SEVERE, "", e);
+                    }
                 }
             }
 
@@ -147,6 +153,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
+        isClosed.set(true);
         final SocketChannel socketChannel = socketChannelRef.get();
         if (socketChannel != null)
             socketChannel.close();
