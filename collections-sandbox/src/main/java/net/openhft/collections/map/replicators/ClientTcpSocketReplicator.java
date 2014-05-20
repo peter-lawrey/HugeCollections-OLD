@@ -96,6 +96,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                         }
                     }
 
+
                     LOG.info("client-connection id=" + map.getIdentifier());
                     socketChannelRef.set(socketChannel);
                     socketChannelEntryWriter.sendBootstrap(socketChannel, map.lastModification(), map.getIdentifier());
@@ -109,11 +110,11 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                     LOG.info("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
 
-                    // we start this connection in blocking mode ( to do the hand-shacking ) , then move it to non-blocking
+                    // we start this connection in blocking mode ( to do the bootstrapping ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);
-
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+
 
                     while (socketChannel.isOpen()) {
                         // this may block for a long time, upon return the
@@ -137,6 +138,10 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                             try {
 
+                                if (key.isConnectable()) {
+                                    LOG.info("here.");
+                                }
+
 
                                 if (!key.isValid()) {
                                     continue;
@@ -144,6 +149,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                                 // is there data to read on this channel?
                                 if (key.isReadable()) {
+
                                     final SocketChannel socketChannel0 = (SocketChannel) key.channel();
                                     socketChannelEntryReader.readAll(socketChannel0);
                                 }

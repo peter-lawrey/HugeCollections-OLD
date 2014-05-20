@@ -80,10 +80,10 @@ public class TCPSocketReplication4WayMapTest {
         final ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
                 result,
                 result,
-                serverPort, socketChannelEntryWriter);
+                serverPort,
+                socketChannelEntryWriter);
 
         result.addCloseable(serverTcpSocketReplicator);
-
         return result;
     }
 
@@ -129,6 +129,26 @@ public class TCPSocketReplication4WayMapTest {
         assertTrue("map2.empty", !map2.isEmpty());
 
     }
+
+
+    @Test
+    public void testBufferOverflow() throws IOException, InterruptedException {
+
+        for (int i = 0; i < 1024; i++) {
+            map1.put(i, "EXAMPLE-1");
+        }
+
+        // allow time for the recompilation to resolve
+        waitTillEqual(1000);
+
+        assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
+        assertEquals("map3", new TreeMap(map1), new TreeMap(map3));
+        assertEquals("map4", new TreeMap(map1), new TreeMap(map4));
+        assertTrue("map2.empty", !map2.isEmpty());
+
+
+    }
+
 
 
     /**

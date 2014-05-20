@@ -159,7 +159,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * @return the maximum size that an entry can be, this includes over sized entries
      */
     int maxEntrySize() {
-        return entrySize * 2;
+        return entrySize * bufferAllocationFactor;
     }
 
 
