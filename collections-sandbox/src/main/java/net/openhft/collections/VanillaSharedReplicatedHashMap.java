@@ -961,7 +961,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         final long offset = offsetFromPos(pos);
                         final NativeBytes entry = entry(offset);
                         if (isNewer(entry, timeStamp)) {
-
                             entryModifiableCallback.set(index, pos);
                         }
                     }

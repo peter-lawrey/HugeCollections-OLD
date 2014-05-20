@@ -91,9 +91,9 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
         map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"), new ClientPort(8077, "localhost"));
-        map4 = newSocketShmIntString((byte) 4, 8079, new ClientPort(8078, "localhost"), new ClientPort(8077, "localhost"));
+        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"), new ClientPort(8076, "localhost"));
+        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"), new ClientPort(8077, "localhost"), new ClientPort(8076, "localhost"));
+        map4 = newSocketShmIntString((byte) 4, 8079, new ClientPort(8078, "localhost"), new ClientPort(8077, "localhost"), new ClientPort(8076, "localhost"));
     }
 
     @After
@@ -114,7 +114,6 @@ public class TCPSocketReplication4WayMapTest {
     @Test
     public void test() throws IOException, InterruptedException {
 
-
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-2");
         map3.put(3, "EXAMPLE-1");
@@ -123,7 +122,7 @@ public class TCPSocketReplication4WayMapTest {
         map4.put(4, "EXAMPLE-5");
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000);
+        waitTillEqual(1000);
 
         assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
         assertEquals("map3", new TreeMap(map1), new TreeMap(map3));

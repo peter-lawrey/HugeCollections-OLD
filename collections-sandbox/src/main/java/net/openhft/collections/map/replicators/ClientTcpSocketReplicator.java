@@ -114,7 +114,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     while (!isClosed.get()) {
                         // this may block for a long time, upon return the
                         // selected set contains keys of the ready channels
-                        int n = selector.select();
+                        final int n = selector.select();
 
                         if (n == 0) {
                             continue;    // nothing to do
@@ -125,20 +125,44 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                         // look at each key in the selected set
                         while (it.hasNext()) {
+
                             SelectionKey key = (SelectionKey) it.next();
-
-
-                            // is there data to read on this channel?
-                            if (key.isReadable()) {
-                                final SocketChannel socketChannel0 = (SocketChannel) key.channel();
-                                socketChannelEntryReader.readAll(socketChannel0);
-                            } else if (key.isWritable()) {
-                                final SocketChannel socketChannel0 = (SocketChannel) key.channel();
-                                socketChannelEntryWriter.writeAll(socketChannel0, remoteModificationIterator);
-                            }
 
                             // remove key from selected set, it's been handled
                             it.remove();
+
+                            try {
+
+
+                                if (!key.isValid()) {
+                                    continue;
+                                }
+
+                                // is there data to read on this channel?
+                                if (key.isReadable()) {
+                                    final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                                    socketChannelEntryReader.readAll(socketChannel0);
+                                }
+
+                                if (key.isWritable()) {
+                                    final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                                    socketChannelEntryWriter.writeAll(socketChannel0, remoteModificationIterator);
+                                }
+
+                            } catch (Exception e) {
+
+                                //  if (!isClosed.get()) {
+                                if (!isClosed.get())
+                                    LOG.log(Level.SEVERE, "", e);
+                                // Close channel and nudge selector
+                                try {
+                                    key.channel().close();
+                                } catch (IOException ex) {
+                                    // do nothing
+                                }
+                                // }
+                            }
+
                         }
                     }
 

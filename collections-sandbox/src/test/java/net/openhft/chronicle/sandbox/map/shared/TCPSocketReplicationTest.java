@@ -79,8 +79,8 @@ public class TCPSocketReplicationTest {
         map1.put(2, "EXAMPLE-2");
         map1.put(3, "EXAMPLE-1");
 
-        map2.put(1, "EXAMPLE-2");
-        map2.put(2, "EXAMPLE-2");
+        map2.put(5, "EXAMPLE-2");
+        map2.put(6, "EXAMPLE-2");
 
         map1.remove(2);
         map2.remove(3);
