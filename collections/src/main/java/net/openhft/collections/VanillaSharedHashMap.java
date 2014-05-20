@@ -24,6 +24,7 @@ import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -857,8 +858,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 prevValue = readValue(entry, null, valueLen);
 
             // putValue may relocate entry and change offset
-            offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                    getValueAsBytes(value));
+            offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
             notifyPut(offset, false, key, value, posFromOffset(offset));
             return prevValue;
         }
@@ -905,8 +905,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             return offset;
         }
 
-        void writeValueOnPutEntry(long valueLen, Bytes valueBytes,
-                                  Byteable valueAsByteable, NativeBytes entry) {
+        void writeValueOnPutEntry(long valueLen, @Nullable Bytes valueBytes,
+                                  @Nullable Byteable valueAsByteable, NativeBytes entry) {
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
 
@@ -1105,8 +1105,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 return null;
             if (expectedValue == null || expectedValue.equals(valueRead)) {
                 // putValue may relocate entry and change offset
-                offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                        getValueAsBytes(newValue));
+                offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, newValue);
                 notifyPut(offset, false, key, newValue,
                         posFromOffset(offset));
                 return valueRead;
@@ -1147,25 +1146,47 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
+        long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
+                      long entryEndAddr, V value) {
+            if (value instanceof Byteable) {
+                return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
+                        null, (Byteable) value, false);
+            } else {
+                return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
+                        getValueAsBytes(value), null, true);
+            }
+        }
+
         /**
          * Replaces value in existing entry. May cause entry relocation, because
          * there may be not enough space for new value in location already
          * allocated for this entry.
          *
-         * @param pos          index of the first block occupied by the entry
-         * @param offset       relative offset of the entry in Segment bytes
-         *                     (before, i. e. including metaData)
-         * @param entry        relative pointer in Segment bytes
-         * @param valueLenPos  relative position of value "stop bit" in entry
-         * @param entryEndAddr absolute address of the entry end
-         * @param valueBytes   serialized value
+         * @param pos             index of the first block occupied by the entry
+         * @param offset          relative offset of the entry in Segment bytes
+         *                        (before, i. e. including metaData)
+         * @param entry           relative pointer in Segment bytes
+         * @param valueLenPos     relative position of value "stop bit" in entry
+         * @param entryEndAddr    absolute address of the entry end
+         * @param valueBytes      serialized value, or {@code null} if valueAsByteable is given
+         * @param valueAsByteable the value to put as {@code Byteable},
+         *                        or {@code null} if valueBytes is given
+         * @param allowOversize   {@code true} if the entry is allowed become oversized
+         *                        if it was not yet
          * @return relative offset of the entry in Segment bytes after putting value
          * (that may cause entry relocation)
          */
         long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
-                      long entryEndAddr, Bytes valueBytes) {
+                      long entryEndAddr, @Nullable Bytes valueBytes,
+                      @Nullable Byteable valueAsByteable, boolean allowOversize) {
             long valueLenAddr = entry.address() + valueLenPos;
-            long newValueLen = valueBytes.remaining();
+            long newValueLen;
+            if (valueBytes != null) {
+                newValueLen = valueBytes.remaining();
+            } else {
+                assert valueAsByteable != null;
+                newValueLen = valueAsByteable.maxSize();
+            }
             long newValueAddr = alignment.alignAddr(
                     valueLenAddr + expectedStopBits(newValueLen));
             long newEntryEndAddr = newValueAddr + newValueLen;
@@ -1178,13 +1199,30 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 int oldSizeInBlocks = inBlocks(oldEntrySize);
                 int newSizeInBlocks = inBlocks(newEntryEndAddr - entryStartAddr);
                 if (newSizeInBlocks > oldSizeInBlocks) {
-                    if (realloc(pos, oldSizeInBlocks, newSizeInBlocks))
-                        break newValueDoesNotFit;
+                    if (!allowOversize && oldSizeInBlocks == 1) {
+                        // If the value is Byteable, illegal oversize could be detected because of
+                        // too high (inaccurate maxSize() estimate. Marshall the value to get
+                        // the precise size.
+                        if (valueAsByteable != null) {
+                            // noinspection unchecked
+                            return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
+                                    getValueAsBytes((V) valueAsByteable), null, false);
+                        }
+                        throw new IllegalArgumentException("Byteable value is not allowed " +
+                                "to make the entry oversized while it was not initially.");
+                    }
                     if (newSizeInBlocks > MAX_ENTRY_OVERSIZE_FACTOR) {
+                        if (valueAsByteable != null) {
+                            // noinspection unchecked
+                            return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
+                                    getValueAsBytes((V) valueAsByteable), null, false);
+                        }
                         throw new IllegalArgumentException("Value too large: " +
                                 "entry takes " + newSizeInBlocks + " blocks, " +
                                 MAX_ENTRY_OVERSIZE_FACTOR + " is maximum.");
                     }
+                    if (realloc(pos, oldSizeInBlocks, newSizeInBlocks))
+                        break newValueDoesNotFit;
                     // RELOCATION
                     free(pos, oldSizeInBlocks);
                     eventListener.onRelocation(pos, this);
@@ -1215,7 +1253,21 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             entry.position(valueLenPos);
             entry.writeStopBit(newValueLen);
             alignment.alignPositionAddr(entry);
-            entry.write(valueBytes);
+            if (valueBytes != null) {
+                entry.write(valueBytes);
+            } else {
+                if (valueAsByteable instanceof BytesMarshallable) {
+                    long posAddr = entry.positionAddr();
+                    ((BytesMarshallable) valueAsByteable).writeMarshallable(entry);
+                    long actualValueLen = entry.positionAddr() - posAddr;
+                    if (actualValueLen > newValueLen) {
+                        throw new AssertionError(
+                                "Byteable value returned maxSize less than the actual size");
+                    }
+                } else {
+                    entry.write(valueAsByteable.bytes(), valueAsByteable.offset(), newValueLen);
+                }
+            }
             return offset;
         }
 

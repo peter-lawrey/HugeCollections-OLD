@@ -541,7 +541,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     inBytes.limit(valueLimit);
                     inBytes.position(valuePos);
 
-                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, inBytes);
+                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, inBytes, null, true);
 
                     if (wasDeleted) {
                         // remove() would have got rid of this so we have to add it back in
@@ -672,8 +672,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     }
 
                     long entryEndAddr = entry.positionAddr() + valueLen;
-                    offset = putValue(pos, offset, entry, valueLenPos,
-                            entryEndAddr, getValueAsBytes(value));
+                    offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
                     notifyPut(offset, true, key, value, posFromOffset(offset));
 
                     // putIfAbsent() when the entry is NOT absent, so we return null as the prevValue
