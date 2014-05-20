@@ -30,7 +30,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -67,7 +66,6 @@ public class ClientTcpSocketReplicator implements Closeable {
     }
 
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
-    private final AtomicBoolean isClosed = new AtomicBoolean();
 
 
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
@@ -100,7 +98,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                     LOG.info("client-connection id=" + map.getIdentifier());
                     socketChannelRef.set(socketChannel);
-                    socketChannelEntryWriter.sendWelcomeMessage(socketChannel, map.lastModification(), map.getIdentifier());
+                    socketChannelEntryWriter.sendBootstrap(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readWelcomeMessage(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
@@ -117,7 +115,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-                    while (!isClosed.get()) {
+                    while (socketChannel.isOpen()) {
                         // this may block for a long time, upon return the
                         // selected set contains keys of the ready channels
                         final int n = selector.select();
@@ -158,7 +156,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                             } catch (Exception e) {
 
                                 //  if (!isClosed.get()) {
-                                if (!isClosed.get())
+                                if (socketChannel.isOpen())
                                     LOG.log(Level.SEVERE, "", e);
                                 // Close channel and nudge selector
                                 try {
@@ -175,7 +173,8 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                 } catch (Exception e) {
                     // we wont log exceptions that occur due ot the socket being closed
-                    if (!isClosed.get()) {
+                    final SocketChannel socketChannel = socketChannelRef.get();
+                    if (socketChannel != null && socketChannel.isOpen()) {
                         LOG.log(Level.SEVERE, "", e);
                     }
                 }
@@ -186,7 +185,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-        isClosed.set(true);
+
         final SocketChannel socketChannel = socketChannelRef.get();
         if (socketChannel != null)
             socketChannel.close();

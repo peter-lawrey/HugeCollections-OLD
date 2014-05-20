@@ -48,12 +48,12 @@ public class SocketChannelEntryReader {
         byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         this.externalizable = externalizable;
         bytes = new ByteBufferBytes(byteBuffer);
+        bytes.limit(0);
 
         // read  remoteIdentifier and time stamp
         byteBuffer.clear();
 
-        bytes.limit(0);
-        bytes.position(0);
+
     }
 
     /**
@@ -120,11 +120,6 @@ public class SocketChannelEntryReader {
     }
 
     Bootstrap readWelcomeMessage(SocketChannel channel) throws IOException {
-        // read  remoteIdentifier and time stamp
-        byteBuffer.clear();
-
-        bytes.limit(0);
-        bytes.position(0);
 
         // read from the channel the timestamp and identifier
         while (bytes.remaining() < 9) {

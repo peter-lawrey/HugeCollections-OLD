@@ -77,7 +77,7 @@ public class TCPSocketReplication4WayMapTest {
 
         final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
 
-        ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
+        final ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
                 result,
                 result,
                 serverPort, socketChannelEntryWriter);
@@ -91,13 +91,13 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
         map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"), new ClientPort(8076, "localhost"));
-        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"), new ClientPort(8077, "localhost"), new ClientPort(8076, "localhost"));
-        map4 = newSocketShmIntString((byte) 4, 8079, new ClientPort(8078, "localhost"), new ClientPort(8077, "localhost"), new ClientPort(8076, "localhost"));
+        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
+        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"));
+        map4 = newSocketShmIntString((byte) 4, 8079);
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws InterruptedException {
 
         // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
 
@@ -108,18 +108,17 @@ public class TCPSocketReplication4WayMapTest {
                 e.printStackTrace();
             }
         }
+        Thread.sleep(100);
     }
 
 
     @Test
     public void test() throws IOException, InterruptedException {
-
+     //   Thread.sleep(1000);
         map1.put(1, "EXAMPLE-1");
-        map2.put(2, "EXAMPLE-2");
+        map2.put(2, "EXAMPLE-1");
         map3.put(3, "EXAMPLE-1");
-        map3.remove(2);
-        map3.put(3, "EXAMPLE-5");
-        map4.put(4, "EXAMPLE-5");
+        map4.put(4, "EXAMPLE-1");
 
         // allow time for the recompilation to resolve
         waitTillEqual(1000);

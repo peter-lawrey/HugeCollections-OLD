@@ -18,6 +18,7 @@
 
 package net.openhft.collections.map.replicators;
 
+import com.sun.javafx.tools.packager.Log;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
@@ -60,46 +61,39 @@ public class SocketChannelEntryWriter {
     void writeAll(@NotNull final SocketChannel socketChannel,
                   final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
+        final long start = bytes.position();
 
         //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
-            byteBuffer.limit(byteBuffer.capacity());
+            if (start != 0)
+                Log.info("START NOT 0");
 
-            boolean wasDataRead = false;
-            try {
-                wasDataRead = modificationIterator.nextEntry(entryCallback);
-            } catch (IndexOutOfBoundsException e) {
-                e.printStackTrace();
-                int i = 1;
-            }
+            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-            if (!wasDataRead && bytes.position() == 0)
+            if (!wasDataRead && bytes.position() == start)
                 return;
 
-            if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == 0))
+            if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == start))
                 continue;
 
-
             byteBuffer.limit((int) bytes.position());
-            //        byteBuffer.position((int) bytes.position());
 
             socketChannel.write(byteBuffer);
 
             //   byteBuffer.position(byteBuffer.position() + bytesWritten);
 
             // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
-
             if (byteBuffer.remaining() == 0) {
-                byteBuffer.position(0);
-                byteBuffer.limit(0);
+                byteBuffer.clear();
+                bytes.clear();
             } else {
                 byteBuffer.compact();
                 byteBuffer.flip();
+                bytes.limit(bytes.capacity());
+                byteBuffer.limit(byteBuffer.capacity());
             }
 
-            bytes.position(byteBuffer.limit());
-            bytes.limit(bytes.capacity());
 
             // we've filled up one bytes lets give another channel a chance to send data
             return;
@@ -153,9 +147,9 @@ public class SocketChannelEntryWriter {
         }
     }
 
-    public void sendWelcomeMessage(@NotNull final SocketChannel socketChannel,
-                                   final long timeStampOfLastMessage,
-                                   final int localIdentifier1) throws IOException {
+    public void sendBootstrap(@NotNull final SocketChannel socketChannel,
+                              final long timeStampOfLastMessage,
+                              final int localIdentifier1) throws IOException {
         bytes.clear();
         byteBuffer.clear();
 
@@ -167,15 +161,14 @@ public class SocketChannelEntryWriter {
         socketChannel.write(byteBuffer);
 
         if (byteBuffer.remaining() == 0) {
-            byteBuffer.position(0);
-            byteBuffer.limit(0);
+            byteBuffer.clear();
+            bytes.clear();
         } else {
             byteBuffer.compact();
             byteBuffer.flip();
+            bytes.limit(bytes.capacity());
+            byteBuffer.limit(byteBuffer.capacity());
         }
-
-        bytes.position(byteBuffer.limit());
-        bytes.limit(bytes.capacity());
 
 
     }

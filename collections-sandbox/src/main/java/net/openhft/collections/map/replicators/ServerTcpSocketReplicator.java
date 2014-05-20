@@ -178,7 +178,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
                     // notify remote map to start to receive data for {@code localIdentifier}
-                    socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
+                    socketChannelEntryWriter.sendBootstrap(channel, map.lastModification(), localIdentifier);
 
                     LOG.info("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
                 }
