@@ -91,9 +91,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private final SharedMapErrorListener errorListener;
 
     /**
-     * Non-final because could be changed in VanillaSharedReplicatedHashMap constructor.
+     * Non-final because could be changed in VanillaSharedReplicatedHashMap.
      */
-    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
+    volatile SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
+
     private final boolean generatedKeyType;
     private final boolean generatedValueType;
 

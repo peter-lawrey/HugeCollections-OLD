@@ -133,6 +133,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public int maxEntrySize() {
+
+        // todo
         return super.maxEntrySize() + 128;  // the 128 for the meta data
     }
 

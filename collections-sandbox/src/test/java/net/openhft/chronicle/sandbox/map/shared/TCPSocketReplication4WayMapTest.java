@@ -114,7 +114,7 @@ public class TCPSocketReplication4WayMapTest {
 
     @Test
     public void test() throws IOException, InterruptedException {
-        Thread.sleep(1000);
+     //   Thread.sleep(1000);
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-1");
         map3.put(3, "EXAMPLE-1");
