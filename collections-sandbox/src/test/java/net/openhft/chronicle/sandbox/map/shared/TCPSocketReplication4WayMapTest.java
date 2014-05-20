@@ -70,7 +70,7 @@ public class TCPSocketReplication4WayMapTest {
 
         for (ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
             final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
-            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(builder.entrySize(), result);
+            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, result);
             ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
             result.addCloseable(clientTcpSocketReplicator);
         }

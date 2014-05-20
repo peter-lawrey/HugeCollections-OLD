@@ -39,7 +39,7 @@ import java.util.logging.Logger;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
-import static net.openhft.collections.map.replicators.SocketChannelEntryReader.WelcomeMessage;
+import static net.openhft.collections.map.replicators.SocketChannelEntryReader.Bootstrap;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the
@@ -164,17 +164,23 @@ public class ServerTcpSocketReplicator implements Closeable {
                     channel.configureBlocking(false);
 
                     final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize, this.externalizable);
-                    final WelcomeMessage welcomeMessage = socketChannelEntryReader.readWelcomeMessage(channel);
+                    final Bootstrap bootstrap = socketChannelEntryReader.readWelcomeMessage(channel);
 
-                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(welcomeMessage.identifier);
-                    remoteModificationIterator.dirtyEntries(welcomeMessage.timeStamp);
+                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
+                    remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
 
                     // register it with the selector and store the ModificationIterator for this key
                     final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
+
+                    if (bootstrap.identifier == map.getIdentifier())
+                        throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
+
                     // notify remote map to start to receive data for {@code localIdentifier}
                     socketChannelEntryWriter.sendWelcomeMessage(channel, map.lastModification(), localIdentifier);
+
+                    LOG.info("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
                 }
                 try {
 
@@ -192,15 +198,15 @@ public class ServerTcpSocketReplicator implements Closeable {
 
                 } catch (Exception e) {
 
-                  //  if (!isClosed.get()) {
+                    //  if (!isClosed.get()) {
                     LOG.log(Level.SEVERE, "", e);
-                        // Close channel and nudge selector
-                        try {
-                            key.channel().close();
-                        } catch (IOException ex) {
-                            // do nothing
-                        }
-                   // }
+                    // Close channel and nudge selector
+                    try {
+                        key.channel().close();
+                    } catch (IOException ex) {
+                        // do nothing
+                    }
+                    // }
                 }
 
                 // remove key from selected set, it's been handled

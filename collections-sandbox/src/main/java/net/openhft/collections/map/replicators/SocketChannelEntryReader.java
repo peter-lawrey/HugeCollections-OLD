@@ -44,7 +44,7 @@ public class SocketChannelEntryReader {
     private long sizeOfNextEntry = Long.MIN_VALUE;
 
     public SocketChannelEntryReader(int entrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-        this.entrySize0 = entrySize + 128;
+        this.entrySize0 = entrySize;
         byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         this.externalizable = externalizable;
         bytes = new ByteBufferBytes(byteBuffer);
@@ -109,17 +109,17 @@ public class SocketChannelEntryReader {
     }
 
 
-    static class WelcomeMessage {
+    static class Bootstrap {
         public final long timeStamp;
         public final byte identifier;
 
-        WelcomeMessage(byte identifier, long timeStamp) {
+        Bootstrap(byte identifier, long timeStamp) {
             this.timeStamp = timeStamp;
             this.identifier = identifier;
         }
     }
 
-    WelcomeMessage readWelcomeMessage(SocketChannel channel) throws IOException {
+    Bootstrap readWelcomeMessage(SocketChannel channel) throws IOException {
         // read  remoteIdentifier and time stamp
         byteBuffer.clear();
 
@@ -132,7 +132,7 @@ public class SocketChannelEntryReader {
             bytes.limit(byteBuffer.position());
         }
 
-        return new WelcomeMessage(bytes.readByte(), bytes.readLong());
+        return new Bootstrap(bytes.readByte(), bytes.readLong());
 
     }
 }

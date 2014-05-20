@@ -64,7 +64,15 @@ public class SocketChannelEntryWriter {
         //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
-            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+            byteBuffer.limit(byteBuffer.capacity());
+
+            boolean wasDataRead = false;
+            try {
+                wasDataRead = modificationIterator.nextEntry(entryCallback);
+            } catch (IndexOutOfBoundsException e) {
+                e.printStackTrace();
+                int i = 1;
+            }
 
             if (!wasDataRead && bytes.position() == 0)
                 return;
@@ -72,24 +80,32 @@ public class SocketChannelEntryWriter {
             if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == 0))
                 continue;
 
-            bytes.flip();
 
-            final ByteBuffer byteBuffer = bytes.buffer();
-            byteBuffer.limit((int) bytes.limit());
-            byteBuffer.position((int) bytes.position());
+            byteBuffer.limit((int) bytes.position());
+            //        byteBuffer.position((int) bytes.position());
 
             socketChannel.write(byteBuffer);
 
+            //   byteBuffer.position(byteBuffer.position() + bytesWritten);
+
             // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
-            bytes.clear();
-            byteBuffer.clear();
+
+            if (byteBuffer.remaining() == 0) {
+                byteBuffer.position(0);
+                byteBuffer.limit(0);
+            } else {
+                byteBuffer.compact();
+                byteBuffer.flip();
+            }
+
+            bytes.position(byteBuffer.limit());
+            bytes.limit(bytes.capacity());
 
             // we've filled up one bytes lets give another channel a chance to send data
             return;
         }
 
     }
-
 
 
     /**
@@ -118,9 +134,6 @@ public class SocketChannelEntryWriter {
 
             return true;
         }
-
-
-
 
 
         /**
@@ -153,9 +166,20 @@ public class SocketChannelEntryWriter {
         byteBuffer.limit((int) bytes.position());
         socketChannel.write(byteBuffer);
 
-        bytes.clear();
-        byteBuffer.clear();
+        if (byteBuffer.remaining() == 0) {
+            byteBuffer.position(0);
+            byteBuffer.limit(0);
+        } else {
+            byteBuffer.compact();
+            byteBuffer.flip();
+        }
+
+        bytes.position(byteBuffer.limit());
+        bytes.limit(bytes.capacity());
+
+
     }
 
 
 }
+
