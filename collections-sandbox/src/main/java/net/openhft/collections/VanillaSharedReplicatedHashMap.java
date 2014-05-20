@@ -396,7 +396,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         /**
-         * @see net.openhft.collections.VanillaSharedHashMap.Segment#acquire(net.openhft.lang.io.Bytes, Object, Object, int, boolean)
+         * @see VanillaSharedHashMap.Segment#acquire(net.openhft.lang.io.Bytes, Object, Object, int, boolean)
          */
         V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create, long timestamp) {
             lock();
@@ -414,7 +414,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 } else {
                     usingValue = tryObtainUsingValueOnAcquire(keyBytes, key, usingValue, create);
                     if (usingValue != null) {
-                        offset = putEntryConsideringByteableValue(keyBytes, hash2, usingValue);
+                        // see VanillaSharedHashMap.Segment.acquire() for explanation
+                        // why `usingValue` is `create`.
+                        offset = putEntryOnAcquire(keyBytes, hash2, usingValue, create);
                         incrementSize();
                         notifyPut(offset, true, key, usingValue, posFromOffset(offset));
                         return usingValue;
@@ -427,8 +429,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
-        private long putEntryConsideringByteableValue(Bytes keyBytes, int hash2, V value) {
-            return putEntry(keyBytes, hash2, value, true, localIdentifier,
+        private long putEntryOnAcquire(Bytes keyBytes, int hash2, V value, boolean usingValue) {
+            return putEntry(keyBytes, hash2, value, usingValue, localIdentifier,
                     timeProvider.currentTimeMillis(), hashLookupLiveOnly);
         }
 
@@ -619,10 +621,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
               final byte identifier, final long timestamp) {
             lock();
             try {
+                IntIntMultiMap hashLookup = hashLookupLiveAndDeleted;
                 long keyLen = keyBytes.remaining();
-                hashLookupLiveAndDeleted.startSearch(hash2);
+                hashLookup.startSearch(hash2);
                 int pos;
-                while ((pos = hashLookupLiveAndDeleted.nextPos()) >= 0) {
+                while ((pos = hashLookup.nextPos()) >= 0) {
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
                     if (!keyEquals(keyBytes, keyLen, entry))
@@ -695,7 +698,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 }
 
                 // key is not found
-                long offset = putEntry(keyBytes, hash2, value, identifier, timestamp);
+                long offset = putEntry(keyBytes, hash2, value, false, identifier, timestamp,
+                        hashLookup);
                 incrementSize();
                 notifyPut(offset, true, key, value, posFromOffset(offset));
                 return null;
@@ -738,41 +742,35 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         /**
-         * todo doc
+         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface
+         * and {@code usingValue} is {@code true}, the value is backed with the bytes of this entry.
          *
-         * @param keyBytes
-         * @param hash2
-         * @param value
-         * @param remoteIdentifier
-         * @param timestamp
-         * @return
+         * @param keyBytes           serialized key
+         * @param hash2              a hash of the {@code keyBytes}. Caller was searching for the
+         *                           key in the {@code searchedHashLookup} using this hash.
+         * @param value              the value to put
+         * @param usingValue         {@code true} if the value should be backed with the bytes
+         *                           of the entry, if it implements
+         *                           {@link net.openhft.lang.model.Byteable} interface,
+         *                           {@code false} if it should put itself
+         * @param identifier         the identifier of the outer SHM node
+         * @param timestamp          the timestamp when the entry was put
+         *                           <s>(this could be later if it was a remote put)</s>
+         *                           this method is called only from usual put or acquire
+         *                           TODO Rob verify
+         * @param searchedHashLookup the hash lookup that was unsuccessfully searched for the key
+         *                           in the caller
+         * @return offset of the written entry in the Segment bytes
+         * @see VanillaSharedHashMap.Segment#putEntry(net.openhft.lang.io.Bytes, Object, boolean)
          */
-        private long putEntry(Bytes keyBytes, int hash2, V value, final int remoteIdentifier, long timestamp) {
-            return putEntry(keyBytes, hash2, value, false, remoteIdentifier,
-                    timestamp, hashLookupLiveAndDeleted);
-        }
-
-        /**
-         * todo doc
-         *
-         * @param keyBytes
-         * @param hash2
-         * @param value
-         * @param considerByteableValue
-         * @param identifier
-         * @param timestamp             the timestamp the entry was put ( this could be later if if was a remote put )
-         * @param searchedHashLookup
-         * @return
-         */
-        private long putEntry(Bytes keyBytes, int hash2, V value, boolean considerByteableValue,
+        private long putEntry(Bytes keyBytes, int hash2, V value, boolean usingValue,
                               final int identifier, final long timestamp,
                               IntIntMultiMap searchedHashLookup) {
             long keyLen = keyBytes.remaining();
 
             // "if-else polymorphism" is not very beautiful, but allows to
             // reuse the rest code of this method and doesn't hurt performance.
-            boolean byteableValue =
-                    considerByteableValue && value instanceof Byteable;
+            boolean byteableValue = usingValue && value instanceof Byteable;
             long valueLen;
             Bytes valueBytes = null;
             Byteable valueAsByteable = null;
