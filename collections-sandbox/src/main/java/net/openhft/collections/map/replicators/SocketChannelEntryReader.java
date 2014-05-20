@@ -34,26 +34,25 @@ import java.nio.channels.SocketChannel;
 public class SocketChannelEntryReader {
 
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
+    public static final int SIZE_OF_UNSIGNED_SHORT = 4;
     private ReplicatedSharedHashMap.EntryExternalizable externalizable;
 
-    //todo HCOLL-71 fix the 128 padding
-    final int entrySize0;
+
+    final int maxEntrySize;
     final ByteBuffer byteBuffer;
     final ByteBufferBytes bytes;
 
     private long sizeOfNextEntry = Long.MIN_VALUE;
 
-    public SocketChannelEntryReader(int entrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-        this.entrySize0 = entrySize;
-        byteBuffer = ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
+    public SocketChannelEntryReader(int maxEntrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+        this.maxEntrySize = maxEntrySize;
+        byteBuffer = ByteBuffer.allocate(this.maxEntrySize * MAX_NUMBER_OF_ENTRIES_PER_BUFFER);
         this.externalizable = externalizable;
         bytes = new ByteBufferBytes(byteBuffer);
         bytes.limit(0);
 
         // read  remoteIdentifier and time stamp
         byteBuffer.clear();
-
-
     }
 
     /**
@@ -68,10 +67,10 @@ public class SocketChannelEntryReader {
         for (; ; ) {
             // its set to MIN_VALUE when it should be read again
             if (sizeOfNextEntry == Long.MIN_VALUE) {
-                if (bytes.remaining() < 8) {
+                if (bytes.remaining() < SIZE_OF_UNSIGNED_SHORT) {
                     socketChannel.read(byteBuffer);
                     bytes.limit(byteBuffer.position());
-                    if (bytes.remaining() < 8)
+                    if (bytes.remaining() < SIZE_OF_UNSIGNED_SHORT)
                         return;
                 }
 
@@ -95,7 +94,7 @@ public class SocketChannelEntryReader {
             // skip onto the next entry
             bytes.position(limit);
 
-            if (byteBuffer.position() > 0 && byteBuffer.remaining() <= entrySize0) {
+            if (byteBuffer.position() > 0 && byteBuffer.remaining() <= maxEntrySize + SIZE_OF_UNSIGNED_SHORT) {
                 byteBuffer.compact();
                 bytes.position(0);
             }
@@ -119,7 +118,7 @@ public class SocketChannelEntryReader {
         }
     }
 
-    Bootstrap readWelcomeMessage(SocketChannel channel) throws IOException {
+    Bootstrap readBootstrap(SocketChannel channel) throws IOException {
 
         // read from the channel the timestamp and identifier
         while (bytes.remaining() < 9) {

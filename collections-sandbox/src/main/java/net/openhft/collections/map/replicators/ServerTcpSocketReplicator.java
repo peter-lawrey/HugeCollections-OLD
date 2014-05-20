@@ -60,7 +60,7 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final SocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
-    private final int entrySize;
+    private final int maxEntrySize;
     private final AtomicBoolean isClosed = new AtomicBoolean();
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
@@ -74,7 +74,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         this.serverChannel = ServerSocketChannel.open();
         this.localIdentifier = map.getIdentifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
-        this.entrySize = map.maxEntrySize();
+        this.maxEntrySize = map.maxEntrySize();
 
 
         // out bound
@@ -163,8 +163,8 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize, this.externalizable);
-                    final Bootstrap bootstrap = socketChannelEntryReader.readWelcomeMessage(channel);
+                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(maxEntrySize, this.externalizable);
+                    final Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(channel);
 
                     final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
                     remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);

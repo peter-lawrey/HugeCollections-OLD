@@ -18,7 +18,6 @@
 
 package net.openhft.collections.map.replicators;
 
-import com.sun.javafx.tools.packager.Log;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
@@ -65,9 +64,6 @@ public class SocketChannelEntryWriter {
 
         //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
-
-            if (start != 0)
-                Log.info("START NOT 0");
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
@@ -149,15 +145,16 @@ public class SocketChannelEntryWriter {
 
     public void sendBootstrap(@NotNull final SocketChannel socketChannel,
                               final long timeStampOfLastMessage,
-                              final int localIdentifier1) throws IOException {
+                              final int localIdentifier) throws IOException {
         bytes.clear();
         byteBuffer.clear();
 
         // send a welcome message to the remote server to ask for data for our localIdentifier
         // and any missed messages
-        bytes.writeByte(localIdentifier1);
+        bytes.writeByte(localIdentifier);
         bytes.writeLong(timeStampOfLastMessage);
         byteBuffer.limit((int) bytes.position());
+
         socketChannel.write(byteBuffer);
 
         if (byteBuffer.remaining() == 0) {
@@ -170,9 +167,7 @@ public class SocketChannelEntryWriter {
             byteBuffer.limit(byteBuffer.capacity());
         }
 
-
     }
-
 
 }
 

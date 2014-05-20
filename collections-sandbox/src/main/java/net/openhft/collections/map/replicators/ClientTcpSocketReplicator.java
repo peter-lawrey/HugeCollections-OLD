@@ -99,7 +99,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     LOG.info("client-connection id=" + map.getIdentifier());
                     socketChannelRef.set(socketChannel);
                     socketChannelEntryWriter.sendBootstrap(socketChannel, map.lastModification(), map.getIdentifier());
-                    final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readWelcomeMessage(socketChannel);
+                    final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
                     remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
