@@ -757,7 +757,11 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 } else {
                     usingValue = tryObtainUsingValueOnAcquire(keyBytes, key, usingValue, create);
                     if (usingValue != null) {
-                        offset = putEntryConsideringByteableValue(keyBytes, usingValue);
+                        // If `create` is false, this method was called from get() or getUsing()
+                        // and non-null `usingValue` was returned by notifyMissed() method.
+                        // This "missed" default value is considered as genuine value
+                        // rather than "using" container to fill up, even if it implements Byteable.
+                        offset = putEntry(keyBytes, usingValue, create);
                         incrementSize();
                         notifyPut(offset, true, key, usingValue, posFromOffset(offset));
                         return usingValue;
@@ -811,12 +815,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             } else {
                 if (usingValue instanceof Byteable)
                     ((Byteable) usingValue).bytes(null, 0);
-                return usingValue = notifyMissed(keyBytes, key, usingValue);
+                return notifyMissed(keyBytes, key, usingValue);
             }
-        }
-
-        private long putEntryConsideringByteableValue(Bytes keyBytes, V value) {
-            return putEntry(keyBytes, value, true);
         }
 
         V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent) {
@@ -838,7 +838,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     }
                 }
                 // key is not found
-                long offset = putEntry(keyBytes, value);
+                long offset = putEntry(keyBytes, value, false);
                 incrementSize();
                 notifyPut(offset, true, key, value, posFromOffset(offset));
                 return null;
@@ -862,18 +862,23 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             return prevValue;
         }
 
-
-        private long putEntry(Bytes keyBytes, V value) {
-            return putEntry(keyBytes, value, false);
-        }
-
-        private long putEntry(Bytes keyBytes, V value, boolean considerByteableValue) {
+        /**
+         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface
+         * and {@code usingValue} is {@code true}, the value is backed with the bytes of this entry.
+         *
+         * @param keyBytes   serialized key
+         * @param value      the value to put
+         * @param usingValue {@code true} if the value should be backed with the bytes of the entry,
+         *                   if it implements {@link net.openhft.lang.model.Byteable} interface,
+         *                   {@code false} if it should put itself
+         * @return offset of the written entry in the Segment bytes
+         */
+        private long putEntry(Bytes keyBytes, V value, boolean usingValue) {
             long keyLen = keyBytes.remaining();
 
             // "if-else polymorphism" is not very beautiful, but allows to
             // reuse the rest code of this method and doesn't hurt performance.
-            boolean byteableValue =
-                    considerByteableValue && value instanceof Byteable;
+            boolean byteableValue = usingValue && value instanceof Byteable;
             long valueLen;
             Bytes valueBytes = null;
             Byteable valueAsByteable = null;
