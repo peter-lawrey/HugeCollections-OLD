@@ -781,7 +781,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 entry.writeBoolean(false);
             }
 
-            writeValueOnPutEntry(byteableValue, valueLen, valueBytes, valueAsByteable, entry);
+            writeValueOnPutEntry(valueLen, valueBytes, valueAsByteable, entry);
 
             // we have to add it both to the live
             if (searchedHashLookup == hashLookupLiveAndDeleted) {
