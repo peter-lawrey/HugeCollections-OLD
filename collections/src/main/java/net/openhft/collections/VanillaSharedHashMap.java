@@ -900,19 +900,20 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             entry.writeStopBit(keyLen);
             entry.write(keyBytes);
 
-            writeValueOnPutEntry(byteableValue, valueLen, valueBytes, valueAsByteable, entry);
+            writeValueOnPutEntry(valueLen, valueBytes, valueAsByteable, entry);
             hashLookup.putAfterFailedSearch(pos);
             return offset;
         }
 
-        void writeValueOnPutEntry(boolean byteableValue, long valueLen, Bytes valueBytes,
+        void writeValueOnPutEntry(long valueLen, Bytes valueBytes,
                                   Byteable valueAsByteable, NativeBytes entry) {
             entry.writeStopBit(valueLen);
             alignment.alignPositionAddr(entry);
 
-            if (!byteableValue) {
+            if (valueBytes != null) {
                 entry.write(valueBytes);
             } else {
+                assert valueAsByteable != null;
                 long valueOffset = entry.positionAddr() - bytes.address();
                 bytes.zeroOut(valueOffset, valueOffset + valueLen);
                 valueAsByteable.bytes(bytes, valueOffset);
