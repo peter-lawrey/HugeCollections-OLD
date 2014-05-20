@@ -339,24 +339,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    /**
-     * returns true if the entry has been modified after ( and including ) the timestamp
-     * <p/>
-     * This functionality was added to support back filling of entries, this occurs when a new node gets
-     * attached to an existing live replicated hash map
-     *
-     * @param entry     the location of the entry
-     * @param timestamp the timestamp from which a entry is considered dirty and subsequently should be republished ( inclusive )
-     * @return true if the entry has been modified after ( and including ) the timestamp
-     */
-
-    public boolean isNewer(NativeBytes entry, long timestamp) {
-        long keyLen = entry.remaining();
-        entry.skip(keyLen);
-        final long entryTimestamp = entry.readLong();
-        return entryTimestamp >= timestamp;
-    }
-
     class Segment extends VanillaSharedHashMap<K, V>.Segment implements ReplicatedSharedSegment {
 
         private volatile IntIntMultiMap hashLookupLiveAndDeleted;
@@ -960,15 +942,23 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     public void accept(int hash, int pos) {
                         final long offset = offsetFromPos(pos);
                         final NativeBytes entry = entry(offset);
-                        if (isNewer(entry, timeStamp)) {
+                        long keyLen = entry.readStopBit();
+                        entry.skip(keyLen);
+
+                        final long entryTimestamp = entry.readLong();
+
+                        if (entryTimestamp >= timeStamp &&
+                                entry.readByte() == VanillaSharedReplicatedHashMap.this.getIdentifier())
                             entryModifiableCallback.set(index, pos);
-                        }
                     }
+
 
                 });
 
 
-            } finally {
+            } finally
+
+            {
                 unlock();
             }
         }
@@ -1202,7 +1192,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     "ModificationIterator.onPut() is called from outside of the parent map";
 
 
-
             //System.out.println("onPut- segmentIndex=" + segment.getIndex() + ",pos=" + pos);
 
             nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
@@ -1345,10 +1334,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         @Override
         public void dirtyEntries(long timeStamp) {
 
-
             // iterate over all the segments and mark bit in the modification iterator
             // that correspond to entries with an older timestamp
-            for (Segment segment : (Segment[]) segments) {
+            for (final Segment segment : (Segment[]) segments) {
                 segment.dirtyNewerEntries(timeStamp, entryModifiableCallback);
             }
 
