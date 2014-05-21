@@ -48,8 +48,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return result;
     }
 
-    public VanillaSharedReplicatedHashMapBuilder() {
-    }
+
 
     public boolean canReplicate() {
         return canReplicate;
