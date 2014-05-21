@@ -1155,7 +1155,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     notifier.notifyAll();
                 }
             }
-
         }
 
         /**
