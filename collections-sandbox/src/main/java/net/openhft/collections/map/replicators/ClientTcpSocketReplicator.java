@@ -85,8 +85,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     for (; ; ) {
                         try {
                             socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
-                            LOG.info("successfully connected to " + clientPort);
-                            socketChannel.socket().setReceiveBufferSize(8 * 1024);
+                            LOG.info("successfully connected to " + clientPort + ", local-id=" + map.getIdentifier());
                             break;
                         } catch (ConnectException e) {
                             if (socketChannel != null)
@@ -95,10 +94,9 @@ public class ClientTcpSocketReplicator implements Closeable {
                             Thread.sleep(100);
                         }
                     }
-
-
-                    LOG.info("client-connection id=" + map.getIdentifier());
                     socketChannelRef.set(socketChannel);
+                    socketChannel.socket().setReceiveBufferSize(8 * 1024);
+
                     socketChannelEntryWriter.sendBootstrap(socketChannel, map.lastModification(), map.getIdentifier());
                     final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(socketChannel);
 
@@ -115,6 +113,9 @@ public class ClientTcpSocketReplicator implements Closeable {
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
+                    // process any bytes.remaining(), this can occur because reading socket for the bootstrap,
+                    // may read more than just 9 bytes
+                    socketChannelEntryReader.readAll(socketChannel);
 
                     while (socketChannel.isOpen()) {
                         // this may block for a long time, upon return the
@@ -138,11 +139,6 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                             try {
 
-                                if (key.isConnectable()) {
-                                    LOG.info("here.");
-                                }
-
-
                                 if (!key.isValid()) {
                                     continue;
                                 }
@@ -150,13 +146,13 @@ public class ClientTcpSocketReplicator implements Closeable {
                                 // is there data to read on this channel?
                                 if (key.isReadable()) {
 
-                                    final SocketChannel socketChannel0 = (SocketChannel) key.channel();
-                                    socketChannelEntryReader.readAll(socketChannel0);
+
+                                    socketChannelEntryReader.readAll(socketChannel);
                                 }
 
                                 if (key.isWritable()) {
-                                    final SocketChannel socketChannel0 = (SocketChannel) key.channel();
-                                    socketChannelEntryWriter.writeAll(socketChannel0, remoteModificationIterator);
+
+                                    socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
                                 }
 
                             } catch (Exception e) {
@@ -181,7 +177,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     // we wont log exceptions that occur due ot the socket being closed
                     final SocketChannel socketChannel = socketChannelRef.get();
                     if (socketChannel != null && socketChannel.isOpen()) {
-                        LOG.info("", e);
+                        LOG.error("", e);
                     }
                 }
             }

@@ -173,7 +173,6 @@ public class ServerTcpSocketReplicator implements Closeable {
                     final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
-
                     if (bootstrap.identifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
@@ -181,6 +180,10 @@ public class ServerTcpSocketReplicator implements Closeable {
                     socketChannelEntryWriter.sendBootstrap(channel, map.lastModification(), localIdentifier);
 
                     LOG.info("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
+
+                    // process any bytes.remaining(), this can occur because reading socket for the bootstrap,
+                    // may read more than just 9 bytes
+                    socketChannelEntryReader.readAll(channel);
                 }
                 try {
 

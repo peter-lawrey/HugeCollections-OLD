@@ -929,7 +929,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * {@inheritDoc}
          */
-        public void dirtyNewerEntries(final long timeStamp, final EntryModifiableCallback entryModifiableCallback) {
+        public void dirtyEntries(final long timeStamp, final EntryModifiableCallback entryModifiableCallback) {
 
             this.lock();
             try {
@@ -938,8 +938,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     @Override
                     public void accept(int hash, int pos) {
-                        final long offset = offsetFromPos(pos);
-                        final NativeBytes entry = entry(offset);
+                        final NativeBytes entry = entry(offsetFromPos(pos));
                         long keyLen = entry.readStopBit();
                         entry.skip(keyLen);
 
@@ -949,14 +948,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                 entry.readByte() == VanillaSharedReplicatedHashMap.this.getIdentifier())
                             entryModifiableCallback.set(index, pos);
                     }
-
-
                 });
 
-
-            } finally
-
-            {
+            } finally {
                 unlock();
             }
         }
@@ -1053,6 +1047,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         entry.position(keyPosition);
         destination.write(entry);
 
+
+        String message = null;
+        if (LOG.isDebugEnabled()) {
+            if (isDeleted || valueLen == 0)
+                LOG.debug("WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remove(key=" + ByteUtils.toCharSequence(entry).trim() + ")");
+            else
+                message = "WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", put(key=" + ByteUtils.toCharSequence(entry).trim() + ",";
+        }
+
+
         if (isDeleted || valueLen == 0)
             return;
 
@@ -1065,6 +1069,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         // writes the value
         entry.limit(entry.position() + valueLen);
         destination.write(entry);
+
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(message + "value=" + ByteUtils.toCharSequence(entry).trim() + ")");
+        }
     }
 
 
@@ -1103,23 +1112,28 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         if (isDeleted) {
 
-            System.out.println("reading data into local=" + localIdentifier + ", remote=" + remoteIdentifier + ", remove(key=" + ByteUtils.toCharSequence(source).trim() + ")");
+            if (LOG.isDebugEnabled())
+                LOG.debug("READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote=" + remoteIdentifier + ", remove(key=" + ByteUtils.toCharSequence(source).trim() + ")");
 
             segment(segmentNum).remoteRemove(source, segmentHash, timeStamp, remoteIdentifier);
             return;
         }
+        String message = null;
 
-        // todo change to debug log
-        final String message = "reading data into local=" + localIdentifier + ", remote=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
+
+        if (LOG.isDebugEnabled()) {
+            message = "READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote-id=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
+        }
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
         segment(segmentNum).remotePut(source, segmentHash, remoteIdentifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
-
-        // todo change to debug log
         source.position(valuePosition);
         source.limit(valueLimit);
-        System.out.println(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
+        }
     }
 
 
@@ -1335,7 +1349,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             // iterate over all the segments and mark bit in the modification iterator
             // that correspond to entries with an older timestamp
             for (final Segment segment : (Segment[]) segments) {
-                segment.dirtyNewerEntries(timeStamp, entryModifiableCallback);
+                segment.dirtyEntries(timeStamp, entryModifiableCallback);
             }
 
         }

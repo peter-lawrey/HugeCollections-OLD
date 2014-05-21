@@ -180,7 +180,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     }
 
     interface ReplicatedSharedSegment<K, V> extends SharedSegment<K, V> {
-        void dirtyNewerEntries(long timeStamp, EntryModifiableCallback entryModifiableCallback);
+        void dirtyEntries(long timeStamp, EntryModifiableCallback entryModifiableCallback);
     }
 
     /**
@@ -231,6 +231,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
 
     interface EntryExternalizable {
+
 
         /**
          * The map implements the {@link #writeExternalEntry(NativeBytes entry, Bytes destination)} method to save

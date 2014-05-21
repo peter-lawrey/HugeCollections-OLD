@@ -86,7 +86,7 @@ public class TCPSocketReplicationTest3way {
 
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000000);
+        waitTillEqual(5000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
         assertEquals(new TreeMap(map3), new TreeMap(map2));

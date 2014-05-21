@@ -19,8 +19,11 @@
 package net.openhft.collections.map.replicators;
 
 import net.openhft.collections.ReplicatedSharedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,7 +39,7 @@ public class SocketChannelEntryReader {
     public static final short MAX_NUMBER_OF_ENTRIES_PER_BUFFER = 128;
     public static final int SIZE_OF_UNSIGNED_SHORT = 4;
     private ReplicatedSharedHashMap.EntryExternalizable externalizable;
-
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
     final int maxEntrySize;
     final ByteBuffer byteBuffer;
@@ -125,6 +128,7 @@ public class SocketChannelEntryReader {
             channel.read(byteBuffer);
             bytes.limit(byteBuffer.position());
         }
+
 
         return new Bootstrap(bytes.readByte(), bytes.readLong());
 

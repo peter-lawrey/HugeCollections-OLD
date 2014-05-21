@@ -23,6 +23,8 @@ import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,6 +40,9 @@ public class SocketChannelEntryWriter {
     private final ByteBufferBytes bytes;
     private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
+
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+
 
     public SocketChannelEntryWriter(final int entryMaxSize,
                                     final short maxNumberOfEntriesPerChunk,
@@ -62,6 +67,10 @@ public class SocketChannelEntryWriter {
 
         final long start = bytes.position();
 
+        // if we still have some unwritten bytes from last time
+        if (bytes.position() > 0)
+            writeBytes(socketChannel);
+
         //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
@@ -73,28 +82,34 @@ public class SocketChannelEntryWriter {
             if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == start))
                 continue;
 
-            byteBuffer.limit((int) bytes.position());
-
-            socketChannel.write(byteBuffer);
-
-            //   byteBuffer.position(byteBuffer.position() + bytesWritten);
-
-            // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
-            if (byteBuffer.remaining() == 0) {
-                byteBuffer.clear();
-                bytes.clear();
-            } else {
-                byteBuffer.compact();
-                byteBuffer.flip();
-                bytes.limit(bytes.capacity());
-                byteBuffer.limit(byteBuffer.capacity());
-            }
-
+            writeBytes(socketChannel);
 
             // we've filled up one bytes lets give another channel a chance to send data
             return;
         }
 
+    }
+
+    private void writeBytes(SocketChannel socketChannel) throws IOException {
+
+        byteBuffer.limit((int) bytes.position());
+
+        final int write = socketChannel.write(byteBuffer);
+
+        if (LOG.isDebugEnabled())
+            LOG.debug("bytes-written=" + write);
+
+        // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
+        if (byteBuffer.remaining() == 0) {
+            byteBuffer.clear();
+            bytes.clear();
+        } else {
+            byteBuffer.compact();
+            byteBuffer.flip();
+            bytes.limit(bytes.capacity());
+            bytes.position(byteBuffer.limit());
+            byteBuffer.limit(byteBuffer.capacity());
+        }
     }
 
 
