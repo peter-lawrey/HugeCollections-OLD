@@ -52,13 +52,11 @@ public class TCPSocketReplication4WayMapTest {
             final int serverPort,
             final ClientPort... clientPorts) throws IOException {
 
-        final VanillaSharedReplicatedHashMapBuilder builder =
-                new VanillaSharedReplicatedHashMapBuilder()
-                        .entries(1000)
-                        .identifier(identifier)
-                        .tcpReplication(new TcpReplication(serverPort, clientPorts));
-
-        return builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        return new VanillaSharedReplicatedHashMapBuilder()
+                .entries(1000)
+                .identifier(identifier)
+                .tcpReplication(new TcpReplication(serverPort, clientPorts))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
 
