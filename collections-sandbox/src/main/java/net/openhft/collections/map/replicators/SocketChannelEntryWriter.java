@@ -37,14 +37,13 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  */
 public class SocketChannelEntryWriter {
 
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
     private final ByteBuffer out;
     private final ByteBufferBytes in;
     private final EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
-
-    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    private int serializedEntrySize;
+    private final int serializedEntrySize;
 
     public SocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final EntryExternalizable externalizable,
@@ -72,7 +71,6 @@ public class SocketChannelEntryWriter {
         if (in.position() > 0)
             writeBytes(socketChannel);
 
-        //todo if writer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);

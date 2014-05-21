@@ -18,7 +18,6 @@
 
 package net.openhft.collections.map.replicators;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
@@ -29,6 +28,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+
 /**
  * Reads map entries from a socket, this could be a client or server socket
  *
@@ -36,10 +37,10 @@ import java.nio.channels.SocketChannel;
  */
 public class SocketChannelEntryReader {
 
-    public static final int SIZE_OF_UNSIGNED_SHORT = 4;
-    private ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
+    public static final int SIZE_OF_UNSIGNED_SHORT = 4;
+    private final EntryExternalizable externalizable;
     private final int serializedEntrySize;
     private final ByteBuffer in;
     private final ByteBufferBytes out;
@@ -48,12 +49,12 @@ public class SocketChannelEntryReader {
     private int sizeOfNextEntry = Integer.MIN_VALUE;
 
     /**
-     * @param serializedEntrySize   the maximum size of an entry include the meta data
-     * @param externalizable supports reading and writing serialize entries
-     * @param packetSize     the estimated size of a tcp/ip packet
+     * @param serializedEntrySize the maximum size of an entry include the meta data
+     * @param externalizable      supports reading and writing serialize entries
+     * @param packetSize          the estimated size of a tcp/ip packet
      */
     public SocketChannelEntryReader(final int serializedEntrySize,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    @NotNull final EntryExternalizable externalizable,
                                     final short packetSize) {
         this.serializedEntrySize = serializedEntrySize;
         in = ByteBuffer.allocate(packetSize);

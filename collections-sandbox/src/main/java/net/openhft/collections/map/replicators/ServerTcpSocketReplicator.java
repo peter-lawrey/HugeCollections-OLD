@@ -66,9 +66,10 @@ public class ServerTcpSocketReplicator implements Closeable {
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
-                                     int port,
+                                     final int port,
                                      @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
-                                     final short packetSize, int serializedEntrySize) throws IOException {
+                                     final short packetSize,
+                                     final int serializedEntrySize) throws IOException {
 
         this.externalizable = externalizable;
         this.map = map;
@@ -228,7 +229,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         final SocketChannelEntryReader socketChannelEntryReader;
         final ModificationIterator remoteModificationIterator;
 
-        Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator) {
+        private Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator) {
             this.socketChannelEntryReader = socketChannelEntryReader;
             this.remoteModificationIterator = remoteModificationIterator;
         }

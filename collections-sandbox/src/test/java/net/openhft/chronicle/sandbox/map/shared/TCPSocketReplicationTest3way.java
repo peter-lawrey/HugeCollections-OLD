@@ -23,9 +23,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.TreeMap;
 
+import static net.openhft.chronicle.sandbox.map.shared.TCPSocketReplication4WayMapTest.newSocketShmIntString;
 import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -43,38 +45,23 @@ public class TCPSocketReplicationTest3way {
     private SharedHashMap<Integer, CharSequence> map2;
     private SharedHashMap<Integer, CharSequence> map3;
 
-    static int i;
-
     @Before
     public void setup() throws IOException {
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"));
-        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"));
-        map3 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 3, 8078);
+        map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"));
+        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"));
+        map3 = newSocketShmIntString((byte) 3, 8078);
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws InterruptedException {
 
-        // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
-
-        try {
-            map1.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        for (final Closeable closeable : new Closeable[]{map1, map2, map3}) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-
-        try {
-            map2.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            map3.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
     }
 
 

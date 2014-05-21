@@ -112,12 +112,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return new Segment(bytes, index);
     }
 
-
-
     Class segmentType() {
         return Segment.class;
     }
-
 
     private long modIterBitSetSizeInBytes() {
         return align64(bitsPerSegmentInModIterBitSet() * segments.length / 8);
@@ -247,11 +244,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
     }
 
-
     public void addCloseable(Closeable closeable) {
         closeables.add(closeable);
     }
-
 
     @Override
     public void close() {
@@ -402,12 +397,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         /**
          * called from a remote node as part of replication
-         *
-         * @param keyBytes
-         * @param hash2
-         * @param timestamp
-         * @param identifier
-         * @return
          */
         private void remoteRemove(Bytes keyBytes, int hash2,
                                   final long timestamp, final byte identifier) {
@@ -458,13 +447,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         /**
          * called from a remote node when it wishes to propagate a remove event
-         *
-         * @param hash2
-         * @param identifier
-         * @param timestamp
-         * @param keyPosition
-         * @param keyLimit
-         * @return
          */
         private void remotePut(@NotNull final Bytes inBytes,
                                int hash2,
@@ -569,18 +551,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
-        /**
-         * todo doc
-         *
-         * @param keyBytes
-         * @param key
-         * @param value
-         * @param hash2
-         * @param replaceIfPresent
-         * @param identifier
-         * @param timestamp
-         * @return
-         */
         V put(Bytes keyBytes, K key, V value, int hash2, boolean replaceIfPresent,
               final byte identifier, final long timestamp) {
             lock();
@@ -680,9 +650,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * we sometime will reject put() and removes()
          * when comparing times stamps with remote systems
          *
-         * @param entry
+         * @param entry      the maps entry
          * @param timestamp  the time the entry was created or updated
-         * @param identifier
+         * @param identifier the unique identifier relating to this map
          * @return true if the entry should not be processed
          */
         private boolean shouldIgnore(@NotNull final NativeBytes entry, final long timestamp, final byte identifier) {
@@ -720,9 +690,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @param timestamp          the timestamp when the entry was put
          *                           <s>(this could be later if it was a remote put)</s>
          *                           this method is called only from usual put or acquire
-         *                           TODO Rob verify
-         * @param searchedHashLookup the hash lookup that was unsuccessfully searched for the key
-         *                           in the caller
+         * @param searchedHashLookup the hash lookup that used to find the entry based on the key
          * @return offset of the written entry in the Segment bytes
          * @see VanillaSharedHashMap.Segment#putEntry(net.openhft.lang.io.Bytes, Object, boolean)
          */
@@ -1028,7 +996,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         entry.position(keyPosition);
         destination.write(entry);
 
-
         String message = null;
         if (LOG.isDebugEnabled()) {
             if (isDeleted || valueLen == 0)
@@ -1036,7 +1003,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             else
                 message = "WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", put(key=" + ByteUtils.toCharSequence(entry).trim() + ",";
         }
-
 
         if (isDeleted || valueLen == 0)
             return;
@@ -1050,7 +1016,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         // writes the value
         entry.limit(entry.position() + valueLen);
         destination.write(entry);
-
 
         if (LOG.isDebugEnabled()) {
             LOG.debug(message + "value=" + ByteUtils.toCharSequence(entry).trim() + ")");
@@ -1068,7 +1033,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         final long valueLen = source.readStopBit();
         final long timeStamp = source.readStopBit();
         final byte id = source.readByte();
-
         final byte remoteIdentifier;
         final boolean isDeleted;
 
@@ -1080,12 +1044,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             remoteIdentifier = id;
         }
 
-
         final long keyPosition = source.position();
         final long keyLimit = source.position() + keyLen;
 
         source.limit(keyLimit);
-
         long hash = Hasher.hash(source);
 
         int segmentNum = hasher.getSegment(hash);
@@ -1099,12 +1061,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             segment(segmentNum).remoteRemove(source, segmentHash, timeStamp, remoteIdentifier);
             return;
         }
+
         String message = null;
-
-
-        if (LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled())
             message = "READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote-id=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
-        }
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
@@ -1218,8 +1178,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     notifier.notifyAll();
                 }
             }
-
-
         }
 
         /**

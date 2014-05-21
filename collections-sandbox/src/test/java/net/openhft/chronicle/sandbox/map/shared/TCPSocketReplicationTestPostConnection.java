@@ -38,10 +38,8 @@ import static org.junit.Assert.assertTrue;
 
 public class TCPSocketReplicationTestPostConnection {
 
-
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
-
 
     @Test
     public void testPostConnection() throws IOException, InterruptedException {
@@ -63,8 +61,6 @@ public class TCPSocketReplicationTestPostConnection {
 
     @After
     public void tearDown() {
-
-        // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
 
         for (final Closeable closeable : new Closeable[]{map1, map2}) {
             try {

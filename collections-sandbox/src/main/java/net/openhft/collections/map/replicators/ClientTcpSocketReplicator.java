@@ -46,33 +46,12 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 public class ClientTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientTcpSocketReplicator.class.getName());
-
-
-    public static class ClientPort {
-        final String host;
-        final int port;
-
-        public ClientPort(int port, String host) {
-            this.host = host;
-            this.port = port;
-        }
-
-        @Override
-        public String toString() {
-            return "host=" + host +
-                    ", port=" + port;
-
-        }
-    }
-
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
-
 
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
                                      @NotNull final SocketChannelEntryReader socketChannelEntryReader,
                                      @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
                                      @NotNull final ReplicatedSharedHashMap map) {
-
 
         newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true)).execute(new Runnable() {
 
@@ -191,6 +170,23 @@ public class ClientTcpSocketReplicator implements Closeable {
         final SocketChannel socketChannel = socketChannelRef.get();
         if (socketChannel != null)
             socketChannel.close();
+    }
+
+    public static class ClientPort {
+        final String host;
+        final int port;
+
+        public ClientPort(int port, String host) {
+            this.host = host;
+            this.port = port;
+        }
+
+        @Override
+        public String toString() {
+            return "host=" + host +
+                    ", port=" + port;
+
+        }
     }
 
 }
