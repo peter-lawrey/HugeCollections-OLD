@@ -25,13 +25,14 @@ import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.util.*;
-import java.util.logging.Logger;
 
 import static java.lang.Thread.currentThread;
 
@@ -50,9 +51,7 @@ public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         implements SharedHashMap<K, V> {
 
-    private static final Logger LOG =
-            Logger.getLogger(AbstractVanillaSharedHashMap.class.getName());
-
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractVanillaSharedHashMap.class);
 
     /**
      * Because DirectBitSet implementations couldn't find more

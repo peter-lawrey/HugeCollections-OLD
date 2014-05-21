@@ -25,6 +25,8 @@ import net.openhft.lang.io.*;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.File;
@@ -34,8 +36,6 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
 import static net.openhft.collections.ReplicatedSharedHashMap.EventType.REMOVE;
@@ -85,8 +85,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
-    private static final Logger LOG =
-            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
@@ -279,7 +278,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             try {
                 closeable.close();
             } catch (IOException e) {
-                LOG.log(Level.SEVERE, "", e);
+                LOG.error("", e);
             }
         }
 

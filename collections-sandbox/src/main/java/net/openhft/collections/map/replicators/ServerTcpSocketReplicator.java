@@ -22,6 +22,8 @@ import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -33,8 +35,6 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
@@ -52,7 +52,7 @@ import static net.openhft.collections.map.replicators.SocketChannelEntryReader.B
 public class ServerTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
-            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+            LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class.getName());
 
     private final ReplicatedSharedHashMap map;
     private final int port;
@@ -85,7 +85,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                 try {
                     process();
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.error("", e);
                 }
             }
 
@@ -199,7 +199,8 @@ public class ServerTcpSocketReplicator implements Closeable {
                 } catch (Exception e) {
 
                     //  if (!isClosed.get()) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.error("", e);
+
                     // Close channel and nudge selector
                     try {
                         key.channel().close();

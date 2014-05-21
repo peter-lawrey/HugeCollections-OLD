@@ -21,6 +21,8 @@ package net.openhft.collections.map.replicators;
 import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,8 +33,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 
@@ -45,7 +45,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  */
 public class ClientTcpSocketReplicator implements Closeable {
 
-    private static final Logger LOG = Logger.getLogger(ClientTcpSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(ClientTcpSocketReplicator.class.getName());
 
 
     public static class ClientPort {
@@ -163,7 +163,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                                 //  if (!isClosed.get()) {
                                 if (socketChannel.isOpen())
-                                    LOG.log(Level.SEVERE, "", e);
+                                    LOG.info("", e);
                                 // Close channel and nudge selector
                                 try {
                                     key.channel().close();
@@ -181,7 +181,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     // we wont log exceptions that occur due ot the socket being closed
                     final SocketChannel socketChannel = socketChannelRef.get();
                     if (socketChannel != null && socketChannel.isOpen()) {
-                        LOG.log(Level.SEVERE, "", e);
+                        LOG.info("", e);
                     }
                 }
             }
