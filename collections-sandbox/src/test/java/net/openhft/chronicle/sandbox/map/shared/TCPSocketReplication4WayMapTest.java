@@ -50,12 +50,13 @@ public class TCPSocketReplication4WayMapTest {
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final byte identifier,
             final int serverPort,
-            ClientPort... clientPorts) throws IOException {
+            final ClientPort... clientPorts) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(1000)
-                        .identifier(identifier).tcpReplication(new TcpReplication(serverPort, clientPorts));
+                        .identifier(identifier).
+                        tcpReplication(new TcpReplication(serverPort, clientPorts));
 
         return builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
