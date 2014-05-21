@@ -37,23 +37,23 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  */
 public class SocketChannelEntryWriter {
 
-    private final int entryMaxSize;
-    private final ByteBuffer byteBuffer;
-    private final ByteBufferBytes bytes;
+
+    private final ByteBuffer out;
+    private final ByteBufferBytes in;
     private final EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+    private int serializedEntrySize;
 
-    public SocketChannelEntryWriter(final int entryMaxSize,
-                                    final short maxNumberOfEntriesPerChunk,
-                                    @NotNull final EntryExternalizable externalizable) {
-        this.entryMaxSize = entryMaxSize;
-        byteBuffer = ByteBuffer.allocateDirect(entryMaxSize * maxNumberOfEntriesPerChunk);
-        bytes = new ByteBufferBytes(byteBuffer);
+    public SocketChannelEntryWriter(final int serializedEntrySize,
+                                    @NotNull final EntryExternalizable externalizable,
+                                    int packetSize) {
+        this.serializedEntrySize = serializedEntrySize;
+        out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
+        in = new ByteBufferBytes(out);
         this.externalizable = externalizable;
     }
-
 
     /**
      * writes all the entries that have changed, to the tcp socket
@@ -66,10 +66,10 @@ public class SocketChannelEntryWriter {
     void writeAll(@NotNull final SocketChannel socketChannel,
                   @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
-        final long start = bytes.position();
+        final long start = in.position();
 
         // if we still have some unwritten writer from last time
-        if (bytes.position() > 0)
+        if (in.position() > 0)
             writeBytes(socketChannel);
 
         //todo if writer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
@@ -77,10 +77,10 @@ public class SocketChannelEntryWriter {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-            if (!wasDataRead && bytes.position() == start)
+            if (!wasDataRead && in.position() == start)
                 return;
 
-            if (bytes.remaining() > entryMaxSize && (wasDataRead || bytes.position() == start))
+            if (in.remaining() > serializedEntrySize && (wasDataRead || in.position() == start))
                 continue;
 
             writeBytes(socketChannel);
@@ -93,22 +93,22 @@ public class SocketChannelEntryWriter {
 
     private void writeBytes(@NotNull final SocketChannel socketChannel) throws IOException {
 
-        byteBuffer.limit((int) bytes.position());
+        out.limit((int) in.position());
 
-        final int write = socketChannel.write(byteBuffer);
+        final int write = socketChannel.write(out);
 
         if (LOG.isDebugEnabled())
             LOG.debug("bytes-written=" + write);
 
-        if (byteBuffer.remaining() == 0) {
-            byteBuffer.clear();
-            bytes.clear();
+        if (out.remaining() == 0) {
+            out.clear();
+            in.clear();
         } else {
-            byteBuffer.compact();
-            byteBuffer.flip();
-            bytes.limit(bytes.capacity());
-            bytes.position(byteBuffer.limit());
-            byteBuffer.limit(byteBuffer.capacity());
+            out.compact();
+            out.flip();
+            in.limit(in.capacity());
+            in.position(out.limit());
+            out.limit(out.capacity());
         }
     }
 
@@ -123,19 +123,19 @@ public class SocketChannelEntryWriter {
          */
         public boolean onEntry(final NativeBytes entry) {
 
-            bytes.skip(2);
-            final long start = (int) bytes.position();
-            externalizable.writeExternalEntry(entry, bytes);
+            in.skip(2);
+            final long start = (int) in.position();
+            externalizable.writeExternalEntry(entry, in);
 
-            if (bytes.position() - start == 0) {
-                bytes.position(bytes.position() - 2);
+            if (in.position() - start == 0) {
+                in.position(in.position() - 2);
                 return false;
             }
 
             // write the length of the entry, just before the start, so when we read it back
             // we read the length of the entry first and hence know how many preceding writer to read
-            final int entrySize = (int) (bytes.position() - start);
-            bytes.writeUnsignedShort(start - 2L, entrySize);
+            final int entrySize = (int) (in.position() - start);
+            in.writeUnsignedShort(start - 2L, entrySize);
 
             return true;
         }
@@ -158,28 +158,36 @@ public class SocketChannelEntryWriter {
         }
     }
 
+    /**
+     * sends the identity and timestamp of this node to a remote node
+     *
+     * @param socketChannel          the socketChannel the message will be sent on
+     * @param timeStampOfLastMessage the last timestamp we received a message from that node
+     * @param localIdentifier        the current nodes identifier
+     * @throws IOException if it failed to send
+     */
     public void sendBootstrap(@NotNull final SocketChannel socketChannel,
                               final long timeStampOfLastMessage,
                               final int localIdentifier) throws IOException {
-        bytes.clear();
-        byteBuffer.clear();
+        in.clear();
+        out.clear();
 
         // send a welcome message to the remote server to ask for data for our localIdentifier
         // and any missed messages
-        bytes.writeByte(localIdentifier);
-        bytes.writeLong(timeStampOfLastMessage);
-        byteBuffer.limit((int) bytes.position());
+        in.writeByte(localIdentifier);
+        in.writeLong(timeStampOfLastMessage);
+        out.limit((int) in.position());
 
-        socketChannel.write(byteBuffer);
+        socketChannel.write(out);
 
-        if (byteBuffer.remaining() == 0) {
-            byteBuffer.clear();
-            bytes.clear();
+        if (out.remaining() == 0) {
+            out.clear();
+            in.clear();
         } else {
-            byteBuffer.compact();
-            byteBuffer.flip();
-            bytes.limit(bytes.capacity());
-            byteBuffer.limit(byteBuffer.capacity());
+            out.compact();
+            out.flip();
+            in.limit(in.capacity());
+            out.limit(out.capacity());
         }
 
     }

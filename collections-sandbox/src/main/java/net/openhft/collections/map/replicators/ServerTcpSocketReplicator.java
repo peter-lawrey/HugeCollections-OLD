@@ -60,7 +60,7 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final SocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
-    private final int maxEntrySize;
+    private final int serializedEntrySize;
     private final AtomicBoolean isClosed = new AtomicBoolean();
     private short packetSize;
 
@@ -68,7 +68,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                                      @NotNull final EntryExternalizable externalizable,
                                      int port,
                                      @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
-                                     final short packetSize) throws IOException {
+                                     final short packetSize, int serializedEntrySize) throws IOException {
 
         this.externalizable = externalizable;
         this.map = map;
@@ -76,7 +76,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         this.serverChannel = ServerSocketChannel.open();
         this.localIdentifier = map.getIdentifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
-        this.maxEntrySize = map.maxEntrySize();
+        this.serializedEntrySize = serializedEntrySize;
         this.packetSize = packetSize;
 
         // out bound
@@ -166,7 +166,8 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(maxEntrySize, this.externalizable, packetSize);
+
+                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
                     final Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(channel);
 
                     final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);

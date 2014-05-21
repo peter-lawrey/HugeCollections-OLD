@@ -21,10 +21,6 @@ package net.openhft.chronicle.sandbox.map.shared;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
-import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
-import net.openhft.collections.map.replicators.ServerTcpSocketReplicator;
-import net.openhft.collections.map.replicators.SocketChannelEntryReader;
-import net.openhft.collections.map.replicators.SocketChannelEntryWriter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,6 +30,7 @@ import java.io.IOException;
 import java.util.TreeMap;
 
 import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
+import static net.openhft.collections.VanillaSharedReplicatedHashMapBuilder.TcpReplication;
 import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -45,52 +42,29 @@ import static org.junit.Assert.assertTrue;
  */
 public class TCPSocketReplication4WayMapTest {
 
-
-    public static final short PACKET_SIZE = 1024 * 8;
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final byte identifier,
             final int serverPort,
-            ClientPort... clientSocketChannelProviderMaps) throws IOException {
+            ClientPort... clientPorts) throws IOException {
 
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(1000)
-                        .identifier(identifier);
+                        .identifier(identifier).tcpReplication(new TcpReplication(serverPort, clientPorts));
 
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result =
-                builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        return builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
-        final int adjustedEntrySize = result.maxEntrySize() + 128;
-        final short maxNumberOfEntriesPerChunk = ServerTcpSocketReplicator.toMaxNumberOfEntriesPerChunk(1024 * 8, adjustedEntrySize);
-
-        for (ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
-            final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
-            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, result, PACKET_SIZE);
-            ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
-            result.addCloseable(clientTcpSocketReplicator);
-        }
-
-        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
-
-        final ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
-                result,
-                result,
-                serverPort,
-                socketChannelEntryWriter, PACKET_SIZE);
-
-        result.addCloseable(serverTcpSocketReplicator);
-        return result;
     }
 
 
     @Before
     public void setup() throws IOException {
+
         map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
         map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
         map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"));

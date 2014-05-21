@@ -40,7 +40,7 @@ public class SocketChannelEntryReader {
     private ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
-    private final int maxEntrySize;
+    private final int serializedEntrySize;
     private final ByteBuffer in;
     private final ByteBufferBytes out;
 
@@ -48,20 +48,18 @@ public class SocketChannelEntryReader {
     private int sizeOfNextEntry = Integer.MIN_VALUE;
 
     /**
-     * @param maxEntrySize   the maximum size of an entry include the meta data
+     * @param serializedEntrySize   the maximum size of an entry include the meta data
      * @param externalizable supports reading and writing serialize entries
      * @param packetSize     the estimated size of a tcp/ip packet
      */
-    public SocketChannelEntryReader(final int maxEntrySize,
+    public SocketChannelEntryReader(final int serializedEntrySize,
                                     @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                                     final short packetSize) {
-        this.maxEntrySize = maxEntrySize;
+        this.serializedEntrySize = serializedEntrySize;
         in = ByteBuffer.allocate(packetSize);
         this.externalizable = externalizable;
         out = new ByteBufferBytes(in);
         out.limit(0);
-
-        // read  remoteIdentifier and time stamp
         in.clear();
     }
 
@@ -93,7 +91,7 @@ public class SocketChannelEntryReader {
             }
 
             if (sizeOfNextEntry <= 0)
-                throw new IllegalStateException("invalid entrySize=" + sizeOfNextEntry);
+                throw new IllegalStateException("invalid serializedEntrySize=" + sizeOfNextEntry);
 
             if (out.remaining() < sizeOfNextEntry) {
                 socketChannel.read(in);
@@ -121,10 +119,10 @@ public class SocketChannelEntryReader {
      */
     private void compact() {
 
-        // the maxEntrySize used here may not be the maximum size of the entry in its serialized form
+        // the serializedEntrySize used here may not be the maximum size of the entry in its serialized form
         // however, its only use as an indication that the buffer is becoming full and should be compacted
         // the buffer can be compacted at any time
-        if (in.position() == 0 || in.remaining() > maxEntrySize)
+        if (in.position() == 0 || in.remaining() > serializedEntrySize)
             return;
 
         in.limit(in.position());

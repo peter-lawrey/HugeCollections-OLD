@@ -90,12 +90,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-    private final Object modificationIteratorNotifier;
-    private final Set<EventType> modificationIteratorWatchList;
-    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
 
-    // todo allow for dynamic creation of modificationIterators
-    private AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
+    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+    private final AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
 
     public VanillaSharedReplicatedHashMap(@NotNull VanillaSharedReplicatedHashMapBuilder builder,
                                           @NotNull File file,
@@ -106,8 +103,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         this.canReplicate = builder.canReplicate();
         this.timeProvider = builder.timeProvider();
         this.localIdentifier = builder.identifier();
-        this.modificationIteratorNotifier = builder.notifier();
-        this.modificationIteratorWatchList = builder.watchList();
 
         createMappedStoreAndSegments(file);
     }
@@ -120,9 +115,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public VanillaSharedReplicatedHashMapBuilder builder() {
-        // todo remove the builder from within the map, the builder should be external is there are a number of ways
-        //    that you can build a  VanillaSharedReplicatedHashMapBuilder for example UDP replication, TCP replication
-        throw new UnsupportedOperationException();
+        return builder(new VanillaSharedReplicatedHashMapBuilder());
+    }
+
+    <T extends SharedHashMapBuilder> T builder(T builder) {
+        super.builder(builder);
+
+        // todo add missing fields
+        builder().canReplicate(canReplicate);
+
+        return builder;
     }
 
 
@@ -130,12 +132,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return Segment.class;
     }
 
-    @Override
-    public int maxEntrySize() {
-
-        // todo
-        return super.maxEntrySize() + 128;  // the 128 for the meta data
-    }
 
     private long modIterBitSetSizeInBytes() {
         return align64(bitsPerSegmentInModIterBitSet() * segments.length / 8);
@@ -255,8 +251,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     modIterBitSetSizeInBytes());
 
             final ModificationIterator newEventListener = new ModificationIterator(
-                    modificationIteratorNotifier,
-                    modificationIteratorWatchList,
+                    null,
+                    EnumSet.allOf(EventType.class),
                     mappedStore.bytes(), eventListener);
 
             modificationIterators.set(remoteIdentifier, newEventListener);
@@ -1173,7 +1169,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                                     @NotNull final DirectBytes bytes,
                                     @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener) {
             this.notifier = notifier;
-
             this.watchList = EnumSet.copyOf(watchList);
             this.nextListener = nextListener;
             long bitsPerSegment = bitsPerSegmentInModIterBitSet();

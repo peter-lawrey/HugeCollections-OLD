@@ -81,9 +81,7 @@ public class TCPSocketReplicationTest3way {
     @Test
     public void test3() throws IOException, InterruptedException {
 
-
         map3.put(5, "EXAMPLE-2");
-
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);

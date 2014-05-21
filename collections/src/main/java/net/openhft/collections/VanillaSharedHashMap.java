@@ -156,14 +156,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
 
-    /**
-     * @return the maximum size that an entry can be, this includes over sized entries
-     */
-    int maxEntrySize() {
-        return entrySize * bufferAllocationFactor;
-    }
-
-
     Segment createSegment(NativeBytes bytes, int index) {
         return new Segment(bytes, index);
     }
@@ -175,25 +167,29 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     @Override
     public SharedHashMapBuilder builder() {
+        return builder(new SharedHashMapBuilder());
+    }
+
+   <T extends SharedHashMapBuilder> T builder(T builder) {
         // TODO update with new fields
-        return new SharedHashMapBuilder()
-                .actualSegments(segments.length)
-                .actualEntriesPerSegment(entriesPerSegment)
-                .entries((long) segments.length * entriesPerSegment / 2)
-                .entrySize(entrySize)
-                .errorListener(errorListener)
-                .generatedKeyType(generatedKeyType)
-                .generatedValueType(generatedValueType)
-                .lockTimeOutMS(lockTimeOutNS / 1000000)
-                .minSegments(segments.length)
-                .actualSegments(segments.length)
-                .actualEntriesPerSegment(entriesPerSegment)
-                .putReturnsNull(putReturnsNull)
-                .removeReturnsNull(removeReturnsNull)
-                .replicas(replicas)
-                .transactional(false)
-                .metaDataBytes(metaDataBytes)
-                .eventListener(eventListener);
+        builder.actualSegments(segments.length);
+        builder.actualEntriesPerSegment(entriesPerSegment);
+        builder.entries((long) segments.length * entriesPerSegment / 2);
+        builder.entrySize(entrySize);
+        builder.errorListener(errorListener);
+        builder.generatedKeyType(generatedKeyType);
+        builder.generatedValueType(generatedValueType);
+        builder.lockTimeOutMS(lockTimeOutNS / 1000000);
+        builder.minSegments(segments.length);
+        builder.actualSegments(segments.length);
+        builder.actualEntriesPerSegment(entriesPerSegment);
+        builder.putReturnsNull(putReturnsNull);
+        builder.removeReturnsNull(removeReturnsNull);
+        builder.replicas(replicas);
+        builder.transactional(false);
+        builder.metaDataBytes(metaDataBytes);
+        builder.eventListener(eventListener);
+        return builder;
     }
 
     /**

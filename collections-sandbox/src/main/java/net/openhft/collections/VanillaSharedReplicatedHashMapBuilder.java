@@ -18,17 +18,16 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
+import net.openhft.collections.map.replicators.ServerTcpSocketReplicator;
+import net.openhft.collections.map.replicators.SocketChannelEntryReader;
+import net.openhft.collections.map.replicators.SocketChannelEntryWriter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Set;
 
-import static net.openhft.collections.ReplicatedSharedHashMap.EventType;
+import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
 
 
 /**
@@ -40,11 +39,9 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private byte identifier = Byte.MIN_VALUE;
     private boolean canReplicate = true;
-    private EnumSet<EventType> watchList = EnumSet.allOf(EventType.class);
-    private
-    @Nullable
-    Object notifier = null;
-    private byte[] externalIdentifiers;
+
+    public VanillaSharedReplicatedHashMapBuilder() {
+    }
 
     public boolean canReplicate() {
         return canReplicate;
@@ -54,6 +51,25 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         this.canReplicate = canReplicate;
         return this;
     }
+
+    public static class TcpReplication {
+
+        private final int serverPort;
+        private final ClientPort[] clientSocketChannelProviderMaps;
+        public short packetSize = 1024 * 8;
+
+        public TcpReplication(int serverPort, ClientPort... clientSocketChannelProviderMaps) {
+            this.serverPort = serverPort;
+            this.clientSocketChannelProviderMaps = clientSocketChannelProviderMaps;
+        }
+
+        public void setPacketSize(short packetSize) {
+            this.packetSize = packetSize;
+        }
+    }
+
+
+    private TcpReplication tcpReplication;
 
     int alignedEntrySize() {
         return entryAndValueAlignment().alignSize(entrySize() + META_BYTES_SIZE);
@@ -79,66 +95,32 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         }
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
-        return new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+        final VanillaSharedReplicatedHashMap<K, V> result = new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+
+        if (tcpReplication != null)
+            applyTcpReplication(result);
+
+        return result;
     }
 
-    /**
-     * Returns a set of event types which should be replicated.
-     * <p/>
-     * <p>Default watch list is all possible event types
-     * (all {@link ReplicatedSharedHashMap.EventType} constants).
-     * <p/>
-     * <p>Ignored if {@link #canReplicate()} is {@code false}.
-     *
-     * @return a set of event types which should be replicated
-     */
-    public Set<EventType> watchList() {
-        return Collections.unmodifiableSet(watchList);
-    }
+    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result) throws IOException {
 
-    /**
-     * Specifies the list of event types to replicate.
-     * <p/>
-     * <p>{@code first} event type and {@code restWatchList} are separated to forbid
-     * providing an empty watch list.
-     *
-     * @return this builder object back
-     */
-    public VanillaSharedReplicatedHashMapBuilder watchList(
-            @NotNull EventType first, @NotNull EventType... restWatchList) {
-        watchList = EnumSet.of(first, restWatchList);
-        return this;
-    }
+        for (ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
+            final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
+            ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
+            result.addCloseable(clientTcpSocketReplicator);
+        }
 
-    /**
-     * Returns the object which should be notified on replication events.
-     * <p/>
-     * <p>I. e. <pre>{@code
-     * synchronized (notifier) {
-     *     notifier.notifyAll();
-     * }}</pre>
-     * is called on watched replication events (see {@link #watchList()}).
-     * <p/>
-     * <p>By default returns {@code null} - no object should be notified.
-     *
-     * @return the object which should be notified on replication events
-     */
-    @Nullable
-    public Object notifier() {
-        return notifier;
-    }
+        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
 
-    /**
-     * Specifies the object which should be notified on watched replication events (see
-     * {@link #notifier()} how).
-     *
-     * @param notifier the object which should be notified on watched replication events,
-     *                 or {@code null} if no object should be notified
-     * @return this builder object back
-     */
-    public VanillaSharedReplicatedHashMapBuilder notifier(@Nullable Object notifier) {
-        this.notifier = notifier;
-        return this;
+        final ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
+                result,
+                result,
+                tcpReplication.serverPort,
+                socketChannelEntryWriter, tcpReplication.packetSize, entrySize());
+
+        result.addCloseable(serverTcpSocketReplicator);
     }
 
 
@@ -326,5 +308,12 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return this;
     }
 
+    public VanillaSharedReplicatedHashMapBuilder tcpReplication(TcpReplication tcpReplication) {
+        this.tcpReplication = tcpReplication;
+        return this;
+    }
 
+    public TcpReplication tcpReplication() {
+        return tcpReplication;
+    }
 }
