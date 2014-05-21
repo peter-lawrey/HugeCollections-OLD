@@ -18,7 +18,6 @@
 
 package net.openhft.collections.map.replicators;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
@@ -30,6 +29,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+
 /**
  * @author Rob Austin.
  */
@@ -38,15 +40,14 @@ public class SocketChannelEntryWriter {
     private final int entryMaxSize;
     private final ByteBuffer byteBuffer;
     private final ByteBufferBytes bytes;
-    private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+    private final EntryExternalizable externalizable;
     private final EntryCallback entryCallback = new EntryCallback();
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
-
     public SocketChannelEntryWriter(final int entryMaxSize,
                                     final short maxNumberOfEntriesPerChunk,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                                    @NotNull final EntryExternalizable externalizable) {
         this.entryMaxSize = entryMaxSize;
         byteBuffer = ByteBuffer.allocateDirect(entryMaxSize * maxNumberOfEntriesPerChunk);
         bytes = new ByteBufferBytes(byteBuffer);
@@ -63,7 +64,7 @@ public class SocketChannelEntryWriter {
      * @throws java.io.IOException
      */
     void writeAll(@NotNull final SocketChannel socketChannel,
-                  final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException, IOException {
+                  @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
         final long start = bytes.position();
 
@@ -90,7 +91,7 @@ public class SocketChannelEntryWriter {
 
     }
 
-    private void writeBytes(SocketChannel socketChannel) throws IOException {
+    private void writeBytes(@NotNull final SocketChannel socketChannel) throws IOException {
 
         byteBuffer.limit((int) bytes.position());
 
@@ -99,7 +100,6 @@ public class SocketChannelEntryWriter {
         if (LOG.isDebugEnabled())
             LOG.debug("bytes-written=" + write);
 
-        // clear the writer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this writer
         if (byteBuffer.remaining() == 0) {
             byteBuffer.clear();
             bytes.clear();

@@ -36,7 +36,6 @@ import java.nio.channels.SocketChannel;
  */
 public class SocketChannelEntryReader {
 
-
     public static final int SIZE_OF_UNSIGNED_SHORT = 4;
     private ReplicatedSharedHashMap.EntryExternalizable externalizable;
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
@@ -45,15 +44,18 @@ public class SocketChannelEntryReader {
     private final ByteBuffer in;
     private final ByteBufferBytes out;
 
-    private long sizeOfNextEntry = Long.MIN_VALUE;
+    // we use Integer.MIN_VALUE as N/A
+    private int sizeOfNextEntry = Integer.MIN_VALUE;
 
     /**
      * @param maxEntrySize   the maximum size of an entry include the meta data
      * @param externalizable supports reading and writing serialize entries
      * @param packetSize     the estimated size of a tcp/ip packet
      */
-    public SocketChannelEntryReader(int maxEntrySize, ReplicatedSharedHashMap.EntryExternalizable externalizable, short packetSize) {
-        this.maxEntrySize = maxEntrySize + SIZE_OF_UNSIGNED_SHORT;
+    public SocketChannelEntryReader(final int maxEntrySize,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    final short packetSize) {
+        this.maxEntrySize = maxEntrySize;
         in = ByteBuffer.allocate(packetSize);
         this.externalizable = externalizable;
         out = new ByteBufferBytes(in);
@@ -79,7 +81,7 @@ public class SocketChannelEntryReader {
             out.limit(in.position());
 
             // its set to MIN_VALUE when it should be read again
-            if (sizeOfNextEntry == Long.MIN_VALUE) {
+            if (sizeOfNextEntry == Integer.MIN_VALUE) {
                 if (out.remaining() < SIZE_OF_UNSIGNED_SHORT) {
                     socketChannel.read(in);
                     out.limit(in.position());
@@ -106,18 +108,23 @@ public class SocketChannelEntryReader {
 
             // skip onto the next entry
             out.position(limit);
-
             compact();
 
             // to allow the sizeOfNextEntry to be read the next time around
-            sizeOfNextEntry = Long.MIN_VALUE;
+            sizeOfNextEntry = Integer.MIN_VALUE;
         }
 
     }
 
+    /**
+     * compacts the buffer and updates the {@code in} and  {@code out} accordingly
+     */
     private void compact() {
 
-        if (in.position() == 0 || in.remaining() > maxEntrySize + SIZE_OF_UNSIGNED_SHORT)
+        // the maxEntrySize used here may not be the maximum size of the entry in its serialized form
+        // however, its only use as an indication that the buffer is becoming full and should be compacted
+        // the buffer can be compacted at any time
+        if (in.position() == 0 || in.remaining() > maxEntrySize)
             return;
 
         in.limit(in.position());
@@ -137,7 +144,7 @@ public class SocketChannelEntryReader {
         }
     }
 
-    Bootstrap readBootstrap(SocketChannel channel) throws IOException {
+    Bootstrap readBootstrap(@NotNull final SocketChannel channel) throws IOException {
 
         // read from the channel the timestamp and identifier
         while (out.remaining() < 9) {
