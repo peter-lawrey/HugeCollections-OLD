@@ -62,11 +62,13 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final EntryExternalizable externalizable;
     private final int maxEntrySize;
     private final AtomicBoolean isClosed = new AtomicBoolean();
+    private short packetSize;
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
                                      int port,
-                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter) throws IOException {
+                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
+                                     final short packetSize) throws IOException {
 
         this.externalizable = externalizable;
         this.map = map;
@@ -75,7 +77,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         this.localIdentifier = map.getIdentifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
         this.maxEntrySize = map.maxEntrySize();
-
+        this.packetSize = packetSize;
 
         // out bound
         newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
@@ -83,6 +85,7 @@ public class ServerTcpSocketReplicator implements Closeable {
             @Override
             public void run() {
                 try {
+                    ServerTcpSocketReplicator.this.packetSize = packetSize;
                     process();
                 } catch (Exception e) {
                     LOG.error("", e);
@@ -163,7 +166,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(maxEntrySize, this.externalizable);
+                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(maxEntrySize, this.externalizable, packetSize);
                     final Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(channel);
 
                     final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
@@ -181,8 +184,8 @@ public class ServerTcpSocketReplicator implements Closeable {
 
                     LOG.info("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
 
-                    // process any bytes.remaining(), this can occur because reading socket for the bootstrap,
-                    // may read more than just 9 bytes
+                    // process any writer.remaining(), this can occur because reading socket for the bootstrap,
+                    // may read more than just 9 writer
                     socketChannelEntryReader.readAll(channel);
                 }
                 try {

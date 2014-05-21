@@ -223,15 +223,17 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * set the bit related to {@code segment} and {@code pos}
          *
          * @param segmentIndex the segment relating to the bit to set
-         * @param pos     the position relating to the bit to set
+         * @param pos          the position relating to the bit to set
          */
         void set(int segmentIndex, int pos);
 
     }
 
 
+    /**
+     * supports reading and writing serialize entries
+     */
     interface EntryExternalizable {
-
 
         /**
          * The map implements the {@link #writeExternalEntry(NativeBytes entry, Bytes destination)} method to save

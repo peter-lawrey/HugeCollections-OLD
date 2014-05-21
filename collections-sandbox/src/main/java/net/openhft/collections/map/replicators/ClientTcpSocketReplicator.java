@@ -113,8 +113,8 @@ public class ClientTcpSocketReplicator implements Closeable {
                     final Selector selector = Selector.open();
                     socketChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-                    // process any bytes.remaining(), this can occur because reading socket for the bootstrap,
-                    // may read more than just 9 bytes
+                    // process any writer.remaining(), this can occur because reading socket for the bootstrap,
+                    // may read more than just 9 writer
                     socketChannelEntryReader.readAll(socketChannel);
 
                     while (socketChannel.isOpen()) {

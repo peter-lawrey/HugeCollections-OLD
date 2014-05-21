@@ -46,6 +46,7 @@ import static org.junit.Assert.assertTrue;
 public class TCPSocketReplication4WayMapTest {
 
 
+    public static final short PACKET_SIZE = 1024 * 8;
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
     private SharedHashMap<Integer, CharSequence> map3;
@@ -70,7 +71,7 @@ public class TCPSocketReplication4WayMapTest {
 
         for (ClientPort clientSocketChannelProvider : clientSocketChannelProviderMaps) {
             final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(adjustedEntrySize, maxNumberOfEntriesPerChunk, result);
-            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, result);
+            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(adjustedEntrySize, result, PACKET_SIZE);
             ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
             result.addCloseable(clientTcpSocketReplicator);
         }
@@ -81,7 +82,7 @@ public class TCPSocketReplication4WayMapTest {
                 result,
                 result,
                 serverPort,
-                socketChannelEntryWriter);
+                socketChannelEntryWriter, PACKET_SIZE);
 
         result.addCloseable(serverTcpSocketReplicator);
         return result;

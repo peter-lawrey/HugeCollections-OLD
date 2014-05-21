@@ -67,11 +67,11 @@ public class SocketChannelEntryWriter {
 
         final long start = bytes.position();
 
-        // if we still have some unwritten bytes from last time
+        // if we still have some unwritten writer from last time
         if (bytes.position() > 0)
             writeBytes(socketChannel);
 
-        //todo if bytes.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
+        //todo if writer.position() ==0 it would make sense to call a blocking version of modificationIterator.nextEntry(entryCallback);
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
@@ -84,7 +84,7 @@ public class SocketChannelEntryWriter {
 
             writeBytes(socketChannel);
 
-            // we've filled up one bytes lets give another channel a chance to send data
+            // we've filled up one writer lets give another channel a chance to send data
             return;
         }
 
@@ -99,7 +99,7 @@ public class SocketChannelEntryWriter {
         if (LOG.isDebugEnabled())
             LOG.debug("bytes-written=" + write);
 
-        // clear the bytes for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this bytes
+        // clear the writer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this writer
         if (byteBuffer.remaining() == 0) {
             byteBuffer.clear();
             bytes.clear();
@@ -133,7 +133,7 @@ public class SocketChannelEntryWriter {
             }
 
             // write the length of the entry, just before the start, so when we read it back
-            // we read the length of the entry first and hence know how many preceding bytes to read
+            // we read the length of the entry first and hence know how many preceding writer to read
             final int entrySize = (int) (bytes.position() - start);
             bytes.writeUnsignedShort(start - 2L, entrySize);
 
