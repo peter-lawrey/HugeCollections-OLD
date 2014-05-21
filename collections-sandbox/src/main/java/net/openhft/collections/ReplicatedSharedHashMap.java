@@ -123,7 +123,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      */
     // todo HCOLL-77 : map replication : back fill missed updates on startup
-    long lastModification();
+    public long getLastModificationTime(byte identifier);
 
 
 

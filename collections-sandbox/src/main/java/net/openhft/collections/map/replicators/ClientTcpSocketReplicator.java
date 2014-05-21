@@ -76,7 +76,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                     socketChannelRef.set(socketChannel);
                     socketChannel.socket().setReceiveBufferSize(8 * 1024);
 
-                    socketChannelEntryWriter.sendBootstrap(socketChannel, map.lastModification(), map.getIdentifier());
+                    socketChannelEntryWriter.sendBootstrap(socketChannel, map.getLastModificationTime(map.getIdentifier()), map.getIdentifier());
                     final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);

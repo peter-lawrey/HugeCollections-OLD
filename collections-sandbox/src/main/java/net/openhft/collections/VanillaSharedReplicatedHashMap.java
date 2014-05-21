@@ -86,6 +86,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+    public static final int LASTUPDATED_HEADER_SIZE = (127 * 8);
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
@@ -93,6 +94,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
+    private Bytes identifierUpdatedBytes;
 
     public VanillaSharedReplicatedHashMap(@NotNull VanillaSharedReplicatedHashMapBuilder builder,
                                           @NotNull File file,
@@ -129,6 +131,35 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     int multiMapsPerSegment() {
         return canReplicate ? 2 : 1;
     }
+
+    int getHeaderSize() {
+        final int headerSize = super.getHeaderSize();
+        return canReplicate ? headerSize + LASTUPDATED_HEADER_SIZE : headerSize;
+    }
+
+    void setLastModificationTime(byte identifier, long timestamp) {
+        final int offset = identifier * 8;
+        identifierUpdatedBytes.writeLong(super.getHeaderSize() + offset, timestamp);
+    }
+
+
+    public long getLastModificationTime(byte identifier) {
+        final int offset = identifier * 8;
+        return identifierUpdatedBytes.readLong(offset);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    void onHeaderCreated(Bytes headerBytes) {
+        final int len = getHeaderSize() - super.getHeaderSize();
+        if (len == 0)
+            return;
+        this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
+    }
+
 
     /**
      * {@inheritDoc}
@@ -244,6 +275,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
     }
 
+
     public void addCloseable(Closeable closeable) {
         closeables.add(closeable);
     }
@@ -261,11 +293,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     }
 
-    // todo HCOLL-77 : map replication : back fill missed updates on startup
-    @Override
-    public long lastModification() {
-        return 0;
-    }
 
     /**
      * {@inheritDoc}
@@ -970,8 +997,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         final long keyLimit = entry.position();
         final long timeStamp = entry.readLong();
 
-        final byte identifier = entry.readByte();
-        if (identifier != localIdentifier) {
+        final byte remoteIdentifier = entry.readByte();
+        if (remoteIdentifier != localIdentifier) {
             return;
         }
 
@@ -985,11 +1012,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         destination.writeStopBit(valueLen);
         destination.writeStopBit(timeStamp);
 
-        // we store the isDeleted flag in the identifier ( when the identifier is negative is it is deleted )
+
+        // we store the isDeleted flag in the remoteIdentifer ( when the remoteIdentifer is negative is it is deleted )
         if (isDeleted)
-            destination.writeByte(-identifier);
+            destination.writeByte(-remoteIdentifier);
         else
-            destination.writeByte(identifier);
+            destination.writeByte(remoteIdentifier);
 
         // write the key
         entry.limit(keyLimit);
@@ -1044,6 +1072,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             remoteIdentifier = id;
         }
 
+        setLastModificationTime(remoteIdentifier, timeStamp);
         final long keyPosition = source.position();
         final long keyLimit = source.position() + keyLen;
 

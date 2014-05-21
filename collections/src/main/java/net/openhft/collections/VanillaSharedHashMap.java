@@ -149,7 +149,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
                 sizeInBytes());
 
-        long offset = SharedHashMapBuilder.HEADER_SIZE;
+        onHeaderCreated(ms.bytes(0, getHeaderSize()));
+
+        long offset = getHeaderSize();
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
             this.segments[i] = createSegment(ms.bytes(offset, segmentSize), i);
@@ -158,6 +160,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return offset;
     }
 
+    /**
+     * called when the header is created
+     *
+     * @param headerBytes the bytes that make up the header
+     */
+    void onHeaderCreated(Bytes headerBytes) {
+
+    }
+
+    int getHeaderSize() {
+        return SharedHashMapBuilder.HEADER_SIZE;
+    }
 
     Segment createSegment(NativeBytes bytes, int index) {
         return new Segment(bytes, index);
@@ -190,7 +204,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     long sizeInBytes() {
-        return SharedHashMapBuilder.HEADER_SIZE +
+        return getHeaderSize() +
                 segments.length * segmentSize();
     }
 
