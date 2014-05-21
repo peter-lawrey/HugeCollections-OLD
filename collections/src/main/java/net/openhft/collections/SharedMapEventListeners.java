@@ -17,8 +17,8 @@
 package net.openhft.collections;
 
 import net.openhft.lang.io.Bytes;
-
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class SharedMapEventListeners {
 
@@ -34,7 +34,7 @@ public final class SharedMapEventListeners {
     }
 
     private static final SharedMapEventListener BYTES_LOGGING = new SharedMapEventListener() {
-        public final Logger LOGGER = Logger.getLogger(getClass().getName());
+        public final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
         @Override
         public Object onGetMissing(SharedHashMap map, Bytes keyBytes,
@@ -91,31 +91,31 @@ public final class SharedMapEventListeners {
     }
 
     private static final SharedMapEventListener KEY_VALUE_LOGGING = new SharedMapEventListener() {
-        public final Logger LOGGER = Logger.getLogger(getClass().getName());
+        public final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
         @Override
         public Object onGetMissing(SharedHashMap map, Bytes keyBytes,
                                    Object key, Object usingValue) {
-            LOGGER.info(map.file() + " missed " + key);
+            LOGGER.info("{} missed {}",map.file(), key);
             return null;
         }
 
         @Override
         public void onGetFound(SharedHashMap map, Bytes entry, int metaDataBytes,
                                Object key, Object value) {
-            LOGGER.info(map.file() + " get " + key + " => " + value);
+            LOGGER.info("{} get {} => {}", map.file(), key,  value);
         }
 
         @Override
         public void onPut(SharedHashMap map, Bytes entry, int metaDataBytes, boolean added,
                           Object key, Object value, long pos, SharedSegment segment) {
-            LOGGER.info(map.file() + " put " + key + " = " + value);
+            LOGGER.info("{} put {} => {}", map.file(), key,  value);
         }
 
         @Override
         public void onRemove(SharedHashMap map, Bytes entry, int metaDataBytes,
                              Object key, Object value, int pos, SharedSegment segment) {
-            LOGGER.info(map.file() + " remove " + key + " was " + value);
+            LOGGER.info("{} remove {} was {}", map.file(), key,  value);
         }
     };
 

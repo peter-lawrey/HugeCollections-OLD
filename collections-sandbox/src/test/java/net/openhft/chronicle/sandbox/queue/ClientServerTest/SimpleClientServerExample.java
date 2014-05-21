@@ -18,19 +18,21 @@
 
 package net.openhft.chronicle.sandbox.queue.ClientServerTest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
-import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
  */
 public class SimpleClientServerExample {
 
-    private static Logger LOG = Logger.getLogger(SimpleClientServerExample.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(SimpleClientServerExample.class);
 
 
     public static void main(String... args) throws InterruptedException {

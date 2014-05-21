@@ -20,9 +20,8 @@ import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
 import net.openhft.lang.io.DirectBytes;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created by Rob Austin
@@ -32,7 +31,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
 
     public static final int ALIGN = 4;
     public static final int LOCK_SIZE = 8;
-    private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(SocketWriter.class);
     // intentionally not volatile, as we are carefully ensuring that the memory barriers are controlled below by other objects
     private final int capacity;
     private final int valueMaxSize;
@@ -80,7 +79,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
                 storeSlice.unlockLong(offset);
             }
         } catch (InterruptedException e) {
-            LOG.log(Level.SEVERE, "", e);
+            LOG.warn("", e);
             return null;
         }
     }
@@ -112,7 +111,7 @@ public class SharedLocalDataLocator<E> implements DataLocator<E>, OffsetProvider
                 storeSlice.unlockLong(offset);
             }
         } catch (InterruptedException e) {
-            LOG.log(Level.SEVERE, "", e);
+            LOG.warn("", e);
         }
 
         return 0;

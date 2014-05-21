@@ -34,6 +34,8 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provid
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.MappedStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,7 +46,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
@@ -54,7 +55,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     public static final int SIZE_OF_INT = 4;
     public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
     public static final int LOCK_TIME_OUT_NS = 100;
-    private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(SocketWriter.class);
     int capacity;
 
     int maxSize = 128;
@@ -170,7 +171,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                 serverSocket.socket().setReuseAddress(true);
                 serverSocket.socket().bind(new InetSocketAddress(port));
                 serverSocket.configureBlocking(true);
-                LOG.info("Server waiting for client on port " + port);
+                LOG.info("Server waiting for client on port {}",port);
                 serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
                 return serverSocket.accept();
             }

@@ -21,14 +21,14 @@ package net.openhft.collections;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static java.lang.System.arraycopy;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
@@ -53,8 +53,8 @@ public class QueueReplicator<K, V> {
     private AtomicBoolean isReadingEntry = new AtomicBoolean(true);
 
 
-    private static final Logger LOG =
-            Logger.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+
     private ByteBufferBytes buffer;
     private ByteBufferBytes entryBuffer;
 
@@ -130,12 +130,12 @@ public class QueueReplicator<K, V> {
                             isReadingEntry.set(false);
 
                         } catch (InterruptedException e1) {
-                            LOG.log(Level.SEVERE, "", e1);
+                            LOG.warn("", e1);
                         }
 
                     }
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.warn("", e);
                 }
 
             }
@@ -223,7 +223,7 @@ public class QueueReplicator<K, V> {
                         try {
                             output.put(dest);
                         } catch (InterruptedException e1) {
-                            LOG.log(Level.SEVERE, "", e1);
+                            LOG.warn("", e1);
                             break;
                         }
 
@@ -232,7 +232,7 @@ public class QueueReplicator<K, V> {
 
                     }
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.warn("", e);
                 }
             }
 

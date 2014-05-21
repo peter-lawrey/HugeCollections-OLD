@@ -20,14 +20,14 @@ package net.openhft.chronicle.sandbox.queue.locators.shared.remote;
 
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Created by Rob Austin
@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  */
 public class SocketWriter<E> {
 
-    private static Logger LOG = Logger.getLogger(SocketWriter.class.getName());
+    private static Logger LOG = LoggerFactory.getLogger(SocketWriter.class);
 
 
     @NotNull
@@ -98,13 +98,13 @@ public class SocketWriter<E> {
 
 
                         } catch (Exception e) {
-                            LOG.log(Level.SEVERE, "", e);
+                            LOG.warn("", e);
                         }
 
                     }
 
                 } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "", e);
+                    LOG.warn("", e);
                 }
             }
         });
