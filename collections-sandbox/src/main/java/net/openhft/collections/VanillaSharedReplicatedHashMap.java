@@ -452,7 +452,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         return;
                     }
 
-                    //      System.out.println("Status=OK");
                     // skip the is deleted flag
                     boolean wasDeleted = entry.readBoolean();
 
@@ -1203,18 +1202,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
 
-
-            //System.out.println("onPut- segmentIndex=" + segment.getIndex() + ",pos=" + pos);
-
             nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
 
             if (!watchList.contains(PUT))
                 return;
 
             changes.set(combine(segment.getIndex(), pos));
-
-            final long combine = combine(segment.getIndex(), pos);
-            System.out.println("onPut- combine=" + combine);
 
             if (notifier != null) {
                 synchronized (notifier) {
@@ -1336,9 +1329,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
             @Override
             public synchronized void set(int segmentIndex, int pos) {
-
                 final long combine = combine(segmentIndex, pos);
-                System.out.println("EntryModifiableCallback- combine=" + combine);
                 changes.set(combine);
             }
         }

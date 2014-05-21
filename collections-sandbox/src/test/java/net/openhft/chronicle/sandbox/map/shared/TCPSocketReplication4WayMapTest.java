@@ -146,7 +146,6 @@ public class TCPSocketReplication4WayMapTest {
         assertEquals("map4", new TreeMap(map1), new TreeMap(map4));
         assertTrue("map2.empty", !map2.isEmpty());
 
-
     }
 
 
