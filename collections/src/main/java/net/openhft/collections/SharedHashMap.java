@@ -50,7 +50,7 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
      *
      * @return a builder which would configure a map the same as this one.
      */
-    SharedHashMapBuilder builder();
+    <B extends SharedHashMapBuilder> B builder();
 
     /**
      * @return The file or directory for this SharedHashMap

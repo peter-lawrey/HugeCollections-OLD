@@ -35,10 +35,18 @@ import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.
  */
 public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder implements Cloneable {
 
-    public static final int META_BYTES_SIZE = 16;
-
     private byte identifier = Byte.MIN_VALUE;
     private boolean canReplicate = true;
+
+
+    @Override
+    public VanillaSharedReplicatedHashMapBuilder clone() {
+        final VanillaSharedReplicatedHashMapBuilder result = (VanillaSharedReplicatedHashMapBuilder) super.clone();
+        result.identifier(identifier);
+        result.canReplicate(canReplicate());
+        result.tcpReplication(tcpReplication);
+        return result;
+    }
 
     public VanillaSharedReplicatedHashMapBuilder() {
     }
@@ -71,9 +79,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private TcpReplication tcpReplication;
 
-    int alignedEntrySize() {
-        return entryAndValueAlignment().alignSize(entrySize() + META_BYTES_SIZE);
-    }
 
     public <K, V> VanillaSharedReplicatedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         VanillaSharedReplicatedHashMapBuilder builder = clone();
@@ -105,7 +110,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result) throws IOException {
 
-        for (ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
+        for (final ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
             final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
             final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
             ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
@@ -123,11 +128,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         result.addCloseable(serverTcpSocketReplicator);
     }
 
-
-    @Override
-    public VanillaSharedReplicatedHashMapBuilder clone() {
-        return (VanillaSharedReplicatedHashMapBuilder) super.clone();
-    }
 
     /**
      * Set minimum number of segments.
@@ -316,4 +316,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     public TcpReplication tcpReplication() {
         return tcpReplication;
     }
+
+
 }

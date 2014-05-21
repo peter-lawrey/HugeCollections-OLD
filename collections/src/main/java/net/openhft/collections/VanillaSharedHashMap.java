@@ -59,6 +59,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
+    private final SharedHashMapBuilder builder;
+
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
         // if expected map size is about 1000, seems rather wasteful to allocate
         // key and value serialization buffers each x64 of expected entry size..
@@ -124,6 +126,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
 
+        this.builder = builder.clone();
         int segments = builder.actualSegments();
         int entriesPerSegment = builder.actualEntriesPerSegment();
         this.entriesPerSegment = entriesPerSegment;
@@ -166,31 +169,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     @Override
-    public SharedHashMapBuilder builder() {
-        return builder(new SharedHashMapBuilder());
+    public <B extends SharedHashMapBuilder> B builder() {
+        return (B) builder.clone();
     }
 
-   <T extends SharedHashMapBuilder> T builder(T builder) {
-        // TODO update with new fields
-        builder.actualSegments(segments.length);
-        builder.actualEntriesPerSegment(entriesPerSegment);
-        builder.entries((long) segments.length * entriesPerSegment / 2);
-        builder.entrySize(entrySize);
-        builder.errorListener(errorListener);
-        builder.generatedKeyType(generatedKeyType);
-        builder.generatedValueType(generatedValueType);
-        builder.lockTimeOutMS(lockTimeOutNS / 1000000);
-        builder.minSegments(segments.length);
-        builder.actualSegments(segments.length);
-        builder.actualEntriesPerSegment(entriesPerSegment);
-        builder.putReturnsNull(putReturnsNull);
-        builder.removeReturnsNull(removeReturnsNull);
-        builder.replicas(replicas);
-        builder.transactional(false);
-        builder.metaDataBytes(metaDataBytes);
-        builder.eventListener(eventListener);
-        return builder;
-    }
 
     /**
      * @param size positive number

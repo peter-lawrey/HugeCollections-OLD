@@ -113,20 +113,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    @Override
-    public VanillaSharedReplicatedHashMapBuilder builder() {
-        return builder(new VanillaSharedReplicatedHashMapBuilder());
-    }
-
-    <T extends SharedHashMapBuilder> T builder(T builder) {
-        super.builder(builder);
-
-        // todo add missing fields
-        builder().canReplicate(canReplicate);
-
-        return builder;
-    }
-
 
     Class segmentType() {
         return Segment.class;

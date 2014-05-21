@@ -55,11 +55,10 @@ public class TCPSocketReplication4WayMapTest {
         final VanillaSharedReplicatedHashMapBuilder builder =
                 new VanillaSharedReplicatedHashMapBuilder()
                         .entries(1000)
-                        .identifier(identifier).
-                        tcpReplication(new TcpReplication(serverPort, clientPorts));
+                        .identifier(identifier)
+                        .tcpReplication(new TcpReplication(serverPort, clientPorts));
 
         return builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
-
     }
 
 
@@ -75,8 +74,6 @@ public class TCPSocketReplication4WayMapTest {
     @After
     public void tearDown() throws InterruptedException {
 
-        // todo fix close, it not blocking ( in other-words we should wait till everything is closed before running the next test)
-
         for (final Closeable closeable : new Closeable[]{map1, map2, map3, map4}) {
             try {
                 closeable.close();
@@ -84,7 +81,6 @@ public class TCPSocketReplication4WayMapTest {
                 e.printStackTrace();
             }
         }
-        Thread.sleep(100);
     }
 
 
