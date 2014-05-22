@@ -45,7 +45,6 @@ public class TCPSocketReplicationBootStrapTests {
 
 
     @Test
-    @Ignore
     public void testBootstrap() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077);
@@ -81,6 +80,49 @@ public class TCPSocketReplicationBootStrapTests {
 
         // add data into it
         waitTillEqual(5000);
+        assertEquals("ADDED WHEN DISCONNECTED TO MAP1", map1.get(11));
+
+    }
+
+
+    // todo we have to fix this
+    @Test
+    @Ignore
+    public void testBootstrapFlippingTheSocketConnection() throws IOException, InterruptedException {
+
+        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077, new ClientPort(8076, "localhost"));
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076);
+        map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
+
+        long lastModificationTime;
+
+        // lets make sure that the message has got to map 1
+        do {
+            lastModificationTime = map1.getLastModificationTime((byte) 2);
+            Thread.yield();
+        } while (lastModificationTime == 0);
+
+        final File map2File = map2a.file();
+        map2a.close();
+
+        System.out.println("lastModificationTime=" + lastModificationTime);
+
+        {
+            // restart map 2 but don't connect it to map one
+            final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2b = new VanillaSharedReplicatedHashMapBuilder()
+                    .entries(1000)
+                    .identifier((byte) 2)
+                    .create(map2File, Integer.class, CharSequence.class);
+            // add data into it
+            map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
+            map2b.close();
+        }
+
+        // now restart map2a and connect it to map1, map1 should bootstrap the missing entry
+        map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
+
+        // add data into it
+        waitTillEqual(10000);
         assertEquals("ADDED WHEN DISCONNECTED TO MAP1", map1.get(11));
 
     }
