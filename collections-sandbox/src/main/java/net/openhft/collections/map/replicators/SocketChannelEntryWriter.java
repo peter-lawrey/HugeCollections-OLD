@@ -156,14 +156,17 @@ public class SocketChannelEntryWriter {
         }
     }
 
-    /**
-     * sends the identity and timestamp of this node to a remote node
-     *
-     * @param socketChannel          the socketChannel the message will be sent on
-     * @param timeStampOfLastMessage the last timestamp we received a message from that node
-     * @param localIdentifier        the current nodes identifier
-     * @throws IOException if it failed to send
-     */
+/*
+    */
+/**
+ * sends the identity and timestamp of this node to a remote node
+ *
+ * @param socketChannel          the socketChannel the message will be sent on
+ * @param timeStampOfLastMessage the last timestamp we received a message from that node
+ * @param localIdentifier        the current nodes identifier
+ * @throws IOException if it failed to send
+ *//*
+
     public void sendBootstrap(@NotNull final SocketChannel socketChannel,
                               final long timeStampOfLastMessage,
                               final int localIdentifier) throws IOException {
@@ -187,8 +190,57 @@ public class SocketChannelEntryWriter {
             in.limit(in.capacity());
             out.limit(out.capacity());
         }
+*/
 
+
+    /**
+     * sends the identity and timestamp of this node to a remote node
+     *
+     * @param socketChannel   the socketChannel the message will be sent on
+     * @param localIdentifier the current nodes identifier
+     * @throws IOException if it failed to send
+     */
+    public void sendIdentifier(@NotNull final SocketChannel socketChannel,
+                               final int localIdentifier) throws IOException {
+        in.clear();
+        out.clear();
+
+        // send a welcome message to the remote server to ask for data for our localIdentifier
+        // and any missed messages
+        in.writeByte(localIdentifier);
+        out.limit((int) in.position());
+
+        while (out.remaining() > 0) {
+            socketChannel.write(out);
+        }
+
+        out.clear();
+        in.clear();
     }
 
+    /**
+     * sends the identity and timestamp of this node to a remote node
+     *
+     * @param socketChannel          the socketChannel the message will be sent on
+     * @param timeStampOfLastMessage the last timestamp we received a message from that node
+     * @throws IOException if it failed to send
+     */
+    public void sendTimestamp(@NotNull final SocketChannel socketChannel,
+                              final long timeStampOfLastMessage) throws IOException {
+        in.clear();
+        out.clear();
+
+        // send a welcome message to the remote server to ask for data for our localIdentifier
+        // and any missed messages
+        in.writeLong(timeStampOfLastMessage);
+        out.limit((int) in.position());
+
+        while (out.remaining() > 0) {
+            socketChannel.write(out);
+        }
+
+        out.clear();
+        in.clear();
+    }
 }
 

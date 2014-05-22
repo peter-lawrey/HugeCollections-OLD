@@ -82,17 +82,21 @@ public class ClientTcpSocketReplicator implements Closeable {
                     socketChannelRef.set(socketChannel);
                     socketChannel.socket().setReceiveBufferSize(8 * 1024);
 
-                    socketChannelEntryWriter.sendBootstrap(socketChannel, map.getLastModificationTime(map.getIdentifier()), map.getIdentifier());
-                    final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(socketChannel);
 
-                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.remoteIdentifier);
-                    remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
+                    socketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
+                    final byte remoteIdentifier = socketChannelEntryReader.readIdentifier(socketChannel);
 
-                    if (bootstrap.remoteIdentifier == map.getIdentifier())
+                    socketChannelEntryWriter.sendTimestamp(socketChannel, map.getLastModificationTime(remoteIdentifier));
+                    final long remoteTimestamp = socketChannelEntryReader.readTimeStamp(socketChannel);
+
+                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+                    remoteModificationIterator.dirtyEntries(remoteTimestamp);
+
+                    if (remoteIdentifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.remoteIdentifier);
+                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
 
                     // we start this connection in blocking mode ( to do the bootstrapping ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);

@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutorService;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
-import static net.openhft.collections.map.replicators.SocketChannelEntryReader.Bootstrap;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the
@@ -164,23 +163,26 @@ public class ServerTcpSocketReplicator implements Closeable {
                     channel.configureBlocking(false);
 
                     final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
-                    final Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(channel);
 
-                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.remoteIdentifier);
-                    remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
+                    final byte remoteIdentifier = socketChannelEntryReader.readIdentifier(channel);
+                    socketChannelEntryWriter.sendIdentifier(channel, localIdentifier);
+
+                    final long remoteTimestamp = socketChannelEntryReader.readTimeStamp(channel);
+
+                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+                    remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                     // register it with the selector and store the ModificationIterator for this key
-                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator, bootstrap.remoteIdentifier);
+                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator, remoteIdentifier);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
-                    if (bootstrap.remoteIdentifier == map.getIdentifier())
+                    if (remoteIdentifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
-                    // notify remote map to start to receive data for {@code localIdentifier}
-                    socketChannelEntryWriter.sendBootstrap(channel, map.getLastModificationTime(bootstrap.remoteIdentifier), localIdentifier);
+                    socketChannelEntryWriter.sendTimestamp(channel, map.getLastModificationTime(remoteIdentifier));
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.remoteIdentifier);
+                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer

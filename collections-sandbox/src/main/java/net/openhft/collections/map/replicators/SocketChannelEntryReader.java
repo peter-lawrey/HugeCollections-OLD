@@ -132,25 +132,27 @@ public class SocketChannelEntryReader {
         out.position(0);
     }
 
-    static class Bootstrap {
-        public final long timeStamp;
-        public final byte remoteIdentifier;
 
-        Bootstrap(byte remoteIdentifier, long timeStamp) {
-            this.timeStamp = timeStamp;
-            this.remoteIdentifier = remoteIdentifier;
-        }
-    }
-
-    Bootstrap readBootstrap(@NotNull final SocketChannel channel) throws IOException {
-
+    byte readIdentifier(@NotNull final SocketChannel channel) throws IOException {
         // read from the channel the timestamp and identifier
-        while (out.remaining() < 9) {
+        while (out.remaining() < 1) {
             channel.read(in);
             out.limit(in.position());
         }
 
-        return new Bootstrap(out.readByte(), out.readLong());
+        return  out.readByte();
+
+    }
+
+
+    long readTimeStamp(@NotNull final SocketChannel channel) throws IOException {
+        // read from the channel the timestamp and identifier
+        while (out.remaining() < 8) {
+            channel.read(in);
+            out.limit(in.position());
+        }
+
+        return  out.readLong();
 
     }
 }
