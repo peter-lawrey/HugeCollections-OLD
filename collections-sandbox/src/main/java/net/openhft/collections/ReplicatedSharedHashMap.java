@@ -118,12 +118,11 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
     /**
      * used in conjunction with replication, to back filling data from a remote node that this node may have missed
-     * while it has not been running
+     * updates while it has not been running
      *
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      */
-    // todo HCOLL-77 : map replication : back fill missed updates on startup
-    public long getLastModificationTime(byte identifier);
+    long getLastModificationTime(byte identifier);
 
 
     /**
