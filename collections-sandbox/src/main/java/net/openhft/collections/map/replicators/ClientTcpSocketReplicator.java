@@ -78,20 +78,21 @@ public class ClientTcpSocketReplicator implements Closeable {
                             Thread.sleep(100);
                         }
                     }
+
                     socketChannelRef.set(socketChannel);
                     socketChannel.socket().setReceiveBufferSize(8 * 1024);
 
                     socketChannelEntryWriter.sendBootstrap(socketChannel, map.getLastModificationTime(map.getIdentifier()), map.getIdentifier());
                     final SocketChannelEntryReader.Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(socketChannel);
 
-                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
+                    final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
 
-                    if (bootstrap.identifier == map.getIdentifier())
+                    if (bootstrap.remoteIdentifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
+                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.remoteIdentifier);
 
                     // we start this connection in blocking mode ( to do the bootstrapping ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);
@@ -124,21 +125,15 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                             try {
 
-                                if (!key.isValid()) {
+                                if (!key.isValid())
                                     continue;
-                                }
 
                                 // is there data to read on this channel?
-                                if (key.isReadable()) {
-
-
+                                if (key.isReadable())
                                     socketChannelEntryReader.readAll(socketChannel);
-                                }
 
-                                if (key.isWritable()) {
-
+                                if (key.isWritable())
                                     socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
-                                }
 
                             } catch (Exception e) {
 
@@ -151,9 +146,7 @@ public class ClientTcpSocketReplicator implements Closeable {
                                 } catch (IOException ex) {
                                     // do nothing
                                 }
-                                // }
                             }
-
                         }
                     }
 

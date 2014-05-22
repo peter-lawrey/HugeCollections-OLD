@@ -139,14 +139,31 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     void setLastModificationTime(byte identifier, long timestamp) {
         final int offset = identifier * 8;
-        identifierUpdatedBytes.writeLong(super.getHeaderSize() + offset, timestamp);
+
+        // purposely not volatile as this will impact performance,
+        // and the worst that will happen is we'll end up loading more data on a bootstrap
+        if (identifierUpdatedBytes.readLong(offset) < timestamp) {
+            System.out.println("write - offset=" + offset + ",timestamp=" + timestamp);
+            identifierUpdatedBytes.writeOrderedLong(offset, timestamp);
+        }
     }
 
 
     public long getLastModificationTime(byte identifier) {
+
+//        assert identifier != this.getIdentifier();
+
         final int offset = identifier * 8;
-        final long l = identifierUpdatedBytes.readLong(offset);
+        // purposely not volatile as this will impact performance,
+        // and the worst that will happen is we'll end up loading more data on a bootstrap
+        final long l = identifierUpdatedBytes.readVolatileLong(offset);
         return l;
+    }
+
+
+    @Override
+    public VanillaSharedReplicatedHashMapBuilder builder() {
+        return (VanillaSharedReplicatedHashMapBuilder) builder.clone();
     }
 
 
@@ -828,10 +845,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     V valueRemoved = expectedValue != null || !removeReturnsNull
                             ? readValue(entry, null, valueLen) : null;
 
-                    if (expectedValue != null && !expectedValue.equals(valueRemoved)) {
+                    if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-                    }
-
 
                     hashLookupLiveOnly.remove(hash2, pos);
                     decrementSize();
@@ -951,7 +966,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 hashLookupLiveOnly.clear();
                 resetSize();
 
-
             } finally {
                 unlock();
             }
@@ -1013,7 +1027,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         destination.writeStopBit(valueLen);
         destination.writeStopBit(timeStamp);
 
-
         // we store the isDeleted flag in the remoteIdentifer ( when the remoteIdentifer is negative is it is deleted )
         if (isDeleted)
             destination.writeByte(-remoteIdentifier);
@@ -1028,9 +1041,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         String message = null;
         if (LOG.isDebugEnabled()) {
             if (isDeleted || valueLen == 0)
-                LOG.debug("WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remove(key=" + ByteUtils.toCharSequence(entry).trim() + ")");
+                LOG.debug("READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remove(key=" + ByteUtils.toCharSequence(entry).trim() + ")");
             else
-                message = "WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", put(key=" + ByteUtils.toCharSequence(entry).trim() + ",";
+                message = "READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", put(key=" + ByteUtils.toCharSequence(entry).trim() + ",";
         }
 
         if (isDeleted || valueLen == 0)
@@ -1073,7 +1086,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             remoteIdentifier = id;
         }
 
-        setLastModificationTime(remoteIdentifier, timeStamp);
+
         final long keyPosition = source.position();
         final long keyLimit = source.position() + keyLen;
 
@@ -1086,19 +1099,22 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (isDeleted) {
 
             if (LOG.isDebugEnabled())
-                LOG.debug("READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote=" + remoteIdentifier + ", remove(key=" + ByteUtils.toCharSequence(source).trim() + ")");
+                LOG.debug("WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote=" + remoteIdentifier + ", remove(key=" + ByteUtils.toCharSequence(source).trim() + ")");
 
             segment(segmentNum).remoteRemove(source, segmentHash, timeStamp, remoteIdentifier);
+            setLastModificationTime(remoteIdentifier, timeStamp);
             return;
         }
 
         String message = null;
         if (LOG.isDebugEnabled())
-            message = "READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote-id=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
+            message = "WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote-id=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
         segment(segmentNum).remotePut(source, segmentHash, remoteIdentifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
+        setLastModificationTime(remoteIdentifier, timeStamp);
+
         source.position(valuePosition);
         source.limit(valueLimit);
 

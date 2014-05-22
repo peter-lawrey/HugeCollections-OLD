@@ -126,12 +126,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     public long getLastModificationTime(byte identifier);
 
 
-
     /**
      * Event types which should be replicated.
-     *
-     * @see VanillaSharedReplicatedHashMapBuilder#watchList()
-     * @see VanillaSharedReplicatedHashMapBuilder#watchList(EventType, EventType...)
      */
     enum EventType {
         /**

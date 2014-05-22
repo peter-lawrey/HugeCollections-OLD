@@ -163,25 +163,24 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-
                     final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
                     final Bootstrap bootstrap = socketChannelEntryReader.readBootstrap(channel);
 
-                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.identifier);
+                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(bootstrap.remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(bootstrap.timeStamp);
 
                     // register it with the selector and store the ModificationIterator for this key
-                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator);
+                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator, bootstrap.remoteIdentifier);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
-                    if (bootstrap.identifier == map.getIdentifier())
+                    if (bootstrap.remoteIdentifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
                     // notify remote map to start to receive data for {@code localIdentifier}
-                    socketChannelEntryWriter.sendBootstrap(channel, map.getLastModificationTime(localIdentifier), localIdentifier);
+                    socketChannelEntryWriter.sendBootstrap(channel, map.getLastModificationTime(bootstrap.remoteIdentifier), localIdentifier);
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
+                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.remoteIdentifier);
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer
@@ -203,8 +202,8 @@ public class ServerTcpSocketReplicator implements Closeable {
 
                 } catch (Exception e) {
 
-                    //  if (!isClosed.get()) {
-                    LOG.error("", e);
+                    if (serverChannel.isOpen())
+                        LOG.error("", e);
 
                     // Close channel and nudge selector
                     try {
@@ -225,10 +224,12 @@ public class ServerTcpSocketReplicator implements Closeable {
 
         final SocketChannelEntryReader socketChannelEntryReader;
         final ModificationIterator remoteModificationIterator;
+        private final byte remoteIdentifier;
 
-        private Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator) {
+        private Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator, byte remoteIdentifier) {
             this.socketChannelEntryReader = socketChannelEntryReader;
             this.remoteModificationIterator = remoteModificationIterator;
+            this.remoteIdentifier = remoteIdentifier;
         }
     }
 

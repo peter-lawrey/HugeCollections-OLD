@@ -134,11 +134,11 @@ public class SocketChannelEntryReader {
 
     static class Bootstrap {
         public final long timeStamp;
-        public final byte identifier;
+        public final byte remoteIdentifier;
 
-        Bootstrap(byte identifier, long timeStamp) {
+        Bootstrap(byte remoteIdentifier, long timeStamp) {
             this.timeStamp = timeStamp;
-            this.identifier = identifier;
+            this.remoteIdentifier = remoteIdentifier;
         }
     }
 

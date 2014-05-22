@@ -59,7 +59,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
-    private final SharedHashMapBuilder builder;
+    final SharedHashMapBuilder builder;
 
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
         // if expected map size is about 1000, seems rather wasteful to allocate
@@ -183,8 +183,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     @Override
-    public <B extends SharedHashMapBuilder> B builder() {
-        return (B) builder.clone();
+    public SharedHashMapBuilder builder() {
+        return builder.clone();
     }
 
 
