@@ -98,15 +98,6 @@ public class ServerTcpSocketReplicator implements Closeable {
         });
     }
 
-    public static short toMaxNumberOfEntriesPerChunk(final double packetSizeInBytes, final double entrySize) {
-
-        final double maxNumberOfEntriesPerChunkD = packetSizeInBytes / entrySize;
-        final int maxNumberOfEntriesPerChunk0 = (int) maxNumberOfEntriesPerChunkD;
-
-        return (short) ((maxNumberOfEntriesPerChunkD != (double) ((int) maxNumberOfEntriesPerChunkD)) ?
-                maxNumberOfEntriesPerChunk0 :
-                maxNumberOfEntriesPerChunk0 + 1);
-    }
 
     @Override
     public void close() throws IOException {
