@@ -82,7 +82,6 @@ public class ClientTcpSocketReplicator implements Closeable {
                     socketChannelRef.set(socketChannel);
                     socketChannel.socket().setReceiveBufferSize(8 * 1024);
 
-
                     socketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
                     final byte remoteIdentifier = socketChannelEntryReader.readIdentifier(socketChannel);
 
@@ -176,8 +175,9 @@ public class ClientTcpSocketReplicator implements Closeable {
     }
 
     public static class ClientPort {
-        final String host;
-        final int port;
+
+        public final String host;
+        public final int port;
 
         public ClientPort(int port, String host) {
             this.host = host;
@@ -186,8 +186,8 @@ public class ClientTcpSocketReplicator implements Closeable {
 
         @Override
         public String toString() {
-            return "host=" + host +
-                    ", port=" + port;
+            return "(host=" + host +
+                    ", port=" + port + ")";
 
         }
     }

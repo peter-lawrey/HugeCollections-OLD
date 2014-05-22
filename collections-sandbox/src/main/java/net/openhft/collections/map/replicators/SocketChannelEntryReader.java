@@ -134,25 +134,19 @@ public class SocketChannelEntryReader {
 
 
     byte readIdentifier(@NotNull final SocketChannel channel) throws IOException {
-        // read from the channel the timestamp and identifier
         while (out.remaining() < 1) {
             channel.read(in);
             out.limit(in.position());
         }
-
-        return  out.readByte();
-
+        return out.readByte();
     }
 
 
     long readTimeStamp(@NotNull final SocketChannel channel) throws IOException {
-        // read from the channel the timestamp and identifier
         while (out.remaining() < 8) {
             channel.read(in);
             out.limit(in.position());
         }
-
-        return  out.readLong();
-
+        return out.readLong();
     }
 }

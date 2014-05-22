@@ -49,7 +49,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     }
 
 
-
     public boolean canReplicate() {
         return canReplicate;
     }
@@ -68,6 +67,12 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         public TcpReplication(int serverPort, ClientPort... clientSocketChannelProviderMaps) {
             this.serverPort = serverPort;
             this.clientSocketChannelProviderMaps = clientSocketChannelProviderMaps;
+
+            for (final ClientPort clientPort : clientSocketChannelProviderMaps) {
+                if (clientPort.port == serverPort && "localhost".equals(clientPort.host))
+                    throw new IllegalArgumentException("clientPort=" + clientPort
+                            + " can not point to the same port as the server");
+            }
         }
 
         public void setPacketSize(short packetSize) {
@@ -106,7 +111,6 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
         return result;
     }
-
 
 
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result) throws IOException {

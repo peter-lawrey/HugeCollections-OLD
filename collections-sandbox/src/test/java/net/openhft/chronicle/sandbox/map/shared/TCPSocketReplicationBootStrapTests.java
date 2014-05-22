@@ -48,8 +48,8 @@ public class TCPSocketReplicationBootStrapTests {
     @Ignore
     public void testBootstrap() throws IOException, InterruptedException {
 
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077, new ClientPort(8076, "localhost"), new ClientPort(8077, "localhost"));
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076);
+        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077);
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076, new ClientPort(8077, "localhost"));
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -75,7 +75,6 @@ public class TCPSocketReplicationBootStrapTests {
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
             map2b.close();
         }
-
 
         // now restart map2a and connect it to map1, map1 should bootstrap the missing entry
         map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
