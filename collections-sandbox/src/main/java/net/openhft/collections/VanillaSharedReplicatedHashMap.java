@@ -283,7 +283,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     @Override
     public void close() {
-        super.close();
         for (Closeable closeable : closeables) {
             try {
                 closeable.close();
@@ -291,6 +290,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 LOG.error("", e);
             }
         }
+        super.close();
 
     }
 
