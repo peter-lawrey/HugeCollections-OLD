@@ -145,7 +145,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     public long getLastModificationTime(byte identifier) {
         final int offset = identifier * 8;
-        return identifierUpdatedBytes.readLong(offset);
+        final long l = identifierUpdatedBytes.readLong(offset);
+        return l;
     }
 
 

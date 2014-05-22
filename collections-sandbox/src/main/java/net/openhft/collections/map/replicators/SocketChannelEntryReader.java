@@ -18,7 +18,6 @@
 
 package net.openhft.collections.map.replicators;
 
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -37,7 +36,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
  */
 public class SocketChannelEntryReader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SocketChannelEntryReader.class);
 
     public static final int SIZE_OF_UNSIGNED_SHORT = 4;
     private final EntryExternalizable externalizable;

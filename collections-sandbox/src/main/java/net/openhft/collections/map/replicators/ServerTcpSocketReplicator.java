@@ -19,7 +19,6 @@
 package net.openhft.collections.map.replicators;
 
 import net.openhft.collections.ReplicatedSharedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -34,7 +33,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
@@ -52,7 +51,7 @@ import static net.openhft.collections.map.replicators.SocketChannelEntryReader.B
 public class ServerTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG =
-            LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class.getName());
+            LoggerFactory.getLogger(ServerTcpSocketReplicator.class.getName());
 
     private final ReplicatedSharedHashMap map;
     private final int port;
@@ -61,8 +60,9 @@ public class ServerTcpSocketReplicator implements Closeable {
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
     private final int serializedEntrySize;
-    private final AtomicBoolean isClosed = new AtomicBoolean();
+
     private short packetSize;
+    private final ExecutorService executorService;
 
     public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
@@ -81,7 +81,9 @@ public class ServerTcpSocketReplicator implements Closeable {
         this.packetSize = packetSize;
 
         // out bound
-        newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true)).execute(new Runnable() {
+        executorService = newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true));
+
+        executorService.execute(new Runnable() {
 
             @Override
             public void run() {
@@ -108,7 +110,8 @@ public class ServerTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-        isClosed.set(true);
+        executorService.shutdownNow();
+
         if (serverChannel != null)
             serverChannel.close();
     }
@@ -121,7 +124,9 @@ public class ServerTcpSocketReplicator implements Closeable {
      */
     private void process() throws Exception {
 
-        LOG.info("Listening on port " + port);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Listening on port " + port);
+        }
 
         // allocate an unbound process socket channel
 
@@ -142,7 +147,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         // register the ServerSocketChannel with the Selector
         serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-        while (!isClosed.get()) {
+        while (serverChannel.isOpen()) {
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
             final int n = selector.select();
@@ -184,7 +189,8 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // notify remote map to start to receive data for {@code localIdentifier}
                     socketChannelEntryWriter.sendBootstrap(channel, map.getLastModificationTime(localIdentifier), localIdentifier);
 
-                    LOG.info("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer

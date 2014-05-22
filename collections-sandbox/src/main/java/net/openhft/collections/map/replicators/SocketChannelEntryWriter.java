@@ -37,7 +37,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  */
 public class SocketChannelEntryWriter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SocketChannelEntryWriter.class);
 
     private final ByteBuffer out;
     private final ByteBufferBytes in;

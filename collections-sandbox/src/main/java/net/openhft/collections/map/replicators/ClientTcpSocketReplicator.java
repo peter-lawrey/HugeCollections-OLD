@@ -32,6 +32,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -47,13 +48,15 @@ public class ClientTcpSocketReplicator implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientTcpSocketReplicator.class.getName());
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
+    private final ExecutorService executorService;
 
     public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
                                      @NotNull final SocketChannelEntryReader socketChannelEntryReader,
                                      @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
                                      @NotNull final ReplicatedSharedHashMap map) {
 
-        newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true)).execute(new Runnable() {
+        executorService = newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true));
+        executorService.execute(new Runnable() {
 
             @Override
             public void run() {
@@ -64,7 +67,9 @@ public class ClientTcpSocketReplicator implements Closeable {
                     for (; ; ) {
                         try {
                             socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
-                            LOG.info("successfully connected to " + clientPort + ", local-id=" + map.getIdentifier());
+                            if (LOG.isDebugEnabled()) {
+                                LOG.info("successfully connected to " + clientPort + ", local-id=" + map.getIdentifier());
+                            }
                             break;
                         } catch (ConnectException e) {
                             if (socketChannel != null)
@@ -85,7 +90,8 @@ public class ClientTcpSocketReplicator implements Closeable {
                     if (bootstrap.identifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
-                    LOG.info("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + bootstrap.identifier);
 
                     // we start this connection in blocking mode ( to do the bootstrapping ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);
@@ -166,7 +172,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-
+        executorService.shutdownNow();
         final SocketChannel socketChannel = socketChannelRef.get();
         if (socketChannel != null)
             socketChannel.close();
