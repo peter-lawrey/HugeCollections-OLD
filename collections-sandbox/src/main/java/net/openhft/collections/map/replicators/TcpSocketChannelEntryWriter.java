@@ -35,23 +35,24 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
 /**
  * @author Rob Austin.
  */
-public class SocketChannelEntryWriter {
+public class TcpSocketChannelEntryWriter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SocketChannelEntryWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryWriter.class);
 
     private final ByteBuffer out;
     private final ByteBufferBytes in;
     private final EntryExternalizable externalizable;
-    private final EntryCallback entryCallback = new EntryCallback();
+    private final EntryCallback entryCallback;
     private final int serializedEntrySize;
 
-    public SocketChannelEntryWriter(final int serializedEntrySize,
-                                    @NotNull final EntryExternalizable externalizable,
-                                    int packetSize) {
+    public TcpSocketChannelEntryWriter(final int serializedEntrySize,
+                                       @NotNull final EntryExternalizable externalizable,
+                                       int packetSize) {
         this.serializedEntrySize = serializedEntrySize;
         out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
         in = new ByteBufferBytes(out);
         this.externalizable = externalizable;
+        entryCallback = new EntryCallback(externalizable, in);
     }
 
     /**
@@ -114,7 +115,15 @@ public class SocketChannelEntryWriter {
     /**
      * {@inheritDoc}
      */
-    class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
+    static class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
+
+        private final EntryExternalizable externalizable;
+        private final ByteBufferBytes in;
+
+        EntryCallback(@NotNull final EntryExternalizable externalizable, @NotNull final ByteBufferBytes in) {
+            this.externalizable = externalizable;
+            this.in = in;
+        }
 
         /**
          * {@inheritDoc}

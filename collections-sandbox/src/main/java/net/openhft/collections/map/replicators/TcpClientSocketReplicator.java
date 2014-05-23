@@ -44,15 +44,15 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class ClientTcpSocketReplicator implements Closeable {
+public class TcpClientSocketReplicator implements Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ClientTcpSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
     private final ExecutorService executorService;
 
-    public ClientTcpSocketReplicator(@NotNull final ClientPort clientPort,
-                                     @NotNull final SocketChannelEntryReader socketChannelEntryReader,
-                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
+    public TcpClientSocketReplicator(@NotNull final ClientPort clientPort,
+                                     @NotNull final TcpSocketChannelEntryReader tcpSocketChannelEntryReader,
+                                     @NotNull final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter,
                                      @NotNull final ReplicatedSharedHashMap map) {
 
         executorService = newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true));
@@ -82,11 +82,11 @@ public class ClientTcpSocketReplicator implements Closeable {
                     socketChannelRef.set(socketChannel);
                     socketChannel.socket().setReceiveBufferSize(8 * 1024);
 
-                    socketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
-                    final byte remoteIdentifier = socketChannelEntryReader.readIdentifier(socketChannel);
+                    tcpSocketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
+                    final byte remoteIdentifier = tcpSocketChannelEntryReader.readIdentifier(socketChannel);
 
-                    socketChannelEntryWriter.sendTimestamp(socketChannel, map.getLastModificationTime(remoteIdentifier));
-                    final long remoteTimestamp = socketChannelEntryReader.readTimeStamp(socketChannel);
+                    tcpSocketChannelEntryWriter.sendTimestamp(socketChannel, map.getLastModificationTime(remoteIdentifier));
+                    final long remoteTimestamp = tcpSocketChannelEntryReader.readTimeStamp(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(remoteTimestamp);
@@ -104,7 +104,7 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer
-                    socketChannelEntryReader.readAll(socketChannel);
+                    tcpSocketChannelEntryReader.readAll(socketChannel);
 
                     while (socketChannel.isOpen()) {
                         // this may block for a long time, upon return the
@@ -133,10 +133,10 @@ public class ClientTcpSocketReplicator implements Closeable {
 
                                 // is there data to read on this channel?
                                 if (key.isReadable())
-                                    socketChannelEntryReader.readAll(socketChannel);
+                                    tcpSocketChannelEntryReader.readAll(socketChannel);
 
                                 if (key.isWritable())
-                                    socketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
+                                    tcpSocketChannelEntryWriter.writeAll(socketChannel, remoteModificationIterator);
 
                             } catch (Exception e) {
 
@@ -168,10 +168,13 @@ public class ClientTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-        executorService.shutdownNow();
-        final SocketChannel socketChannel = socketChannelRef.get();
-        if (socketChannel != null)
+
+        final SocketChannel socketChannel = socketChannelRef.getAndSet(null);
+        if (socketChannel != null) {
+            socketChannel.socket().close();
             socketChannel.close();
+        }
+        executorService.shutdownNow();
     }
 
     public static class ClientPort {

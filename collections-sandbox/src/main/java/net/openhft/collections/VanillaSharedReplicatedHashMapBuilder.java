@@ -18,16 +18,16 @@
 
 package net.openhft.collections;
 
-import net.openhft.collections.map.replicators.ClientTcpSocketReplicator;
-import net.openhft.collections.map.replicators.ServerTcpSocketReplicator;
-import net.openhft.collections.map.replicators.SocketChannelEntryReader;
-import net.openhft.collections.map.replicators.SocketChannelEntryWriter;
+import net.openhft.collections.map.replicators.TcpClientSocketReplicator;
+import net.openhft.collections.map.replicators.TcpServerSocketReplicator;
+import net.openhft.collections.map.replicators.TcpSocketChannelEntryReader;
+import net.openhft.collections.map.replicators.TcpSocketChannelEntryWriter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
+import static net.openhft.collections.map.replicators.TcpClientSocketReplicator.ClientPort;
 
 
 /**
@@ -116,21 +116,21 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result) throws IOException {
 
         for (final ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
-            final SocketChannelEntryWriter socketChannelEntryWriter0 = new SocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
-            final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
-            ClientTcpSocketReplicator clientTcpSocketReplicator = new ClientTcpSocketReplicator(clientSocketChannelProvider, socketChannelEntryReader, socketChannelEntryWriter0, result);
-            result.addCloseable(clientTcpSocketReplicator);
+            final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter0 = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+            final TcpSocketChannelEntryReader tcpSocketChannelEntryReader = new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
+            TcpClientSocketReplicator tcpClientSocketReplicator = new TcpClientSocketReplicator(clientSocketChannelProvider, tcpSocketChannelEntryReader, tcpSocketChannelEntryWriter0, result);
+            result.addCloseable(tcpClientSocketReplicator);
         }
 
-        final SocketChannelEntryWriter socketChannelEntryWriter = new SocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+        final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
 
-        final ServerTcpSocketReplicator serverTcpSocketReplicator = new ServerTcpSocketReplicator(
+        final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
                 result,
                 result,
                 tcpReplication.serverPort,
-                socketChannelEntryWriter, tcpReplication.packetSize, entrySize());
+                tcpSocketChannelEntryWriter, tcpReplication.packetSize, entrySize());
 
-        result.addCloseable(serverTcpSocketReplicator);
+        result.addCloseable(tcpServerSocketReplicator);
     }
 
 

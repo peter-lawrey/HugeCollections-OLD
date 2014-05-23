@@ -47,15 +47,15 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  *
  * @author Rob Austin.
  */
-public class ServerTcpSocketReplicator implements Closeable {
+public class TcpServerSocketReplicator implements Closeable {
 
     private static final Logger LOG =
-            LoggerFactory.getLogger(ServerTcpSocketReplicator.class.getName());
+            LoggerFactory.getLogger(TcpServerSocketReplicator.class.getName());
 
     private final ReplicatedSharedHashMap map;
     private final int port;
     private final ServerSocketChannel serverChannel;
-    private final SocketChannelEntryWriter socketChannelEntryWriter;
+    private final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter;
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
     private final int serializedEntrySize;
@@ -63,10 +63,10 @@ public class ServerTcpSocketReplicator implements Closeable {
     private short packetSize;
     private final ExecutorService executorService;
 
-    public ServerTcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
+    public TcpServerSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
                                      final int port,
-                                     @NotNull final SocketChannelEntryWriter socketChannelEntryWriter,
+                                     @NotNull final TcpSocketChannelEntryWriter socketChannelEntryWriter,
                                      final short packetSize,
                                      final int serializedEntrySize) throws IOException {
 
@@ -75,7 +75,7 @@ public class ServerTcpSocketReplicator implements Closeable {
         this.port = port;
         this.serverChannel = ServerSocketChannel.open();
         this.localIdentifier = map.getIdentifier();
-        this.socketChannelEntryWriter = socketChannelEntryWriter;
+        this.tcpSocketChannelEntryWriter = socketChannelEntryWriter;
         this.serializedEntrySize = serializedEntrySize;
         this.packetSize = packetSize;
 
@@ -87,7 +87,7 @@ public class ServerTcpSocketReplicator implements Closeable {
             @Override
             public void run() {
                 try {
-                    ServerTcpSocketReplicator.this.packetSize = packetSize;
+                    TcpServerSocketReplicator.this.packetSize = packetSize;
                     process();
                 } catch (Exception e) {
                     LOG.error("", e);
@@ -100,10 +100,12 @@ public class ServerTcpSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-        executorService.shutdownNow();
 
-        if (serverChannel != null)
+        if (serverChannel != null) {
+            serverChannel.socket().close();
             serverChannel.close();
+        }
+        executorService.shutdown();
     }
 
     /**
@@ -162,44 +164,44 @@ public class ServerTcpSocketReplicator implements Closeable {
                     // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    final SocketChannelEntryReader socketChannelEntryReader = new SocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
+                    final TcpSocketChannelEntryReader tcpSocketChannelEntryReader = new TcpSocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
 
-                    final byte remoteIdentifier = socketChannelEntryReader.readIdentifier(channel);
-                    socketChannelEntryWriter.sendIdentifier(channel, localIdentifier);
+                    final byte remoteIdentifier = tcpSocketChannelEntryReader.readIdentifier(channel);
+                    tcpSocketChannelEntryWriter.sendIdentifier(channel, localIdentifier);
 
-                    final long remoteTimestamp = socketChannelEntryReader.readTimeStamp(channel);
+                    final long remoteTimestamp = tcpSocketChannelEntryReader.readTimeStamp(channel);
 
                     final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                     // register it with the selector and store the ModificationIterator for this key
-                    final Attached attached = new Attached(socketChannelEntryReader, remoteModificationIterator, remoteIdentifier);
+                    final Attached attached = new Attached(tcpSocketChannelEntryReader, remoteModificationIterator, remoteIdentifier);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
                     if (remoteIdentifier == map.getIdentifier())
                         throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
 
-                    socketChannelEntryWriter.sendTimestamp(channel, map.getLastModificationTime(remoteIdentifier));
+                    tcpSocketChannelEntryWriter.sendTimestamp(channel, map.getLastModificationTime(remoteIdentifier));
 
                     if (LOG.isDebugEnabled())
                         LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer
-                    socketChannelEntryReader.readAll(channel);
+                    tcpSocketChannelEntryReader.readAll(channel);
                 }
                 try {
 
                     if (key.isWritable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
                         final Attached attachment = (Attached) key.attachment();
-                        socketChannelEntryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
+                        tcpSocketChannelEntryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
                     }
 
                     if (key.isReadable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
                         final Attached attachment = (Attached) key.attachment();
-                        attachment.socketChannelEntryReader.readAll(socketChannel);
+                        attachment.tcpSocketChannelEntryReader.readAll(socketChannel);
                     }
 
                 } catch (Exception e) {
@@ -213,7 +215,7 @@ public class ServerTcpSocketReplicator implements Closeable {
                     } catch (IOException ex) {
                         // do nothing
                     }
-                    // }
+                    return;
                 }
 
                 // remove key from selected set, it's been handled
@@ -224,12 +226,12 @@ public class ServerTcpSocketReplicator implements Closeable {
 
     private static class Attached {
 
-        final SocketChannelEntryReader socketChannelEntryReader;
+        final TcpSocketChannelEntryReader tcpSocketChannelEntryReader;
         final ModificationIterator remoteModificationIterator;
         private final byte remoteIdentifier;
 
-        private Attached(SocketChannelEntryReader socketChannelEntryReader, ModificationIterator remoteModificationIterator, byte remoteIdentifier) {
-            this.socketChannelEntryReader = socketChannelEntryReader;
+        private Attached(TcpSocketChannelEntryReader tcpSocketChannelEntryReader, ModificationIterator remoteModificationIterator, byte remoteIdentifier) {
+            this.tcpSocketChannelEntryReader = tcpSocketChannelEntryReader;
             this.remoteModificationIterator = remoteModificationIterator;
             this.remoteIdentifier = remoteIdentifier;
         }

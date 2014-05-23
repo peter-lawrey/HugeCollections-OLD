@@ -31,7 +31,7 @@ import java.util.TreeMap;
 
 import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
 import static net.openhft.collections.VanillaSharedReplicatedHashMapBuilder.TcpReplication;
-import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
+import static net.openhft.collections.map.replicators.TcpClientSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

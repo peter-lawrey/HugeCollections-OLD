@@ -29,7 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.TreeMap;
 
-import static net.openhft.collections.map.replicators.ClientTcpSocketReplicator.ClientPort;
+import static net.openhft.collections.map.replicators.TcpClientSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 
 /**

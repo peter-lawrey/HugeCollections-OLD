@@ -142,22 +142,18 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
-        if (identifierUpdatedBytes.readLong(offset) < timestamp) {
-            System.out.println("write - offset=" + offset + ",timestamp=" + timestamp);
-            identifierUpdatedBytes.writeOrderedLong(offset, timestamp);
-        }
+        if (identifierUpdatedBytes.readLong(offset) < timestamp)
+            identifierUpdatedBytes.writeLong(offset, timestamp);
     }
 
 
     public long getLastModificationTime(byte identifier) {
-
-//        assert identifier != this.getIdentifier();
+        assert identifier != this.getIdentifier();
 
         final int offset = identifier * 8;
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
-        final long l = identifierUpdatedBytes.readVolatileLong(offset);
-        return l;
+        return identifierUpdatedBytes.readLong(offset);
     }
 
 
