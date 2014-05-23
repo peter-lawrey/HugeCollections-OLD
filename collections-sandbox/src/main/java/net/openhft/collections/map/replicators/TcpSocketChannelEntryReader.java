@@ -38,7 +38,7 @@ public class TcpSocketChannelEntryReader {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryReader.class);
 
-    public static final int SIZE_OF_UNSIGNED_SHORT = 4;
+    public static final int SIZE_OF_UNSIGNED_SHORT = 2;
     private final EntryExternalizable externalizable;
     private final int serializedEntrySize;
     private final ByteBuffer in;
@@ -56,7 +56,7 @@ public class TcpSocketChannelEntryReader {
                                        @NotNull final EntryExternalizable externalizable,
                                        final short packetSize) {
         this.serializedEntrySize = serializedEntrySize;
-        in = ByteBuffer.allocate(packetSize);
+        in = ByteBuffer.allocate(packetSize + serializedEntrySize);
         this.externalizable = externalizable;
         out = new ByteBufferBytes(in);
         out.limit(0);

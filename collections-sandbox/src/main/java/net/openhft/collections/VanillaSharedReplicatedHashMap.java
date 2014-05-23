@@ -1082,6 +1082,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             remoteIdentifier = id;
         }
 
+        if (remoteIdentifier == VanillaSharedReplicatedHashMap.this.getIdentifier())
+            // this can occur when working with UDP, as we will receive our own data
+            return;
 
         final long keyPosition = source.position();
         final long keyLimit = source.position() + keyLen;
