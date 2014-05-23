@@ -47,7 +47,7 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
+    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
@@ -63,10 +63,10 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
 
-        map1 = newSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map2 = newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map3 = newSocketShmIntString((byte) 3, 8078, new InetSocketAddress("localhost", 8079));
-        map4 = newSocketShmIntString((byte) 4, 8079);
+        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
+        map3 = newTcpSocketShmIntString((byte) 3, 8078, new InetSocketAddress("localhost", 8079));
+        map4 = newTcpSocketShmIntString((byte) 4, 8079);
     }
 
     @After

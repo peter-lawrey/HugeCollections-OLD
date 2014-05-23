@@ -122,10 +122,10 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
         // allocate an unbound process socket channel
 
         // Get the associated ServerSocket to bind it with
-        ServerSocket serverSocket = serverChannel.socket();
+        final ServerSocket serverSocket = serverChannel.socket();
 
         // create a new Selector for use below
-        Selector selector = Selector.open();
+        final Selector selector = Selector.open();
 
         serverSocket.setReuseAddress(true);
 

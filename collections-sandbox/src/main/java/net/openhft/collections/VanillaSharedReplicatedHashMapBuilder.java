@@ -59,6 +59,15 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return this;
     }
 
+    public VanillaSharedReplicatedHashMapBuilder updPort(short updPort) {
+        this.updPort = updPort;
+        return this;
+    }
+
+    public short getUpdPort() {
+        return updPort;
+    }
+
     public static class TcpReplication {
 
         private final int serverPort;

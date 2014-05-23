@@ -43,16 +43,16 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-public class TcpClientSocketReplicator implements Closeable {
+class TcpClientSocketReplicator implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
     private final ExecutorService executorService;
 
-    public TcpClientSocketReplicator(@NotNull final InetSocketAddress inetSocketAddress,
-                                     @NotNull final TcpSocketChannelEntryReader tcpSocketChannelEntryReader,
-                                     @NotNull final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter,
-                                     @NotNull final ReplicatedSharedHashMap map) {
+    TcpClientSocketReplicator(@NotNull final InetSocketAddress inetSocketAddress,
+                              @NotNull final TcpSocketChannelEntryReader tcpSocketChannelEntryReader,
+                              @NotNull final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter,
+                              @NotNull final ReplicatedSharedHashMap map) {
 
         executorService = newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true));
         executorService.execute(new Runnable() {
@@ -71,15 +71,14 @@ public class TcpClientSocketReplicator implements Closeable {
                             }
                             break;
                         } catch (ConnectException e) {
-                            if (socketChannel != null)
-                                socketChannel.close();
-                            // todo add better back-off logic
                             Thread.sleep(100);
                         }
                     }
 
                     socketChannelRef.set(socketChannel);
-                    socketChannel.socket().setReceiveBufferSize(8 * 1024);
+
+                    socketChannel.socket().setReceiveBufferSize(0x100000); // 1Mb
+                    socketChannel.socket().setSendBufferSize(0x100000); // 1Mb
 
                     tcpSocketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
                     final byte remoteIdentifier = tcpSocketChannelEntryReader.readIdentifier(socketChannel);
@@ -126,6 +125,8 @@ public class TcpClientSocketReplicator implements Closeable {
                             it.remove();
 
                             try {
+
+
 
                                 if (!key.isValid())
                                     continue;

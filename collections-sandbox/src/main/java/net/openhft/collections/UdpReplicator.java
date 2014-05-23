@@ -43,12 +43,10 @@ class UdpReplicator implements Closeable {
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
 
-
     private final int port;
     private final DatagramChannel datagramChannel;
     private final UdpSocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
-
 
     private final ExecutorService executorService;
     private final ModificationIterator udpModificationIterator;
@@ -73,10 +71,15 @@ class UdpReplicator implements Closeable {
             @Override
             public void run() {
                 try {
-
                     process();
                 } catch (Exception e) {
                     LOG.error("", e);
+                    try {
+                        datagramChannel.close();
+                    } catch (IOException e1) {
+                        LOG.error("", e1);
+                    }
+
                 }
             }
 
@@ -103,18 +106,20 @@ class UdpReplicator implements Closeable {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Listening on port " + port);
         }
+        final Selector selector = Selector.open();
+        InetSocketAddress hostAddress = new InetSocketAddress("255.255.255.255", port);
 
-        Selector selector = Selector.open();
+
+        // Create a non-blocking socket channel
+        datagramChannel.socket().setBroadcast(true);
+       // datagramChannel.socket().bind(hostAddress);
+        datagramChannel.configureBlocking(false);
+
+        // Kick off connection establishment
+        datagramChannel.connect(hostAddress);
 
 
-        // set the port the process channel will listen to
-        this.datagramChannel.bind(new InetSocketAddress(port));
-
-        // set non-blocking mode for the listening socket
-        this.datagramChannel.configureBlocking(false);
-
-        // register the ServerSocketChannel with the Selector
-        this.datagramChannel.register(selector, SelectionKey.OP_WRITE);
+        this.datagramChannel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ);
 
         for (; ; ) {
             // this may block for a long time, upon return the
@@ -137,8 +142,9 @@ class UdpReplicator implements Closeable {
 
                 try {
 
-                    if (key.isValid()) {
-                        continue;
+                    if (key.isReadable()) {
+                        final DatagramChannel socketChannel = (DatagramChannel) key.channel();
+                        socketChannelEntryReader.readAll(socketChannel);
                     }
 
                     if (key.isWritable()) {
@@ -146,11 +152,6 @@ class UdpReplicator implements Closeable {
                         socketChannelEntryWriter.writeAll(socketChannel, udpModificationIterator);
                     }
 
-
-                    if (key.isWritable()) {
-                        final DatagramChannel socketChannel = (DatagramChannel) key.channel();
-                        socketChannelEntryReader.readAll(socketChannel);
-                    }
 
                 } catch (Exception e) {
 
@@ -206,6 +207,7 @@ class UdpReplicator implements Closeable {
 
             // we'll write the size inverted at the start
             in.writeShort(0, ~(in.readUnsignedShort(2)));
+            out.limit((int) in.position());
             socketChannel.write(out);
 
         }

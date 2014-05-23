@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.chronicle.sandbox.map.shared.TCPSocketReplication4WayMapTest.newSocketShmIntString;
+import static net.openhft.chronicle.sandbox.map.shared.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -46,8 +46,8 @@ public class TCPSocketReplicationTest {
 
     @Before
     public void setup() throws IOException {
-        map1 = newSocketShmIntString((byte) 1, 8076);
-        map2 = newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map1 = newTcpSocketShmIntString((byte) 1, 8076);
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
     }
 
     @After

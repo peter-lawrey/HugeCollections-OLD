@@ -46,10 +46,10 @@ public class TCPSocketReplicationTestPostConnection {
     public void testPostConnection() throws IOException, InterruptedException {
 
 
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
+        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
         Thread.sleep(1);
-        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map2 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(500);
@@ -63,9 +63,9 @@ public class TCPSocketReplicationTestPostConnection {
     public void testPostConnectionNoSleep() throws IOException, InterruptedException {
 
 
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
+        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
-        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map2 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(500);
@@ -78,8 +78,8 @@ public class TCPSocketReplicationTestPostConnection {
     @Test
     public void testBootStrapIntoNewMapWithNewFile() throws IOException, InterruptedException {
 
-        final SharedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
+        final SharedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
 
         Thread.sleep(1);
         map1.put(5, "EXAMPLE-2");
