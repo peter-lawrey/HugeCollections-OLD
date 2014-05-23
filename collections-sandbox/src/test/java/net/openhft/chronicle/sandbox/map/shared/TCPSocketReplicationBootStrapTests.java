@@ -27,9 +27,9 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.collections.TcpClientSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -48,7 +48,7 @@ public class TCPSocketReplicationBootStrapTests {
     public void testBootstrap() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077);
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076, new ClientPort(8077, "localhost"));
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8077));
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -90,7 +90,7 @@ public class TCPSocketReplicationBootStrapTests {
     @Ignore
     public void testBootstrapFlippingTheSocketConnection() throws IOException, InterruptedException {
 
-        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077, new ClientPort(8076, "localhost"));
+        map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8077, new InetSocketAddress("localhost", 8076));
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8076);
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 

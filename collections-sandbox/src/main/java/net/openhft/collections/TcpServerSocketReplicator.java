@@ -46,7 +46,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  *
  * @author Rob Austin.
  */
-public class TcpServerSocketReplicator implements Closeable {
+ class TcpServerSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(TcpServerSocketReplicator.class.getName());
@@ -79,7 +79,7 @@ public class TcpServerSocketReplicator implements Closeable {
         this.packetSize = packetSize;
 
         // out bound
-        executorService = newSingleThreadExecutor(new NamedThreadFactory("OutSocketReplicator-" + localIdentifier, true));
+        executorService = newSingleThreadExecutor(new NamedThreadFactory("TcpServerSocketReplicator-" + localIdentifier, true));
 
         executorService.execute(new Runnable() {
 
@@ -116,9 +116,8 @@ public class TcpServerSocketReplicator implements Closeable {
      */
     private void process() throws Exception {
 
-        if (LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled())
             LOG.debug("Listening on port " + port);
-        }
 
         // allocate an unbound process socket channel
 

@@ -34,7 +34,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
  *
  * @author Rob Austin.
  */
-public class TcpSocketChannelEntryReader {
+ class TcpSocketChannelEntryReader {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryReader.class);
 
@@ -52,7 +52,7 @@ public class TcpSocketChannelEntryReader {
      * @param externalizable      supports reading and writing serialize entries
      * @param packetSize          the estimated size of a tcp/ip packet
      */
-    public TcpSocketChannelEntryReader(final int serializedEntrySize,
+     TcpSocketChannelEntryReader(final int serializedEntrySize,
                                        @NotNull final EntryExternalizable externalizable,
                                        final short packetSize) {
         this.serializedEntrySize = serializedEntrySize;

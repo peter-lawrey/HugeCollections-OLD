@@ -49,7 +49,7 @@ public class TcpClientSocketReplicator implements Closeable {
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
     private final ExecutorService executorService;
 
-    public TcpClientSocketReplicator(@NotNull final ClientPort clientPort,
+    public TcpClientSocketReplicator(@NotNull final InetSocketAddress inetSocketAddress,
                                      @NotNull final TcpSocketChannelEntryReader tcpSocketChannelEntryReader,
                                      @NotNull final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter,
                                      @NotNull final ReplicatedSharedHashMap map) {
@@ -65,9 +65,9 @@ public class TcpClientSocketReplicator implements Closeable {
 
                     for (; ; ) {
                         try {
-                            socketChannel = SocketChannel.open(new InetSocketAddress(clientPort.host, clientPort.port));
+                            socketChannel = SocketChannel.open(inetSocketAddress);
                             if (LOG.isDebugEnabled()) {
-                                LOG.info("successfully connected to " + clientPort + ", local-id=" + map.getIdentifier());
+                                LOG.info("successfully connected to " + inetSocketAddress + ", local-id=" + map.getIdentifier());
                             }
                             break;
                         } catch (ConnectException e) {
@@ -176,23 +176,6 @@ public class TcpClientSocketReplicator implements Closeable {
         executorService.shutdownNow();
     }
 
-    public static class ClientPort {
-
-        public final String host;
-        public final int port;
-
-        public ClientPort(int port, String host) {
-            this.host = host;
-            this.port = port;
-        }
-
-        @Override
-        public String toString() {
-            return "(host=" + host +
-                    ", port=" + port + ")";
-
-        }
-    }
 
 }
 

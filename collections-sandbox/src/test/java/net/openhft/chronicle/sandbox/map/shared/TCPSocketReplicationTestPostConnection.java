@@ -24,10 +24,10 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
 import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
-import static net.openhft.collections.TcpClientSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -49,7 +49,7 @@ public class TCPSocketReplicationTestPostConnection {
         map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
         Thread.sleep(1);
-        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new ClientPort(8076, "localhost"));
+        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(500);
@@ -65,7 +65,7 @@ public class TCPSocketReplicationTestPostConnection {
 
         map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
-        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new ClientPort(8076, "localhost"));
+        map2 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(500);
@@ -78,7 +78,7 @@ public class TCPSocketReplicationTestPostConnection {
     @Test
     public void testBootStrapIntoNewMapWithNewFile() throws IOException, InterruptedException {
 
-        final SharedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new ClientPort(8076, "localhost"));
+        final SharedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
         map1 = TCPSocketReplication4WayMapTest.newSocketShmIntString((byte) 1, 8076);
 
         Thread.sleep(1);
@@ -104,7 +104,7 @@ public class TCPSocketReplicationTestPostConnection {
     }
 
 
-      @After
+    @After
     public void tearDown() {
 
         for (final Closeable closeable : new Closeable[]{map1, map2}) {

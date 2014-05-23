@@ -27,11 +27,11 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
 import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
 import static net.openhft.collections.VanillaSharedReplicatedHashMapBuilder.TcpReplication;
-import static net.openhft.collections.TcpClientSocketReplicator.ClientPort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -50,12 +50,12 @@ public class TCPSocketReplication4WayMapTest {
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newSocketShmIntString(
             final byte identifier,
             final int serverPort,
-            final ClientPort... clientPorts) throws IOException {
+            final InetSocketAddress... InetSocketAddress) throws IOException {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(new TcpReplication(serverPort, clientPorts))
+                .tcpReplication(new TcpReplication(serverPort, InetSocketAddress))
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
@@ -63,9 +63,9 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
 
-        map1 = newSocketShmIntString((byte) 1, 8076, new ClientPort(8077, "localhost"), new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map2 = newSocketShmIntString((byte) 2, 8077, new ClientPort(8078, "localhost"), new ClientPort(8079, "localhost"));
-        map3 = newSocketShmIntString((byte) 3, 8078, new ClientPort(8079, "localhost"));
+        map1 = newSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
+        map2 = newSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
+        map3 = newSocketShmIntString((byte) 3, 8078, new InetSocketAddress("localhost", 8079));
         map4 = newSocketShmIntString((byte) 4, 8079);
     }
 

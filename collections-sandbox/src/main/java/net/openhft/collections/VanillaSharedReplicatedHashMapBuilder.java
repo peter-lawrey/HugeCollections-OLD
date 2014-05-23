@@ -23,10 +23,10 @@ import net.openhft.lang.io.ByteBufferBytes;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
 
-import static net.openhft.collections.TcpClientSocketReplicator.ClientPort;
 import static net.openhft.collections.UdpReplicator.UdpSocketChannelEntryWriter;
 
 
@@ -62,16 +62,16 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     public static class TcpReplication {
 
         private final int serverPort;
-        private final ClientPort[] clientSocketChannelProviderMaps;
+        private final InetSocketAddress[] clientSocketChannelProviderMaps;
         public short packetSize = 1024 * 8;
 
-        public TcpReplication(int serverPort, ClientPort... clientSocketChannelProviderMaps) {
+        public TcpReplication(int serverPort, InetSocketAddress... clientSocketChannelProviderMaps) {
             this.serverPort = serverPort;
             this.clientSocketChannelProviderMaps = clientSocketChannelProviderMaps;
 
-            for (final ClientPort clientPort : clientSocketChannelProviderMaps) {
-                if (clientPort.port == serverPort && "localhost".equals(clientPort.host))
-                    throw new IllegalArgumentException("clientPort=" + clientPort
+            for (final InetSocketAddress inetSocketAddress : clientSocketChannelProviderMaps) {
+                if (inetSocketAddress.getPort() == serverPort && "localhost".equals(inetSocketAddress.getHostName()))
+                    throw new IllegalArgumentException("inetSocketAddress=" + inetSocketAddress
                             + " can not point to the same port as the server");
             }
         }
@@ -140,10 +140,10 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result, TcpReplication tcpReplication) throws IOException {
 
-        for (final ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
+        for (final InetSocketAddress clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
             final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter0 = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
             final TcpSocketChannelEntryReader tcpSocketChannelEntryReader = new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
-            TcpClientSocketReplicator tcpClientSocketReplicator = new TcpClientSocketReplicator(clientSocketChannelProvider, tcpSocketChannelEntryReader, tcpSocketChannelEntryWriter0, result);
+            final TcpClientSocketReplicator tcpClientSocketReplicator = new TcpClientSocketReplicator(clientSocketChannelProvider, tcpSocketChannelEntryReader, tcpSocketChannelEntryWriter0, result);
             result.addCloseable(tcpClientSocketReplicator);
         }
 
