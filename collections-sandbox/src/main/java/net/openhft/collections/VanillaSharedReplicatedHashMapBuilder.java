@@ -18,16 +18,16 @@
 
 package net.openhft.collections;
 
-import net.openhft.collections.map.replicators.TcpClientSocketReplicator;
-import net.openhft.collections.map.replicators.TcpServerSocketReplicator;
-import net.openhft.collections.map.replicators.TcpSocketChannelEntryReader;
-import net.openhft.collections.map.replicators.TcpSocketChannelEntryWriter;
+import net.openhft.lang.io.ByteBufferBytes;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.EnumSet;
 
-import static net.openhft.collections.map.replicators.TcpClientSocketReplicator.ClientPort;
+import static net.openhft.collections.TcpClientSocketReplicator.ClientPort;
+import static net.openhft.collections.UdpReplicator.UdpSocketChannelEntryWriter;
 
 
 /**
@@ -37,6 +37,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     private byte identifier = Byte.MIN_VALUE;
     private boolean canReplicate = true;
+    private short updPort = Short.MIN_VALUE;
 
 
     @Override
@@ -107,13 +108,37 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         final VanillaSharedReplicatedHashMap<K, V> result = new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
 
         if (tcpReplication != null)
-            applyTcpReplication(result);
+            applyTcpReplication(result, tcpReplication);
+
+        if (updPort != Short.MIN_VALUE)
+            applyUdpReplication(result, updPort);
 
         return result;
     }
 
+    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort) throws IOException {
 
-    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result) throws IOException {
+        // the udp modification modification iterator will not be stored in shared memory
+        final ByteBufferBytes updModIteratorBytes = new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
+
+        final VanillaSharedReplicatedHashMap.ModificationIterator udpModificationIterator = result.new ModificationIterator(
+                null,
+                EnumSet.allOf(ReplicatedSharedHashMap.EventType.class),
+                updModIteratorBytes,
+                result.eventListener);
+
+        result.eventListener = udpModificationIterator;
+
+        final UdpSocketChannelEntryWriter socketChannelEntryWriter = new UdpSocketChannelEntryWriter(entrySize(), result);
+        final UdpReplicator.UdpSocketChannelEntryReader socketChannelEntryReader = new UdpReplicator.UdpSocketChannelEntryReader(entrySize(), result);
+
+        final UdpReplicator udpReplicator = new UdpReplicator(result, updPort, socketChannelEntryWriter, socketChannelEntryReader, udpModificationIterator);
+        result.addCloseable(udpReplicator);
+
+    }
+
+
+    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result, TcpReplication tcpReplication) throws IOException {
 
         for (final ClientPort clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
             final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter0 = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);

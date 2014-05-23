@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.map.replicators;
+package net.openhft.collections;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +31,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 
@@ -40,14 +38,14 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 
-public class UdpReplicator implements Closeable {
+class UdpReplicator implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
 
 
     private final int port;
-    private final ServerSocketChannel serverChannel;
+    private final DatagramChannel datagramChannel;
     private final UdpSocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
 
@@ -56,13 +54,13 @@ public class UdpReplicator implements Closeable {
     private final ModificationIterator udpModificationIterator;
     private final UdpSocketChannelEntryReader socketChannelEntryReader;
 
-    public UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
-                         final int port,
-                         @NotNull final UdpSocketChannelEntryWriter socketChannelEntryWriter,
-                         @NotNull final UdpSocketChannelEntryReader socketChannelEntryReader,
-                         @NotNull final ModificationIterator udpModificationIterator) throws IOException {
+    UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
+                  final int port,
+                  @NotNull final UdpSocketChannelEntryWriter socketChannelEntryWriter,
+                  @NotNull final UdpSocketChannelEntryReader socketChannelEntryReader,
+                  @NotNull final ModificationIterator udpModificationIterator) throws IOException {
         this.port = port;
-        this.serverChannel = ServerSocketChannel.open();
+        this.datagramChannel = DatagramChannel.open();
         this.localIdentifier = map.getIdentifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
         this.socketChannelEntryReader = socketChannelEntryReader;
@@ -90,8 +88,8 @@ public class UdpReplicator implements Closeable {
     public void close() throws IOException {
         executorService.shutdownNow();
 
-        if (serverChannel != null)
-            serverChannel.close();
+        if (datagramChannel != null)
+            datagramChannel.close();
     }
 
     /**
@@ -107,16 +105,16 @@ public class UdpReplicator implements Closeable {
         }
 
         Selector selector = Selector.open();
-        DatagramChannel channel = DatagramChannel.open();
+
 
         // set the port the process channel will listen to
-        channel.bind(new InetSocketAddress(port));
+        this.datagramChannel.bind(new InetSocketAddress(port));
 
         // set non-blocking mode for the listening socket
-        this.serverChannel.configureBlocking(false);
+        this.datagramChannel.configureBlocking(false);
 
         // register the ServerSocketChannel with the Selector
-        this.serverChannel.register(selector, SelectionKey.OP_WRITE);
+        this.datagramChannel.register(selector, SelectionKey.OP_WRITE);
 
         for (; ; ) {
             // this may block for a long time, upon return the
@@ -156,7 +154,7 @@ public class UdpReplicator implements Closeable {
 
                 } catch (Exception e) {
 
-                    if (this.serverChannel.isOpen())
+                    if (this.datagramChannel.isOpen())
                         LOG.error("", e);
 
                     // Close channel and nudge selector
@@ -172,16 +170,16 @@ public class UdpReplicator implements Closeable {
     }
 
 
-    public static class UdpSocketChannelEntryWriter {
+    static class UdpSocketChannelEntryWriter {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
         private final TcpSocketChannelEntryWriter.EntryCallback entryCallback;
 
         public UdpSocketChannelEntryWriter(final int serializedEntrySize,
-                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                                           int packetSize) {
-            out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
+                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+            // we make the buffer twice as large just to give ourselves headroom
+            out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
             entryCallback = new TcpSocketChannelEntryWriter.EntryCallback(externalizable, in);
         }
@@ -217,22 +215,20 @@ public class UdpReplicator implements Closeable {
     public static final int SIZE_OF_SHORT = 2;
     public static final int SIZE_OF_UNSIGNED_SHORT = 2;
 
-    public class UdpSocketChannelEntryReader {
+    static class UdpSocketChannelEntryReader {
 
         private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
-
         private final ByteBuffer in;
         private final ByteBufferBytes out;
 
         /**
          * @param serializedEntrySize the maximum size of an entry include the meta data
          * @param externalizable      supports reading and writing serialize entries
-         * @param packetSize          the estimated size of a tcp/ip packet
          */
         public UdpSocketChannelEntryReader(final int serializedEntrySize,
-                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                                           final short packetSize) {
-            in = ByteBuffer.allocate(packetSize + serializedEntrySize);
+                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+            // we make the buffer twice as large just to give ourselves headroom
+            in = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             this.externalizable = externalizable;
             out = new ByteBufferBytes(in);
             out.limit(0);

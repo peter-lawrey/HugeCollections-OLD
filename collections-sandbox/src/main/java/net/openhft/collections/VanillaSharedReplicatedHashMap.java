@@ -118,7 +118,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         return Segment.class;
     }
 
-    private long modIterBitSetSizeInBytes() {
+    long modIterBitSetSizeInBytes() {
         return align64(bitsPerSegmentInModIterBitSet() * segments.length / 8);
     }
 
@@ -1157,7 +1157,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         public ModificationIterator(@Nullable final Object notifier,
                                     @NotNull final Set<EventType> watchList,
-                                    @NotNull final DirectBytes bytes,
+                                    @NotNull final Bytes bytes,
                                     @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener) {
             this.notifier = notifier;
             this.watchList = EnumSet.copyOf(watchList);

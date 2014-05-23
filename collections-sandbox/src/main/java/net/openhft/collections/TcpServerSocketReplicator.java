@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.map.replicators;
+package net.openhft.collections;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -105,6 +104,7 @@ public class TcpServerSocketReplicator implements Closeable {
             serverChannel.socket().close();
             serverChannel.close();
         }
+
         executorService.shutdown();
     }
 

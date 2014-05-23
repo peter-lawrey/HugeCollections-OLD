@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.map.replicators;
+package net.openhft.collections;
 
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +34,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
 /**
  * @author Rob Austin.
  */
-public class TcpSocketChannelEntryWriter {
+class TcpSocketChannelEntryWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryWriter.class);
 
@@ -45,9 +44,9 @@ public class TcpSocketChannelEntryWriter {
     private final EntryCallback entryCallback;
     private final int serializedEntrySize;
 
-    public TcpSocketChannelEntryWriter(final int serializedEntrySize,
-                                       @NotNull final EntryExternalizable externalizable,
-                                       int packetSize) {
+    TcpSocketChannelEntryWriter(final int serializedEntrySize,
+                                @NotNull final EntryExternalizable externalizable,
+                                int packetSize) {
         this.serializedEntrySize = serializedEntrySize;
         out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
         in = new ByteBufferBytes(out);
@@ -173,8 +172,8 @@ public class TcpSocketChannelEntryWriter {
      * @param localIdentifier the current nodes identifier
      * @throws IOException if it failed to send
      */
-    public void sendIdentifier(@NotNull final SocketChannel socketChannel,
-                               final int localIdentifier) throws IOException {
+    void sendIdentifier(@NotNull final SocketChannel socketChannel,
+                        final int localIdentifier) throws IOException {
         in.clear();
         out.clear();
 
@@ -198,8 +197,8 @@ public class TcpSocketChannelEntryWriter {
      * @param timeStampOfLastMessage the last timestamp we received a message from that node
      * @throws IOException if it failed to send
      */
-    public void sendTimestamp(@NotNull final SocketChannel socketChannel,
-                              final long timeStampOfLastMessage) throws IOException {
+    void sendTimestamp(@NotNull final SocketChannel socketChannel,
+                       final long timeStampOfLastMessage) throws IOException {
         in.clear();
         out.clear();
 

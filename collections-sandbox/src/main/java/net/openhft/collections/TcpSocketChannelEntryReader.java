@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.map.replicators;
+package net.openhft.collections;
 
 import net.openhft.lang.io.ByteBufferBytes;
 import org.jetbrains.annotations.NotNull;
