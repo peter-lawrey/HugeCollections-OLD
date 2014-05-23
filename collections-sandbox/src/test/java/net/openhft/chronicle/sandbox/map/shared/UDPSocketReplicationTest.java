@@ -23,7 +23,6 @@ import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
@@ -40,7 +39,7 @@ import static org.junit.Assert.assertTrue;
  * @author Rob Austin.
  */
 
-public class UPDPSocketReplicationTest {
+public class UDPSocketReplicationTest {
 
     static VanillaSharedReplicatedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
             final int identifier,
@@ -60,7 +59,7 @@ public class UPDPSocketReplicationTest {
     @Before
     public void setup() throws IOException {
         map1 = newUdpSocketShmIntString(1, 1234);
-        map2 = newUdpSocketShmIntString(2, 1234);
+      map2 = newUdpSocketShmIntString(2, 1234);
         try {
             Thread.sleep(500);
         } catch (InterruptedException e) {
