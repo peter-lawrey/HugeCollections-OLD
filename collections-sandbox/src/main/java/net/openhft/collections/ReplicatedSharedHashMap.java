@@ -149,7 +149,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes entry)}
      * which will get called whenever a put() or remove() has occurred to the map
      */
-    interface EntryCallback {
+    abstract class EntryCallback {
 
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
@@ -160,19 +160,23 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
-        boolean onEntry(final NativeBytes entry);
+        public abstract boolean onEntry(final NativeBytes entry);
 
         /**
          * Called just after {@see #onEntry(NativeBytes entry)}
          *
          * @see #onEntry(NativeBytes entry);
          */
-        void onAfterEntry();
+        public void onAfterEntry() {
+            // no-op by default
+        }
 
         /**
          * Called just before {@see #onEntry(NativeBytes entry)}
          */
-        void onBeforeEntry();
+        public void onBeforeEntry() {
+            // no-op by default
+        }
     }
 
 

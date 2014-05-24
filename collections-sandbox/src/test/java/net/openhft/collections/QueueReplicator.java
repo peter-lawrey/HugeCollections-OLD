@@ -178,7 +178,6 @@ public class QueueReplicator<K, V> {
                                 return true;
                             }
 
-
                             /**
                              * {@inheritDoc}
                              */
@@ -186,15 +185,6 @@ public class QueueReplicator<K, V> {
                             public void onBeforeEntry() {
                                 isWritingEntry.set(true);
                             }
-
-                            /**
-                             * {@inheritDoc}
-                             */
-                            @Override
-                            public void onAfterEntry() {
-
-                            }
-
 
                         };
 

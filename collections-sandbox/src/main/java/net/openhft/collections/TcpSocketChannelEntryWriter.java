@@ -40,7 +40,6 @@ class TcpSocketChannelEntryWriter {
 
     private final ByteBuffer out;
     private final ByteBufferBytes in;
-    private final EntryExternalizable externalizable;
     private final EntryCallback entryCallback;
     private final int serializedEntrySize;
 
@@ -50,7 +49,6 @@ class TcpSocketChannelEntryWriter {
         this.serializedEntrySize = serializedEntrySize;
         out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
         in = new ByteBufferBytes(out);
-        this.externalizable = externalizable;
         entryCallback = new EntryCallback(externalizable, in);
     }
 
@@ -103,10 +101,9 @@ class TcpSocketChannelEntryWriter {
             in.clear();
         } else {
             out.compact();
-            out.flip();
+            in.position(out.position());
             in.limit(in.capacity());
-            in.position(out.limit());
-            out.limit(out.capacity());
+            out.clear();
         }
     }
 
@@ -114,7 +111,7 @@ class TcpSocketChannelEntryWriter {
     /**
      * {@inheritDoc}
      */
-    static class EntryCallback implements VanillaSharedReplicatedHashMap.EntryCallback {
+    static class EntryCallback extends VanillaSharedReplicatedHashMap.EntryCallback {
 
         private final EntryExternalizable externalizable;
         private final ByteBufferBytes in;
@@ -124,9 +121,7 @@ class TcpSocketChannelEntryWriter {
             this.in = in;
         }
 
-        /**
-         * {@inheritDoc}
-         */
+        @Override
         public boolean onEntry(final NativeBytes entry) {
 
             in.skip(2);
@@ -144,23 +139,6 @@ class TcpSocketChannelEntryWriter {
             in.writeUnsignedShort(start - 2L, entrySize);
 
             return true;
-        }
-
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void onAfterEntry() {
-
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void onBeforeEntry() {
-
         }
     }
 

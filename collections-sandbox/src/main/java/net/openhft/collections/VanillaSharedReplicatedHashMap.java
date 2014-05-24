@@ -1,14 +1,14 @@
 /*
  * Copyright 2014 Higher Frequency Trading
- * <p/>
+ * <p>
  * http://www.higherfrequencytrading.com
- * <p/>
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * <p/>
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -43,7 +43,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
  * A Replicating Multi Master HashMap
- * <p/>
+ * <p>
  * Each remote hash-map, mirrors its changes over to another remote hash map, neither hash map is considered the master
  * store of data, each hash map uses timestamps to reconcile changes.
  * We refer to in instance of a remote hash-map as a node. A node will be connected to any number of other nodes, for
@@ -57,9 +57,9 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * In other words the nodes are only concurrent locally. Its worth realising that another node performing exactly the
  * same operation may return a different value.
  * However reconciliation will ensure the maps themselves become eventually consistent.
- * <p/>
+ * <p>
  * Reconciliation
- * <p/>
+ * <p>
  * If two ( or more nodes ) were to receive a change to their maps for the same key but different values, say by a user
  * of the maps, calling the put(<key>,<value>). Then, initially each node will update its local store and each local
  * store will hold a different value, but the aim of multi master replication is to provide eventual consistency across
@@ -69,7 +69,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the remote
  * nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be applied to the
  * local node, otherwise the event will be ignored.
- * <p/>
+ * <p>
  * However there is an edge case that we have to concern ourselves with, If two nodes update their map at the same time
  * with different values, we have to deterministically resolve which update wins, because of eventual consistency both
  * nodes should end up locally holding the same data. Although it is rare two remote nodes could receive an update to
@@ -86,7 +86,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    public static final int LASTUPDATED_HEADER_SIZE = (127 * 8);
+    public static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
     private final boolean canReplicate;
     private final TimeProvider timeProvider;
@@ -134,7 +134,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
     int getHeaderSize() {
         final int headerSize = super.getHeaderSize();
-        return canReplicate ? headerSize + LASTUPDATED_HEADER_SIZE : headerSize;
+        return canReplicate ? headerSize + LAST_UPDATED_HEADER_SIZE : headerSize;
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
@@ -147,6 +147,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
+    @Override
     public long lastModificationTime(byte identifier) {
         assert identifier != this.identifier();
 
@@ -290,7 +291,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    public void addCloseable(Closeable closeable) {
+    void addCloseable(Closeable closeable) {
         closeables.add(closeable);
     }
 
@@ -687,7 +688,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * used only with replication, it sometimes possible to receive and old ( or stale updates ) from a remote map
          * The method is used to determine if we should ignore such updates.
-         * <p/>
+         * <p>
          * we sometime will reject put() and removes()
          * when comparing times stamps with remote systems
          *
@@ -1035,12 +1036,18 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         entry.position(keyPosition);
         destination.write(entry);
 
+        boolean debugEnabled = LOG.isDebugEnabled();
         String message = null;
-        if (LOG.isDebugEnabled()) {
-            if (isDeleted || valueLen == 0)
-                LOG.debug("READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remove(key=" + ByteUtils.toCharSequence(entry).trim() + ")");
-            else
-                message = "READING REMOTE ENTRY -  into local-id=" + localIdentifier + ", put(key=" + ByteUtils.toCharSequence(entry).trim() + ",";
+        if (debugEnabled) {
+            if (isDeleted || valueLen == 0) {
+                LOG.debug("READING REMOTE ENTRY -  into local-id={}, remove(key={})",
+                        localIdentifier, ByteUtils.toCharSequence(entry).trim());
+            } else {
+                message = String.format(
+                        "READING REMOTE ENTRY -  into local-id=%d, put(key=%s,",
+                        localIdentifier, ByteUtils.toCharSequence(entry).trim()
+                );
+            }
         }
 
         if (isDeleted || valueLen == 0)
@@ -1056,7 +1063,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         entry.limit(entry.position() + valueLen);
         destination.write(entry);
 
-        if (LOG.isDebugEnabled()) {
+        if (debugEnabled) {
             LOG.debug(message + "value=" + ByteUtils.toCharSequence(entry).trim() + ")");
         }
     }
@@ -1088,7 +1095,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             return;
 
         final long keyPosition = source.position();
-        final long keyLimit = source.position() + keyLen;
+        final long keyLimit = keyPosition + keyLen;
 
         source.limit(keyLimit);
         long hash = Hasher.hash(source);
@@ -1096,10 +1103,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
 
+        boolean debugEnabled = LOG.isDebugEnabled();
+        
         if (isDeleted) {
 
-            if (LOG.isDebugEnabled())
-                LOG.debug("WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote=" + remoteIdentifier + ", remove(key=" + ByteUtils.toCharSequence(source).trim() + ")");
+            if (debugEnabled) {
+                LOG.debug(
+                        "WRITING REMOTE ENTRY -  into local-id={}, remote={}, remove(key={})",
+                        localIdentifier, remoteIdentifier, ByteUtils.toCharSequence(source).trim()
+                );
+            }
 
             segment(segmentNum).remoteRemove(source, segmentHash, timeStamp, remoteIdentifier);
             setLastModificationTime(remoteIdentifier, timeStamp);
@@ -1107,18 +1120,26 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         String message = null;
-        if (LOG.isDebugEnabled())
-            message = "WRITING REMOTE ENTRY -  into local-id=" + localIdentifier + ", remote-id=" + remoteIdentifier + ", put(key=" + ByteUtils.toCharSequence(source).trim() + ",";
+        if (debugEnabled) {
+            message = String.format(
+                    "WRITING REMOTE ENTRY -  into local-id=%d, remote-id=%d, put(key=%s,",
+                    localIdentifier, remoteIdentifier, ByteUtils.toCharSequence(source).trim()
+            );
+        }
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
-        segment(segmentNum).remotePut(source, segmentHash, remoteIdentifier, timeStamp, valuePosition, valueLimit, keyPosition, keyLimit);
+        segment(segmentNum).remotePut(
+                source, segmentHash,
+                remoteIdentifier, timeStamp,
+                valuePosition, valueLimit, keyPosition, keyLimit
+        );
         setLastModificationTime(remoteIdentifier, timeStamp);
 
         source.position(valuePosition);
         source.limit(valueLimit);
 
-        if (LOG.isDebugEnabled()) {
+        if (debugEnabled) {
             LOG.debug(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
         }
     }
@@ -1128,12 +1149,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      * Once a change occurs to a map, map replication requires
      * that these changes are picked up by another thread,
      * this class provides an iterator like interface to poll for such changes.
-     * <p/>
+     * <p>
      * In most cases the thread that adds data to the node is unlikely to be the same thread
      * that replicates the data over to the other nodes,
      * so data will have to be marshaled between the main thread storing data to the map,
      * and the thread running the replication.
-     * <p/>
+     * <p>
      * One way to perform this marshalling, would be to pipe the data into a queue. However,
      * This class takes another approach. It uses a bit set, and marks bits
      * which correspond to the indexes of the entries that have changed.
