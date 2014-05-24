@@ -42,28 +42,15 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
 
 public class QueueReplicator<K, V> {
 
-
     public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
-
-
-    @NotNull
-
-
-    private AtomicBoolean isWritingEntry = new AtomicBoolean(true);
-    private AtomicBoolean isReadingEntry = new AtomicBoolean(true);
-
-
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
 
+    private final AtomicBoolean isWritingEntry = new AtomicBoolean(true);
+    private final AtomicBoolean isReadingEntry = new AtomicBoolean(true);
     private ByteBufferBytes buffer;
-    private ByteBufferBytes entryBuffer;
+    private final ByteBufferBytes entryBuffer;
 
-
-
-
-
-        //    / @NotNull final ReplicatedSharedHashMap.WireFormat result.getWireFormat()
-    public QueueReplicator(@NotNull final   ModificationIterator modificationIterator,
+    public QueueReplicator(@NotNull final ModificationIterator modificationIterator,
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            final int entrySize,
@@ -217,7 +204,8 @@ public class QueueReplicator<K, V> {
                             break;
                         }
 
-                        // clear the buffer for reuse, we can store a maximum of MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
+                        // clear the buffer for reuse, we can store a maximum of
+                        // MAX_NUMBER_OF_ENTRIES_PER_CHUNK in this buffer
                         buffer.clear();
 
                     }
@@ -231,7 +219,6 @@ public class QueueReplicator<K, V> {
 
 
     }
-
 
     /**
      * @return true indicates that all the data has been processed ( it lock free so can not be relied upon )
