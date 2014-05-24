@@ -55,7 +55,7 @@ public class TCPSocketReplicationBootStrapTests {
 
         // lets make sure that the message has got to map 1
         do {
-            lastModificationTime = map1.getLastModificationTime((byte) 2);
+            lastModificationTime = map1.lastModificationTime((byte) 2);
             Thread.yield();
         } while (lastModificationTime == 0);
 
@@ -98,7 +98,7 @@ public class TCPSocketReplicationBootStrapTests {
 
         // lets make sure that the message has got to map 1
         do {
-            lastModificationTime = map1.getLastModificationTime((byte) 2);
+            lastModificationTime = map1.lastModificationTime((byte) 2);
             Thread.yield();
         } while (lastModificationTime == 0);
 

@@ -21,6 +21,8 @@ import net.openhft.lang.io.Bytes;
 /**
  * This event listener is called when key events occur.
  * <p>All these calls are synchronous while a lock is held so make them as quick as possible</p>
+ *
+ * TODO specify more clearly in which cases methods are called.
  */
 public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V> > {
     /**
@@ -50,8 +52,13 @@ public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V>
         // do nothing
     }
 
+    void onPut(M  map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
+                      long pos, SharedSegment segment) {
+        onPut(map, entry, metaDataBytes, added, key, value);
+    }
+
     /**
-     * This method is called if a key/value is put in the map
+     * This method is called if a key/value is put in the map.
      *
      * @param map           accessed
      * @param entry         added/modified
@@ -59,12 +66,14 @@ public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V>
      * @param added         if this is a new entry
      * @param key           looked up
      * @param value         set for key
-     * @param pos           the position of this entry in the segment
-     * @param segment       the segment that the entry is store in
      */
-    public void onPut(M  map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
-                      long pos, SharedSegment segment) {
+    public void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value) {
         // do nothing
+    }
+
+    void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value,
+                         int pos, SharedSegment segment) {
+        onRemove(map, entry, metaDataBytes, key, value);
     }
 
     /**
@@ -75,11 +84,8 @@ public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V>
      * @param metaDataBytes length of meta data
      * @param key           removed
      * @param value         removed
-     * @param pos           the position of this entry in the segment
-     * @param segment       the segment that the entry is store in
      */
-    public void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value,
-                         int pos, SharedSegment segment) {
+    public void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value) {
         // do nothing
     }
 

@@ -130,12 +130,12 @@ public class SharedHashMapBuilder implements Cloneable {
     /**
      * Specifies alignment of address in memory of entries
      * and independently of address in memory of values within entries.
-     * <p/>
+     *
      * <p>Useful when values of the map are updated intensively, particularly
      * fields with volatile access, because it doesn't work well
      * if the value crosses cache lines. Also, on some (nowadays rare)
      * architectures any misaligned memory access is more expensive than aligned.
-     * <p/>
+     *
      * <p>Note that specified {@link #entrySize()} will be aligned according to
      * this alignment. I. e. if you set {@code entrySize(20)} and
      * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
@@ -152,7 +152,7 @@ public class SharedHashMapBuilder implements Cloneable {
     /**
      * Returns alignment of addresses in memory of entries and independently
      * of values within entries.
-     * <p/>
+     *
      * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
      *
      * @see #entryAndValueAlignment(Alignment)

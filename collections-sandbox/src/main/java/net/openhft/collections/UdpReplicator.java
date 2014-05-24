@@ -59,7 +59,7 @@ class UdpReplicator implements Closeable {
                   @NotNull final ModificationIterator udpModificationIterator) throws IOException {
         this.port = port;
         this.datagramChannel = DatagramChannel.open();
-        this.localIdentifier = map.getIdentifier();
+        this.localIdentifier = map.identifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
         this.socketChannelEntryReader = socketChannelEntryReader;
         this.udpModificationIterator = udpModificationIterator;

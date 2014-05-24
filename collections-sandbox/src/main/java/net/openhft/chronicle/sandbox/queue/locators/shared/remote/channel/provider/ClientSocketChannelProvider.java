@@ -31,63 +31,56 @@ import java.nio.channels.SocketChannel;
  */
 public class ClientSocketChannelProvider extends AbstractSocketChannelProvider {
 
-    public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
     private static Logger LOG = LoggerFactory.getLogger(ClientSocketChannelProvider.class);
+
     private volatile boolean closed;
+    private final Thread thread;
 
     public ClientSocketChannelProvider(final int port, @NotNull final String host) {
+        // let IllegalArgumentException to be thrown in the main thread
+        // if either the host or the post is invalid
+        final InetSocketAddress remote = new InetSocketAddress(host, port);
 
-        new Thread(new Runnable() {
+        thread = new Thread(new Runnable() {
             @Override
             public void run() {
-
-                SocketChannel result = null;
-                try {
-                    while (!closed) {
-                        try {
-                            result = SocketChannel.open(new InetSocketAddress(host, port));
-                            break;
-                        } catch (Exception e) {
-                            Thread.sleep(1000);
-                            continue;
+                while (!closed) {
+                    SocketChannel result = null;
+                    try {
+                        result = SocketChannel.open(remote);
+                        LOG.info("successfully connected to host={} , port={}", host, port);
+                        result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
+                        socketChannel = result;
+                        latch.countDown();
+                        return;
+                    } catch (IOException e) {
+                        LOG.warn("host: {}, port: {}, error: {}", host, port, e);
+                        if (result != null) {
+                            try {
+                                result.close();
+                            } catch (IOException e1) {
+                                LOG.warn("host: {}, port: {}, error: {}", host, port, e1);
+                            }
                         }
                     }
-
-                    LOG.info("successfully connected to host={} , port={}", host, port);
-
-                    result.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
-
-                    socketChannel.set(result);
-                    latch.countDown();
-                } catch (Exception e) {
-                    LOG.warn("", e);
-                    if (result != null)
-                        try {
-                            result.close();
-                        } catch (IOException e1) {
-                            LOG.warn("", e);
-                        }
+                    try {
+                        Thread.sleep(DELAY_BETWEEN_CONNECTION_ATTEMPTS_IN_MILLIS);
+                    } catch (InterruptedException e) {
+                        LOG.warn("host: {}, port: {}, error: {}", host, port, e);
+                    }
                 }
             }
-        }).start();
+        });
+        thread.start();
     }
 
     /**
-     * @throws IOException
-     * @inhre
+     * {@inheritDoc}
      */
     public void close() throws IOException {
         closed = true;
-        final SocketChannel result = socketChannel.get();
-        if (result != null) {
-            result.close();
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                LOG.warn("", e);
-            }
-        }
-
+        thread.interrupt();
+        closeAndWait(socketChannel, LOG);
     }
 
 }

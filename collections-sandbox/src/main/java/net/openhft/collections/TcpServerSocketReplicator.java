@@ -31,18 +31,19 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
+import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
- * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the
- * maps using na nio, non blocking, server socket connection
- * <p/>
- * {@see net.openhft.collections.InSocketReplicator}
+ * Used with a {@link ReplicatedSharedHashMap} to send data between the
+ * maps using nio, non blocking, server socket connection.
+ *
+ * @see TcpClientSocketReplicator
  *
  * @author Rob Austin.
  */
@@ -52,41 +53,41 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
             LoggerFactory.getLogger(TcpServerSocketReplicator.class.getName());
 
     private final ReplicatedSharedHashMap map;
-    private final int port;
+    private final InetSocketAddress address;
     private final ServerSocketChannel serverChannel;
-    private final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter;
+    private final TcpSocketChannelEntryWriter entryWriter;
     private final byte localIdentifier;
     private final EntryExternalizable externalizable;
     private final int serializedEntrySize;
 
-    private short packetSize;
+    private final short packetSize;
     private final ExecutorService executorService;
 
     public TcpServerSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
                                      final int port,
-                                     @NotNull final TcpSocketChannelEntryWriter socketChannelEntryWriter,
+                                     @NotNull final TcpSocketChannelEntryWriter entryWriter,
                                      final short packetSize,
                                      final int serializedEntrySize) throws IOException {
 
         this.externalizable = externalizable;
         this.map = map;
-        this.port = port;
+        address = new InetSocketAddress(port);
         this.serverChannel = ServerSocketChannel.open();
-        this.localIdentifier = map.getIdentifier();
-        this.tcpSocketChannelEntryWriter = socketChannelEntryWriter;
+        this.localIdentifier = map.identifier();
+        this.entryWriter = entryWriter;
         this.serializedEntrySize = serializedEntrySize;
         this.packetSize = packetSize;
 
         // out bound
-        executorService = newSingleThreadExecutor(new NamedThreadFactory("TcpServerSocketReplicator-" + localIdentifier, true));
+        executorService = newSingleThreadExecutor(
+                new NamedThreadFactory("TcpServerSocketReplicator-" + localIdentifier, true));
 
         executorService.execute(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    TcpServerSocketReplicator.this.packetSize = packetSize;
                     process();
                 } catch (Exception e) {
                     LOG.error("", e);
@@ -101,8 +102,11 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
     public void close() throws IOException {
 
         if (serverChannel != null) {
-            serverChannel.socket().close();
-            serverChannel.close();
+            try {
+                serverChannel.socket().close();
+            } finally {
+                serverChannel.close();
+            }
         }
 
         executorService.shutdown();
@@ -111,96 +115,77 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
     /**
      * binds to the server socket and process data
      * This method will block until interrupted
-     *
-     * @throws Exception
      */
-    private void process() throws Exception {
+    private void process() throws IOException, InterruptedException {
 
-        if (LOG.isDebugEnabled())
-            LOG.debug("Listening on port " + port);
+        LOG.debug("Listening on port {}", address.getPort());
 
-        // allocate an unbound process socket channel
-
-        // Get the associated ServerSocket to bind it with
         final ServerSocket serverSocket = serverChannel.socket();
-
-        // create a new Selector for use below
-        final Selector selector = Selector.open();
-
         serverSocket.setReuseAddress(true);
+        serverSocket.bind(address);
 
-        // set the port the process channel will listen to
-        serverSocket.bind(new InetSocketAddress(port));
-
-        // set non-blocking mode for the listening socket
+        final Selector selector = Selector.open();
         serverChannel.configureBlocking(false);
-
-        // register the ServerSocketChannel with the Selector
-        serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        serverChannel.register(selector, OP_ACCEPT);
 
         while (serverChannel.isOpen()) {
-            // this may block for a long time, upon return the
-            // selected set contains keys of the ready channels
-            final int n = selector.select();
-
-            if (n == 0) {
+            final int nSelectedKeys = selector.select();
+            if (nSelectedKeys == 0) {
                 continue;    // nothing to do
             }
 
-            // get an iterator over the set of selected keys
-            final Iterator it = selector.selectedKeys().iterator();
-
-            // look at each key in the selected set
-            while (it.hasNext()) {
-                SelectionKey key = (SelectionKey) it.next();
-
-                // Is a new connection coming in?
+            Set<SelectionKey> selectedKeys = selector.selectedKeys();
+            for (SelectionKey key : selectedKeys) {
                 if (key.isAcceptable()) {
 
                     final ServerSocketChannel server = (ServerSocketChannel) key.channel();
                     final SocketChannel channel = server.accept();
-
-                    // set the new channel non-blocking
                     channel.configureBlocking(false);
 
-                    final TcpSocketChannelEntryReader tcpSocketChannelEntryReader = new TcpSocketChannelEntryReader(serializedEntrySize, this.externalizable, packetSize);
+                    final TcpSocketChannelEntryReader entryReader =
+                            new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
 
-                    final byte remoteIdentifier = tcpSocketChannelEntryReader.readIdentifier(channel);
-                    tcpSocketChannelEntryWriter.sendIdentifier(channel, localIdentifier);
+                    final byte remoteIdentifier = entryReader.readIdentifier(channel);
+                    entryWriter.sendIdentifier(channel, localIdentifier);
 
-                    final long remoteTimestamp = tcpSocketChannelEntryReader.readTimeStamp(channel);
+                    final long remoteTimestamp = entryReader.readTimeStamp(channel);
 
-                    final ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+                    final ModificationIterator remoteModificationIterator =
+                            map.acquireModificationIterator(remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                     // register it with the selector and store the ModificationIterator for this key
-                    final Attached attached = new Attached(tcpSocketChannelEntryReader, remoteModificationIterator, remoteIdentifier);
-                    channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
+                    final Attached attached = new Attached(entryReader, remoteModificationIterator);
+                    channel.register(selector, OP_WRITE | OP_READ, attached);
 
-                    if (remoteIdentifier == map.getIdentifier())
-                        throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
+                    if (remoteIdentifier == map.identifier())
+                        throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
 
-                    tcpSocketChannelEntryWriter.sendTimestamp(channel, map.getLastModificationTime(remoteIdentifier));
+                    entryWriter.sendTimestamp(channel, map.lastModificationTime(remoteIdentifier));
 
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
+                    if (LOG.isDebugEnabled()) {
+                        // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
+                        // Subtle gain, but.
+                        LOG.debug("server-connection id={}, remoteIdentifier={}",
+                                map.identifier(), remoteIdentifier);
+                    }
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer
-                    tcpSocketChannelEntryReader.readAll(channel);
+                    entryReader.readAll(channel);
                 }
                 try {
 
                     if (key.isWritable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
                         final Attached attachment = (Attached) key.attachment();
-                        tcpSocketChannelEntryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
+                        entryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
                     }
 
                     if (key.isReadable()) {
                         final SocketChannel socketChannel = (SocketChannel) key.channel();
                         final Attached attachment = (Attached) key.attachment();
-                        attachment.tcpSocketChannelEntryReader.readAll(socketChannel);
+                        attachment.entryReader.readAll(socketChannel);
                     }
 
                 } catch (Exception e) {
@@ -216,23 +201,20 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
                     }
                     return;
                 }
-
-                // remove key from selected set, it's been handled
-                it.remove();
             }
+            selectedKeys.clear();
         }
     }
 
     private static class Attached {
 
-        final TcpSocketChannelEntryReader tcpSocketChannelEntryReader;
+        final TcpSocketChannelEntryReader entryReader;
         final ModificationIterator remoteModificationIterator;
-        private final byte remoteIdentifier;
 
-        private Attached(TcpSocketChannelEntryReader tcpSocketChannelEntryReader, ModificationIterator remoteModificationIterator, byte remoteIdentifier) {
-            this.tcpSocketChannelEntryReader = tcpSocketChannelEntryReader;
+        private Attached(TcpSocketChannelEntryReader entryReader,
+                         ModificationIterator remoteModificationIterator) {
+            this.entryReader = entryReader;
             this.remoteModificationIterator = remoteModificationIterator;
-            this.remoteIdentifier = remoteIdentifier;
         }
     }
 
