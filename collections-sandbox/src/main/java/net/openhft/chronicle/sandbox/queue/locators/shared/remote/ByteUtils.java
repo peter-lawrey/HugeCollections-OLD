@@ -51,23 +51,6 @@ public class ByteUtils {
         return builder.toString();
     }
 
-    public static CharSequence toCharSequence(@NotNull final ByteBuffer buffer) {
-
-        final ByteBuffer slice = buffer.slice();
-        slice.limit(buffer.limit());
-        slice.position(buffer.position());
-
-        final StringBuilder builder = new StringBuilder();
-
-        while (slice.hasRemaining()) {
-            final byte b = slice.get();
-            builder.append((char) b);
-        }
-
-
-        return builder.toString();
-    }
-
     public static String toCharSequence(@NotNull final Bytes buffer) {
 
         final Bytes slice = buffer.slice();
