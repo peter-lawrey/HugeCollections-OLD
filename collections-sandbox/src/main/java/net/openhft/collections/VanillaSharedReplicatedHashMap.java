@@ -356,7 +356,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    class Segment extends VanillaSharedHashMap<K, V>.Segment implements ReplicatedSharedSegment {
+    class Segment extends VanillaSharedHashMap<K, V>.Segment {
 
         private volatile IntIntMultiMap hashLookupLiveAndDeleted;
         private volatile IntIntMultiMap hashLookupLiveOnly;
@@ -917,7 +917,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * {@inheritDoc}
          */
-        public void dirtyEntries(final long timeStamp, final EntryModifiableCallback entryModifiableCallback) {
+        public void dirtyEntries(final long timeStamp,
+                                 final ModificationIterator.EntryModifiableCallback callback) {
 
             this.lock();
             try {
@@ -934,7 +935,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                         if (entryTimestamp >= timeStamp &&
                                 entry.readByte() == VanillaSharedReplicatedHashMap.this.identifier())
-                            entryModifiableCallback.set(index, pos);
+                            callback.set(index, pos);
                     }
                 });
 
@@ -1308,9 +1309,17 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
-        class EntryModifiableCallback<K, V> implements ReplicatedSharedHashMap.EntryModifiableCallback<K, V> {
+        /**
+         * details about when a modification to an entry was made
+         */
+        class EntryModifiableCallback {
 
-            @Override
+            /**
+             * set the bit related to {@code segment} and {@code pos}
+             *
+             * @param segmentIndex the segment relating to the bit to set
+             * @param pos          the position relating to the bit to set
+             */
             public synchronized void set(int segmentIndex, int pos) {
                 final long combine = combine(segmentIndex, pos);
                 changes.set(combine);
@@ -1318,12 +1327,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         @Override
-        public void dirtyEntries(long timeStamp) {
+        public void dirtyEntries(long fromTimeStamp) {
 
             // iterate over all the segments and mark bit in the modification iterator
             // that correspond to entries with an older timestamp
             for (final Segment segment : (Segment[]) segments) {
-                segment.dirtyEntries(timeStamp, entryModifiableCallback);
+                segment.dirtyEntries(fromTimeStamp, entryModifiableCallback);
             }
 
         }
