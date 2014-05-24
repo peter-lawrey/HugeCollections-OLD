@@ -82,7 +82,7 @@ class TcpSocketChannelEntryWriter {
 
             // if we have space in the buffer to write more data and we just wrote data into the
             // buffer then let try and write some more, else if we failed to just write data
-            // {@code asDataRead} then we will send what we have
+            // {@code wasDataRead} then we will send what we have
             if (in.remaining() > serializedEntrySize && wasDataRead)
                 continue;
 
