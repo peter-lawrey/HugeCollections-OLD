@@ -65,20 +65,27 @@ class TcpSocketChannelEntryWriter {
     void writeAll(@NotNull final SocketChannel socketChannel,
                   @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
-        final long start = in.position();
 
         // if we still have some unwritten writer from last time
         if (in.position() > 0)
             writeBytes(socketChannel);
 
+        final long start = in.position();
+
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
+
+            // if there was no data written to the buffer and we have not written any more data to
+            // the buffer, then give up
             if (!wasDataRead && in.position() == start)
                 return;
 
-            if (in.remaining() > serializedEntrySize && (wasDataRead || in.position() == start))
+            // if we have space in the buffer to write more data and we just wrote data into the
+            // buffer then let try and write some more, else if we failed to just write data
+            // {@code asDataRead} then we will send what we have
+            if (in.remaining() > serializedEntrySize && wasDataRead)
                 continue;
 
             writeBytes(socketChannel);
