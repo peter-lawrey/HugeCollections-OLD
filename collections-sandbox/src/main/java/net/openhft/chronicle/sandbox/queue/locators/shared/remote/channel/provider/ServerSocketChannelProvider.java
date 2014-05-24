@@ -24,58 +24,51 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 
 /**
  * Created by Rob Austin
  */
 public class ServerSocketChannelProvider extends AbstractSocketChannelProvider implements SocketChannelProvider {
 
-    public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
     private static Logger LOG = LoggerFactory.getLogger(ServerSocketChannelProvider.class);
+
     private volatile ServerSocketChannel serverSocket;
-    volatile boolean closed;
+    private volatile boolean closed;
     private final Thread thread;
 
     public ServerSocketChannelProvider(final int port) {
+        // let IllegalArgumentException to be thrown in the main thread if the post is invalid
+        final InetSocketAddress endpoint = new InetSocketAddress(port);
 
         thread = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 while (!closed) {
-
                     try {
-                        if (closed)
-                            return;
-
                         serverSocket = ServerSocketChannel.open();
                         serverSocket.socket().setReuseAddress(true);
-                        serverSocket.socket().bind(new InetSocketAddress(port));
+                        serverSocket.socket().bind(endpoint);
                         serverSocket.configureBlocking(true);
                         LOG.info("Server waiting for client on port " + port);
                         serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
-                        final SocketChannel result = serverSocket.accept();
-
-                        socketChannel.set(result);
+                        socketChannel = serverSocket.accept();
                         latch.countDown();
                         return;
-                    } catch (Exception e) {
-                        if (closed)
-                            return;
-                        LOG.warn("port={}", port, e);
+                    } catch (IOException e) {
+                        LOG.warn("port={}, error: {}", port, e);
                         if (serverSocket != null) {
                             try {
                                 serverSocket.close();
                             } catch (IOException e1) {
-                                LOG.warn("port={}", port, e);
+                                LOG.warn("port={}, error: {}", port, e1);
                             }
                         }
                     }
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(DELAY_BETWEEN_CONNECTION_ATTEMPTS_IN_MILLIS);
                     } catch (InterruptedException e) {
-                        LOG.warn("port={}", port, e);
+                        LOG.warn("port={}, error: {}", port, e);
                     }
                 }
             }
@@ -89,14 +82,11 @@ public class ServerSocketChannelProvider extends AbstractSocketChannelProvider i
     public void close() throws IOException {
         closed = true;
         thread.interrupt();
-        if (serverSocket != null) {
-            serverSocket.close();
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                LOG.warn("", e);
-            }
+        try {
+            if (socketChannel != null)
+                socketChannel.close();
+        } finally {
+            closeAndWait(serverSocket, LOG);
         }
-
     }
 }

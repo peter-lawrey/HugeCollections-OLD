@@ -18,7 +18,11 @@
 
 package net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider;
 
+import net.openhft.lang.model.constraints.Nullable;
+import org.slf4j.Logger;
+
 import java.io.IOException;
+import java.nio.channels.Channel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,21 +32,29 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 abstract class AbstractSocketChannelProvider implements SocketChannelProvider {
 
-    final AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
+    public static final int RECEIVE_BUFFER_SIZE = 256 * 1024;
+    static final int DELAY_BETWEEN_CONNECTION_ATTEMPTS_IN_MILLIS = 1000;
+
+    volatile SocketChannel socketChannel = null;
     final CountDownLatch latch = new CountDownLatch(1);
 
     public SocketChannel getSocketChannel() throws InterruptedException {
 
-        final SocketChannel result = socketChannel.get();
-        if (result != null)
-            return result;
+        if (socketChannel != null)
+            return socketChannel;
 
         latch.await();
-        return socketChannel.get();
+        return socketChannel;
     }
 
-    @Override
-    public abstract void close() throws IOException;
-
-
+    static void closeAndWait(@Nullable Channel channel, Logger log) throws IOException {
+        if (channel != null) {
+            channel.close();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                log.warn("", e);
+            }
+        }
+    }
 }
