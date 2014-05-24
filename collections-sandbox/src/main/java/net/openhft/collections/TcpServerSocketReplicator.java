@@ -73,7 +73,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
         this.map = map;
         this.port = port;
         this.serverChannel = ServerSocketChannel.open();
-        this.localIdentifier = map.getIdentifier();
+        this.localIdentifier = map.identifier();
         this.tcpSocketChannelEntryWriter = socketChannelEntryWriter;
         this.serializedEntrySize = serializedEntrySize;
         this.packetSize = packetSize;
@@ -177,13 +177,13 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
                     final Attached attached = new Attached(tcpSocketChannelEntryReader, remoteModificationIterator, remoteIdentifier);
                     channel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, attached);
 
-                    if (remoteIdentifier == map.getIdentifier())
-                        throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
+                    if (remoteIdentifier == map.identifier())
+                        throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
 
-                    tcpSocketChannelEntryWriter.sendTimestamp(channel, map.getLastModificationTime(remoteIdentifier));
+                    tcpSocketChannelEntryWriter.sendTimestamp(channel, map.lastModificationTime(remoteIdentifier));
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("server-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
+                        LOG.debug("server-connection id=" + map.identifier() + ", remoteIdentifier=" + remoteIdentifier);
 
                     // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                     // may read more than just 9 writer

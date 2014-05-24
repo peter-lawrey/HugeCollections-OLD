@@ -147,8 +147,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
     }
 
 
-    public long getLastModificationTime(byte identifier) {
-        assert identifier != this.getIdentifier();
+    public long lastModificationTime(byte identifier) {
+        assert identifier != this.identifier();
 
         final int offset = identifier * 8;
         // purposely not volatile as this will impact performance,
@@ -312,7 +312,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      * {@inheritDoc}
      */
     @Override
-    public byte getIdentifier() {
+    public byte identifier() {
         return localIdentifier;
     }
 
@@ -933,7 +933,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         final long entryTimestamp = entry.readLong();
 
                         if (entryTimestamp >= timeStamp &&
-                                entry.readByte() == VanillaSharedReplicatedHashMap.this.getIdentifier())
+                                entry.readByte() == VanillaSharedReplicatedHashMap.this.identifier())
                             entryModifiableCallback.set(index, pos);
                     }
                 });
@@ -1082,7 +1082,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             remoteIdentifier = id;
         }
 
-        if (remoteIdentifier == VanillaSharedReplicatedHashMap.this.getIdentifier())
+        if (remoteIdentifier == VanillaSharedReplicatedHashMap.this.identifier())
             // this can occur when working with UDP, as we will receive our own data
             return;
 

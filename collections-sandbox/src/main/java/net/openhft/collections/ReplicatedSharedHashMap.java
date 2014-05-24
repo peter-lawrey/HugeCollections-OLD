@@ -105,7 +105,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      *
      * @return the unique Identifier associated with this map instance
      */
-    byte getIdentifier();
+    byte identifier();
 
     /**
      * gets ( if it does not exist, creates a new instance of ModificationIterator ) based on a remoteIdentifier
@@ -122,7 +122,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      *
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      */
-    long getLastModificationTime(byte identifier);
+    long lastModificationTime(byte identifier);
 
 
     /**

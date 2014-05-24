@@ -54,7 +54,7 @@ class TcpClientSocketReplicator implements Closeable {
                               @NotNull final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter,
                               @NotNull final ReplicatedSharedHashMap map) {
 
-        executorService = newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.getIdentifier(), true));
+        executorService = newSingleThreadExecutor(new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
         executorService.execute(new Runnable() {
 
             @Override
@@ -67,7 +67,7 @@ class TcpClientSocketReplicator implements Closeable {
                         try {
                             socketChannel = SocketChannel.open(inetSocketAddress);
                             if (LOG.isDebugEnabled()) {
-                                LOG.info("successfully connected to " + inetSocketAddress + ", local-id=" + map.getIdentifier());
+                                LOG.info("successfully connected to " + inetSocketAddress + ", local-id=" + map.identifier());
                             }
                             break;
                         } catch (ConnectException e) {
@@ -80,20 +80,20 @@ class TcpClientSocketReplicator implements Closeable {
                     socketChannel.socket().setReceiveBufferSize(0x100000); // 1Mb
                     socketChannel.socket().setSendBufferSize(0x100000); // 1Mb
 
-                    tcpSocketChannelEntryWriter.sendIdentifier(socketChannel, map.getIdentifier());
+                    tcpSocketChannelEntryWriter.sendIdentifier(socketChannel, map.identifier());
                     final byte remoteIdentifier = tcpSocketChannelEntryReader.readIdentifier(socketChannel);
 
-                    tcpSocketChannelEntryWriter.sendTimestamp(socketChannel, map.getLastModificationTime(remoteIdentifier));
+                    tcpSocketChannelEntryWriter.sendTimestamp(socketChannel, map.lastModificationTime(remoteIdentifier));
                     final long remoteTimestamp = tcpSocketChannelEntryReader.readTimeStamp(socketChannel);
 
                     final ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
                     remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
-                    if (remoteIdentifier == map.getIdentifier())
-                        throw new IllegalStateException("Non unique identifiers id=" + map.getIdentifier());
+                    if (remoteIdentifier == map.identifier())
+                        throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
 
                     if (LOG.isDebugEnabled())
-                        LOG.debug("client-connection id=" + map.getIdentifier() + ", remoteIdentifier=" + remoteIdentifier);
+                        LOG.debug("client-connection id=" + map.identifier() + ", remoteIdentifier=" + remoteIdentifier);
 
                     // we start this connection in blocking mode ( to do the bootstrapping ) , then move it to non-blocking
                     socketChannel.configureBlocking(false);
