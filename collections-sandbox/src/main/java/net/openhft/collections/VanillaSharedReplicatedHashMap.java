@@ -534,7 +534,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     inBytes.limit(valueLimit);
                     inBytes.position(valuePos);
 
-                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, inBytes, null, true);
+                    putValue(pos, offset, entry, valueLenPos, entryEndAddr, inBytes, null, true,
+                            hashLookupLiveAndDeleted);
 
                     if (wasDeleted) {
                         // remove() would have got rid of this so we have to add it back in
@@ -619,7 +620,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             entry.writeBoolean(false);
                         }
 
-                        final V prevValue = replaceValueOnPut(key, value, entry, pos, offset);
+                        final V prevValue = replaceValueOnPut(key, value, entry, pos, offset,
+                                !wasDeleted && !putReturnsNull, hashLookup);
 
                         if (wasDeleted) {
                             // remove() would have got rid of this so we have to add it back in
@@ -861,7 +863,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         // skip the is deleted flag
                         entry.skip(1);
                     }
-                    return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry);
+                    return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry,
+                            hashLookupLiveOnly);
                 }
                 // key is not found
                 return null;
@@ -871,10 +874,12 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         @Override
-        void replacePosInHashLookupOnRelocation(int prevPos, int pos) {
-            hashLookupLiveAndDeleted.replacePrevPos(pos);
-            int hash = hashLookupLiveAndDeleted.getSearchHash();
-            hashLookupLiveOnly.replace(hash, prevPos, pos);
+        void replacePosInHashLookupOnRelocation(IntIntMultiMap searchedHashLookup, int prevPos, int pos) {
+            searchedHashLookup.replacePrevPos(pos);
+            int hash = searchedHashLookup.getSearchHash();
+            IntIntMultiMap anotherLookup = searchedHashLookup == hashLookupLiveAndDeleted ?
+                    hashLookupLiveOnly : hashLookupLiveAndDeleted;
+            anotherLookup.replace(hash, prevPos, pos);
         }
 
 
