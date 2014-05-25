@@ -468,10 +468,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     // skip the is deleted flag
                     boolean wasDeleted = entry.readBoolean();
 
-                    if (!wasDeleted)
+                    if (!wasDeleted) {
                         hashLookupLiveOnly.remove(hash2, pos);
-
-                    decrementSize();
+                        decrementSize();
+                    }
 
                     entry.position(timeStampPos);
                     entry.writeLong(timestamp);
