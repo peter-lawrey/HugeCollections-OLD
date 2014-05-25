@@ -629,36 +629,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                         } else {
                             return prevValue;
                         }
-
+                    } else {
+                        // we wont replaceIfPresent and the entry is not deleted
+                        return putReturnsNull ? null : readValue(entry, null);
                     }
-
-                    long valueLenPos = entry.positionAddr();
-
-                    // this is the case where we wont replaceIfPresent and the entry is not deleted
-                    final long valueLen = readValueLen(entry);
-                    final V prevValue = readValue(entry, value, valueLen);
-
-                    if (prevValue != null)
-                        // as we already have a previous value then we will return this and do nothing.
-                        return prevValue;
-
-                    // so we don't have a previous value, lets add one.
-
-                    if (canReplicate) {
-                        entry.positionAddr(timeStampPos);
-                        entry.writeLong(timestamp);
-                        entry.writeByte(identifier);
-                        // deleted flag
-                        entry.writeBoolean(false);
-                    }
-
-                    long entryEndAddr = entry.positionAddr() + valueLen;
-                    offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
-                    notifyPut(offset, true, key, value, posFromOffset(offset));
-
-                    // putIfAbsent() when the entry is NOT absent, so we return null as the prevValue
-                    return null;
-
                 }
 
                 // key is not found
