@@ -371,21 +371,10 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         @Override
         void createHashLookups(long start) {
-            final NativeBytes iimmapBytes =
-                    new NativeBytes(null, start, start + sizeOfMultiMap(), null);
-            iimmapBytes.load();
-            hashLookupLiveAndDeleted = hashMask == ~0 ?
-                    new VanillaIntIntMultiMap(iimmapBytes) :
-                    new VanillaShortShortMultiMap(iimmapBytes);
-            start += sizeOfMultiMap();
-
+            hashLookupLiveAndDeleted = createMultiMap(start);
             if (canReplicate) {
-                final NativeBytes iimmapBytes2 =
-                        new NativeBytes(null, start, start + sizeOfMultiMap(), null);
-                iimmapBytes2.load();
-                hashLookupLiveOnly = hashMask == ~0 ?
-                        new VanillaIntIntMultiMap(iimmapBytes2) :
-                        new VanillaShortShortMultiMap(iimmapBytes2);
+                start += sizeOfMultiMap();
+                hashLookupLiveOnly = createMultiMap(start);
             } else {
                 hashLookupLiveOnly = hashLookupLiveAndDeleted;
             }

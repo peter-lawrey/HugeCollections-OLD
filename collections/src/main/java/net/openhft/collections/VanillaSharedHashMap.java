@@ -88,7 +88,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int entrySize;
     final Alignment alignment;
     final int entriesPerSegment;
-    final int hashMask;
 
     private final SharedMapErrorListener errorListener;
 
@@ -132,8 +131,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.entriesPerSegment = entriesPerSegment;
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
-        this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
 
+        int hashMask = useSmallMultiMaps() ? 0xFFFF : ~0;
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
@@ -212,6 +211,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     long sizeOfMultiMap() {
         int np2 = Maths.nextPower2(entriesPerSegment, 8);
         return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
+    }
+
+    boolean useSmallMultiMaps() {
+        return entriesPerSegment <= (1 << 16);
     }
 
     long sizeOfBitSets() {
@@ -613,12 +616,16 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         void createHashLookups(long start) {
-            final NativeBytes iimmapBytes =
+            hashLookup = createMultiMap(start);
+        }
+
+        IntIntMultiMap createMultiMap(long start) {
+            final NativeBytes multiMapBytes =
                     new NativeBytes(null, start, start + sizeOfMultiMap(), null);
-            iimmapBytes.load();
-            hashLookup = hashMask == ~0 ?
-                    new VanillaIntIntMultiMap(iimmapBytes) :
-                    new VanillaShortShortMultiMap(iimmapBytes);
+            multiMapBytes.load();
+            return useSmallMultiMaps() ?
+                    new VanillaShortShortMultiMap(multiMapBytes) :
+                    new VanillaIntIntMultiMap(multiMapBytes);
         }
 
         public int getIndex() {
