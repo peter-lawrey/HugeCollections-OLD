@@ -486,24 +486,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         /**
          * called from a remote node when it wishes to propagate a remove event
          */
-        private void remotePut(@NotNull final Bytes inBytes,
-                               int hash2,
-                               final byte identifier,
-                               final long timestamp,
-                               long valuePos,
-                               long valueLimit,
-                               long keyPosition,
-                               long keyLimit) {
+        private void remotePut(@NotNull final Bytes inBytes, int hash2,
+                               final byte identifier, final long timestamp,
+                               long valuePos, long valueLimit) {
             lock();
             try {
-
-                final long keyLen = keyLimit - keyPosition;
+                // inBytes position and limit correspond to the key
+                final long keyLen = inBytes.remaining();
 
                 hashLookupLiveAndDeleted.startSearch(hash2);
                 for (int pos; (pos = hashLookupLiveAndDeleted.nextPos()) >= 0; ) {
-
-                    inBytes.limit(keyLimit);
-                    inBytes.position(keyPosition);
 
                     long offset = offsetFromPos(pos);
                     NativeBytes entry = entry(offset);
@@ -559,9 +551,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 entry.writeStopBit(keyLen);
 
                 // write the key
-                inBytes.limit(keyLimit);
-                inBytes.position(keyPosition);
-
                 entry.write(inBytes);
 
                 entry.writeLong(timestamp);
@@ -1098,11 +1087,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
         final long valuePosition = keyLimit;
         final long valueLimit = valuePosition + valueLen;
-        segment(segmentNum).remotePut(
-                source, segmentHash,
-                remoteIdentifier, timeStamp,
-                valuePosition, valueLimit, keyPosition, keyLimit
-        );
+        segment(segmentNum).remotePut(source, segmentHash, remoteIdentifier, timeStamp,
+                valuePosition, valueLimit);
         setLastModificationTime(remoteIdentifier, timeStamp);
 
         source.position(valuePosition);
