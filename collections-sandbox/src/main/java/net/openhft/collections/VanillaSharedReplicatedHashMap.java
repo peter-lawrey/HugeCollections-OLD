@@ -85,6 +85,12 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
+    static void checkIdentifier(byte identifier) {
+        if (identifier <= 0) {
+            throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
+        }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
     public static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
@@ -189,6 +195,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      */
     @Override
     public V put(K key, V value, byte identifier, long timeStamp) {
+        checkIdentifier(identifier);
         return put0(key, value, true, identifier, timeStamp);
     }
 
@@ -251,6 +258,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
      */
     @Override
     public V remove(K key, V value, byte identifier, long timeStamp) {
+        checkIdentifier(identifier);
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
@@ -464,8 +472,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     entry.position(timeStampPos);
                     entry.writeLong(timestamp);
-                    if (identifier <= 0)
-                        throw new IllegalStateException("identifier=" + identifier);
+                    assert identifier > 0;
                     entry.writeByte(identifier);
                     // was deleted
                     entry.writeBoolean(true);
@@ -517,10 +524,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     boolean wasDeleted = entry.readBoolean();
                     entry.positionAddr(timeStampPos);
                     entry.writeLong(timestamp);
-
-                    if (identifier <= 0)
-                        throw new IllegalStateException("identifier=" + identifier);
-
+                    assert identifier > 0;
                     entry.writeByte(identifier);
 
                     // deleted flag
@@ -754,6 +758,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          */
         public V remove(Bytes keyBytes, K key, V expectedValue, int hash2,
                         final long timestamp, final byte identifier) {
+            assert identifier > 0;
             lock();
             try {
 
@@ -774,9 +779,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     if (canReplicate) {
                         timeStampPos = entry.position();
-                        if (identifier <= 0)
-                            throw new IllegalStateException("identifier=" + identifier);
-
+                        assert identifier > 0;
                         if (shouldIgnore(entry, timestamp, identifier)) {
                             return null;
                         }
@@ -788,8 +791,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             // map but maybe in our hashLookupLiveAndDeleted, so we have to send the deleted notification
                             entry.position(timeStampPos);
                             entry.writeLong(timestamp);
-                            if (identifier <= 0)
-                                throw new IllegalStateException("identifier=" + identifier);
                             entry.writeByte(identifier);
 
                             // was deleted
@@ -816,8 +817,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     if (canReplicate) {
                         entry.position(timeStampPos);
                         entry.writeLong(timestamp);
-                        if (identifier <= 0)
-                            throw new IllegalStateException("identifier=" + identifier);
                         entry.writeByte(identifier);
                         entry.writeBoolean(true);
 
@@ -1053,9 +1052,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (id < 0) {
             isDeleted = true;
             remoteIdentifier = (byte) -id;
-        } else {
+        } else if (id != 0) {
             isDeleted = false;
             remoteIdentifier = id;
+        } else {
+            throw new IllegalStateException("identifier can't be 0");
         }
 
         if (remoteIdentifier == VanillaSharedReplicatedHashMap.this.identifier())

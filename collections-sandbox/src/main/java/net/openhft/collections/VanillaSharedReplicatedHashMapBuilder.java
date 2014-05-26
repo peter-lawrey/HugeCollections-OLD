@@ -343,6 +343,7 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     }
 
     public VanillaSharedReplicatedHashMapBuilder identifier(byte identifier) {
+        VanillaSharedReplicatedHashMap.checkIdentifier(identifier);
         this.identifier = identifier;
         return this;
     }
