@@ -477,6 +477,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     // was deleted
                     entry.writeBoolean(true);
                 }
+                // key is not found
+                LOG.warn("Segment.remoteRemove(): hashLookupLiveAndDeleted should contain all keys, " +
+                        ByteUtils.toCharSequence(keyBytes) + " was not found");
             } finally {
                 unlock();
             }
