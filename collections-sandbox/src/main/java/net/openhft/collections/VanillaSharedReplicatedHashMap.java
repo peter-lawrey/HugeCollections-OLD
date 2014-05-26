@@ -456,9 +456,6 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                     long timeStampPos = entry.position();
 
                     if (shouldIgnore(entry, timestamp, identifier)) {
-
-                        // skip the is deleted flag
-                        entry.skip(1);
                         return;
                     }
 
@@ -509,10 +506,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                     final long timeStampPos = entry.positionAddr();
 
-                    entry.positionAddr(timeStampPos);
-
                     if (shouldIgnore(entry, timestamp, identifier)) {
-                        entry.positionAddr(timeStampPos);
                         return;
                     }
 
@@ -784,10 +778,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                             entry.position(timeStampPos);
                             entry.writeLong(timestamp);
                             entry.writeByte(identifier);
-
-                            // was deleted
-                            entry.writeBoolean(true);
-
+                            // was deleted is already true
+                            entry.skip(1);
 
                             notifyRemoved(offset, key, null, pos);
                             return null;
@@ -969,8 +961,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         final long keyLimit = entry.position();
         final long timeStamp = entry.readLong();
 
-        final byte remoteIdentifier = entry.readByte();
-        if (remoteIdentifier != localIdentifier) {
+        final byte identifier = entry.readByte();
+        if (identifier != localIdentifier) {
+            // TODO explain this case
             return;
         }
 
@@ -990,11 +983,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         destination.writeStopBit(valueLen);
         destination.writeStopBit(timeStamp);
 
-        // we store the isDeleted flag in the remoteIdentifer ( when the remoteIdentifer is negative is it is deleted )
-        if (isDeleted)
-            destination.writeByte(-remoteIdentifier);
-        else
-            destination.writeByte(remoteIdentifier);
+        // we store the isDeleted flag in the identifier
+        // ( when the identifier is negative it is deleted )
+        destination.writeByte(isDeleted ? -identifier : identifier);
 
         // write the key
         entry.position(keyPosition);
@@ -1100,10 +1091,9 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 valuePosition, valueLimit);
         setLastModificationTime(remoteIdentifier, timeStamp);
 
-        source.position(valuePosition);
-        source.limit(valueLimit);
-
         if (debugEnabled) {
+            source.limit(valueLimit);
+            source.position(valuePosition);
             LOG.debug(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
         }
     }
@@ -1242,8 +1232,8 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          */
         public boolean hasNext() {
             final long position = this.position;
-            return changes.nextSetBit(position == -1 ? 0 : position) != NOT_FOUND ||
-                    changes.nextSetBit(0) != NOT_FOUND;
+            return changes.nextSetBit(position == NOT_FOUND ? 0 : position) != NOT_FOUND ||
+                    (position > 0 && changes.nextSetBit(0) != NOT_FOUND);
         }
 
 
@@ -1259,7 +1249,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
 
                 if (position == NOT_FOUND) {
                     if (oldPosition == NOT_FOUND) {
-                        this.position = -1;
+                        this.position = NOT_FOUND;
                         return false;
                     }
                     continue;
@@ -1304,7 +1294,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
              * @param segmentIndex the segment relating to the bit to set
              * @param pos          the position relating to the bit to set
              */
-            public synchronized void set(int segmentIndex, int pos) {
+            public void set(int segmentIndex, int pos) {
                 final long combine = combine(segmentIndex, pos);
                 changes.set(combine);
             }
