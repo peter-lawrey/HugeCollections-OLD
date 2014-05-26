@@ -54,7 +54,7 @@ class TcpClientSocketReplicator implements Closeable {
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
     private final ExecutorService executorService;
 
-    TcpClientSocketReplicator(@NotNull final InetSocketAddress inetSocketAddress,
+    TcpClientSocketReplicator(@NotNull final InetSocketAddress endpoint,
                               @NotNull final TcpSocketChannelEntryReader entryReader,
                               @NotNull final TcpSocketChannelEntryWriter entryWriter,
                               @NotNull final ReplicatedSharedHashMap map) {
@@ -71,10 +71,10 @@ class TcpClientSocketReplicator implements Closeable {
 
                     for (; ; ) {
                         try {
-                            socketChannel = SocketChannel.open(inetSocketAddress);
+                            socketChannel = SocketChannel.open(endpoint);
                             if (LOG.isDebugEnabled()) {
                                 LOG.info("successfully connected to {}, local-id={}",
-                                        inetSocketAddress, map.identifier());
+                                        endpoint, map.identifier());
                             }
                             break;
                         } catch (ConnectException e) {

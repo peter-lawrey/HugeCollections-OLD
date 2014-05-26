@@ -1,14 +1,14 @@
 /*
  * Copyright 2014 Higher Frequency Trading 
- * <p/>
+ * <p>
  * http://www.higherfrequencytrading.com 
- * <p/>
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * <p/>
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,7 +42,8 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
 
     @Override
     public VanillaSharedReplicatedHashMapBuilder clone() {
-        final VanillaSharedReplicatedHashMapBuilder result = (VanillaSharedReplicatedHashMapBuilder) super.clone();
+        final VanillaSharedReplicatedHashMapBuilder result =
+                (VanillaSharedReplicatedHashMapBuilder) super.clone();
         result.identifier(identifier);
         result.canReplicate(canReplicate());
         result.tcpReplication(tcpReplication);
@@ -68,19 +69,20 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return updPort;
     }
 
+    // TODO refactor to series of overloaded builder configuration methods or sub-builder in common SHM builder
     public static class TcpReplication {
 
         private final int serverPort;
-        private final InetSocketAddress[] clientSocketChannelProviderMaps;
+        private final InetSocketAddress[] endpoints;
         public short packetSize = 1024 * 8;
 
-        public TcpReplication(int serverPort, InetSocketAddress... clientSocketChannelProviderMaps) {
+        public TcpReplication(int serverPort, InetSocketAddress... endpoints) {
             this.serverPort = serverPort;
-            this.clientSocketChannelProviderMaps = clientSocketChannelProviderMaps;
+            this.endpoints = endpoints;
 
-            for (final InetSocketAddress inetSocketAddress : clientSocketChannelProviderMaps) {
-                if (inetSocketAddress.getPort() == serverPort && "localhost".equals(inetSocketAddress.getHostName()))
-                    throw new IllegalArgumentException("inetSocketAddress=" + inetSocketAddress
+            for (final InetSocketAddress endpoint : endpoints) {
+                if (endpoint.getPort() == serverPort && "localhost".equals(endpoint.getHostName()))
+                    throw new IllegalArgumentException("endpoint=" + endpoint
                             + " can not point to the same port as the server");
             }
         }
@@ -94,7 +96,8 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     private TcpReplication tcpReplication;
 
 
-    public <K, V> VanillaSharedReplicatedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
+    public <K, V> VanillaSharedReplicatedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass)
+            throws IOException {
         VanillaSharedReplicatedHashMapBuilder builder = clone();
 
         for (int i = 0; i < 10; i++) {
@@ -114,7 +117,8 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         }
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
-        final VanillaSharedReplicatedHashMap<K, V> result = new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+        final VanillaSharedReplicatedHashMap<K, V> result =
+                new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
 
         if (tcpReplication != null)
             applyTcpReplication(result, tcpReplication);
@@ -125,44 +129,54 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
         return result;
     }
 
-    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort) throws IOException {
+    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort)
+            throws IOException {
 
         // the udp modification modification iterator will not be stored in shared memory
-        final ByteBufferBytes updModIteratorBytes = new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
+        final ByteBufferBytes updModIteratorBytes =
+                new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
 
-        final VanillaSharedReplicatedHashMap.ModificationIterator udpModificationIterator = result.new ModificationIterator(
-                null,
-                EnumSet.allOf(ReplicatedSharedHashMap.EventType.class),
-                updModIteratorBytes,
-                result.eventListener);
+        final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
+                result.new ModificationIterator(
+                    null,
+                    EnumSet.allOf(ReplicatedSharedHashMap.EventType.class),
+                    updModIteratorBytes,
+                    result.eventListener
+                );
 
-        result.eventListener = udpModificationIterator;
+        result.eventListener = udpModIterator;
 
-        final UdpSocketChannelEntryWriter socketChannelEntryWriter = new UdpSocketChannelEntryWriter(entrySize(), result);
-        final UdpReplicator.UdpSocketChannelEntryReader socketChannelEntryReader = new UdpReplicator.UdpSocketChannelEntryReader(entrySize(), result);
+        final UdpSocketChannelEntryWriter entryWriter =
+                new UdpSocketChannelEntryWriter(entrySize(), result);
+        final UdpReplicator.UdpSocketChannelEntryReader entryReader =
+                new UdpReplicator.UdpSocketChannelEntryReader(entrySize(), result);
 
-        final UdpReplicator udpReplicator = new UdpReplicator(result, updPort, socketChannelEntryWriter, socketChannelEntryReader, udpModificationIterator);
+        final UdpReplicator udpReplicator =
+                new UdpReplicator(result, updPort, entryWriter, entryReader, udpModIterator);
         result.addCloseable(udpReplicator);
 
     }
 
 
-    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result, TcpReplication tcpReplication) throws IOException {
+    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
+                                            TcpReplication tcpReplication) throws IOException {
 
-        for (final InetSocketAddress clientSocketChannelProvider : tcpReplication.clientSocketChannelProviderMaps) {
-            final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter0 = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
-            final TcpSocketChannelEntryReader tcpSocketChannelEntryReader = new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
-            final TcpClientSocketReplicator tcpClientSocketReplicator = new TcpClientSocketReplicator(clientSocketChannelProvider, tcpSocketChannelEntryReader, tcpSocketChannelEntryWriter0, result);
-            result.addCloseable(tcpClientSocketReplicator);
+        for (final InetSocketAddress endpoint : tcpReplication.endpoints) {
+            final TcpSocketChannelEntryWriter entryWriter =
+                    new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+            final TcpSocketChannelEntryReader entryReader =
+                    new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
+            final TcpClientSocketReplicator replicator =
+                    new TcpClientSocketReplicator(endpoint, entryReader, entryWriter, result);
+            result.addCloseable(replicator);
         }
 
-        final TcpSocketChannelEntryWriter tcpSocketChannelEntryWriter = new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+        final TcpSocketChannelEntryWriter entryWriter =
+                new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
 
         final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
-                result,
-                result,
-                tcpReplication.serverPort,
-                tcpSocketChannelEntryWriter, tcpReplication.packetSize, entrySize());
+                result, result, tcpReplication.serverPort,
+                entryWriter, tcpReplication.packetSize, entrySize());
 
         result.addCloseable(tcpServerSocketReplicator);
     }
@@ -201,12 +215,12 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
     /**
      * Specifies alignment of address in memory of entries
      * and independently of address in memory of values within entries.
-     * <p/>
+     * <p>
      * Useful when values of the map are updated intensively, particularly
      * fields with volatile access, because it doesn't work well
      * if the value crosses cache lines. Also, on some (nowadays rare)
      * architectures any misaligned memory access is more expensive than aligned.
-     * <p/>
+     * <p>
      * Note that specified {@link #entrySize()} will be aligned according to
      * this alignment. I. e. if you set {@code entrySize(20)} and
      * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
@@ -271,7 +285,8 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
+     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced
+     *                       but instead return null
      * @return an instance of the map builder
      */
     public VanillaSharedReplicatedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
@@ -285,7 +300,8 @@ public class VanillaSharedReplicatedHashMapBuilder extends SharedHashMapBuilder 
      * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
      * Either way it's expensive for something you probably don't use.
      *
-     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
+     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return
+     *                          the object that was removed but instead return null
      * @return an instance of the map builder
      */
     public VanillaSharedReplicatedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
