@@ -975,7 +975,13 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         }
 
         final boolean isDeleted = entry.readBoolean();
-        long valueLen = isDeleted ? 0 : entry.readStopBit();
+        long valueLen;
+        if (!isDeleted) {
+            valueLen = entry.readStopBit();
+            assert valueLen > 0;
+        } else {
+            valueLen = 0;
+        }
 
         // set the limit on the entry to the length ( in bytes ) of our entry
         final long position = entry.position();
@@ -991,14 +997,14 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             destination.writeByte(remoteIdentifier);
 
         // write the key
-        entry.limit(keyLimit);
         entry.position(keyPosition);
+        entry.limit(keyLimit);
         destination.write(entry);
 
         boolean debugEnabled = LOG.isDebugEnabled();
         String message = null;
         if (debugEnabled) {
-            if (isDeleted || valueLen == 0) {
+            if (isDeleted) {
                 LOG.debug("READING REMOTE ENTRY -  into local-id={}, remove(key={})",
                         localIdentifier, ByteUtils.toCharSequence(entry).trim());
             } else {
@@ -1009,7 +1015,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             }
         }
 
-        if (isDeleted || valueLen == 0)
+        if (isDeleted)
             return;
 
         // skipping the alignment, as alignment wont work when we send the data over the wire.
