@@ -32,6 +32,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 
 import static java.nio.channels.SelectionKey.*;
@@ -47,7 +48,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  *
  * @author Rob Austin.
  */
- class TcpServerSocketReplicator implements Closeable {
+class TcpServerSocketReplicator implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(TcpServerSocketReplicator.class.getName());
@@ -62,6 +63,8 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
 
     private final short packetSize;
     private final ExecutorService executorService;
+    private CountDownLatch latch = new CountDownLatch(1);
+    private final Selector selector;
 
     public TcpServerSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                                      @NotNull final EntryExternalizable externalizable,
@@ -74,6 +77,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
         this.map = map;
         address = new InetSocketAddress(port);
         this.serverChannel = ServerSocketChannel.open();
+        selector = Selector.open();
         this.localIdentifier = map.identifier();
         this.entryWriter = entryWriter;
         this.serializedEntrySize = serializedEntrySize;
@@ -97,112 +101,119 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
         });
     }
 
-
     @Override
     public void close() throws IOException {
-
-        if (serverChannel != null) {
-            try {
-                serverChannel.socket().close();
-            } finally {
-                serverChannel.close();
-            }
+        serverChannel.close();
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            LOG.error("", e);
         }
-
-        executorService.shutdown();
+        executorService.shutdownNow();
     }
 
     /**
-     * binds to the server socket and process data
-     * This method will block until interrupted
+     * binds to the server socket and process data This method will block until interrupted
      */
     private void process() throws IOException, InterruptedException {
 
         LOG.debug("Listening on port {}", address.getPort());
 
         final ServerSocket serverSocket = serverChannel.socket();
-        serverSocket.setReuseAddress(true);
-        serverSocket.bind(address);
+        try {
+            serverSocket.setReuseAddress(true);
+            serverSocket.bind(address);
 
-        final Selector selector = Selector.open();
-        serverChannel.configureBlocking(false);
-        serverChannel.register(selector, OP_ACCEPT);
+            serverChannel.configureBlocking(false);
+            serverChannel.register(selector, OP_ACCEPT);
 
-        while (serverChannel.isOpen()) {
-            final int nSelectedKeys = selector.select();
-            if (nSelectedKeys == 0) {
-                continue;    // nothing to do
-            }
-
-            Set<SelectionKey> selectedKeys = selector.selectedKeys();
-            for (SelectionKey key : selectedKeys) {
-                if (key.isAcceptable()) {
-
-                    final ServerSocketChannel server = (ServerSocketChannel) key.channel();
-                    final SocketChannel channel = server.accept();
-                    channel.configureBlocking(false);
-
-                    final TcpSocketChannelEntryReader entryReader =
-                            new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
-
-                    final byte remoteIdentifier = entryReader.readIdentifier(channel);
-                    entryWriter.sendIdentifier(channel, localIdentifier);
-
-                    final long remoteTimestamp = entryReader.readTimeStamp(channel);
-
-                    final ModificationIterator remoteModificationIterator =
-                            map.acquireModificationIterator(remoteIdentifier);
-                    remoteModificationIterator.dirtyEntries(remoteTimestamp);
-
-                    // register it with the selector and store the ModificationIterator for this key
-                    final Attached attached = new Attached(entryReader, remoteModificationIterator);
-                    channel.register(selector, OP_WRITE | OP_READ, attached);
-
-                    if (remoteIdentifier == map.identifier())
-                        throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-
-                    entryWriter.sendTimestamp(channel, map.lastModificationTime(remoteIdentifier));
-
-                    if (LOG.isDebugEnabled()) {
-                        // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
-                        // Subtle gain, but.
-                        LOG.debug("server-connection id={}, remoteIdentifier={}",
-                                map.identifier(), remoteIdentifier);
-                    }
-
-                    // process any writer.remaining(), this can occur because reading socket for the bootstrap,
-                    // may read more than just 9 writer
-                    entryReader.readAll(channel);
+            while (serverChannel.isOpen()) {
+                final int nSelectedKeys = selector.select(100);
+                if (nSelectedKeys == 0) {
+                    continue;    // nothing to do
                 }
-                try {
 
-                    if (key.isWritable()) {
-                        final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        final Attached attachment = (Attached) key.attachment();
-                        entryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                for (SelectionKey key : selectedKeys) {
+                    if (key.isAcceptable()) {
+
+                        final ServerSocketChannel server = (ServerSocketChannel) key.channel();
+                        final SocketChannel channel = server.accept();
+                        channel.configureBlocking(false);
+                        channel.socket().setKeepAlive(true);
+                        channel.socket().setSoTimeout(100);
+
+                        final TcpSocketChannelEntryReader entryReader =
+                                new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
+
+                        final byte remoteIdentifier = entryReader.readIdentifier(channel);
+                        entryWriter.sendIdentifier(channel, localIdentifier);
+
+                        final long remoteTimestamp = entryReader.readTimeStamp(channel);
+
+                        final ModificationIterator remoteModificationIterator =
+                                map.acquireModificationIterator(remoteIdentifier);
+                        remoteModificationIterator.dirtyEntries(remoteTimestamp);
+
+                        // register it with the selector and store the ModificationIterator for this key
+                        final Attached attached = new Attached(entryReader, remoteModificationIterator);
+                        channel.register(selector, OP_WRITE | OP_READ, attached);
+
+                        if (remoteIdentifier == map.identifier())
+                            throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
+
+                        entryWriter.sendTimestamp(channel, map.lastModificationTime(remoteIdentifier));
+
+                        if (LOG.isDebugEnabled()) {
+                            // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
+                            // Subtle gain, but.
+                            LOG.debug("server-connection id={}, remoteIdentifier={}",
+                                    map.identifier(), remoteIdentifier);
+                        }
+
+                        // process any writer.remaining(), this can occur because reading socket for the bootstrap,
+                        // may read more than just 9 writer
+                        entryReader.readAll(channel);
                     }
-
-                    if (key.isReadable()) {
-                        final SocketChannel socketChannel = (SocketChannel) key.channel();
-                        final Attached attachment = (Attached) key.attachment();
-                        attachment.entryReader.readAll(socketChannel);
-                    }
-
-                } catch (Exception e) {
-
-                    if (serverChannel.isOpen())
-                        LOG.error("", e);
-
-                    // Close channel and nudge selector
                     try {
-                        key.channel().close();
-                    } catch (IOException ex) {
-                        // do nothing
+
+                        if (key.isWritable()) {
+                            final SocketChannel socketChannel = (SocketChannel) key.channel();
+                            final Attached attachment = (Attached) key.attachment();
+                            entryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
+                        }
+
+                        if (key.isReadable()) {
+                            final SocketChannel socketChannel = (SocketChannel) key.channel();
+                            final Attached attachment = (Attached) key.attachment();
+                            attachment.entryReader.readAll(socketChannel);
+                        }
+
+                    } catch (Exception e) {
+
+                        if (serverChannel.isOpen())
+                            LOG.error("", e);
+
+                        // Close channel and nudge selector
+                        try {
+                            key.channel().close();
+                        } catch (IOException ex) {
+                            // do nothing
+                        }
+                        return;
                     }
-                    return;
                 }
+                selectedKeys.clear();
             }
-            selectedKeys.clear();
+        } finally {
+
+            try {
+                serverChannel.socket().close();
+            } finally {
+                serverChannel.close();
+            }
+            selector.close();
+            latch.countDown();
         }
     }
 

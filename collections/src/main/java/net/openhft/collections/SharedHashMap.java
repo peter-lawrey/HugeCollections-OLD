@@ -28,7 +28,8 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
     long longSize();
 
     /**
-     * Get a value for a key if available.  If the value is Byteable, it will be assigned to reference the value, instead of copying the data for zero copy access to the collection.
+     * Get a value for a key if available.  If the value is Byteable, it will be assigned to
+     * reference the value, instead of copying the data for zero copy access to the collection.
      *
      * @param key   to lookup.
      * @param value to reuse if possible. If null, a new object will be created.
@@ -37,7 +38,8 @@ public interface SharedHashMap<K, V> extends ConcurrentMap<K, V>, Closeable {
     V getUsing(K key, V value);
 
     /**
-     * Acquire a value for a key, creating if absent. If the value is Byteable, it will be assigned to reference the value, instead of copying the data.
+     * Acquire a value for a key, creating if absent. If the value is Byteable, it will be assigned
+     * to reference the value, instead of copying the data.
      *
      * @param key   to lookup.
      * @param value to reuse if possible. If null, a new object will be created.

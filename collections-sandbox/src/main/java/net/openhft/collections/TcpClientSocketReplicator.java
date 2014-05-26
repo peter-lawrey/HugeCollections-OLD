@@ -30,18 +30,18 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static java.nio.channels.SelectionKey.*;
 import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 
 /**
- * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a socket connection
- * <p/>
+ * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps
+ * using a socket connection
+ *
  * {@see net.openhft.collections.OutSocketReplicator}
  *
  * @author Rob Austin.
@@ -83,9 +83,10 @@ class TcpClientSocketReplicator implements Closeable {
                     }
 
                     socketChannelRef.set(socketChannel);
-
                     socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
                     socketChannel.socket().setSendBufferSize(BUFFER_SIZE);
+                    socketChannel.socket().setKeepAlive(true);
+                    socketChannel.socket().setSoTimeout(100);
 
                     entryWriter.sendIdentifier(socketChannel, map.identifier());
                     final byte remoteIdentifier = entryReader.readIdentifier(socketChannel);
@@ -152,29 +153,41 @@ class TcpClientSocketReplicator implements Closeable {
 
 
                 } catch (Exception e) {
-                    // we wont log exceptions that occur due ot the socket being closed
-                    final SocketChannel socketChannel = socketChannelRef.get();
-                    if (socketChannel != null && socketChannel.isOpen()) {
-                        LOG.error("", e);
-                    }
+                     LOG.error("", e);
+                    //  }
+                } finally {
+                    close(socketChannelRef.getAndSet(null));
                 }
+
             }
+
 
         });
     }
 
     @Override
     public void close() throws IOException {
+        close(socketChannelRef.getAndSet(null));
+        executorService.shutdownNow();
+    }
 
-        final SocketChannel socketChannel = socketChannelRef.getAndSet(null);
+    private static void close(SocketChannel socketChannel) {
         if (socketChannel != null) {
             try {
-                socketChannel.socket().close();
+                try {
+                    socketChannel.socket().close();
+                } catch (IOException e) {
+                    LOG.error("", e);
+                }
             } finally {
-                socketChannel.close();
+                try {
+                    socketChannel.close();
+                } catch (IOException e) {
+                    LOG.error("", e);
+                }
             }
         }
-        executorService.shutdownNow();
+
     }
 
 

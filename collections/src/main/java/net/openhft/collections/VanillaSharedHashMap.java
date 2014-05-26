@@ -37,7 +37,7 @@ import java.util.*;
 import static java.lang.Thread.currentThread;
 
 
-public class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
+class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
 
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
@@ -54,8 +54,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private static final Logger LOG = LoggerFactory.getLogger(AbstractVanillaSharedHashMap.class);
 
     /**
-     * Because DirectBitSet implementations couldn't find more
-     * than 64 continuous clear or set bits.
+     * Because DirectBitSet implementations couldn't find more than 64 continuous clear or set
+     * bits.
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
@@ -190,8 +190,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * @param size positive number
-     * @return number of bytes taken by
-     * {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
+     * @return number of bytes taken by {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
      * applied to {@code size}
      */
     static int expectedStopBits(long size) {
@@ -448,8 +447,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     /**
-     * removes ( if there exists ) an entry from the map, if the {@param key} and {@param expectedValue} match that of a maps.entry.
-     * If the {@param expectedValue} equals null then ( if there exists ) an entry whose key equals {@param key} this is removed.
+     * removes ( if there exists ) an entry from the map, if the {@param key} and {@param
+     * expectedValue} match that of a maps.entry. If the {@param expectedValue} equals null then (
+     * if there exists ) an entry whose key equals {@param key} this is removed.
      *
      * @param key           the key of the entry to remove
      * @param expectedValue null if not required
@@ -479,8 +479,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     /**
      * {@inheritDoc}
      *
-     * @return the previous value associated with the specified key,
-     * or <tt>null</tt> if there was no mapping for the key
+     * @return the previous value associated with the specified key, or <tt>null</tt> if there was
+     * no mapping for the key
      * @throws NullPointerException if the specified key or value is null
      */
     @Override
@@ -509,7 +509,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * replace the value in a map, only if the existing entry equals {@param existingValue}
      *
      * @param key           the key into the map
-     * @param existingValue the expected existing value in the map ( could be null when we don't wish to do this check )
+     * @param existingValue the expected existing value in the map ( could be null when we don't
+     *                      wish to do this check )
      * @param newValue      the new value you wish to store in the map
      * @return the value that was replaced
      */
@@ -722,23 +723,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Used to acquire an object of type V from the Segment.
-         * <p/>
-         * {@code usingValue} is reused to read the value if key is present
-         * in this Segment, if key is absent in this Segment:
-         * <p/>
-         * <ol><li>If {@code create == false}, just {@code null} is returned
-         * (except when event listener provides a value "on get missing" - then
-         * it is put into this Segment for the key).</li>
-         * <p/>
-         * <li>If {@code create == true}, {@code usingValue} or a newly
-         * created instance of value class, if {@code usingValue == null},
-         * is put into this Segment for the key.</li></ol>
+         * Used to acquire an object of type V from the Segment. <p/> {@code usingValue} is reused
+         * to read the value if key is present in this Segment, if key is absent in this Segment:
+         * <p/> <ol><li>If {@code create == false}, just {@code null} is returned (except when event
+         * listener provides a value "on get missing" - then it is put into this Segment for the
+         * key).</li> <p/> <li>If {@code create == true}, {@code usingValue} or a newly created
+         * instance of value class, if {@code usingValue == null}, is put into this Segment for the
+         * key.</li></ol>
          *
          * @param keyBytes serialized {@code key}
          * @param hash2    a hash code related to the {@code keyBytes}
-         * @return the value which is finally associated with the given key in
-         * this Segment after execution of this method, or {@code null}.
+         * @return the value which is finally associated with the given key in this Segment after
+         * execution of this method, or {@code null}.
          */
         V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create) {
             lock();
@@ -856,7 +852,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         /**
          * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface
-         * and {@code usingValue} is {@code true}, the value is backed with the bytes of this entry.
+         * and {@code usingValue} is {@code true}, the value is backed with the bytes of this
+         * entry.
          *
          * @param keyBytes   serialized key
          * @param value      the value to put
@@ -969,8 +966,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         /**
          * TODO use the value length to limit reading
          *
-         * @param value the object to reuse (if possible),
-         *              if {@code null} a new object is created
+         * @param value the object to reuse (if possible), if {@code null} a new object is created
          */
         V readValue(NativeBytes entry, V value, long valueLen) {
             if (generatedValueType)
@@ -991,17 +987,14 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Removes a key (or key-value pair) from the Segment.
-         * <p/>
-         * The entry will only be removed if {@code expectedValue} equals
-         * to {@code null} or the value previously corresponding to the specified key.
+         * Removes a key (or key-value pair) from the Segment. <p/> The entry will only be removed
+         * if {@code expectedValue} equals to {@code null} or the value previously corresponding to
+         * the specified key.
          *
          * @param keyBytes bytes of the key to remove
          * @param hash2    a hash code related to the {@code keyBytes}
-         * @return the value of the entry that was removed if the entry
-         * corresponding to the {@code keyBytes} exists
-         * and {@link #removeReturnsNull} is {@code false},
-         * {@code null} otherwise
+         * @return the value of the entry that was removed if the entry corresponding to the {@code
+         * keyBytes} exists and {@link #removeReturnsNull} is {@code false}, {@code null} otherwise
          */
         V remove(Bytes keyBytes, K key, V expectedValue, int hash2) {
             lock();
@@ -1056,11 +1049,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Replaces the specified value for the key with the given value.
-         * <p/>
-         * {@code newValue} is set only if the existing value corresponding
-         * to the specified key is equal to {@code expectedValue}
-         * or {@code expectedValue == null}.
+         * Replaces the specified value for the key with the given value. <p/> {@code newValue} is
+         * set only if the existing value corresponding to the specified key is equal to {@code
+         * expectedValue} or {@code expectedValue == null}.
          *
          * @param hash2 a hash code related to the {@code keyBytes}
          * @return the replaced value or {@code null} if the value was not replaced
@@ -1149,23 +1140,22 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Replaces value in existing entry. May cause entry relocation, because
-         * there may be not enough space for new value in location already
-         * allocated for this entry.
+         * Replaces value in existing entry. May cause entry relocation, because there may be not
+         * enough space for new value in location already allocated for this entry.
          *
          * @param pos             index of the first block occupied by the entry
-         * @param offset          relative offset of the entry in Segment bytes
-         *                        (before, i. e. including metaData)
+         * @param offset          relative offset of the entry in Segment bytes (before, i. e.
+         *                        including metaData)
          * @param entry           relative pointer in Segment bytes
          * @param valueLenPos     relative position of value "stop bit" in entry
          * @param entryEndAddr    absolute address of the entry end
          * @param valueBytes      serialized value, or {@code null} if valueAsByteable is given
-         * @param valueAsByteable the value to put as {@code Byteable},
-         *                        or {@code null} if valueBytes is given
-         * @param allowOversize   {@code true} if the entry is allowed become oversized
-         *                        if it was not yet
-         * @return relative offset of the entry in Segment bytes after putting value
-         * (that may cause entry relocation)
+         * @param valueAsByteable the value to put as {@code Byteable}, or {@code null} if
+         *                        valueBytes is given
+         * @param allowOversize   {@code true} if the entry is allowed become oversized if it was
+         *                        not yet
+         * @return relative offset of the entry in Segment bytes after putting value (that may cause
+         * entry relocation)
          */
         long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
                       long entryEndAddr, @Nullable Bytes valueBytes,
