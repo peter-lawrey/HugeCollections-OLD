@@ -1246,17 +1246,16 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
          * @return true if an entry was processed
          */
         public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
-            long oldPosition = position;
+            long position = this.position;
             while (true) {
-
-                long position = changes.nextSetBit(oldPosition + 1);
+                long oldPosition = position;
+                position = changes.nextSetBit(oldPosition + 1);
 
                 if (position == NOT_FOUND) {
                     if (oldPosition == NOT_FOUND) {
                         this.position = -1;
                         return false;
                     }
-                    oldPosition = position;
                     continue;
                 }
 
