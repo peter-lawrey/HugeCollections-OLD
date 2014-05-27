@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.shared;
+package net.openhft.collections.replication;
 
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.chronicle.sandbox.map.shared.Builder.getPersistenceFile;
+import static net.openhft.collections.replication.Builder.getPersistenceFile;
 import static net.openhft.collections.VanillaSharedReplicatedHashMapBuilder.TcpReplication;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;

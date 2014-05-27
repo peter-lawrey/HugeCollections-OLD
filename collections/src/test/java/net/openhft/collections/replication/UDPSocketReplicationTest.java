@@ -16,19 +16,21 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.shared;
+package net.openhft.collections.replication;
 
 import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMap;
+import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.chronicle.sandbox.map.shared.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
+import static net.openhft.collections.replication.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -38,24 +40,38 @@ import static org.junit.Assert.assertTrue;
  * @author Rob Austin.
  */
 
-public class TCPSocketReplicationTest3way {
+public class UDPSocketReplicationTest {
+
+    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
+            final int identifier,
+            final int udpPort) throws IOException {
+
+        return new VanillaSharedReplicatedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) identifier)
+                .updPort((short) udpPort)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+    }
 
 
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
-    private SharedHashMap<Integer, CharSequence> map3;
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078));
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078));
-        map3 = newTcpSocketShmIntString((byte) 3, 8078);
+        map1 = newUdpSocketShmIntString(1, 1234);
+      map2 = newUdpSocketShmIntString(2, 1234);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map1, map2, map3}) {
+        for (final Closeable closeable : new Closeable[]{map1, map2}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -66,54 +82,37 @@ public class TCPSocketReplicationTest3way {
 
 
     @Test
-    public void test3() throws IOException, InterruptedException {
+    @Ignore
+    public void testBufferOverflow() throws IOException, InterruptedException {
 
-        map3.put(5, "EXAMPLE-2");
-
-        // allow time for the recompilation to resolve
-        waitTillEqual(5000);
-
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertEquals(new TreeMap(map3), new TreeMap(map2));
-        assertTrue(!map1.isEmpty());
-
-    }
-
-    @Test
-    public void test() throws IOException, InterruptedException {
-
-        map1.put(1, "EXAMPLE-1");
-        map1.put(2, "EXAMPLE-2");
-        map1.put(3, "EXAMPLE-1");
-
-        map2.put(5, "EXAMPLE-2");
-        map2.put(6, "EXAMPLE-2");
-
-        map1.remove(2);
-        map2.remove(3);
-        map1.remove(3);
-        map2.put(5, "EXAMPLE-2");
+        for (int i = 0; i < 1024; i++) {
+            map1.put(i, "EXAMPLE-1");
+        }
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertEquals(new TreeMap(map3), new TreeMap(map3));
-        assertTrue(!map1.isEmpty());
+        assertTrue(!map2.isEmpty());
 
     }
 
-
+    /**
+     * * waits until map1 and map2 show the same value
+     *
+     * @param timeOutMs timeout in milliseconds
+     * @throws InterruptedException
+     */
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)) &&
-                    new TreeMap(map1).equals(new TreeMap(map3)))
+            if (new TreeMap(map1).equals(new TreeMap(map2)))
                 break;
             Thread.sleep(1);
         }
 
     }
+
 }
 
 

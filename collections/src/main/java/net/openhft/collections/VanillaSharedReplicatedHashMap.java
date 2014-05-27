@@ -18,7 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.chronicle.sandbox.queue.locators.shared.remote.ByteUtils;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.io.*;
@@ -470,7 +469,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
                 }
                 // key is not found
                 LOG.warn("Segment.remoteRemove(): hashLookupLiveAndDeleted should contain all keys, " +
-                        ByteUtils.toCharSequence(keyBytes) + " was not found");
+                        AbstractBytes.toString(keyBytes) + " was not found");
             } finally {
                 unlock();
             }
@@ -979,11 +978,11 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (debugEnabled) {
             if (isDeleted) {
                 LOG.debug("READING REMOTE ENTRY -  into local-id={}, remove(key={})",
-                        localIdentifier, ByteUtils.toCharSequence(entry).trim());
+                        localIdentifier, AbstractBytes.toString(entry).trim());
             } else {
                 message = String.format(
                         "READING REMOTE ENTRY -  into local-id=%d, put(key=%s,",
-                        localIdentifier, ByteUtils.toCharSequence(entry).trim()
+                        localIdentifier, AbstractBytes.toString(entry).trim()
                 );
             }
         }
@@ -1001,7 +1000,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         destination.write(entry);
 
         if (debugEnabled) {
-            LOG.debug(message + "value=" + ByteUtils.toCharSequence(entry).trim() + ")");
+            LOG.debug(message + "value=" + AbstractBytes.toString(entry).trim() + ")");
         }
     }
 
@@ -1050,7 +1049,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
             if (debugEnabled) {
                 LOG.debug(
                         "WRITING REMOTE ENTRY -  into local-id={}, remote={}, remove(key={})",
-                        localIdentifier, remoteIdentifier, ByteUtils.toCharSequence(source).trim()
+                        localIdentifier, remoteIdentifier, AbstractBytes.toString(source).trim()
                 );
             }
 
@@ -1063,7 +1062,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (debugEnabled) {
             message = String.format(
                     "WRITING REMOTE ENTRY -  into local-id=%d, remote-id=%d, put(key=%s,",
-                    localIdentifier, remoteIdentifier, ByteUtils.toCharSequence(source).trim()
+                    localIdentifier, remoteIdentifier, AbstractBytes.toString(source).trim()
             );
         }
 
@@ -1076,7 +1075,7 @@ public class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedH
         if (debugEnabled) {
             source.limit(valueLimit);
             source.position(valuePosition);
-            LOG.debug(message + "value=" + ByteUtils.toCharSequence(source).trim() + ")");
+            LOG.debug(message + "value=" + AbstractBytes.toString(source).trim() + ")");
         }
     }
 

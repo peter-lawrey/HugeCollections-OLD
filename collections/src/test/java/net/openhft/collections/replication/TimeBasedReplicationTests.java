@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.shared;
+package net.openhft.collections.replication;
 
-import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
 import net.openhft.collections.TimeProvider;
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+import net.openhft.collections.jrs166.JSR166TestCase;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -34,7 +34,7 @@ import static org.junit.Assert.*;
 /**
  * @author Rob Austin.
  */
-public class TimeBasedReplicationTests extends SharedJSR166TestCase {
+public class TimeBasedReplicationTests extends JSR166TestCase {
 
 
     public static final byte IDENTIFIER = 1;
@@ -54,7 +54,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -83,7 +83,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -113,7 +113,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -123,7 +123,6 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         map.put("key-1", "value-1");
         assertEquals(1, map.size());
         assertEquals("value-1", map.get("key-1"));
-
 
 
         // now test assume that we receive a late update to the map, the following update should be ignored
@@ -146,7 +145,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -176,7 +175,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -205,7 +204,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -234,7 +233,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -264,7 +263,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -294,7 +293,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);
@@ -322,7 +321,7 @@ public class TimeBasedReplicationTests extends SharedJSR166TestCase {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
         final VanillaSharedReplicatedHashMap map = new VanillaSharedReplicatedHashMapBuilder()
                 .entries(10)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         current(timeProvider);

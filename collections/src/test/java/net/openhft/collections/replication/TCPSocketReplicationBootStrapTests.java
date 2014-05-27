@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.shared;
+package net.openhft.collections.replication;
 
 import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;

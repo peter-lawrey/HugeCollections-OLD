@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.openhft.collections;
+package net.openhft.collections.replication;
 
 import java.io.File;
 

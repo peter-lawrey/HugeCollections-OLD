@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package net.openhft.chronicle.sandbox.map.shared;
+package net.openhft.collections.replication;
 
-import net.openhft.chronicle.sandbox.queue.shared.SharedJSR166TestCase;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+import net.openhft.collections.jrs166.JSR166TestCase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -28,6 +28,7 @@ import org.junit.runners.Parameterized;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import static org.junit.Assert.*;
 
@@ -40,7 +41,7 @@ import static org.junit.Assert.*;
  */
 
 @RunWith(value = Parameterized.class)
-public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
+public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
 
     boolean canReplicate;
 
@@ -50,14 +51,12 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         return Arrays.asList(new Object[][]{
                 {
                         Boolean.TRUE
-                },
-                {
-                        Boolean.FALSE
                 }
+
         });
     }
 
-    public VanillaSharedReplicatedHashMapTest(Boolean canReplicate) {
+    public VanillaSharedReplicatedHashMapTest2(Boolean canReplicate) {
         this.canReplicate = canReplicate;
     }
 
@@ -71,40 +70,31 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
     SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier((byte)1)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
+
+        final SharedHashMap<Integer, CharSequence> map1 =
+                Builder.newShmIntString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
+        final SharedHashMap<Integer, CharSequence> map2 =
+                Builder.newShmIntString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+
+        return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
+
 
     }
 
-    SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
-
-    }
-
-
-    SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
-
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
-
-    }
 
     SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .entries(size)
-                .identifier((byte)1)
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+        final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
+        final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
+
+        final SharedHashMap<CharSequence, CharSequence> map1 =
+                Builder.newShmStringString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
+        final SharedHashMap<CharSequence, CharSequence> map2 =
+                Builder.newShmStringString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+
+        return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 
     }
 
@@ -113,18 +103,11 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 
         return new VanillaSharedReplicatedHashMapBuilder()
                 .canReplicate(canReplicate)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
-    SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
-
-        return new VanillaSharedReplicatedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), BI.class, Boolean.class);
-
-    }
 
     /**
      * Returns a new map from Integers 1-5 to Strings "A"-"E".
@@ -132,11 +115,11 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     private SharedHashMap map5() throws IOException {
         SharedHashMap<Integer, CharSequence> map = newShmIntString(5);
         assertTrue(map.isEmpty());
-        map.put(one, "A");
-        map.put(two, "B");
-        map.put(three, "C");
-        map.put(four, "D");
-        map.put(five, "E");
+        map.put(JSR166TestCase.one, "A");
+        map.put(JSR166TestCase.two, "B");
+        map.put(JSR166TestCase.three, "C");
+        map.put(JSR166TestCase.four, "D");
+        map.put(JSR166TestCase.five, "E");
         assertFalse(map.isEmpty());
         assertEquals(5, map.size());
         return map;
@@ -182,8 +165,8 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testContainsKey() throws IOException {
         SharedHashMap map = map5();
-        assertTrue(map.containsKey(one));
-        assertFalse(map.containsKey(zero));
+        assertTrue(map.containsKey(JSR166TestCase.one));
+        assertFalse(map.containsKey(JSR166TestCase.zero));
     }
 
     /**
@@ -258,15 +241,14 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
 */
 
     /**
-     * get returns the correct element at the given key,
-     * or null if not present
+     * get returns the correct element at the given key, or null if not present
      */
     @Test
     public void testGet() throws IOException {
         SharedHashMap map = map5();
-        assertEquals("A", (String) map.get(one));
+        assertEquals("A", (String) map.get(JSR166TestCase.one));
         SharedHashMap empty = newShmIntString();
-        assertNull(map.get(notPresent));
+        assertNull(map.get(JSR166TestCase.notPresent));
     }
 
     /**
@@ -288,11 +270,11 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         SharedHashMap map = map5();
         Set s = map.keySet();
         assertEquals(5, s.size());
-        assertTrue(s.contains(one));
-        assertTrue(s.contains(two));
-        assertTrue(s.contains(three));
-        assertTrue(s.contains(four));
-        assertTrue(s.contains(five));
+        assertTrue(s.contains(JSR166TestCase.one));
+        assertTrue(s.contains(JSR166TestCase.two));
+        assertTrue(s.contains(JSR166TestCase.three));
+        assertTrue(s.contains(JSR166TestCase.four));
+        assertTrue(s.contains(JSR166TestCase.five));
     }
 
     /**
@@ -305,7 +287,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         Object[] ar = s.toArray();
         assertTrue(s.containsAll(Arrays.asList(ar)));
         assertEquals(5, ar.length);
-        ar[0] = m10;
+        ar[0] = JSR166TestCase.m10;
         assertFalse(s.containsAll(Arrays.asList(ar)));
     }
 
@@ -397,11 +379,11 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
             assertTrue(
-                    (e.getKey().equals(one) && e.getValue().equals("A")) ||
-                            (e.getKey().equals(two) && e.getValue().equals("B")) ||
-                            (e.getKey().equals(three) && e.getValue().equals("C")) ||
-                            (e.getKey().equals(four) && e.getValue().equals("D")) ||
-                            (e.getKey().equals(five) && e.getValue().equals("E"))
+                    (e.getKey().equals(JSR166TestCase.one) && e.getValue().equals("A")) ||
+                            (e.getKey().equals(JSR166TestCase.two) && e.getValue().equals("B")) ||
+                            (e.getKey().equals(JSR166TestCase.three) && e.getValue().equals("C")) ||
+                            (e.getKey().equals(JSR166TestCase.four) && e.getValue().equals("D")) ||
+                            (e.getKey().equals(JSR166TestCase.five) && e.getValue().equals("E"))
             );
         }
     }
@@ -415,11 +397,11 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
         SharedHashMap map = map5();
         empty.putAll(map);
         assertEquals(5, empty.size());
-        assertTrue(empty.containsKey(one));
-        assertTrue(empty.containsKey(two));
-        assertTrue(empty.containsKey(three));
-        assertTrue(empty.containsKey(four));
-        assertTrue(empty.containsKey(five));
+        assertTrue(empty.containsKey(JSR166TestCase.one));
+        assertTrue(empty.containsKey(JSR166TestCase.two));
+        assertTrue(empty.containsKey(JSR166TestCase.three));
+        assertTrue(empty.containsKey(JSR166TestCase.four));
+        assertTrue(empty.containsKey(JSR166TestCase.five));
     }
 
     /**
@@ -428,8 +410,8 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testPutIfAbsent() throws IOException {
         SharedHashMap map = map5();
-        map.putIfAbsent(six, "Z");
-        assertTrue(map.containsKey(six));
+        map.putIfAbsent(JSR166TestCase.six, "Z");
+        assertTrue(map.containsKey(JSR166TestCase.six));
     }
 
     /**
@@ -438,7 +420,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testPutIfAbsent2() throws IOException {
         SharedHashMap map = map5();
-        final Object z = map.putIfAbsent(one, "Z");
+        final Object z = map.putIfAbsent(JSR166TestCase.one, "Z");
         assertEquals("A", z);
     }
 
@@ -448,8 +430,8 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testReplace() throws IOException {
         SharedHashMap map = map5();
-        assertNull(map.replace(six, "Z"));
-        assertFalse(map.containsKey(six));
+        assertNull(map.replace(JSR166TestCase.six, "Z"));
+        assertFalse(map.containsKey(JSR166TestCase.six));
     }
 
     /**
@@ -458,8 +440,8 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testReplace2() throws IOException {
         SharedHashMap map = map5();
-        assertNotNull(map.replace(one, "Z"));
-        assertEquals("Z", map.get(one));
+        assertNotNull(map.replace(JSR166TestCase.one, "Z"));
+        assertEquals("Z", map.get(JSR166TestCase.one));
     }
 
     /**
@@ -468,9 +450,9 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testReplaceValue() throws IOException {
         SharedHashMap map = map5();
-        assertEquals("A", map.get(one));
-        assertFalse(map.replace(one, "Z", "Z"));
-        assertEquals("A", map.get(one));
+        assertEquals("A", map.get(JSR166TestCase.one));
+        assertFalse(map.replace(JSR166TestCase.one, "Z", "Z"));
+        assertEquals("A", map.get(JSR166TestCase.one));
     }
 
     /**
@@ -479,9 +461,9 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testReplaceValue2() throws IOException {
         SharedHashMap map = map5();
-        assertEquals("A", map.get(one));
-        assertTrue(map.replace(one, "A", "Z"));
-        assertEquals("Z", map.get(one));
+        assertEquals("A", map.get(JSR166TestCase.one));
+        assertTrue(map.replace(JSR166TestCase.one, "A", "Z"));
+        assertEquals("Z", map.get(JSR166TestCase.one));
     }
 
     /**
@@ -490,9 +472,9 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testRemove() throws IOException {
         SharedHashMap map = map5();
-        map.remove(five);
+        map.remove(JSR166TestCase.five);
         assertEquals(4, map.size());
-        assertFalse(map.containsKey(five));
+        assertFalse(map.containsKey(JSR166TestCase.five));
     }
 
     /**
@@ -501,12 +483,12 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     @Test
     public void testRemove2() throws IOException {
         SharedHashMap map = map5();
-        map.remove(five, "E");
+        map.remove(JSR166TestCase.five, "E");
         assertEquals(4, map.size());
-        assertFalse(map.containsKey(five));
-        map.remove(four, "A");
+        assertFalse(map.containsKey(JSR166TestCase.five));
+        map.remove(JSR166TestCase.four, "A");
         assertEquals(4, map.size());
-        assertTrue(map.containsKey(four));
+        assertTrue(map.containsKey(JSR166TestCase.four));
     }
 
     /**
@@ -578,7 +560,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     public void testPut2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.put(notPresent, null);
+            c.put(JSR166TestCase.notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -691,7 +673,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     public void testPutIfAbsent2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.putIfAbsent(notPresent, null);
+            c.putIfAbsent(JSR166TestCase.notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -704,7 +686,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     public void testReplace2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace(notPresent, null);
+            c.replace(JSR166TestCase.notPresent, null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -717,7 +699,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     public void testReplaceValue2_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace(notPresent, null, "A");
+            c.replace(JSR166TestCase.notPresent, null, "A");
             shouldThrow();
         } catch (NullPointerException success) {
         }
@@ -730,7 +712,7 @@ public class VanillaSharedReplicatedHashMapTest extends SharedJSR166TestCase {
     public void testReplaceValue3_NullPointerException() throws IOException {
         try {
             SharedHashMap c = newShmIntString(5);
-            c.replace(notPresent, "A", null);
+            c.replace(JSR166TestCase.notPresent, "A", null);
             shouldThrow();
         } catch (NullPointerException success) {
         }
