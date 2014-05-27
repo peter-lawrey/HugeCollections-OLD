@@ -100,12 +100,14 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
                     return;
             }
 
-            final long limit = out.position() + sizeOfNextEntry;
-            out.limit(limit);
+            final long nextEntryPos = out.position() + sizeOfNextEntry;
+            final long limit = out.limit();
+            out.limit(nextEntryPos);
             externalizable.readExternalEntry(out);
 
+            out.limit(limit);
             // skip onto the next entry
-            out.position(limit);
+            out.position(nextEntryPos);
             compact();
 
             // to allow the sizeOfNextEntry to be read the next time around

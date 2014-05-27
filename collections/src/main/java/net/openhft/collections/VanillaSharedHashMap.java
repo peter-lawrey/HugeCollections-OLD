@@ -88,7 +88,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int entrySize;
     final Alignment alignment;
     final int entriesPerSegment;
-    final int hashMask;
 
     private final SharedMapErrorListener errorListener;
 
@@ -132,8 +131,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.entriesPerSegment = entriesPerSegment;
         this.metaDataBytes = builder.metaDataBytes();
         this.eventListener = builder.eventListener();
-        this.hashMask = entriesPerSegment > (1 << 16) ? ~0 : 0xFFFF;
 
+        int hashMask = useSmallMultiMaps() ? 0xFFFF : ~0;
         this.hasher = new Hasher(segments, hashMask);
 
         @SuppressWarnings("unchecked")
@@ -211,6 +210,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     long sizeOfMultiMap() {
         int np2 = Maths.nextPower2(entriesPerSegment, 8);
         return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
+    }
+
+    boolean useSmallMultiMaps() {
+        return entriesPerSegment <= (1 << 16);
     }
 
     long sizeOfBitSets() {
@@ -614,12 +617,16 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         void createHashLookups(long start) {
-            final NativeBytes iimmapBytes =
+            hashLookup = createMultiMap(start);
+        }
+
+        IntIntMultiMap createMultiMap(long start) {
+            final NativeBytes multiMapBytes =
                     new NativeBytes(null, start, start + sizeOfMultiMap(), null);
-            iimmapBytes.load();
-            hashLookup = hashMask == ~0 ?
-                    new VanillaIntIntMultiMap(iimmapBytes) :
-                    new VanillaShortShortMultiMap(iimmapBytes);
+            multiMapBytes.load();
+            return useSmallMultiMaps() ?
+                    new VanillaShortShortMultiMap(multiMapBytes) :
+                    new VanillaIntIntMultiMap(multiMapBytes);
         }
 
         public int getIndex() {
@@ -821,7 +828,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     // key is found
                     entry.skip(keyLen);
                     if (replaceIfPresent) {
-                        return replaceValueOnPut(key, value, entry, pos, offset);
+                        return replaceValueOnPut(key, value, entry, pos, offset, !putReturnsNull, hashLookup);
                     } else {
                         return putReturnsNull ? null : readValue(entry, null);
                     }
@@ -836,16 +843,17 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        V replaceValueOnPut(K key, V value, NativeBytes entry, int pos, long offset) {
+        V replaceValueOnPut(K key, V value, NativeBytes entry, int pos, long offset,
+                            boolean readPrevValue, IntIntMultiMap searchedHashLookup) {
             long valueLenPos = entry.position();
             long valueLen = readValueLen(entry);
             long entryEndAddr = entry.positionAddr() + valueLen;
             V prevValue = null;
-            if (!putReturnsNull)
+            if (readPrevValue)
                 prevValue = readValue(entry, null, valueLen);
 
             // putValue may relocate entry and change offset
-            offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, value);
+            offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, value, searchedHashLookup);
             notifyPut(offset, false, key, value, posFromOffset(offset));
             return prevValue;
         }
@@ -1068,7 +1076,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                         continue;
                     // key is found
                     entry.skip(keyLen);
-                    return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry);
+                    return onKeyPresentOnReplace(key, expectedValue, newValue, pos, offset, entry,
+                            hashLookup);
                 }
                 // key is not found
                 return null;
@@ -1078,7 +1087,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         V onKeyPresentOnReplace(K key, V expectedValue, V newValue, int pos, long offset,
-                                NativeBytes entry) {
+                                NativeBytes entry, IntIntMultiMap searchedHashLookup) {
             long valueLenPos = entry.position();
             long valueLen = readValueLen(entry);
             long entryEndAddr = entry.positionAddr() + valueLen;
@@ -1087,7 +1096,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 return null;
             if (expectedValue == null || expectedValue.equals(valueRead)) {
                 // putValue may relocate entry and change offset
-                offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, newValue);
+                offset = putValue(pos, offset, entry, valueLenPos, entryEndAddr, newValue,
+                        searchedHashLookup);
                 notifyPut(offset, false, key, newValue,
                         posFromOffset(offset));
                 return valueRead;
@@ -1129,13 +1139,13 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
-                      long entryEndAddr, V value) {
+                      long entryEndAddr, V value, IntIntMultiMap searchedHashLookup) {
             if (value instanceof Byteable) {
                 return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                        null, (Byteable) value, false);
+                        null, (Byteable) value, false, searchedHashLookup);
             } else {
                 return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                        getValueAsBytes(value), null, true);
+                        getValueAsBytes(value), null, true, searchedHashLookup);
             }
         }
 
@@ -1159,7 +1169,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
          */
         long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
                       long entryEndAddr, @Nullable Bytes valueBytes,
-                      @Nullable Byteable valueAsByteable, boolean allowOversize) {
+                      @Nullable Byteable valueAsByteable, boolean allowOversize,
+                      IntIntMultiMap searchedHashLookup) {
             long valueLenAddr = entry.address() + valueLenPos;
             long newValueLen;
             if (valueBytes != null) {
@@ -1187,7 +1198,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                         if (valueAsByteable != null) {
                             // noinspection unchecked
                             return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                                    getValueAsBytes((V) valueAsByteable), null, false);
+                                    getValueAsBytes((V) valueAsByteable), null, false, searchedHashLookup);
                         }
                         throw new IllegalArgumentException("Byteable value is not allowed " +
                                 "to make the entry oversized while it was not initially.");
@@ -1196,7 +1207,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                         if (valueAsByteable != null) {
                             // noinspection unchecked
                             return putValue(pos, offset, entry, valueLenPos, entryEndAddr,
-                                    getValueAsBytes((V) valueAsByteable), null, false);
+                                    getValueAsBytes((V) valueAsByteable), null, false, searchedHashLookup);
                         }
                         throw new IllegalArgumentException("Value too large: " +
                                 "entry takes " + newSizeInBlocks + " blocks, " +
@@ -1211,7 +1222,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     pos = alloc(newSizeInBlocks);
                     // putValue() is called from put() and replace()
                     // after successful search by key
-                    replacePosInHashLookupOnRelocation(prevPos, pos);
+                    replacePosInHashLookupOnRelocation(searchedHashLookup, prevPos, pos);
                     offset = offsetFromPos(pos);
                     // Moving metadata, key stop bit and key.
                     // Don't want to fiddle with pseudo-buffers for this,
@@ -1252,8 +1263,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             return offset;
         }
 
-        void replacePosInHashLookupOnRelocation(int prevPos, int pos) {
-            hashLookup.replacePrevPos(pos);
+        void replacePosInHashLookupOnRelocation(IntIntMultiMap searchedHashLookup, int prevPos, int pos) {
+            searchedHashLookup.replacePrevPos(pos);
         }
 
         void clear() {
