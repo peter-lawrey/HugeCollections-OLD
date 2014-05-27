@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;

@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.SharedHashMap;
 import org.junit.After;
 import org.junit.Test;
 
@@ -27,7 +26,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.collections.replication.Builder.getPersistenceFile;
+import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

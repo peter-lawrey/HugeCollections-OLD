@@ -16,11 +16,9 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.SharedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,8 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.collections.replication.Builder.getPersistenceFile;
-import static net.openhft.collections.VanillaSharedReplicatedHashMapBuilder.TcpReplication;
+import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -47,15 +44,16 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newTcpSocketShmIntString(
+    static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
+        return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(new TcpReplication(serverPort, InetSocketAddress))
+                .tcpReplication(new SharedHashMapBuilder.TcpReplication(serverPort,
+                        InetSocketAddress))
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 

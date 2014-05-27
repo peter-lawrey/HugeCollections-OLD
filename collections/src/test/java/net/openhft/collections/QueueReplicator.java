@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;

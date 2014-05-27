@@ -17,11 +17,14 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
+import net.openhft.lang.io.ByteBufferBytes;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.EnumSet;
 
 public class SharedHashMapBuilder implements Cloneable {
 
@@ -72,6 +75,14 @@ public class SharedHashMapBuilder implements Cloneable {
             result.transactional(transactional);
             result.metaDataBytes(metaDataBytes);
             result.eventListener(eventListener);
+
+            // replication
+
+            result.canReplicate = canReplicate;
+            result.identifier = identifier;
+            result.tcpReplication(tcpReplication);
+            result.updPort(updPort);
+
             return result;
 
         } catch (CloneNotSupportedException e) {
@@ -80,8 +91,7 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Set minimum number of segments.
-     * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
+     * Set minimum number of segments. See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
      */
@@ -103,11 +113,9 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * <p>Note that the actual entrySize will be aligned
-     * to 4 (default entry alignment). I. e. if you set entry size to 30, the
-     * actual entry size will be 32 (30 aligned to 4 bytes). If you don't want
-     * entry size to be aligned, set
-     * {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
+     * <p>Note that the actual entrySize will be aligned to 4 (default entry alignment). I. e. if
+     * you set entry size to 30, the actual entry size will be 32 (30 aligned to 4 bytes). If you
+     * don't want entry size to be aligned, set {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
      *
      * @param entrySize the size in bytes
      * @return this {@code SharedHashMapBuilder} back
@@ -128,18 +136,16 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Specifies alignment of address in memory of entries
-     * and independently of address in memory of values within entries.
+     * Specifies alignment of address in memory of entries and independently of address in memory of
+     * values within entries.
      *
-     * <p>Useful when values of the map are updated intensively, particularly
-     * fields with volatile access, because it doesn't work well
-     * if the value crosses cache lines. Also, on some (nowadays rare)
-     * architectures any misaligned memory access is more expensive than aligned.
+     * <p>Useful when values of the map are updated intensively, particularly fields with volatile
+     * access, because it doesn't work well if the value crosses cache lines. Also, on some
+     * (nowadays rare) architectures any misaligned memory access is more expensive than aligned.
      *
-     * <p>Note that specified {@link #entrySize()} will be aligned according to
-     * this alignment. I. e. if you set {@code entrySize(20)} and
-     * {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
-     * will be 24 (20 aligned to 8 bytes).
+     * <p>Note that specified {@link #entrySize()} will be aligned according to this alignment. I.
+     * e. if you set {@code entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES},
+     * actual entry size will be 24 (20 aligned to 8 bytes).
      *
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment()
@@ -150,8 +156,8 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Returns alignment of addresses in memory of entries and independently
-     * of values within entries.
+     * Returns alignment of addresses in memory of entries and independently of values within
+     * entries.
      *
      * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
      *
@@ -249,7 +255,21 @@ public class SharedHashMapBuilder implements Cloneable {
         }
         if (builder == null || !file.exists())
             throw new FileNotFoundException("Unable to create " + file);
-        return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
+
+        if (!canReplicate())
+            return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
+
+
+        final VanillaSharedReplicatedHashMap<K, V> result =
+                new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+
+        if (tcpReplication != null)
+            applyTcpReplication(result, tcpReplication);
+
+        if (updPort != Short.MIN_VALUE)
+            applyUdpReplication(result, updPort);
+        return result;
+
     }
 
     static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
@@ -309,11 +329,12 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
-     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
-     * Either way it's expensive for something you probably don't use.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for
+     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a
+     * recycled one) Either way it's expensive for something you probably don't use.
      *
-     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced but instead return null
+     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was
+     *                       replaced but instead return null
      * @return an instance of the map builder
      */
     public SharedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
@@ -322,22 +343,24 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
-     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
-     * Either way it's expensive for something you probably don't use.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for
+     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a
+     * recycled one) Either way it's expensive for something you probably don't use.
      *
-     * @return true if SharedHashMap.put() is not going to return the object that was replaced but instead return null
+     * @return true if SharedHashMap.put() is not going to return the object that was replaced but
+     * instead return null
      */
     public boolean putReturnsNull() {
         return putReturnsNull;
     }
 
     /**
-     * Map.remove()  returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
-     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
-     * Either way it's expensive for something you probably don't use.
+     * Map.remove()  returns the previous value, functionality which is rarely used but fairly cheap
+     * for HashMap. In the case, for an off heap collection, it has to create a new object (or
+     * return a recycled one) Either way it's expensive for something you probably don't use.
      *
-     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was removed but instead return null
+     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object
+     *                          that was removed but instead return null
      * @return an instance of the map builder
      */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
@@ -347,11 +370,12 @@ public class SharedHashMapBuilder implements Cloneable {
 
 
     /**
-     * Map.remove() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
-     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
-     * Either way it's expensive for something you probably don't use.
+     * Map.remove() returns the previous value, functionality which is rarely used but fairly cheap
+     * for HashMap. In the case, for an off heap collection, it has to create a new object (or
+     * return a recycled one) Either way it's expensive for something you probably don't use.
      *
-     * @return true if SharedHashMap.remove() is not going to return the object that was removed but instead return null
+     * @return true if SharedHashMap.remove() is not going to return the object that was removed but
+     * instead return null
      */
     public boolean removeReturnsNull() {
         return removeReturnsNull;
@@ -456,4 +480,145 @@ public class SharedHashMapBuilder implements Cloneable {
     public Alignment alignment() {
         return alignment;
     }
+
+
+    private byte identifier = Byte.MIN_VALUE;
+    private boolean canReplicate;
+    private short updPort = Short.MIN_VALUE;
+
+
+    public boolean canReplicate() {
+        return canReplicate || tcpReplication != null || updPort != Short.MIN_VALUE;
+    }
+
+    public SharedHashMapBuilder canReplicate(boolean canReplicate) {
+        this.canReplicate = canReplicate;
+        return this;
+    }
+
+    public SharedHashMapBuilder updPort(short updPort) {
+        this.updPort = updPort;
+        return this;
+    }
+
+    public short getUpdPort() {
+        return updPort;
+    }
+
+    // TODO refactor to series of overloaded builder configuration methods or sub-builder in common SHM builder
+    public static class TcpReplication {
+
+        private final int serverPort;
+        private final InetSocketAddress[] endpoints;
+        public short packetSize = 1024 * 8;
+
+        public TcpReplication(int serverPort, InetSocketAddress... endpoints) {
+            this.serverPort = serverPort;
+            this.endpoints = endpoints;
+
+            for (final InetSocketAddress endpoint : endpoints) {
+                if (endpoint.getPort() == serverPort && "localhost".equals(endpoint.getHostName()))
+                    throw new IllegalArgumentException("endpoint=" + endpoint
+                            + " can not point to the same port as the server");
+            }
+        }
+
+        public void setPacketSize(short packetSize) {
+            this.packetSize = packetSize;
+        }
+    }
+
+
+    private TcpReplication tcpReplication;
+
+
+    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort)
+            throws IOException {
+
+        // the udp modification modification iterator will not be stored in shared memory
+        final ByteBufferBytes updModIteratorBytes =
+                new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
+
+        final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
+                result.new ModificationIterator(
+                        null,
+                        EnumSet.allOf(ReplicatedSharedHashMap.EventType.class),
+                        updModIteratorBytes,
+                        result.eventListener
+                );
+
+        result.eventListener = udpModIterator;
+
+        final UdpReplicator.UdpSocketChannelEntryWriter entryWriter =
+                new UdpReplicator.UdpSocketChannelEntryWriter(entrySize(), result);
+        final UdpReplicator.UdpSocketChannelEntryReader entryReader =
+                new UdpReplicator.UdpSocketChannelEntryReader(entrySize(), result);
+
+        final UdpReplicator udpReplicator =
+                new UdpReplicator(result, updPort, entryWriter, entryReader, udpModIterator);
+        result.addCloseable(udpReplicator);
+
+    }
+
+
+    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
+                                            TcpReplication tcpReplication) throws IOException {
+
+        for (final InetSocketAddress endpoint : tcpReplication.endpoints) {
+            final TcpSocketChannelEntryWriter entryWriter =
+                    new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+            final TcpSocketChannelEntryReader entryReader =
+                    new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
+            final TcpClientSocketReplicator replicator =
+                    new TcpClientSocketReplicator(endpoint, entryReader, entryWriter, result);
+            result.addCloseable(replicator);
+        }
+
+        final TcpSocketChannelEntryWriter entryWriter =
+                new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+
+        final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
+                result, result, tcpReplication.serverPort,
+                entryWriter, tcpReplication.packetSize, entrySize());
+
+        result.addCloseable(tcpServerSocketReplicator);
+    }
+
+
+    private TimeProvider timeProvider = new TimeProvider();
+
+    public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
+        this.timeProvider = timeProvider;
+        return this;
+    }
+
+    public TimeProvider timeProvider() {
+        return timeProvider;
+    }
+
+    public byte identifier() {
+
+        if (identifier == Byte.MIN_VALUE)
+            throw new IllegalStateException("identifier is not set.");
+
+        return identifier;
+    }
+
+    public SharedHashMapBuilder identifier(byte identifier) {
+        if (canReplicate)
+            VanillaSharedReplicatedHashMap.checkIdentifier(identifier);
+        this.identifier = identifier;
+        return this;
+    }
+
+    public SharedHashMapBuilder tcpReplication(TcpReplication tcpReplication) {
+        this.tcpReplication = tcpReplication;
+        return this;
+    }
+
+    public TcpReplication tcpReplication() {
+        return tcpReplication;
+    }
+
+
 }

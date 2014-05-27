@@ -1,24 +1,23 @@
 /*
-* Copyright 2014 Higher Frequency Trading
-* <p/>
-* http://www.higherfrequencytrading.com
-* <p/>
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-* <p/>
-* http://www.apache.org/licenses/LICENSE-2.0
-* <p/>
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2014 Higher Frequency Trading
+ * <p/>
+ * http://www.higherfrequencytrading.com
+ * <p/>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.SharedHashMap;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -28,7 +27,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.TreeMap;
 
-import static net.openhft.collections.replication.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
+import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -38,22 +37,24 @@ import static org.junit.Assert.assertTrue;
  * @author Rob Austin.
  */
 
-public class TCPSocketReplicationTest {
+public class TCPSocketReplicationTest3way {
 
 
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
+    private SharedHashMap<Integer, CharSequence> map3;
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076);
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078));
+        map3 = newTcpSocketShmIntString((byte) 3, 8078);
     }
 
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map1, map2}) {
+        for (final Closeable closeable : new Closeable[]{map1, map2, map3}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -66,15 +67,16 @@ public class TCPSocketReplicationTest {
     @Test
     public void test3() throws IOException, InterruptedException {
 
-        map1.put(5, "EXAMPLE-2");
+        map3.put(5, "EXAMPLE-2");
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(new TreeMap(map3), new TreeMap(map2));
         assertTrue(!map1.isEmpty());
-    }
 
+    }
 
     @Test
     public void test() throws IOException, InterruptedException {
@@ -95,42 +97,22 @@ public class TCPSocketReplicationTest {
         waitTillEqual(5000);
 
         assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(new TreeMap(map3), new TreeMap(map3));
         assertTrue(!map1.isEmpty());
 
     }
 
 
-    @Test
-    public void testBufferOverflow() throws IOException, InterruptedException {
-
-        for (int i = 0; i < 1024; i++) {
-            map1.put(i, "EXAMPLE-1");
-        }
-
-        // allow time for the recompilation to resolve
-        waitTillEqual(5000);
-
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertTrue(!map2.isEmpty());
-
-    }
-
-    /**
-     * * waits until map1 and map2 show the same value
-     *
-     * @param timeOutMs timeout in milliseconds
-     * @throws InterruptedException
-     */
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)))
+            if (new TreeMap(map1).equals(new TreeMap(map2)) &&
+                    new TreeMap(map1).equals(new TreeMap(map3)))
                 break;
             Thread.sleep(1);
         }
 
     }
-
 }
 
 

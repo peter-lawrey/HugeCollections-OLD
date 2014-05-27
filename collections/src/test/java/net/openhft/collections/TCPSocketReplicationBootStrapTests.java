@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.After;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -40,15 +38,17 @@ import static org.junit.Assert.assertEquals;
 
 public class TCPSocketReplicationBootStrapTests {
 
-    private VanillaSharedReplicatedHashMap<Integer, CharSequence> map1;
-    private VanillaSharedReplicatedHashMap<Integer, CharSequence> map2;
+    private ReplicatedSharedHashMap<Integer, CharSequence> map1;
+    private SharedHashMap<Integer, CharSequence> map2;
 
 
     @Test
     public void testBootstrap() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8077);
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8077));
+        final ReplicatedSharedHashMap<Integer,
+                CharSequence> map2a = TCPSocketReplication4WayMapTest
+                .newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8077));
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -66,9 +66,10 @@ public class TCPSocketReplicationBootStrapTests {
 
         {
             // restart map 2 but don't connect it to map one
-            final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2b = new VanillaSharedReplicatedHashMapBuilder()
+            final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
+                    .canReplicate(true)
                     .create(map2File, Integer.class, CharSequence.class);
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
@@ -109,7 +110,7 @@ public class TCPSocketReplicationBootStrapTests {
 
         {
             // restart map 2 but don't connect it to map one
-            final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2b = new VanillaSharedReplicatedHashMapBuilder()
+            final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
                     .create(map2File, Integer.class, CharSequence.class);

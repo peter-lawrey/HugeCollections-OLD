@@ -16,11 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.ReplicatedSharedHashMap;
-import net.openhft.collections.TimeProvider;
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -39,10 +36,10 @@ public class MultiMapTimeBaseReplicationTest {
 
     private ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator2;
     private ReplicatedSharedHashMap.ModificationIterator segmentModificationIterator1;
-    private Builder.MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> mapP1;
-    private Builder.MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> mapP2;
-    private VanillaSharedReplicatedHashMap<Integer, Integer> map2;
-    private VanillaSharedReplicatedHashMap<Integer, Integer> map1;
+    private Builder.MapProvider<ReplicatedSharedHashMap<Integer, Integer>> mapP1;
+    private Builder.MapProvider<ReplicatedSharedHashMap<Integer, Integer>> mapP2;
+    private ReplicatedSharedHashMap<Integer, Integer> map2;
+    private ReplicatedSharedHashMap<Integer, Integer> map1;
 
 
     private ArrayBlockingQueue<byte[]> map1ToMap2;
@@ -52,10 +49,8 @@ public class MultiMapTimeBaseReplicationTest {
     public void setup() throws IOException {
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
 
-
         map1ToMap2 = new ArrayBlockingQueue<byte[]>(10000);
         map2ToMap1 = new ArrayBlockingQueue<byte[]>(10000);
-
 
         mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1, (byte)2);
         map1 = mapP1.getMap();

@@ -680,9 +680,11 @@ public class SharedHashMapTest {
         return sb;
     }
 
+    static long count = 0;
+
     static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + System.nanoTime());
+        File file = new File(TMP + "/shm-test" + System.nanoTime() + count++);
         file.delete();
         file.deleteOnExit();
         return file;

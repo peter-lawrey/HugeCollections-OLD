@@ -16,11 +16,8 @@
  * limitations under the License.
  */
 
-package net.openhft.collections.replication;
+package net.openhft.collections;
 
-import net.openhft.collections.SharedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMap;
-import net.openhft.collections.VanillaSharedReplicatedHashMapBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -30,7 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.TreeMap;
 
-import static net.openhft.collections.replication.Builder.getPersistenceFile;
+import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -42,11 +39,11 @@ import static org.junit.Assert.assertTrue;
 
 public class UDPSocketReplicationTest {
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
+    static SharedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
             final int identifier,
             final int udpPort) throws IOException {
 
-        return new VanillaSharedReplicatedHashMapBuilder()
+        return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)
                 .updPort((short) udpPort)
@@ -60,7 +57,7 @@ public class UDPSocketReplicationTest {
     @Before
     public void setup() throws IOException {
         map1 = newUdpSocketShmIntString(1, 1234);
-      map2 = newUdpSocketShmIntString(2, 1234);
+        map2 = newUdpSocketShmIntString(2, 1234);
         try {
             Thread.sleep(500);
         } catch (InterruptedException e) {
