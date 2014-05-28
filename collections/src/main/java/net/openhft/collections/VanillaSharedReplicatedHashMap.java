@@ -471,8 +471,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     entry.writeBoolean(true);
                 }
                 // key is not found
-                LOG.warn("Segment.remoteRemove(): hashLookupLiveAndDeleted should contain all keys, " +
-                        AbstractBytes.toString(keyBytes) + " was not found");
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Segment.remoteRemove() : key=" + AbstractBytes.toString(keyBytes)
+                            .trim() + " was not found");
             } finally {
                 unlock();
             }
@@ -1281,7 +1282,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         }
     }
-
 
 
 }
