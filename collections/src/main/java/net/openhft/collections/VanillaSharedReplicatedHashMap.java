@@ -91,6 +91,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
+    private static final int MAX_UNSIGNED_SHORT = 1 << 16;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
@@ -380,10 +381,19 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
 
         private long entrySize(long keyLen, long valueLen) {
-            return alignment.alignAddr(metaDataBytes +
+            long result = alignment.alignAddr(metaDataBytes +
                     expectedStopBits(keyLen) + keyLen + 10 +
                     expectedStopBits(valueLen)) + valueLen;
+            // replication enforces that the entry size will never be larger than an unsigned short
+            if (result > MAX_UNSIGNED_SHORT)
+                throw new IllegalStateException("ENTRY SIZE TOO LARGE : Replicated " +
+                        "SharedHashMap's" +
+                        " are restricted to an " +
+                        "entry size of " + MAX_UNSIGNED_SHORT + ", " +
+                        "your entry size=" + result);
+            return result;
         }
+
 
         /**
          * @see VanillaSharedHashMap.Segment#acquire(net.openhft.lang.io.Bytes, Object, Object, int,
@@ -582,12 +592,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     entry.skip(keyLen);
 
                     final long timeStampPos = entry.positionAddr();
-                    boolean wasDeleted = false;
-
 
                     if (shouldIgnore(entry, timestamp, identifier))
                         return null;
-                    wasDeleted = entry.readBoolean();
+
+                    boolean wasDeleted = entry.readBoolean();
 
                     // if wasDeleted==true then we even if replaceIfPresent==false we can treat it
                     // the same way as replaceIfPresent true
@@ -629,8 +638,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         /**
          * Used only with replication, its sometimes possible to receive an old ( or stale update )
          * from a remote map. This method is used to determine if we should ignore such updates. <p>
-         * We can reject put() and removes() when comparing times stamps with remote
-         * systems
+         * We can reject put() and removes() when comparing times stamps with remote systems
          *
          * @param entry      the maps entry
          * @param timestamp  the time the entry was created or updated
