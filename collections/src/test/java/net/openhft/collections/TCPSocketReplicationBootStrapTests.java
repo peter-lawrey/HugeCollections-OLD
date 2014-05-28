@@ -26,7 +26,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.TreeMap;
 
 import static org.junit.Assert.assertEquals;
 
@@ -150,7 +149,7 @@ public class TCPSocketReplicationBootStrapTests {
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)))
+            if (map1.equals(map2))
                 break;
             Thread.sleep(1);
         }

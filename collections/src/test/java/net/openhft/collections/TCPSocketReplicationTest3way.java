@@ -25,7 +25,6 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.TreeMap;
 
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
@@ -72,8 +71,8 @@ public class TCPSocketReplicationTest3way {
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertEquals(new TreeMap(map3), new TreeMap(map2));
+        assertEquals(map1, map2);
+        assertEquals(map3, map2);
         assertTrue(!map1.isEmpty());
 
     }
@@ -96,8 +95,8 @@ public class TCPSocketReplicationTest3way {
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
-        assertEquals(new TreeMap(map3), new TreeMap(map3));
+        assertEquals(map1, map2);
+        assertEquals(map3, map3);
         assertTrue(!map1.isEmpty());
 
     }
@@ -106,8 +105,8 @@ public class TCPSocketReplicationTest3way {
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)) &&
-                    new TreeMap(map1).equals(new TreeMap(map3)))
+            if (map1.equals(map2) &&
+                    map1.equals(map3))
                 break;
             Thread.sleep(1);
         }

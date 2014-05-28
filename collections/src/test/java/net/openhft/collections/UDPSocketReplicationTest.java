@@ -25,7 +25,6 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.TreeMap;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
@@ -89,7 +88,7 @@ public class UDPSocketReplicationTest {
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
         assertTrue(!map2.isEmpty());
 
     }
@@ -103,7 +102,7 @@ public class UDPSocketReplicationTest {
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)))
+            if (map1.equals(map2))
                 break;
             Thread.sleep(1);
         }

@@ -1237,4 +1237,21 @@ public class SharedHashMapTest {
 
         map.close();
     }
+
+    @Test
+    public void equalsTest() throws IOException {
+        final SharedHashMap<Integer, String> map1 = new SharedHashMapBuilder().create
+                (getPersistenceFile(), Integer.class, String.class);
+
+        map1.put(1, "one");
+        map1.put(2, "two");
+
+        final SharedHashMap<Integer, String> map2 = new SharedHashMapBuilder().create
+                (getPersistenceFile(), Integer.class, String.class);
+
+        map2.put(1, "one");
+        map2.put(2, "two");
+
+        assertEquals(map1, map2);
+    }
 }

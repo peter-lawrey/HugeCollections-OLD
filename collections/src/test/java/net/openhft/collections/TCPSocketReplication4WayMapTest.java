@@ -26,7 +26,6 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.TreeMap;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
@@ -91,9 +90,9 @@ public class TCPSocketReplication4WayMapTest {
         // allow time for the recompilation to resolve
         waitTillEqual(1000);
 
-        assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
-        assertEquals("map3", new TreeMap(map1), new TreeMap(map3));
-        assertEquals("map4", new TreeMap(map1), new TreeMap(map4));
+        assertEquals("map2", map1, map2);
+        assertEquals("map3", map1, map3);
+        assertEquals("map4", map1, map4);
         assertTrue("map2.empty", !map2.isEmpty());
 
     }
@@ -109,9 +108,9 @@ public class TCPSocketReplication4WayMapTest {
         // allow time for the recompilation to resolve
         waitTillEqual(1000);
 
-        assertEquals("map2", new TreeMap(map1), new TreeMap(map2));
-        assertEquals("map3", new TreeMap(map1), new TreeMap(map3));
-        assertEquals("map4", new TreeMap(map1), new TreeMap(map4));
+        assertEquals("map2", map1, map2);
+        assertEquals("map3", map1, map3);
+        assertEquals("map4", map1, map4);
         assertTrue("map2.empty", !map2.isEmpty());
 
     }
@@ -127,9 +126,9 @@ public class TCPSocketReplication4WayMapTest {
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {
-            if (new TreeMap(map1).equals(new TreeMap(map2)) &&
-                    new TreeMap(map1).equals(new TreeMap(map3)) &&
-                    new TreeMap(map1).equals(new TreeMap(map4)))
+            if (map1.equals(map2) &&
+                    map1.equals(map3) &&
+                    map1.equals(map4))
                 break;
             Thread.sleep(1);
         }

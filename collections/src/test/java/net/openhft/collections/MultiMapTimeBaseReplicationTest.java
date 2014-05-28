@@ -24,7 +24,6 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import static org.junit.Assert.assertEquals;
@@ -52,11 +51,11 @@ public class MultiMapTimeBaseReplicationTest {
         map1ToMap2 = new ArrayBlockingQueue<byte[]>(10000);
         map2ToMap1 = new ArrayBlockingQueue<byte[]>(10000);
 
-        mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1, (byte)2);
+        mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1, (byte) 2);
         map1 = mapP1.getMap();
         segmentModificationIterator1 = map1.acquireModificationIterator((byte) 2);
 
-        mapP2 = Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2, (byte)1);
+        mapP2 = Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2, (byte) 1);
         map2 = mapP2.getMap();
 
         segmentModificationIterator2 = map2.acquireModificationIterator((byte) 1);
@@ -78,7 +77,7 @@ public class MultiMapTimeBaseReplicationTest {
         // we will check 10 times that there all the work queues are empty
         waitTillEqual(5000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
     }
 
@@ -94,7 +93,7 @@ public class MultiMapTimeBaseReplicationTest {
 
         // we will check 10 times that there all the work queues are empty
         waitTillEqual(5000);
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
     }
 
@@ -110,7 +109,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
 
@@ -125,7 +124,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
 
@@ -140,7 +139,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
 
@@ -155,7 +154,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
     @Test
@@ -169,7 +168,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
     @Test
@@ -183,7 +182,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
 
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
     }
 
 
@@ -197,7 +196,7 @@ public class MultiMapTimeBaseReplicationTest {
 
         waitTillEqual(5000);
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
     }
 
@@ -212,7 +211,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
         // we will check 10 times that there all the work queues are empty
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
 
     }
@@ -228,7 +227,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
         // we will check 10 times that there all the work queues are empty
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
     }
 
@@ -243,7 +242,7 @@ public class MultiMapTimeBaseReplicationTest {
         waitTillEqual(5000);
         // we will check 10 times that there all the work queues are empty
 
-        assertEquals(new TreeMap(map1), new TreeMap(map2));
+        assertEquals(map1, map2);
 
     }
 
@@ -268,7 +267,7 @@ public class MultiMapTimeBaseReplicationTest {
         int t = 0;
         for (; t < timeOutMs; t++) {
             waitTillFinished0();
-            if (new TreeMap(map1).equals(new TreeMap(map2)))
+            if (map1.equals(map2))
                 break;
             Thread.sleep(1);
         }
@@ -302,7 +301,7 @@ public class MultiMapTimeBaseReplicationTest {
 
             waitTillEqual(5000);
 
-            assertEquals("j=" + j, new TreeMap(map1), new TreeMap(map2));
+            assertEquals("j=" + j, map1, map2);
 
 
         }
