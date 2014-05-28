@@ -41,12 +41,11 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
- * Used with a {@link ReplicatedSharedHashMap} to send data between the
- * maps using nio, non blocking, server socket connection.
- *
- * @see TcpClientSocketReplicator
+ * Used with a {@link ReplicatedSharedHashMap} to send data between the maps using nio, non
+ * blocking, server socket connection.
  *
  * @author Rob Austin.
+ * @see TcpClientSocketReplicator
  */
 class TcpServerSocketReplicator implements Closeable {
 
@@ -117,7 +116,8 @@ class TcpServerSocketReplicator implements Closeable {
      */
     private void process() throws IOException, InterruptedException {
 
-        LOG.debug("Listening on port {}", address.getPort());
+        if (LOG.isDebugEnabled())
+            LOG.debug("Listening on port {}", address.getPort());
 
         final ServerSocket serverSocket = serverChannel.socket();
         try {

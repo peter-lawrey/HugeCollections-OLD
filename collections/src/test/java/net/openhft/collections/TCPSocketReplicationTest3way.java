@@ -102,6 +102,32 @@ public class TCPSocketReplicationTest3way {
     }
 
 
+
+    @Test
+    public void testPutIfAbsent() throws IOException, InterruptedException {
+
+        map1.putIfAbsent(1, "EXAMPLE-1");
+        map1.putIfAbsent(1, "EXAMPLE-2");
+        map1.putIfAbsent(2, "EXAMPLE-2");
+        map1.putIfAbsent(3, "EXAMPLE-1");
+
+        map2.putIfAbsent(5, "EXAMPLE-2");
+        map2.putIfAbsent(6, "EXAMPLE-2");
+
+        map1.remove(2);
+        map2.remove(3);
+        map1.remove(3);
+        map2.putIfAbsent(5, "EXAMPLE-2");
+
+        // allow time for the recompilation to resolve
+        waitTillEqual(5000);
+
+        assertEquals(map1, map2);
+        assertEquals(map3, map3);
+        assertTrue(!map1.isEmpty());
+
+    }
+
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
         int t = 0;
         for (; t < timeOutMs; t++) {

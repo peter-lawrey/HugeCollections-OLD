@@ -73,7 +73,7 @@ class TcpClientSocketReplicator implements Closeable {
                         try {
                             socketChannel = SocketChannel.open(endpoint);
                             if (LOG.isDebugEnabled()) {
-                                LOG.info("successfully connected to {}, local-id={}",
+                                LOG.debug("successfully connected to {}, local-id={}",
                                         endpoint, map.identifier());
                             }
                             break;

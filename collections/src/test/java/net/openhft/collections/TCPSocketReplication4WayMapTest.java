@@ -116,6 +116,29 @@ public class TCPSocketReplication4WayMapTest {
     }
 
 
+    @Test
+    public void testBufferOverflowPutIfAbsent() throws IOException, InterruptedException {
+
+        for (int i = 0; i < 1024; i++) {
+            map1.putIfAbsent(i, "EXAMPLE-1");
+        }
+
+        for (int i = 0; i < 1024; i++) {
+            map1.putIfAbsent(i, "");
+        }
+
+        // allow time for the recompilation to resolve
+        waitTillEqual(1000);
+
+        assertEquals("map2", map1, map2);
+        assertEquals("map3", map1, map3);
+        assertEquals("map4", map1, map4);
+        assertTrue("map2.empty", !map2.isEmpty());
+
+    }
+
+
+
     /**
      * waits until map1 and map2 show the same value
      *

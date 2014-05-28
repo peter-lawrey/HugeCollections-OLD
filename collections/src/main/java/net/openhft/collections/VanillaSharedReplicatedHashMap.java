@@ -91,19 +91,12 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
-    static void checkIdentifier(byte identifier) {
-        if (identifier <= 0) {
-            throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
-        }
-    }
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    public static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
-
+    private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
     private Bytes identifierUpdatedBytes;
@@ -186,7 +179,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
     }
 
-
     /**
      * {@inheritDoc}
      */
@@ -200,7 +192,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      */
     @Override
     public V put(K key, V value, byte identifier, long timeStamp) {
-        checkIdentifier(identifier);
+        assert identifier > 0;
         return put0(key, value, true, identifier, timeStamp);
     }
 
@@ -263,7 +255,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      */
     @Override
     public V remove(K key, V value, byte identifier, long timeStamp) {
-        checkIdentifier(identifier);
+        assert identifier > 0;
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
@@ -306,6 +298,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         closeables.add(closeable);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void close() {
         for (Closeable closeable : closeables) {
@@ -632,9 +627,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
 
         /**
-         * used only with replication, it sometimes possible to receive and old ( or stale updates )
-         * from a remote map The method is used to determine if we should ignore such updates. <p>
-         * we sometime will reject put() and removes() when comparing times stamps with remote
+         * Used only with replication, its sometimes possible to receive an old ( or stale update )
+         * from a remote map. This method is used to determine if we should ignore such updates. <p>
+         * We can reject put() and removes() when comparing times stamps with remote
          * systems
          *
          * @param entry      the maps entry
@@ -708,8 +703,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             entry.writeStopBit(keyLen);
             entry.write(keyBytes);
-
-
             entry.writeLong(timestamp);
             entry.writeByte(identifier);
             entry.writeBoolean(false);
@@ -879,13 +872,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             lock();
             try {
                 // we have to make sure that every calls notifies on remove,
-                // so that the replicators can pick it up, but there must be a quicker
-                // way to do it than this.
-
+                // so that the replicators can pick it up
                 for (K k : keySet()) {
                     VanillaSharedReplicatedHashMap.this.remove(k);
                 }
-
 
                 hashLookupLiveOnly.clear();
                 resetSize();
@@ -923,6 +913,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
+     *
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
@@ -937,7 +930,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         final byte identifier = entry.readByte();
         if (identifier != localIdentifier) {
-            // TODO explain this case
+            // although unlikely, this may occur if the entry has been updated
             return;
         }
 
@@ -999,6 +992,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
+     *
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1021,7 +1017,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
 
         if (remoteIdentifier == VanillaSharedReplicatedHashMap.this.identifier()) {
-            // this can occur when working with UDP, as we will receive our own data
+            // this may occur when working with UDP, as we will receive our own data
             return;
         }
 
@@ -1089,8 +1085,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             implements ReplicatedSharedHashMap.ModificationIterator {
 
         private final Object notifier;
-
-        @NotNull
         private final ATSDirectBitSet changes;
         private final int segmentIndexShift;
         private final long posMask;
