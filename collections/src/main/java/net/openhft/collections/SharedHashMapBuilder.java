@@ -605,8 +605,6 @@ public class SharedHashMapBuilder implements Cloneable {
     }
 
     public SharedHashMapBuilder identifier(byte identifier) {
-        if (canReplicate)
-            VanillaSharedReplicatedHashMap.checkIdentifier(identifier);
         this.identifier = identifier;
         return this;
     }
