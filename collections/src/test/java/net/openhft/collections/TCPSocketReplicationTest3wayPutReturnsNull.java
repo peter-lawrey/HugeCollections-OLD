@@ -26,8 +26,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
-import static org.junit.Assert.*;
+import static net.openhft.collections.Builder.getPersistenceFile;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -35,12 +36,27 @@ import static org.junit.Assert.*;
  * @author Rob Austin.
  */
 
-public class TCPSocketReplicationTest3way {
+public class TCPSocketReplicationTest3wayPutReturnsNull {
 
 
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
     private SharedHashMap<Integer, CharSequence> map3;
+
+    static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
+            final byte identifier,
+            final int serverPort,
+            final InetSocketAddress... InetSocketAddress) throws IOException {
+
+        return (T) new SharedHashMapBuilder()
+                .entries(1000)
+                .putReturnsNull(true)
+                .identifier(identifier)
+                .tcpReplication(new SharedHashMapBuilder.TcpReplication(serverPort,
+                        InetSocketAddress))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+    }
+
 
     @Before
     public void setup() throws IOException {
@@ -65,7 +81,7 @@ public class TCPSocketReplicationTest3way {
     @Test
     public void test3() throws IOException, InterruptedException {
 
-        assertEquals(null, map3.put(5, "EXAMPLE-2"));
+        map3.put(5, "EXAMPLE-2");
 
         // allow time for the recompilation to resolve
         waitTillEqual(5000);
@@ -81,7 +97,7 @@ public class TCPSocketReplicationTest3way {
 
         assertEquals(null, map1.put(1, "EXAMPLE-1"));
         assertEquals(null, map1.put(2, "EXAMPLE-2"));
-        assertNotEquals(null, map1.put(2, "EXAMPLE-1"));
+        assertEquals(null, map1.put(2, "EXAMPLE-1"));
 
         assertEquals(null, map2.put(5, "EXAMPLE-2"));
         assertEquals(null, map2.put(6, "EXAMPLE-2"));
@@ -105,7 +121,7 @@ public class TCPSocketReplicationTest3way {
     public void testPutIfAbsent() throws IOException, InterruptedException {
 
         assertEquals(null, map1.putIfAbsent(1, "EXAMPLE-1"));
-        assertNotEquals(null, map1.putIfAbsent(1, "EXAMPLE-2"));
+        assertEquals(null, map1.putIfAbsent(1, "EXAMPLE-2"));
         assertEquals(null, map1.putIfAbsent(2, "EXAMPLE-2"));
         assertEquals(null, map1.putIfAbsent(3, "EXAMPLE-1"));
 
