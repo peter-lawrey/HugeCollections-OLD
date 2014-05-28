@@ -259,6 +259,8 @@ public class SharedHashMapBuilder implements Cloneable {
         if (!canReplicate())
             return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
 
+        if (identifier <= 0)
+            throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
 
         final VanillaSharedReplicatedHashMap<K, V> result =
                 new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
