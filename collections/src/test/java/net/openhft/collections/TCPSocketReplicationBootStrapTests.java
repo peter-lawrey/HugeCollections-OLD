@@ -141,7 +141,7 @@ public class TCPSocketReplicationBootStrapTests {
 
 
     /**
-     * * waits until map1 and map2 show the same value
+     * waits until map1 and map2 show the same value
      *
      * @param timeOutMs timeout in milliseconds
      * @throws InterruptedException

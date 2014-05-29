@@ -96,8 +96,7 @@ class UdpReplicator implements Closeable {
     }
 
     /**
-     * binds to the server socket and process data
-     * This method will block until interrupted
+     * binds to the server socket and process data This method will block until interrupted
      *
      * @throws Exception
      */
@@ -214,9 +213,15 @@ class UdpReplicator implements Closeable {
             // we'll write the size inverted at the start
             in.writeShort(0, ~(in.readUnsignedShort(2)));
             out.limit((int) in.position());
-            socketChannel.write(out);
 
+            try {
+                socketChannel.write(out);
+            } catch (IOException e) {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("", e);
+            }
         }
+
 
     }
 
