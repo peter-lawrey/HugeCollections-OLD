@@ -99,7 +99,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
-    private final AtomicReferenceArray<ModificationIterator> modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
+    private final AtomicReferenceArray<ModificationIterator> modificationIterators =
+            new AtomicReferenceArray<ModificationIterator>(127);
     private Bytes identifierUpdatedBytes;
 
     public VanillaSharedReplicatedHashMap(@NotNull SharedHashMapBuilder builder,
@@ -750,10 +751,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     // key is found
                     entry.skip(keyLen);
 
-                    long timeStampPos = 0;
-
-                    timeStampPos = entry.position();
-                    assert identifier > 0;
+                    long timeStampPos = entry.position();
                     if (shouldIgnore(entry, timestamp, identifier)) {
                         return null;
                     }
@@ -774,7 +772,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     }
 
                     long valueLen = readValueLen(entry);
-                    long entryEndAddr = entry.positionAddr() + valueLen;
                     V valueRemoved = expectedValue != null || !removeReturnsNull
                             ? readValue(entry, null, valueLen) : null;
 

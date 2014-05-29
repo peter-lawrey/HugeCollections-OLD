@@ -23,10 +23,9 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.EnumSet;
+import java.util.*;
 
-public class SharedHashMapBuilder implements Cloneable {
+public final class SharedHashMapBuilder implements Cloneable {
 
     static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
@@ -53,45 +52,28 @@ public class SharedHashMapBuilder implements Cloneable {
     private boolean generatedValueType = false;
     private boolean largeSegments = false;
 
+    // replication
+    private boolean canReplicate;
+    private byte identifier = Byte.MIN_VALUE;
+    private TcpReplication tcpReplication;
+    private short udpPort = Short.MIN_VALUE;
+    private TimeProvider timeProvider = TimeProvider.SYSTEM;
+
     @Override
     public SharedHashMapBuilder clone() {
-
         try {
-            final SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
-            result.actualSegments(actualSegments);
-            result.actualEntriesPerSegment(actualEntriesPerSegment());
-            result.entries(entries);
-            result.entrySize(entrySize);
-            result.errorListener(errorListener);
-            result.generatedKeyType(generatedKeyType);
-            result.generatedValueType(generatedValueType);
-            result.lockTimeOutMS(lockTimeOutMS);
-            result.minSegments(minSegments);
-            result.actualSegments(actualSegments);
-            result.actualEntriesPerSegment(actualEntriesPerSegment);
-            result.putReturnsNull(putReturnsNull);
-            result.removeReturnsNull(removeReturnsNull);
-            result.replicas(replicas);
-            result.transactional(transactional);
-            result.metaDataBytes(metaDataBytes);
-            result.eventListener(eventListener);
-
-            // replication
-
-            result.canReplicate = canReplicate;
-            result.identifier = identifier;
-            result.tcpReplication(tcpReplication);
-            result.updPort(updPort);
-
+            SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
+            if (tcpReplication() != null)
+                result.tcpReplication(tcpReplication().clone());
             return result;
-
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
         }
     }
 
     /**
-     * Set minimum number of segments. See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
+     * Set minimum number of segments.
+     * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
      */
@@ -193,13 +175,8 @@ public class SharedHashMapBuilder implements Cloneable {
     public int actualEntriesPerSegment() {
         if (actualEntriesPerSegment > 0)
             return actualEntriesPerSegment;
-        // round up to the next multiple of 64.
         int as = actualSegments();
-        int aeps = segmentsForEntries(as);
-        return aeps;
-    }
-
-    private int segmentsForEntries(int as) {
+        // round up to the next multiple of 64.
         return (int) (Math.max(1, entries * 2L / as) + 63) & ~63;
     }
 
@@ -268,8 +245,8 @@ public class SharedHashMapBuilder implements Cloneable {
         if (tcpReplication != null)
             applyTcpReplication(result, tcpReplication);
 
-        if (updPort != Short.MIN_VALUE)
-            applyUdpReplication(result, updPort);
+        if (udpPort != Short.MIN_VALUE)
+            applyUdpReplication(result, udpPort);
         return result;
 
     }
@@ -435,7 +412,7 @@ public class SharedHashMapBuilder implements Cloneable {
     public String toString() {
         return "SharedHashMapBuilder{" +
                 "actualSegments=" + actualSegments() +
-                (actualSegments > 0 ? ", actualSegments=" + actualSegments() : ", minSegments=" + minSegments()) +
+                ", minSegments=" + minSegments() +
                 ", actualEntriesPerSegment=" + actualEntriesPerSegment() +
                 ", entrySize=" + entrySize() +
                 ", entryAndValueAlignment=" + entryAndValueAlignment() +
@@ -443,14 +420,19 @@ public class SharedHashMapBuilder implements Cloneable {
                 ", replicas=" + replicas() +
                 ", transactional=" + transactional() +
                 ", lockTimeOutMS=" + lockTimeOutMS() +
+                ", metaDataBytes=" + metaDataBytes() +
+                ", eventListener=" + eventListener() +
                 ", errorListener=" + errorListener() +
                 ", putReturnsNull=" + putReturnsNull() +
                 ", removeReturnsNull=" + removeReturnsNull() +
                 ", generatedKeyType=" + generatedKeyType() +
                 ", generatedValueType=" + generatedValueType() +
                 ", largeSegments=" + largeSegments() +
-                ", metaDataBytes=" + metaDataBytes() +
-                ", eventListener=" + eventListener() +
+                ", canReplicate=" + canReplicate() +
+                ", identifier=" + identifier() +
+                ", tcpReplication=" + tcpReplication() +
+                ", udpPort=" + udpPort() +
+                ", timeProvider=" + timeProvider() +
                 '}';
     }
 
@@ -461,36 +443,33 @@ public class SharedHashMapBuilder implements Cloneable {
 
         SharedHashMapBuilder that = (SharedHashMapBuilder) o;
 
-        if (actualEntriesPerSegment() != that.actualEntriesPerSegment()) return false;
         if (actualSegments() != that.actualSegments()) return false;
-        if (entries() != that.entries()) return false;
+        if (minSegments() != that.minSegments()) return false;
+        if (actualEntriesPerSegment() != that.actualEntriesPerSegment()) return false;
         if (entrySize() != that.entrySize()) return false;
         if (entryAndValueAlignment() != that.entryAndValueAlignment()) return false;
-        if (generatedKeyType() != that.generatedKeyType()) return false;
-        if (generatedValueType() != that.generatedValueType()) return false;
-        if (lockTimeOutMS() != that.lockTimeOutMS()) return false;
-        if (minSegments() != that.minSegments()) return false;
-        if (putReturnsNull() != that.putReturnsNull()) return false;
-        if (removeReturnsNull() != that.removeReturnsNull()) return false;
+        if (entries() != that.entries()) return false;
         if (replicas() != that.replicas()) return false;
         if (transactional() != that.transactional()) return false;
+        if (lockTimeOutMS() != that.lockTimeOutMS()) return false;
         if (metaDataBytes() != that.metaDataBytes()) return false;
-        return errorListener().equals(that.errorListener());
-
+        if (!eventListener().equals(that.eventListener())) return false;
+        if (!errorListener().equals(that.errorListener())) return false;
+        if (putReturnsNull() != that.putReturnsNull()) return false;
+        if (removeReturnsNull() != that.removeReturnsNull()) return false;
+        if (generatedKeyType() != that.generatedKeyType()) return false;
+        if (generatedValueType() != that.generatedValueType()) return false;
+        if (largeSegments() != that.largeSegments()) return false;
+        if (canReplicate() != that.canReplicate()) return false;
+        if (identifier() != that.identifier()) return false;
+        if (!tcpReplication().equals(that.tcpReplication())) return false;
+        if (udpPort() != that.udpPort()) return false;
+        if (!timeProvider().equals(that.timeProvider())) return false;
+        return true;
     }
-
-    public Alignment alignment() {
-        return alignment;
-    }
-
-
-    private byte identifier = Byte.MIN_VALUE;
-    private boolean canReplicate;
-    private short updPort = Short.MIN_VALUE;
-
 
     public boolean canReplicate() {
-        return canReplicate || tcpReplication != null || updPort != Short.MIN_VALUE;
+        return canReplicate || tcpReplication != null || udpPort != Short.MIN_VALUE;
     }
 
     public SharedHashMapBuilder canReplicate(boolean canReplicate) {
@@ -498,41 +477,14 @@ public class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder updPort(short updPort) {
-        this.updPort = updPort;
+    public SharedHashMapBuilder udpPort(short udpPort) {
+        this.udpPort = udpPort;
         return this;
     }
 
-    public short getUpdPort() {
-        return updPort;
+    public short udpPort() {
+        return udpPort;
     }
-
-    // TODO refactor to series of overloaded builder configuration methods or sub-builder in common SHM builder
-    public static class TcpReplication {
-
-        private final int serverPort;
-        private final InetSocketAddress[] endpoints;
-        public short packetSize = 1024 * 8;
-
-        public TcpReplication(int serverPort, InetSocketAddress... endpoints) {
-            this.serverPort = serverPort;
-            this.endpoints = endpoints;
-
-            for (final InetSocketAddress endpoint : endpoints) {
-                if (endpoint.getPort() == serverPort && "localhost".equals(endpoint.getHostName()))
-                    throw new IllegalArgumentException("endpoint=" + endpoint
-                            + " can not point to the same port as the server");
-            }
-        }
-
-        public void setPacketSize(short packetSize) {
-            this.packetSize = packetSize;
-        }
-    }
-
-
-    private TcpReplication tcpReplication;
-
 
     private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort)
             throws IOException {
@@ -565,28 +517,25 @@ public class SharedHashMapBuilder implements Cloneable {
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
                                             TcpReplication tcpReplication) throws IOException {
 
-        for (final InetSocketAddress endpoint : tcpReplication.endpoints) {
+        for (final InetSocketAddress endpoint : tcpReplication.endpoints()) {
             final TcpSocketChannelEntryWriter entryWriter =
-                    new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+                    new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
             final TcpSocketChannelEntryReader entryReader =
-                    new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize);
+                    new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize());
             final TcpClientSocketReplicator replicator =
                     new TcpClientSocketReplicator(endpoint, entryReader, entryWriter, result);
             result.addCloseable(replicator);
         }
 
         final TcpSocketChannelEntryWriter entryWriter =
-                new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize);
+                new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
 
         final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
-                result, result, tcpReplication.serverPort,
-                entryWriter, tcpReplication.packetSize, entrySize());
+                result, result, tcpReplication.serverPort(),
+                entryWriter, tcpReplication.packetSize(), entrySize());
 
         result.addCloseable(tcpServerSocketReplicator);
     }
-
-
-    private TimeProvider timeProvider = new TimeProvider();
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
         this.timeProvider = timeProvider;
@@ -618,6 +567,5 @@ public class SharedHashMapBuilder implements Cloneable {
     public TcpReplication tcpReplication() {
         return tcpReplication;
     }
-
 
 }

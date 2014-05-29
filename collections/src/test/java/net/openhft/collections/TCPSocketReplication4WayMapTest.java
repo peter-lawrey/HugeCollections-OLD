@@ -51,7 +51,7 @@ public class TCPSocketReplication4WayMapTest {
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(new SharedHashMapBuilder.TcpReplication(serverPort,
+                .tcpReplication(new TcpReplication(serverPort,
                         InetSocketAddress))
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }

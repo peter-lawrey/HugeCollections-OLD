@@ -41,7 +41,7 @@ public class UDPSocketReplicationTest2 {
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)
-                .updPort((short) udpPort)
+                .udpPort((short) udpPort)
                 .create(Builder.getPersistenceFile(), Integer.class, CharSequence.class);
     }
 

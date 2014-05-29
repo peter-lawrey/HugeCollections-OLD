@@ -23,12 +23,36 @@ package net.openhft.collections;
  * with the aim of possibly later providing and optimization to System.currentTimeMillis()
  * on every call to put(), get() and remove()
  *
+ * Subclasses should be immutable, because {@link SharedHashMapBuilder} don't make defensive copies.
+ *
  * @author Rob Austin.
  */
-public class TimeProvider {
+public abstract class TimeProvider {
 
-    public long currentTimeMillis() {
-        return System.currentTimeMillis();
+    private static class System extends TimeProvider {
+
+        public long currentTimeMillis() {
+            return java.lang.System.currentTimeMillis();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o != null && o.getClass() == getClass();
+        }
+
+        @Override
+        public int hashCode() {
+            return getClass().hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName();
+        }
     }
+
+    public static final TimeProvider SYSTEM = new System();
+
+    public abstract long currentTimeMillis();
 
 }
