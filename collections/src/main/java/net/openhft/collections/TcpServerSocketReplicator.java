@@ -157,11 +157,7 @@ class TcpServerSocketReplicator implements Closeable {
                         remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                         // register it with the selector and store the ModificationIterator for this key
-                        final Attached attached = new Attached();
-                        attached.entryReader = entryReader;
-                        attached.entryWriter = entryWriter;
-                        attached.remoteModificationIterator = remoteModificationIterator;
-
+                        final Attached attached = new Attached(entryReader,remoteModificationIterator);
                         channel.register(selector, OP_WRITE | OP_READ, attached);
 
                         if (remoteIdentifier == map.identifier())
@@ -187,7 +183,7 @@ class TcpServerSocketReplicator implements Closeable {
                             final SocketChannel socketChannel = (SocketChannel) key.channel();
                             final Attached a = (Attached) key.attachment();
 
-                            a.entryWriter.writeAll(socketChannel, a.remoteModificationIterator);
+                           this.entryWriter.writeAll(socketChannel, a.remoteModificationIterator);
                         }
 
                         if (key.isReadable()) {
@@ -225,11 +221,16 @@ class TcpServerSocketReplicator implements Closeable {
         }
     }
 
-    public static class Attached {
-        public TcpSocketChannelEntryWriter entryWriter;
-        public ModificationIterator remoteModificationIterator;
-        public TcpSocketChannelEntryReader entryReader;
+    static class Attached {
 
+        final TcpSocketChannelEntryReader entryReader;
+        final ModificationIterator remoteModificationIterator;
+
+        Attached(TcpSocketChannelEntryReader entryReader,
+                 ModificationIterator remoteModificationIterator) {
+            this.entryReader = entryReader;
+            this.remoteModificationIterator = remoteModificationIterator;
+        }
     }
 
 }

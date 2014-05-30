@@ -116,12 +116,8 @@ class UdpReplicator implements Closeable {
         // datagramChannel.socket().bind(hostAddress);
         datagramChannel.configureBlocking(false);
 
-
-        // Kick off connection establishment
         datagramChannel.bind(hostAddress);
-
-
-        this.datagramChannel.register(selector, SelectionKey.OP_READ);
+        datagramChannel.register(selector, SelectionKey.OP_READ);
 
         for (; ; ) {
             // this may block for a long time, upon return the

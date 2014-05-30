@@ -54,16 +54,19 @@ class TcpClientSocketReplicator implements Closeable {
     private final ExecutorService executorService;
 
     TcpClientSocketReplicator(@NotNull final InetSocketAddress endpoint,
-                              @NotNull final TcpSocketChannelEntryReader entryReader,
                               @NotNull final TcpSocketChannelEntryWriter entryWriter,
-                              @NotNull final ReplicatedSharedHashMap map) {
+                              @NotNull final ReplicatedSharedHashMap map,
+                              final short packetSize,
+                              final int serializedEntrySize,
+                              final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
 
         executorService = newSingleThreadExecutor(
                 new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
         executorService.execute(new Runnable() {
                                     @Override
                                     public void run() {
-                                        process(endpoint, map, entryWriter, entryReader);
+                                        process(endpoint, map, entryWriter, packetSize,
+                                                serializedEntrySize, externalizable);
                                     }
                                 }
 
@@ -73,7 +76,9 @@ class TcpClientSocketReplicator implements Closeable {
     private void process(InetSocketAddress endpoint,
                          ReplicatedSharedHashMap map,
                          TcpSocketChannelEntryWriter entryWriter,
-                         TcpSocketChannelEntryReader entryReader) {
+                         final short packetSize,
+                         final int serializedEntrySize,
+                         final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
         Selector selector = null;
         try {
             selector = Selector.open();
@@ -111,13 +116,18 @@ class TcpClientSocketReplicator implements Closeable {
 
                             entryWriter.sendIdentifier(socketChannel, map.identifier());
 
+                            final TcpSocketChannelEntryReader entryReader =
+                                    new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
+
                             final byte remoteIdentifier = entryReader.readIdentifier(socketChannel);
 
                             entryWriter.sendTimestamp(socketChannel,
                                     map.lastModificationTime(remoteIdentifier));
                             final long remoteTimestamp = entryReader.readTimeStamp(socketChannel);
 
-                            ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+                            ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator
+                                    = map.acquireModificationIterator(remoteIdentifier);
+
                             remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                             if (remoteIdentifier == map.identifier())
@@ -126,11 +136,10 @@ class TcpClientSocketReplicator implements Closeable {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("client-connection id=" + map.identifier() + ", remoteIdentifier=" + remoteIdentifier);
 
-                            final Attached attached = new Attached();
-                            attached.entryReader = entryReader;
-                            attached.entryWriter = entryWriter;
-                            attached.remoteModificationIterator =
-                                    remoteModificationIterator;
+
+                            // register it with the selector and store the ModificationIterator for this key
+                            final Attached attached = new Attached(entryReader, remoteModificationIterator);
+
 
                             socketChannel.register(selector,
                                     OP_READ | OP_WRITE, attached);
@@ -150,7 +159,7 @@ class TcpClientSocketReplicator implements Closeable {
                         if (key.isWritable()) {
                             final SocketChannel socketChannel0 = (SocketChannel) key.channel();
                             final Attached a = (Attached) key.attachment();
-                            a.entryWriter.writeAll(socketChannel0, a.remoteModificationIterator);
+                            entryWriter.writeAll(socketChannel0, a.remoteModificationIterator);
                         }
                     } catch (Exception e) {
 
@@ -200,7 +209,7 @@ class TcpClientSocketReplicator implements Closeable {
 
                 // todo not sure why we have to have this here,
                 // but if we don't add it'll fail !
-                Thread.sleep(100);
+                Thread.sleep(200);
 
                 socketChannel.connect(endpoint);
                 socketChannelRef.set(socketChannel);
@@ -227,7 +236,6 @@ class TcpClientSocketReplicator implements Closeable {
     @Override
     public void close() throws IOException {
         close(socketChannelRef.getAndSet(null));
-
         executorService.shutdownNow();
     }
 

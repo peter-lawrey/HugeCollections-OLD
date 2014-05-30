@@ -23,7 +23,8 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.*;
+import java.util.Arrays;
+import java.util.EnumSet;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
@@ -72,8 +73,7 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Set minimum number of segments.
-     * See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
+     * Set minimum number of segments. See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
      *
      * @return this builder object back
      */
@@ -95,9 +95,9 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * <p>Note that the actual entrySize will be aligned to 4 (default entry alignment). I. e. if
-     * you set entry size to 30, the actual entry size will be 32 (30 aligned to 4 bytes). If you
-     * don't want entry size to be aligned, set {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
+     * <p>Note that the actual entrySize will be aligned to 4 (default entry alignment). I. e. if you set
+     * entry size to 30, the actual entry size will be 32 (30 aligned to 4 bytes). If you don't want entry
+     * size to be aligned, set {@code entryAndValueAlignment(Alignment.NO_ALIGNMENT)}.
      *
      * @param entrySize the size in bytes
      * @return this {@code SharedHashMapBuilder} back
@@ -118,16 +118,16 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Specifies alignment of address in memory of entries and independently of address in memory of
-     * values within entries.
+     * Specifies alignment of address in memory of entries and independently of address in memory of values
+     * within entries.
      *
-     * <p>Useful when values of the map are updated intensively, particularly fields with volatile
-     * access, because it doesn't work well if the value crosses cache lines. Also, on some
-     * (nowadays rare) architectures any misaligned memory access is more expensive than aligned.
+     * <p>Useful when values of the map are updated intensively, particularly fields with volatile access,
+     * because it doesn't work well if the value crosses cache lines. Also, on some (nowadays rare)
+     * architectures any misaligned memory access is more expensive than aligned.
      *
-     * <p>Note that specified {@link #entrySize()} will be aligned according to this alignment. I.
-     * e. if you set {@code entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES},
-     * actual entry size will be 24 (20 aligned to 8 bytes).
+     * <p>Note that specified {@link #entrySize()} will be aligned according to this alignment. I. e. if you
+     * set {@code entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
+     * will be 24 (20 aligned to 8 bytes).
      *
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment()
@@ -138,8 +138,7 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Returns alignment of addresses in memory of entries and independently of values within
-     * entries.
+     * Returns alignment of addresses in memory of entries and independently of values within entries.
      *
      * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
      *
@@ -308,12 +307,12 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for
-     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a
-     * recycled one) Either way it's expensive for something you probably don't use.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
      *
-     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was
-     *                       replaced but instead return null
+     * @param putReturnsNull false if you want SharedHashMap.put() to not return the object that was replaced
+     *                       but instead return null
      * @return an instance of the map builder
      */
     public SharedHashMapBuilder putReturnsNull(boolean putReturnsNull) {
@@ -322,24 +321,24 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for
-     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a
-     * recycled one) Either way it's expensive for something you probably don't use.
+     * Map.put() returns the previous value, functionality which is rarely used but fairly cheap for HashMap.
+     * In the case, for an off heap collection, it has to create a new object (or return a recycled one)
+     * Either way it's expensive for something you probably don't use.
      *
-     * @return true if SharedHashMap.put() is not going to return the object that was replaced but
-     * instead return null
+     * @return true if SharedHashMap.put() is not going to return the object that was replaced but instead
+     * return null
      */
     public boolean putReturnsNull() {
         return putReturnsNull;
     }
 
     /**
-     * Map.remove()  returns the previous value, functionality which is rarely used but fairly cheap
-     * for HashMap. In the case, for an off heap collection, it has to create a new object (or
-     * return a recycled one) Either way it's expensive for something you probably don't use.
+     * Map.remove()  returns the previous value, functionality which is rarely used but fairly cheap for
+     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a recycled
+     * one) Either way it's expensive for something you probably don't use.
      *
-     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object
-     *                          that was removed but instead return null
+     * @param removeReturnsNull false if you want SharedHashMap.remove() to not return the object that was
+     *                          removed but instead return null
      * @return an instance of the map builder
      */
     public SharedHashMapBuilder removeReturnsNull(boolean removeReturnsNull) {
@@ -349,12 +348,12 @@ public final class SharedHashMapBuilder implements Cloneable {
 
 
     /**
-     * Map.remove() returns the previous value, functionality which is rarely used but fairly cheap
-     * for HashMap. In the case, for an off heap collection, it has to create a new object (or
-     * return a recycled one) Either way it's expensive for something you probably don't use.
+     * Map.remove() returns the previous value, functionality which is rarely used but fairly cheap for
+     * HashMap. In the case, for an off heap collection, it has to create a new object (or return a recycled
+     * one) Either way it's expensive for something you probably don't use.
      *
-     * @return true if SharedHashMap.remove() is not going to return the object that was removed but
-     * instead return null
+     * @return true if SharedHashMap.remove() is not going to return the object that was removed but instead
+     * return null
      */
     public boolean removeReturnsNull() {
         return removeReturnsNull;
@@ -520,10 +519,9 @@ public final class SharedHashMapBuilder implements Cloneable {
         for (final InetSocketAddress endpoint : tcpReplication.endpoints()) {
             final TcpSocketChannelEntryWriter entryWriter =
                     new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
-            final TcpSocketChannelEntryReader entryReader =
-                    new TcpSocketChannelEntryReader(entrySize(), result, tcpReplication.packetSize());
             final TcpClientSocketReplicator replicator =
-                    new TcpClientSocketReplicator(endpoint, entryReader, entryWriter, result);
+                    new TcpClientSocketReplicator(endpoint, entryWriter, result,
+                            tcpReplication.packetSize(), entrySize(), result);
             result.addCloseable(replicator);
         }
 
