@@ -44,8 +44,8 @@ public class TCPSocketReplicationTest {
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076);
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077);
     }
 
     @After

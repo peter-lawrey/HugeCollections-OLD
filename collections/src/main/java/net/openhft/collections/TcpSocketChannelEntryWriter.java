@@ -64,10 +64,6 @@ class TcpSocketChannelEntryWriter {
                   @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
 
-        // if we still have some unwritten writer from last time
-        if (in.position() > 0)
-            writeBytes(socketChannel);
-
         final long start = in.position();
 
         for (; ; ) {
@@ -86,22 +82,26 @@ class TcpSocketChannelEntryWriter {
             if (in.remaining() > serializedEntrySize && wasDataRead)
                 continue;
 
-            writeBytes(socketChannel);
-
             // we've filled up one writer lets give another channel a chance to send data
             return;
         }
 
     }
 
+    public void sendAll(SocketChannel socketChannel) throws IOException {
+        // if we still have some unwritten writer from last time
+        if (in.position() > 0)
+            writeBytes(socketChannel);
+    }
+
     private void writeBytes(@NotNull final SocketChannel socketChannel) throws IOException {
 
         out.limit((int) in.position());
 
-        final int write = socketChannel.write(out);
+        final int len = socketChannel.write(out);
 
         if (LOG.isDebugEnabled())
-            LOG.debug("bytes-written=" + write);
+            LOG.debug("bytes-written=" + len);
 
         if (out.remaining() == 0) {
             out.clear();
@@ -153,51 +153,21 @@ class TcpSocketChannelEntryWriter {
     /**
      * sends the identity and timestamp of this node to a remote node
      *
-     * @param socketChannel   the socketChannel the message will be sent on
      * @param localIdentifier the current nodes identifier
      * @throws IOException if it failed to send
      */
-    void sendIdentifier(@NotNull final SocketChannel socketChannel,
-                        final int localIdentifier) throws IOException {
-        in.clear();
-        out.clear();
-
-        // send a welcome message to the remote server to ask for data for our localIdentifier
-        // and any missed messages
+    void writeIdentifier(final int localIdentifier) throws IOException {
         in.writeByte(localIdentifier);
-        out.limit((int) in.position());
-
-        while (out.remaining() > 0) {
-            socketChannel.write(out);
-        }
-
-        out.clear();
-        in.clear();
     }
 
     /**
      * sends the identity and timestamp of this node to a remote node
      *
-     * @param socketChannel          the socketChannel the message will be sent on
      * @param timeStampOfLastMessage the last timestamp we received a message from that node
      * @throws IOException if it failed to send
      */
-    void sendTimestamp(@NotNull final SocketChannel socketChannel,
-                       final long timeStampOfLastMessage) throws IOException {
-        in.clear();
-        out.clear();
-
-        // send a welcome message to the remote server to ask for data for our localIdentifier
-        // and any missed messages
+    void writeTimestamp(final long timeStampOfLastMessage) throws IOException {
         in.writeLong(timeStampOfLastMessage);
-        out.limit((int) in.position());
-
-        while (out.remaining() > 0) {
-            socketChannel.write(out);
-        }
-
-        out.clear();
-        in.clear();
     }
 }
 

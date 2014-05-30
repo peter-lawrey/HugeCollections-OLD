@@ -34,7 +34,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
  *
  * @author Rob Austin.
  */
- class TcpSocketChannelEntryReader {
+class TcpSocketChannelEntryReader {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryReader.class);
 
@@ -52,15 +52,22 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
      * @param externalizable      supports reading and writing serialize entries
      * @param packetSize          the estimated size of a tcp/ip packet
      */
-     TcpSocketChannelEntryReader(final int serializedEntrySize,
-                                       @NotNull final EntryExternalizable externalizable,
-                                       final short packetSize) {
+    TcpSocketChannelEntryReader(final int serializedEntrySize,
+                                @NotNull final EntryExternalizable externalizable,
+                                final short packetSize) {
         this.serializedEntrySize = serializedEntrySize;
         in = ByteBuffer.allocate(packetSize + serializedEntrySize);
         this.externalizable = externalizable;
         out = new ByteBufferBytes(in);
         out.limit(0);
         in.clear();
+    }
+
+
+    int read(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
+        final int len = socketChannel.read(in);
+        out.limit(in.position());
+        return len;
     }
 
     /**
@@ -72,7 +79,6 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
      */
     void readAll(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
 
-        compact();
 
         for (; ; ) {
 
@@ -81,10 +87,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
             // its set to MIN_VALUE when it should be read again
             if (sizeOfNextEntry == Integer.MIN_VALUE) {
                 if (out.remaining() < SIZE_OF_UNSIGNED_SHORT) {
-                    socketChannel.read(in);
-                    out.limit(in.position());
-                    if (out.remaining() < SIZE_OF_UNSIGNED_SHORT)
-                        return;
+                    return;
                 }
 
                 sizeOfNextEntry = out.readUnsignedShort();
@@ -94,10 +97,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
                 throw new IllegalStateException("invalid serializedEntrySize=" + sizeOfNextEntry);
 
             if (out.remaining() < sizeOfNextEntry) {
-                socketChannel.read(in);
-                out.limit(in.position());
-                if (out.remaining() < sizeOfNextEntry)
-                    return;
+                return;
             }
 
             final long nextEntryPos = out.position() + sizeOfNextEntry;
@@ -108,7 +108,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
             out.limit(limit);
             // skip onto the next entry
             out.position(nextEntryPos);
-            compact();
+            // compact();
 
             // to allow the sizeOfNextEntry to be read the next time around
             sizeOfNextEntry = Integer.MIN_VALUE;
@@ -119,7 +119,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
     /**
      * compacts the buffer and updates the {@code in} and  {@code out} accordingly
      */
-    private void compact() {
+    public void compact() {
 
         // the serializedEntrySize used here may not be the maximum size of the entry in its serialized form
         // however, its only use as an indication that the buffer is becoming full and should be compacted
@@ -135,20 +135,15 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
     }
 
 
-    byte readIdentifier(@NotNull final SocketChannel channel) throws IOException {
-        while (out.remaining() < 1) {
-            final int read = channel.read(in);
-            out.limit(in.position());
-        }
-        return out.readByte();
+    /**
+     * @return -1 if unsuccessful
+     */
+    byte readIdentifier() {
+        return (out.remaining() >= 1) ? out.readByte() : Byte.MIN_VALUE;
     }
 
 
-    long readTimeStamp(@NotNull final SocketChannel channel) throws IOException {
-        while (out.remaining() < 8) {
-            channel.read(in);
-            out.limit(in.position());
-        }
-        return out.readLong();
+    long readTimeStamp() throws IOException {
+        return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
     }
 }

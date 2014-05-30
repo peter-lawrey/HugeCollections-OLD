@@ -520,7 +520,7 @@ public final class SharedHashMapBuilder implements Cloneable {
             final TcpSocketChannelEntryWriter entryWriter =
                     new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
             final TcpClientSocketReplicator replicator =
-                    new TcpClientSocketReplicator(endpoint, entryWriter, result,
+                    new TcpClientSocketReplicator(endpoint, result,
                             tcpReplication.packetSize(), entrySize(), result);
             result.addCloseable(replicator);
         }
@@ -530,7 +530,7 @@ public final class SharedHashMapBuilder implements Cloneable {
 
         final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
                 result, result, tcpReplication.serverPort(),
-                entryWriter, tcpReplication.packetSize(), entrySize());
+                tcpReplication.packetSize(), entrySize());
 
         result.addCloseable(tcpServerSocketReplicator);
     }

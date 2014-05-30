@@ -44,10 +44,10 @@ public class TCPSocketReplicationBootStrapTests {
     @Test
     public void testBootstrap() throws IOException, InterruptedException {
 
-        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8077);
+        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079);
         final ReplicatedSharedHashMap<Integer,
                 CharSequence> map2a = TCPSocketReplication4WayMapTest
-                .newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8077));
+                .newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8079));
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -90,7 +90,7 @@ public class TCPSocketReplicationBootStrapTests {
     @Ignore
     public void testBootstrapFlippingTheSocketConnection() throws IOException, InterruptedException {
 
-        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8077, new InetSocketAddress("localhost", 8076));
+        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079, new InetSocketAddress("localhost", 8076));
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8076);
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 

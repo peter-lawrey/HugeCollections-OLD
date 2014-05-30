@@ -30,6 +30,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,40 +54,94 @@ class TcpClientSocketReplicator implements Closeable {
 
     private final AtomicReference<SocketChannel> socketChannelRef = new AtomicReference<SocketChannel>();
     private final ExecutorService executorService;
+    final CopyOnWriteArraySet<SocketChannel> socketChannels = new CopyOnWriteArraySet<SocketChannel>();
+    final Selector selector;
 
     TcpClientSocketReplicator(@NotNull final InetSocketAddress endpoint,
-                              @NotNull final TcpSocketChannelEntryWriter entryWriter,
                               @NotNull final ReplicatedSharedHashMap map,
                               final short packetSize,
                               final int serializedEntrySize,
-                              final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                              final ReplicatedSharedHashMap.EntryExternalizable externalizable) throws IOException {
 
         executorService = newSingleThreadExecutor(
                 new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
+        selector = Selector.open();
+
         executorService.execute(new Runnable() {
                                     @Override
                                     public void run() {
-                                        process(endpoint, map, entryWriter, packetSize,
-                                                serializedEntrySize, externalizable);
+                                        try {
+                                            process(map, packetSize,
+                                                    serializedEntrySize, externalizable, endpoint);
+                                        } catch (IOException e) {
+                                            LOG.error("", e);
+                                        }
                                     }
                                 }
-
         );
     }
 
-    private void process(InetSocketAddress endpoint,
-                         ReplicatedSharedHashMap map,
-                         TcpSocketChannelEntryWriter entryWriter,
-                         final short packetSize,
-                         final int serializedEntrySize,
-                         final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
-        Selector selector = null;
-        try {
-            selector = Selector.open();
+    private void process(ReplicatedSharedHashMap map,
+                         final short packetSize, final int serializedEntrySize,
+                         final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                         final InetSocketAddress... endpoints) throws IOException {
 
-            connect(endpoint, map, selector);
+
+        final ConcurrentLinkedQueue<SocketChannel> newSockets = new ConcurrentLinkedQueue<SocketChannel>();
+
+        final byte identifier = map.identifier();
+
+        try {
+
+            for (final InetSocketAddress endpoint : endpoints) {
+
+                final Runnable target = new Runnable() {
+
+                    public void run() {
+                        try {
+                            SocketChannel socketChannel = blockingConnect(endpoint, identifier);
+                            socketChannels.add(socketChannel);
+                            newSockets.add(socketChannel);
+                        } catch (InterruptedException e) {
+                            // do nothing
+                        } catch (IOException e) {
+                            LOG.error("", e);
+                        }
+                    }
+
+                };
+
+                final Thread thread = new Thread(target);
+                thread.setName("connector-" + endpoint);
+                thread.setDaemon(true);
+                thread.start();
+            }
+
+            boolean wasRegistered = false;
 
             for (; ; ) {
+
+
+                for (; ; ) {
+                    final SocketChannel socketChannel = newSockets.poll();
+
+                    if (socketChannel == null)
+                        break;
+                    synchronized (selector) {
+                        if (selector.isOpen()) {
+                            socketChannel.register(selector, OP_CONNECT);
+                            wasRegistered = true;
+                        } else
+                            return;
+                    }
+                }
+
+
+                if (!wasRegistered) {
+                    Thread.sleep(100);
+                    continue;
+                }
+
                 final int nSelectedKeys = selector.select(100);
                 if (nSelectedKeys == 0) {
                     continue;    // nothing to do
@@ -98,84 +154,105 @@ class TcpClientSocketReplicator implements Closeable {
                         if (!key.isValid())
                             continue;
 
-
                         if (key.isConnectable()) {
 
-                            final SocketChannel socketChannel = (SocketChannel) key.channel();
+                            final SocketChannel channel = (SocketChannel) key.channel();
 
-                            while (!socketChannel.finishConnect()) {
+                            while (!channel.finishConnect()) {
                                 Thread.sleep(100);
                             }
-                            // see http://www.exampledepot.8waytrips.com/egs/java.nio/NbClient.html
-                            socketChannel.register(selector, OP_READ | OP_WRITE);
 
-                            if (LOG.isDebugEnabled()) {
-                                LOG.info("successfully connected to  local-id=" + map
-                                        .identifier());
-                            }
 
-                            entryWriter.sendIdentifier(socketChannel, map.identifier());
+                            channel.configureBlocking(false);
+                            channel.socket().setKeepAlive(true);
+                            channel.socket().setSoTimeout(100);
+                            channel.socket().setSoLinger(false, 0);
+                            final Attached attached = new Attached();
+                            channel.register(selector, OP_WRITE | OP_READ, attached);
 
-                            final TcpSocketChannelEntryReader entryReader =
-                                    new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
+                            attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
+                                    externalizable, packetSize);
 
-                            final byte remoteIdentifier = entryReader.readIdentifier(socketChannel);
-
-                            entryWriter.sendTimestamp(socketChannel,
-                                    map.lastModificationTime(remoteIdentifier));
-                            final long remoteTimestamp = entryReader.readTimeStamp(socketChannel);
-
-                            ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator
-                                    = map.acquireModificationIterator(remoteIdentifier);
-
-                            remoteModificationIterator.dirtyEntries(remoteTimestamp);
-
-                            if (remoteIdentifier == map.identifier())
-                                throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-
-                            if (LOG.isDebugEnabled())
-                                LOG.debug("client-connection id=" + map.identifier() + ", remoteIdentifier=" + remoteIdentifier);
+                            attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
+                                    externalizable, packetSize);
 
 
                             // register it with the selector and store the ModificationIterator for this key
-                            final Attached attached = new Attached(entryReader, remoteModificationIterator);
+                            final byte identifier1 = map.identifier();
+                            LOG.info("out=" + identifier1);
+                            attached.entryWriter.writeIdentifier(identifier1);
 
 
-                            socketChannel.register(selector,
-                                    OP_READ | OP_WRITE, attached);
-
-                            // process any writer.remaining(), this can occur because reading socket for the bootstrap,
-                            // may read more than just 9 writer
-                            entryReader.readAll(socketChannel);
                         }
 
-                        // is there data to read on this channel?
+
                         if (key.isReadable()) {
 
-                            final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                            final SocketChannel socketChannel = (SocketChannel) key.channel();
                             final Attached a = (Attached) key.attachment();
-                            a.entryReader.readAll(socketChannel0);
+
+                            a.entryReader.compact();
+                            int len = a.entryReader.read(socketChannel);
+
+                            if (len > 0) {
+
+                                if (!a.handShakingComplete) {
+                                    if (a.remoteIdentifier == Byte.MIN_VALUE) {
+                                        if (len == 8)
+                                            len = 8;
+                                        byte remoteIdentifier = a.entryReader.readIdentifier();
+
+                                        if (remoteIdentifier != Byte.MIN_VALUE) {
+                                            a.remoteIdentifier = remoteIdentifier;
+                                            sendTimeStamp(map, a.entryWriter, a, remoteIdentifier);
+                                        }
+                                    }
+
+
+                                    if (a.remoteIdentifier != Byte.MIN_VALUE && a.remoteTimestamp == Long
+                                            .MIN_VALUE) {
+                                        a.remoteTimestamp = a.entryReader.readTimeStamp();
+                                        if (a.remoteTimestamp != Long.MIN_VALUE) {
+                                            a.remoteModificationIterator.dirtyEntries(a.remoteTimestamp);
+                                            a.handShakingComplete = true;
+                                        }
+                                    }
+                                }
+
+
+                                if (a.handShakingComplete)
+                                    a.entryReader.readAll(socketChannel);
+                            }
+
                         }
+
                         if (key.isWritable()) {
-                            final SocketChannel socketChannel0 = (SocketChannel) key.channel();
+                            final SocketChannel socketChannel = (SocketChannel) key.channel();
                             final Attached a = (Attached) key.attachment();
-                            entryWriter.writeAll(socketChannel0, a.remoteModificationIterator);
+
+                            if (a.remoteModificationIterator != null)
+                                a.entryWriter.writeAll(socketChannel, a.remoteModificationIterator);
+
+                            a.entryWriter.sendAll(socketChannel);
                         }
+
+
                     } catch (Exception e) {
 
                         //  if (!isClosed.get()) {
                         //   if (socketChannel.isOpen())
-                        //     LOG.info("", e);
+                        LOG.info("", e);
                         // Close channel and nudge selector
                         try {
                             key.channel().close();
                         } catch (IOException ex) {
                             // do nothing
-
                         }
+
                     }
-                    selectedKeys.clear();
                 }
+                selectedKeys.clear();
+
             }
         } catch (Exception e) {
             LOG.error("", e);
@@ -186,9 +263,82 @@ class TcpClientSocketReplicator implements Closeable {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            close(socketChannelRef.getAndSet(null));
+            close();
         }
     }
+
+    private void sendTimeStamp(ReplicatedSharedHashMap map, TcpSocketChannelEntryWriter entryWriter, Attached a, byte remoteIdentifier) throws IOException {
+        LOG.info("remoteIdentifier=" + remoteIdentifier);
+        if (LOG.isDebugEnabled()) {
+            // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
+            // Subtle gain, but.
+            LOG.debug("server-connection id={}, remoteIdentifier={}",
+                    map.identifier(), remoteIdentifier);
+        }
+
+        if (remoteIdentifier == map.identifier())
+            throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
+        a.remoteModificationIterator =
+                map.acquireModificationIterator(remoteIdentifier);
+
+        entryWriter.writeTimestamp(map.lastModificationTime(remoteIdentifier));
+    }
+
+    /**
+     * blocks until connected
+     *
+     * @param endpoint   the endpoint to connect
+     * @param identifier used for logging only
+     * @throws Exception if we are not successful at connection
+     */
+
+    private SocketChannel blockingConnect(final InetSocketAddress endpoint,
+                                          final byte identifier) throws InterruptedException, IOException {
+
+        boolean success = false;
+
+        for (; ; ) {
+
+            final SocketChannel socketChannel = SocketChannel.open();
+
+            try {
+
+                socketChannel.configureBlocking(false);
+                socketChannel.socket().setKeepAlive(true);
+                socketChannel.socket().setReuseAddress(false);
+                socketChannel.socket().setSoLinger(false, 0);
+                socketChannel.socket().setSoTimeout(0);
+                socketChannel.socket().setTcpNoDelay(true);
+
+                // todo not sure why we have to have this here,
+                // but if we don't add it'll fail !
+                Thread.sleep(500);
+
+                socketChannel.connect(endpoint);
+                socketChannelRef.set(socketChannel);
+
+                if (LOG.isDebugEnabled())
+                    LOG.debug("successfully connected to {}, local-id={}", endpoint, identifier);
+                success = true;
+                return socketChannel;
+
+            } catch (IOException e) {
+                throw e;
+            } catch (InterruptedException e) {
+                throw e;
+            } finally {
+                if (!success)
+                    try {
+                        socketChannel.close();
+                    } catch (IOException e) {
+                        LOG.error("", e);
+                    }
+            }
+
+        }
+
+    }
+
 
     private void connect(InetSocketAddress endpoint,
                          ReplicatedSharedHashMap map,
@@ -235,27 +385,30 @@ class TcpClientSocketReplicator implements Closeable {
 
     @Override
     public void close() throws IOException {
-        close(socketChannelRef.getAndSet(null));
-        executorService.shutdownNow();
-    }
 
-    private static void close(SocketChannel socketChannel) {
-        if (socketChannel != null) {
-            try {
-                try {
-                    socketChannel.socket().close();
-                } catch (IOException e) {
-                    LOG.error("", e);
+        synchronized (selector) {
+            for (SocketChannel socketChannel : this.socketChannels)
+                if (socketChannel != null) {
+                    try {
+                        try {
+                            socketChannel.socket().close();
+                        } catch (IOException e) {
+                            LOG.error("", e);
+                        }
+                    } finally {
+                        try {
+                            socketChannel.close();
+                        } catch (IOException e) {
+                            LOG.error("", e);
+                        }
+                    }
                 }
-            } finally {
-                try {
-                    socketChannel.close();
-                } catch (IOException e) {
-                    LOG.error("", e);
-                }
-            }
+
+            socketChannels.clear();
+            selector.close();
         }
 
+        executorService.shutdownNow();
     }
 
 

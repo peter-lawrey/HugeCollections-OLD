@@ -401,7 +401,7 @@ public class SharedHashMapTest {
     @Test
     public void testAcquireAndGet() throws IOException, ClassNotFoundException,
             IllegalAccessException, InstantiationException {
-        int entries = 1000 * 1000;
+        int entries = 100 * 1000;
         testAcquireAndGet(getSharedMap(entries, 128, 24, NO_ALIGNMENT), entries);
         testAcquireAndGet(getSharedMap(entries, 128, 24, OF_4_BYTES), entries);
         testAcquireAndGet(getSharedMap(entries, 128, 24, OF_8_BYTES), entries);
