@@ -93,7 +93,7 @@ public class TCPSocketReplicationTestPostConnection {
 
 
         // allow time for the recompilation to resolve
-        waitTillEqual(500);
+        waitTillEqual(5000);
 
         assertEquals(map1, map2);
         assertTrue(!map1.isEmpty());

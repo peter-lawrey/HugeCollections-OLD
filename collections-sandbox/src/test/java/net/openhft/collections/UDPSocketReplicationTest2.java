@@ -75,8 +75,6 @@ public class UDPSocketReplicationTest2 {
                 map1.put(i, "EXAMPLE-1");
             }
         }
-
-
     }
 
 

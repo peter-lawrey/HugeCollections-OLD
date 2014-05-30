@@ -27,8 +27,6 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -49,12 +47,12 @@ public class UDPSocketReplicationTest {
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
-    private SharedHashMap<Integer, CharSequence> map1;
+  //  private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
 
     @Before
     public void setup() throws IOException {
-        map1 = newUdpSocketShmIntString(1, 1234);
+  //      map1 = newUdpSocketShmIntString(1, 1234);
         map2 = newUdpSocketShmIntString(2, 1234);
         try {
             Thread.sleep(500);
@@ -66,7 +64,7 @@ public class UDPSocketReplicationTest {
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map1, map2}) {
+        for (final Closeable closeable : new Closeable[]{ map2}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -81,32 +79,14 @@ public class UDPSocketReplicationTest {
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
-            map1.put(i, "EXAMPLE-1");
+            Thread.sleep(1000);
         }
 
-        // allow time for the recompilation to resolve
-        waitTillEqual(5000);
 
-        assertEquals(map1, map2);
-        assertTrue(!map2.isEmpty());
+
 
     }
 
-    /**
-     * * waits until map1 and map2 show the same value
-     *
-     * @param timeOutMs timeout in milliseconds
-     * @throws InterruptedException
-     */
-    private void waitTillEqual(final int timeOutMs) throws InterruptedException {
-        int t = 0;
-        for (; t < timeOutMs; t++) {
-            if (map1.equals(map2))
-                break;
-            Thread.sleep(1);
-        }
-
-    }
 
 }
 
