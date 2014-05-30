@@ -137,7 +137,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
 
     byte readIdentifier(@NotNull final SocketChannel channel) throws IOException {
         while (out.remaining() < 1) {
-            channel.read(in);
+            final int read = channel.read(in);
             out.limit(in.position());
         }
         return out.readByte();

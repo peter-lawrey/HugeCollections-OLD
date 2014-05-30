@@ -108,23 +108,20 @@ class UdpReplicator implements Closeable {
         final Selector selector = Selector.open();
 
         //224.0.0.0 through 239.255.255.255
-        InetSocketAddress hostAddress = new InetSocketAddress("224.0.0.0", port);
+        InetSocketAddress hostAddress = new InetSocketAddress(port);
 
-
-        // Kick off connection establishment
-        datagramChannel.connect(hostAddress);
-     /*   datagramChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
-                .setOption(StandardSocketOptions.SO_BROADCAST, true)
-                .setOption(StandardSocketOptions.SO_REUSEADDR, true);
-*/
 
         // Create a non-blocking socket channel
-        datagramChannel.socket().setBroadcast(true);
+        // datagramChannel.socket().setBroadcast(true);
         // datagramChannel.socket().bind(hostAddress);
         datagramChannel.configureBlocking(false);
 
-        this.datagramChannel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ);
+
+        // Kick off connection establishment
+        datagramChannel.bind(hostAddress);
+
+
+        this.datagramChannel.register(selector, SelectionKey.OP_READ);
 
         for (; ; ) {
             // this may block for a long time, upon return the
@@ -260,7 +257,9 @@ class UdpReplicator implements Closeable {
             out.clear();
             in.clear();
 
-            final int bytesRead = socketChannel.read(in);
+            socketChannel.receive(in);
+
+            final int bytesRead = in.position();
 
             if (bytesRead < SIZE_OF_SHORT + SIZE_OF_UNSIGNED_SHORT)
                 return;

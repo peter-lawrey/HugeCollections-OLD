@@ -41,8 +41,8 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizabl
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
- * Used with a {@link ReplicatedSharedHashMap} to send data between the maps using nio, non
- * blocking, server socket connection.
+ * Used with a {@link ReplicatedSharedHashMap} to send data between the maps using nio, non blocking, server
+ * socket connection.
  *
  * @author Rob Austin.
  * @see TcpClientSocketReplicator
@@ -142,6 +142,7 @@ class TcpServerSocketReplicator implements Closeable {
                         channel.configureBlocking(false);
                         channel.socket().setKeepAlive(true);
                         channel.socket().setSoTimeout(100);
+                        channel.socket().setSoLinger(false, 0);
 
                         final TcpSocketChannelEntryReader entryReader =
                                 new TcpSocketChannelEntryReader(serializedEntrySize, externalizable, packetSize);
@@ -156,7 +157,11 @@ class TcpServerSocketReplicator implements Closeable {
                         remoteModificationIterator.dirtyEntries(remoteTimestamp);
 
                         // register it with the selector and store the ModificationIterator for this key
-                        final Attached attached = new Attached(entryReader, remoteModificationIterator);
+                        final Attached attached = new Attached();
+                        attached.entryReader = entryReader;
+                        attached.entryWriter = entryWriter;
+                        attached.remoteModificationIterator = remoteModificationIterator;
+
                         channel.register(selector, OP_WRITE | OP_READ, attached);
 
                         if (remoteIdentifier == map.identifier())
@@ -174,19 +179,22 @@ class TcpServerSocketReplicator implements Closeable {
                         // process any writer.remaining(), this can occur because reading socket for the bootstrap,
                         // may read more than just 9 writer
                         entryReader.readAll(channel);
+
                     }
                     try {
 
                         if (key.isWritable()) {
                             final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached attachment = (Attached) key.attachment();
-                            entryWriter.writeAll(socketChannel, attachment.remoteModificationIterator);
+                            final Attached a = (Attached) key.attachment();
+
+                            a.entryWriter.writeAll(socketChannel, a.remoteModificationIterator);
                         }
 
                         if (key.isReadable()) {
                             final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached attachment = (Attached) key.attachment();
-                            attachment.entryReader.readAll(socketChannel);
+                            final Attached a = (Attached) key.attachment();
+
+                            a.entryReader.readAll(socketChannel);
                         }
 
                     } catch (Exception e) {
@@ -198,7 +206,7 @@ class TcpServerSocketReplicator implements Closeable {
                         try {
                             key.channel().close();
                         } catch (IOException ex) {
-                            // do nothing
+                            // ignore the exception, likely due to a client disconnect
                         }
                         return;
                     }
@@ -217,16 +225,11 @@ class TcpServerSocketReplicator implements Closeable {
         }
     }
 
-    private static class Attached {
+    public static class Attached {
+        public TcpSocketChannelEntryWriter entryWriter;
+        public ModificationIterator remoteModificationIterator;
+        public TcpSocketChannelEntryReader entryReader;
 
-        final TcpSocketChannelEntryReader entryReader;
-        final ModificationIterator remoteModificationIterator;
-
-        private Attached(TcpSocketChannelEntryReader entryReader,
-                         ModificationIterator remoteModificationIterator) {
-            this.entryReader = entryReader;
-            this.remoteModificationIterator = remoteModificationIterator;
-        }
     }
 
 }
