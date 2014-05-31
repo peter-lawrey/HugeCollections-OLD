@@ -30,7 +30,7 @@ import java.nio.channels.SocketChannel;
  */
 public class AbstractTCPReplicator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TcpSocketReplicator.class.getName());
 
     /**
      * used to exchange identifiers and timestamps between the server and client

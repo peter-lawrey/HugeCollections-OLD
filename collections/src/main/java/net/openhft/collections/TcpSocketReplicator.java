@@ -47,21 +47,21 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
  *
  * @author Rob Austin.
  */
-class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeable {
+class TcpSocketReplicator extends AbstractTCPReplicator implements Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TcpSocketReplicator.class.getName());
     private static final int BUFFER_SIZE = 0x100000; // 1Mb
 
     private final ExecutorService executorService;
     private final CopyOnWriteArraySet<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final Selector selector;
 
-    TcpClientSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
-                              final short packetSize,
-                              final int serializedEntrySize,
-                              @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                              @NotNull final Set<? extends SocketAddress> endpoint,
-                              final int port) throws IOException {
+    TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
+                        final short packetSize,
+                        final int serializedEntrySize,
+                        @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                        @NotNull final Set<? extends SocketAddress> endpoint,
+                        final int port) throws IOException {
 
         executorService = newSingleThreadExecutor(
                 new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
@@ -235,7 +235,6 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
             SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
                     IOException {
-
 
                 ServerSocketChannel serverChannel = ServerSocketChannel.open();
                 final ServerSocket serverSocket = serverChannel.socket();
