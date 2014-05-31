@@ -173,14 +173,14 @@ class UdpReplicator implements Closeable {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
-        private final TcpSocketChannelEntryWriter.EntryCallback entryCallback;
+        private final TcpSocketReplicator.EntryCallback entryCallback;
 
         public UdpSocketChannelEntryWriter(final int serializedEntrySize,
                                            @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
-            entryCallback = new TcpSocketChannelEntryWriter.EntryCallback(externalizable, in);
+            entryCallback = new TcpSocketReplicator.EntryCallback(externalizable, in);
         }
 
         /**

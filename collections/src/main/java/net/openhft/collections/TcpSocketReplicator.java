@@ -18,6 +18,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +31,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Queue;
 import java.util.Set;
@@ -63,9 +66,10 @@ class TcpSocketReplicator implements Closeable {
                         @NotNull final Set<? extends SocketAddress> endpoint,
                         final int port) throws IOException {
 
-        executorService = newSingleThreadExecutor(
-                new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
         selector = Selector.open();
+
+        executorService = newSingleThreadExecutor(
+                new NamedThreadFactory("TcpSocketReplicator-" + map.identifier(), true));
 
         executorService.execute(new Runnable() {
                                     @Override
@@ -80,23 +84,6 @@ class TcpSocketReplicator implements Closeable {
                                     }
                                 }
         );
-    }
-
-
-    /**
-     * Registers the SocketChannel with the selector
-     *
-     * @param newSockets
-     * @return
-     * @throws ClosedChannelException
-     */
-    void register(@NotNull final Queue<SelectableChannel> newSockets) throws ClosedChannelException {
-        for (SelectableChannel sc = newSockets.poll(); sc != null; sc = newSockets.poll()) {
-            if (sc instanceof ServerSocketChannel)
-                sc.register(selector, OP_ACCEPT);
-            else
-                sc.register(selector, OP_CONNECT);
-        }
     }
 
 
@@ -131,30 +118,20 @@ class TcpSocketReplicator implements Closeable {
                         if (!key.isValid())
                             continue;
 
-
-                        if (key.isAcceptable()) {
+                        if (key.isAcceptable())
                             doAccept(key, serializedEntrySize, externalizable, packetSize, map.identifier());
-                        }
 
-                        if (key.isConnectable()) {
+                        if (key.isConnectable())
                             onConnect(map, packetSize, serializedEntrySize, externalizable, key);
-                        }
 
-                        if (key.isReadable()) {
+                        if (key.isReadable())
                             onRead(map, key);
-                        }
 
-                        if (key.isWritable()) {
+                        if (key.isWritable())
                             onWrite(key);
-                        }
-
 
                     } catch (Exception e) {
-
-                        //  if (!isClosed.get()) {
-                        //   if (socketChannel.isOpen())
                         LOG.info("", e);
-                        // Close channel and nudge selector
                         try {
                             key.channel().close();
                         } catch (IOException ex) {
@@ -180,7 +157,6 @@ class TcpSocketReplicator implements Closeable {
                     if (LOG.isDebugEnabled())
                         LOG.debug("", e);
                 }
-
             close();
         }
     }
@@ -432,7 +408,17 @@ class TcpSocketReplicator implements Closeable {
 
             if (remoteIdentifier != Byte.MIN_VALUE) {
                 attached.remoteIdentifier = remoteIdentifier;
-                sendTimeStamp(map, attached.entryWriter, attached, remoteIdentifier);
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("server-connection id={}, remoteIdentifier={}",
+                            map.identifier(), remoteIdentifier);
+                }
+
+                if (remoteIdentifier == map.identifier())
+                    throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
+
+                attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+                attached.entryWriter.timestampToBuffer(map.lastModificationTime(remoteIdentifier));
             }
         }
 
@@ -449,7 +435,7 @@ class TcpSocketReplicator implements Closeable {
         }
     }
 
-    protected void onWrite(final SelectionKey key) throws InterruptedException, IOException {
+    private void onWrite(final SelectionKey key) throws InterruptedException, IOException {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
 
@@ -460,8 +446,8 @@ class TcpSocketReplicator implements Closeable {
         attached.entryWriter.writeBufferToSocket(socketChannel);
     }
 
-    protected void onRead(final ReplicatedSharedHashMap map,
-                          final SelectionKey key) throws IOException, InterruptedException {
+    private void onRead(final ReplicatedSharedHashMap map,
+                        final SelectionKey key) throws IOException, InterruptedException {
 
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
@@ -476,22 +462,19 @@ class TcpSocketReplicator implements Closeable {
 
     }
 
-    void sendTimeStamp(final ReplicatedSharedHashMap map,
-                       final TcpSocketChannelEntryWriter entryWriter,
-                       final Attached attached,
-                       final byte remoteIdentifier) throws IOException {
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("server-connection id={}, remoteIdentifier={}",
-                    map.identifier(), remoteIdentifier);
+    /**
+     * Registers the SocketChannel with the selector
+     *
+     * @param selectableChannels the SelectableChannel to register
+     * @throws ClosedChannelException
+     */
+    private void register(@NotNull final Queue<SelectableChannel> selectableChannels) throws ClosedChannelException {
+        for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
+            if (sc instanceof ServerSocketChannel)
+                sc.register(selector, OP_ACCEPT);
+            else
+                sc.register(selector, OP_CONNECT);
         }
-
-        if (remoteIdentifier == map.identifier())
-            throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-
-        attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
-
-        entryWriter.timestampToBuffer(map.lastModificationTime(remoteIdentifier));
     }
 
     static class Attached {
@@ -512,5 +495,270 @@ class TcpSocketReplicator implements Closeable {
         }
 
     }
+
+    /**
+     * @author Rob Austin.
+     */
+    private static class TcpSocketChannelEntryWriter {
+
+        private static final Logger LOG = LoggerFactory.getLogger(TcpSocketChannelEntryWriter.class);
+
+        private final ByteBuffer out;
+        private final ByteBufferBytes in;
+        private final EntryCallback entryCallback;
+        private final int serializedEntrySize;
+
+        /**
+         * @param serializedEntrySize the size of the entry
+         * @param externalizable      supports reading and writing serialize entries
+         * @param packetSize          the max TCP/IP packet size
+         */
+        TcpSocketChannelEntryWriter(final int serializedEntrySize,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    int packetSize) {
+            this.serializedEntrySize = serializedEntrySize;
+            out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
+            in = new ByteBufferBytes(out);
+            entryCallback = new EntryCallback(externalizable, in);
+        }
+
+
+        /**
+         * writes the timestamp into the buffer
+         *
+         * @param localIdentifier the current nodes identifier
+         */
+        void identifierToBuffer(final int localIdentifier) {
+            in.writeByte(localIdentifier);
+        }
+
+        /**
+         * sends the identity and timestamp of this node to a remote node
+         *
+         * @param timeStampOfLastMessage the last timestamp we received a message from that node
+         */
+        void timestampToBuffer(final long timeStampOfLastMessage) {
+            in.writeLong(timeStampOfLastMessage);
+        }
+
+        /**
+         * writes all the entries that have changed, to the buffer which will later be written to TCP/IP
+         *
+         * @param modificationIterator Holds a record of which entries have modification.
+         */
+        void entriesToBuffer(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException {
+
+            final long start = in.position();
+
+            for (; ; ) {
+
+                final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+
+                // if there was no data written to the buffer and we have not written any more data to
+                // the buffer, then give up
+                if (!wasDataRead && in.position() == start)
+                    return;
+
+                // if we have space in the buffer to write more data and we just wrote data into the
+                // buffer then let try and write some more, else if we failed to just write data
+                // {@code wasDataRead} then we will send what we have
+                if (in.remaining() > serializedEntrySize && wasDataRead)
+                    continue;
+
+                // we've filled up one writer lets give another channel a chance to send data
+                return;
+            }
+
+        }
+
+        /**
+         * writes the contents of the buffer to the socket
+         *
+         * @param socketChannel the socket to publish the buffer to
+         * @throws IOException
+         */
+        public void writeBufferToSocket(SocketChannel socketChannel) throws IOException {
+            // if we still have some unwritten writer from last time
+            if (in.position() > 0) {
+
+                out.limit((int) in.position());
+
+                final int len = socketChannel.write(out);
+
+                if (LOG.isDebugEnabled())
+                    LOG.debug("bytes-written=" + len);
+
+                if (out.remaining() == 0) {
+                    out.clear();
+                    in.clear();
+                } else {
+                    out.compact();
+                    in.position(out.position());
+                    in.limit(in.capacity());
+                    out.clear();
+                }
+            }
+        }
+
+
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    static class EntryCallback extends VanillaSharedReplicatedHashMap.EntryCallback {
+
+        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+        private final ByteBufferBytes in;
+
+        EntryCallback(@NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable, @NotNull final ByteBufferBytes in) {
+            this.externalizable = externalizable;
+            this.in = in;
+        }
+
+        @Override
+        public boolean onEntry(final NativeBytes entry) {
+
+            in.skip(2);
+            final long start = (int) in.position();
+            externalizable.writeExternalEntry(entry, in);
+
+            if (in.position() - start == 0) {
+                in.position(in.position() - 2);
+                return false;
+            }
+
+            // write the length of the entry, just before the start, so when we read it back
+            // we read the length of the entry first and hence know how many preceding writer to read
+            final int entrySize = (int) (in.position() - start);
+            in.writeUnsignedShort(start - 2L, entrySize);
+
+            return true;
+        }
+    }
+
+
+    /**
+     * Reads map entries from a socket, this could be a client or server socket
+     *
+     * @author Rob Austin.
+     */
+    private static class TcpSocketChannelEntryReader {
+
+        public static final int SIZE_OF_UNSIGNED_SHORT = 2;
+        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+        private final int serializedEntrySize;
+        private final ByteBuffer in;
+        private final ByteBufferBytes out;
+
+        // we use Integer.MIN_VALUE as N/A
+        private int sizeOfNextEntry = Integer.MIN_VALUE;
+
+        /**
+         * @param serializedEntrySize the maximum size of an entry include the meta data
+         * @param externalizable      supports reading and writing serialize entries
+         * @param packetSize          the estimated size of a tcp/ip packet
+         */
+        TcpSocketChannelEntryReader(final int serializedEntrySize,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    final short packetSize) {
+            this.serializedEntrySize = serializedEntrySize;
+            in = ByteBuffer.allocate(packetSize + serializedEntrySize);
+            this.externalizable = externalizable;
+            out = new ByteBufferBytes(in);
+            out.limit(0);
+            in.clear();
+        }
+
+        /**
+         * reads from the socket and writes the contents to the buffer
+         *
+         * @param socketChannel the  socketChannel to read from
+         * @return the number of bytes read
+         * @throws IOException
+         */
+        int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
+            compactBuffer();
+            final int len = socketChannel.read(in);
+            out.limit(in.position());
+            return len;
+        }
+
+        /**
+         * reads entries from the socket till it is empty
+         *
+         * @throws InterruptedException
+         */
+        void entriesFromBuffer() throws InterruptedException {
+
+            for (; ; ) {
+
+                out.limit(in.position());
+
+                // its set to MIN_VALUE when it should be read again
+                if (sizeOfNextEntry == Integer.MIN_VALUE) {
+                    if (out.remaining() < SIZE_OF_UNSIGNED_SHORT) {
+                        return;
+                    }
+
+                    sizeOfNextEntry = out.readUnsignedShort();
+                }
+
+                if (sizeOfNextEntry <= 0)
+                    throw new IllegalStateException("invalid serializedEntrySize=" + sizeOfNextEntry);
+
+                if (out.remaining() < sizeOfNextEntry) {
+                    return;
+                }
+
+                final long nextEntryPos = out.position() + sizeOfNextEntry;
+                final long limit = out.limit();
+                out.limit(nextEntryPos);
+                externalizable.readExternalEntry(out);
+
+                out.limit(limit);
+                // skip onto the next entry
+                out.position(nextEntryPos);
+
+                // to allow the sizeOfNextEntry to be read the next time around
+                sizeOfNextEntry = Integer.MIN_VALUE;
+            }
+
+        }
+
+        /**
+         * compacts the buffer and updates the {@code in} and  {@code out} accordingly
+         */
+        private void compactBuffer() {
+
+            // the serializedEntrySize used here may not be the maximum size of the entry in its serialized form
+            // however, its only use as an indication that the buffer is becoming full and should be compacted
+            // the buffer can be compacted at any time
+            if (in.position() == 0 || in.remaining() > serializedEntrySize)
+                return;
+
+            in.limit(in.position());
+            in.position((int) out.position());
+
+            in.compact();
+            out.position(0);
+        }
+
+        /**
+         * @return the identifier or -1 if unsuccessful
+         */
+        byte identifierFromBuffer() {
+            return (out.remaining() >= 1) ? out.readByte() : Byte.MIN_VALUE;
+        }
+
+        /**
+         * @return the timestamp or -1 if unsuccessful
+         */
+        long timeStampFromBuffer() {
+            return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
+        }
+    }
+
 }
 
