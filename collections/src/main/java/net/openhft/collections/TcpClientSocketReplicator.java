@@ -90,7 +90,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
      * @return
      * @throws ClosedChannelException
      */
-    void register(Queue<SelectableChannel> newSockets) throws ClosedChannelException {
+    void register(@NotNull final Queue<SelectableChannel> newSockets) throws ClosedChannelException {
         for (SelectableChannel sc = newSockets.poll(); sc != null; sc = newSockets.poll()) {
             if (sc instanceof ServerSocketChannel)
                 sc.register(selector, OP_ACCEPT);
@@ -100,16 +100,12 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
     }
 
 
-    private void process(ReplicatedSharedHashMap map,
+    private void process(@NotNull final ReplicatedSharedHashMap map,
                          final short packetSize, final int serializedEntrySize,
-                         final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                         final Set<? extends SocketAddress> endpoints, final int port) throws
-            IOException {
-
+                         @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                         @NotNull final Set<? extends SocketAddress> endpoints, final int port) throws IOException {
 
         final InetSocketAddress serverEndpoint = port == -1 ? null : new InetSocketAddress(port);
-
-
         final byte identifier = map.identifier();
 
         try {
@@ -195,7 +191,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
     private ConcurrentLinkedQueue<SelectableChannel> asyncConnect(
             final byte identifier,
             final @Nullable SocketAddress serverEndpoint,
-            final Set<? extends SocketAddress> clientEndpoints) {
+            final @NotNull Set<? extends SocketAddress> clientEndpoints) {
 
         final ConcurrentLinkedQueue<SelectableChannel> result = new ConcurrentLinkedQueue<SelectableChannel>();
 
@@ -206,7 +202,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
             abstract SelectableChannel connect(final SocketAddress address, final byte identifier)
                     throws IOException, InterruptedException;
 
-            AbstractConnector(final SocketAddress address) {
+            AbstractConnector(@NotNull final SocketAddress address) {
                 this.address = address;
             }
 
@@ -228,11 +224,11 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
         class ServerConnector extends AbstractConnector {
 
-            ServerConnector(SocketAddress address) {
+            ServerConnector(@NotNull final SocketAddress address) {
                 super(address);
             }
 
-            SelectableChannel connect(final SocketAddress address, final byte identifier) throws
+            SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
                     IOException {
                 ServerSocketChannel serverChannel = ServerSocketChannel.open();
                 final ServerSocket serverSocket = serverChannel.socket();
@@ -336,11 +332,11 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         return result;
     }
 
-    private void onConnect(ReplicatedSharedHashMap map,
+    private void onConnect(@NotNull final ReplicatedSharedHashMap map,
                            short packetSize,
                            int serializedEntrySize,
-                           ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                           SelectionKey key) throws IOException, InterruptedException {
+                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                           @NotNull final SelectionKey key) throws IOException, InterruptedException {
         final SocketChannel channel = (SocketChannel) key.channel();
 
         while (!channel.finishConnect()) {
