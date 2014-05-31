@@ -31,9 +31,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
-import java.util.Collections;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
@@ -169,23 +167,36 @@ class TcpSocketReplicator implements Closeable {
 
     private class Connector {
 
+        private final Map<InetSocketAddress, Integer> connectionAttempt = new HashMap<InetSocketAddress, Integer>();
 
         /**
          * used to connect both client and server sockets
          *
          * @param identifier
-         * @param clientEndpoints     a queue containing the SocketChannel as they become connected
-         * @param deferConnectionTime
-         * @param destination
+         * @param socket              a queue containing the SocketChannel as they become connected
+         * @param pendingRegistration
          * @return
          */
         private void asyncClientReconnect(
                 final byte identifier,
-                final SocketAddress clientEndpoints,
-                final long deferConnectionTime, Queue<SelectableChannel> destination) {
+                final Socket socket,
+                Queue<SelectableChannel> pendingRegistration) {
 
-            asyncConnect0(identifier, null, Collections.singleton(clientEndpoints), deferConnectionTime,
-                    destination);
+            final InetSocketAddress inetSocketAddress = new InetSocketAddress(socket.getInetAddress()
+                    .getHostName(), socket.getPort());
+
+            final Integer lastAttempts = connectionAttempt.get(connectionAttempt);
+            final Integer attempts = lastAttempts == null ? 1 : lastAttempts + 1;
+            connectionAttempt.put(inetSocketAddress, attempts);
+
+            int reconnectionInterval = (attempts * attempts) * 100;
+
+            // limit the reconnectionInterval to 20 seconds
+            if (reconnectionInterval > 20 * 1000)
+                reconnectionInterval = 20 * 1000;
+
+            asyncConnect0(identifier, null, Collections.singleton(inetSocketAddress), reconnectionInterval,
+                    pendingRegistration);
         }
 
 
@@ -206,13 +217,20 @@ class TcpSocketReplicator implements Closeable {
 
         }
 
+        void setSuccessfullyConnected(final Socket socket) {
+            final InetSocketAddress inetSocketAddress = new InetSocketAddress(socket.getInetAddress()
+                    .getHostName(), socket.getPort());
+
+            connectionAttempt.remove(inetSocketAddress);
+        }
+
 
         /**
          * used to connect both client and server sockets
          *
          * @param identifier
          * @param clientEndpoints     a queue containing the SocketChannel as they become connected
-         * @param deferConnectionTime
+         * @param reconnectionInterval
          * @param destination
          * @return
          */
@@ -220,7 +238,7 @@ class TcpSocketReplicator implements Closeable {
                 final byte identifier,
                 final @Nullable SocketAddress serverEndpoint,
                 final @NotNull Set<? extends SocketAddress> clientEndpoints,
-                final long deferConnectionTime,
+                final long reconnectionInterval,
                 Queue<SelectableChannel> destination) {
 
             final Queue<SelectableChannel> result = destination == null ? new
@@ -261,7 +279,7 @@ class TcpSocketReplicator implements Closeable {
 
                 SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
                         IOException, InterruptedException {
-                    Thread.sleep(deferConnectionTime);
+                    Thread.sleep(reconnectionInterval);
                     ServerSocketChannel serverChannel = ServerSocketChannel.open();
                     final ServerSocket serverSocket = serverChannel.socket();
                     closeables.add(serverSocket);
@@ -292,7 +310,7 @@ class TcpSocketReplicator implements Closeable {
                                           final byte identifier)
                         throws IOException, InterruptedException {
 
-                    Thread.sleep(deferConnectionTime);
+                    Thread.sleep(reconnectionInterval);
                     boolean success = false;
 
                     for (; ; ) {
@@ -364,7 +382,7 @@ class TcpSocketReplicator implements Closeable {
                            int serializedEntrySize,
                            @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                            @NotNull final SelectionKey key,
-                           final byte identifier, Queue<SelectableChannel> sockets) throws IOException, InterruptedException {
+                           final byte identifier, Queue<SelectableChannel> pendingRegistrations) throws IOException, InterruptedException {
         final SocketChannel channel = (SocketChannel) key.channel();
         if (channel == null)
             return;
@@ -373,16 +391,11 @@ class TcpSocketReplicator implements Closeable {
                 return;
             }
         } catch (ConnectException e) {
-
-
-            final InetAddress inetAddress = channel.socket().getInetAddress();
-            final int port = channel.socket().getPort();
-            final SocketAddress remoteSocketAddress = channel.socket().getRemoteSocketAddress();
-            connector.asyncClientReconnect(identifier, new InetSocketAddress(inetAddress.getHostName(), port)
-                    , 500, sockets);
-
+            connector.asyncClientReconnect(identifier, channel.socket(), pendingRegistrations);
             throw e;
         }
+
+        connector.setSuccessfullyConnected(channel.socket());
 
         channel.configureBlocking(false);
         channel.socket().setKeepAlive(true);
@@ -657,7 +670,6 @@ class TcpSocketReplicator implements Closeable {
                 }
             }
         }
-
 
     }
 

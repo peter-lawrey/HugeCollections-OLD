@@ -103,6 +103,7 @@ public class TCPSocketReplicationBootStrapTests {
         } while (lastModificationTime == 0);
 
         final File map2File = map2a.file();
+        Thread.sleep(1);
         map2a.close();
 
         System.out.println("lastModificationTime=" + lastModificationTime);
