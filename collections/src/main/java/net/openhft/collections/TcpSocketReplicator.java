@@ -147,14 +147,21 @@ class TcpSocketReplicator implements Closeable {
 
                         checkHeartbeat(key, approxTimeOutTime, identifier, pendingRegistrations);
 
+                    } catch (ClosedSelectorException e) {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("", e);
+                        close(key);
+                    } catch (ClosedChannelException e) {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("", e);
+                        close(key);
+                    } catch (ConnectException e) {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("", e);
+                        close(key);
                     } catch (Exception e) {
                         LOG.info("", e);
-                        try {
-                            key.channel().provider().openSocketChannel().close();
-                            key.channel().close();
-                        } catch (IOException ex) {
-                            // do nothing
-                        }
+                        close(key);
 
                     }
                 }
@@ -163,6 +170,12 @@ class TcpSocketReplicator implements Closeable {
             }
 
         } catch (ClosedSelectorException e) {
+            if (LOG.isDebugEnabled())
+                LOG.debug("", e);
+        } catch (ClosedChannelException e) {
+            if (LOG.isDebugEnabled())
+                LOG.debug("", e);
+        } catch (ConnectException e) {
             if (LOG.isDebugEnabled())
                 LOG.debug("", e);
         } catch (Exception e) {
@@ -176,6 +189,15 @@ class TcpSocketReplicator implements Closeable {
                         LOG.debug("", e);
                 }
             close();
+        }
+    }
+
+    private void close(SelectionKey key) {
+        try {
+            key.channel().provider().openSocketChannel().close();
+            key.channel().close();
+        } catch (IOException ex) {
+            // do nothing
         }
     }
 

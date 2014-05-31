@@ -49,7 +49,7 @@ public class TCPSocketReplication4WayMapTest {
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplication tcpReplication = new TcpReplication(serverPort,
-                InetSocketAddress).heartBeatInterval(500);
+                InetSocketAddress).heartBeatInterval(1000);
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
