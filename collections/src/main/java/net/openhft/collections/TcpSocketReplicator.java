@@ -56,31 +56,34 @@ class TcpSocketReplicator implements Closeable {
     private final CopyOnWriteArraySet<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final Connector connector = new Connector();
     private final Selector selector;
+    private long heartBeatInterval;
 
     TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                         final short packetSize,
                         final int serializedEntrySize,
                         @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                         @NotNull final Set<? extends SocketAddress> endpoint,
-                        final int port) throws IOException {
+                        final int port,
+                        long heartBeatInterval) throws IOException {
 
-        selector = Selector.open();
+        this.heartBeatInterval = heartBeatInterval;
+        this.selector = Selector.open();
 
-        executorService = newSingleThreadExecutor(
+        this.executorService = newSingleThreadExecutor(
                 new NamedThreadFactory("TcpSocketReplicator-" + map.identifier(), true));
 
-        executorService.execute(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        try {
-                                            process(map, packetSize, serializedEntrySize,
-                                                    externalizable, endpoint, port);
-                                        } catch (IOException e) {
-                                            if (selector.isOpen())
-                                                LOG.error("", e);
-                                        }
-                                    }
-                                }
+        this.executorService.execute(new Runnable() {
+                                         @Override
+                                         public void run() {
+                                             try {
+                                                 process(map, packetSize, serializedEntrySize,
+                                                         externalizable, endpoint, port);
+                                             } catch (IOException e) {
+                                                 if (selector.isOpen())
+                                                     LOG.error("", e);
+                                             }
+                                         }
+                                     }
         );
     }
 
@@ -95,20 +98,28 @@ class TcpSocketReplicator implements Closeable {
 
         try {
 
-            final Queue<SelectableChannel> newSockets = connector.asyncConnect(identifier, serverEndpoint,
+            final Queue<SelectableChannel> pendingRegistrations = connector.asyncConnect(identifier, serverEndpoint,
                     endpoints);
 
             for (; ; ) {
 
-                register(newSockets);
+                register(pendingRegistrations);
 
                 if (!selector.isOpen())
                     return;
 
                 final int nSelectedKeys = selector.select(100);
+
+
                 if (nSelectedKeys == 0) {
                     continue;    // nothing to do
                 }
+
+                // its less resource intensive to set this less frequently and use an approximation
+                long approxTime = System.currentTimeMillis();
+
+                // we add a 10% safety margin, due time fluctuations on the network
+                final long approxTimeOutTime = approxTime - (long) (heartBeatInterval * 1.10);
 
                 final Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
@@ -118,18 +129,20 @@ class TcpSocketReplicator implements Closeable {
                             continue;
 
                         if (key.isAcceptable())
-                            doAccept(key, serializedEntrySize, externalizable, packetSize, map.identifier());
+                            doAccept(key, serializedEntrySize, externalizable, packetSize,
+                                    map.identifier(), heartBeatInterval);
 
                         if (key.isConnectable())
                             onConnect(packetSize, serializedEntrySize, externalizable, key,
-                                    map.identifier(), newSockets);
+                                    map.identifier(), pendingRegistrations);
 
                         if (key.isReadable())
-                            onRead(map, key);
+                            onRead(map, key, approxTime);
 
                         if (key.isWritable())
-                            onWrite(key);
+                            onWrite(key, approxTime);
 
+                        checkHeartbeat(key, approxTimeOutTime, identifier, pendingRegistrations);
 
                     } catch (Exception e) {
                         LOG.info("", e);
@@ -163,6 +176,32 @@ class TcpSocketReplicator implements Closeable {
         }
     }
 
+    private void checkHeartbeat(SelectionKey key,
+                                final long timeOutTime,
+                                final byte identifier,
+                                final Queue<SelectableChannel> pendingRegistrations) throws ConnectException {
+
+        final Attached attached = (Attached) key.attachment();
+
+        if (attached == null)
+            return;
+
+        final boolean isServerConnection = key.channel() instanceof ServerSocketChannel;
+        if (isServerConnection)
+            return;
+
+
+        final SocketChannel channel = (SocketChannel) key.channel();
+
+        final long lastHeartBeat = attached.entryReader.lastHeartBeatReceived;
+        if (timeOutTime > lastHeartBeat) {
+            connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
+            throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
+                    .remoteIdentifier + " (attempting an automatic reconnection), " +
+                    " heartbeat-interval=" + heartBeatInterval + " milliseconds");
+        }
+    }
+
 
     private class Connector {
 
@@ -176,7 +215,7 @@ class TcpSocketReplicator implements Closeable {
          * @param pendingRegistration
          * @return
          */
-        private void asyncClientReconnect(
+        private void asyncReconnect(
                 final byte identifier,
                 final Socket socket,
                 Queue<SelectableChannel> pendingRegistration) {
@@ -322,7 +361,7 @@ class TcpSocketReplicator implements Closeable {
                             socketChannel.socket().setKeepAlive(true);
                             socketChannel.socket().setReuseAddress(false);
                             socketChannel.socket().setSoLinger(false, 0);
-                            socketChannel.socket().setSoTimeout(0);
+                            socketChannel.socket().setSoTimeout(100);
                             socketChannel.socket().setTcpNoDelay(true);
                             socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
                             closeables.add(socketChannel.socket());
@@ -390,7 +429,7 @@ class TcpSocketReplicator implements Closeable {
                 return;
             }
         } catch (ConnectException e) {
-            connector.asyncClientReconnect(identifier, channel.socket(), pendingRegistrations);
+            connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
             throw e;
         }
 
@@ -407,7 +446,7 @@ class TcpSocketReplicator implements Closeable {
                 externalizable, packetSize);
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                externalizable, packetSize);
+                externalizable, packetSize, heartBeatInterval);
 
         channel.register(selector, OP_WRITE | OP_READ, attached);
 
@@ -439,7 +478,7 @@ class TcpSocketReplicator implements Closeable {
                           final int serializedEntrySize,
                           final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                           final short packetSize,
-                          final int localIdentifier) throws IOException {
+                          final int localIdentifier, final long heartBeatPeriod) throws IOException {
         final ServerSocketChannel server = (ServerSocketChannel) key.channel();
         final SocketChannel channel = server.accept();
         channel.configureBlocking(false);
@@ -454,7 +493,7 @@ class TcpSocketReplicator implements Closeable {
                 externalizable, packetSize);
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                externalizable, packetSize);
+                externalizable, packetSize, heartBeatPeriod);
 
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
@@ -463,14 +502,14 @@ class TcpSocketReplicator implements Closeable {
      * used to exchange identifiers and timestamps between the server and client
      *
      * @param map
-     * @param socketChannel
      * @param attached
+     * @param approxTime
      * @throws java.io.IOException
      * @throws InterruptedException
      */
     private void doHandShaking(final ReplicatedSharedHashMap map,
-                               final SocketChannel socketChannel,
-                               final Attached attached) throws IOException, InterruptedException {
+                               final Attached attached,
+                               final long approxTime) throws IOException, InterruptedException {
 
         if (attached.remoteIdentifier == Byte.MIN_VALUE) {
 
@@ -500,12 +539,12 @@ class TcpSocketReplicator implements Closeable {
             if (attached.remoteTimestamp != Long.MIN_VALUE) {
                 attached.remoteModificationIterator.dirtyEntries(attached.remoteTimestamp);
                 attached.setHandShakingComplete();
-                attached.entryReader.entriesFromBuffer();
+                attached.entryReader.entriesFromBuffer(approxTime);
             }
         }
     }
 
-    private void onWrite(final SelectionKey key) throws InterruptedException, IOException {
+    private void onWrite(final SelectionKey key, final long approxTime) throws InterruptedException, IOException {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
 
@@ -513,11 +552,12 @@ class TcpSocketReplicator implements Closeable {
             attached.entryWriter.entriesToBuffer(
                     attached.remoteModificationIterator);
 
-        attached.entryWriter.writeBufferToSocket(socketChannel);
+
+        attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime);
     }
 
     private void onRead(final ReplicatedSharedHashMap map,
-                        final SelectionKey key) throws IOException, InterruptedException {
+                        final SelectionKey key, final long approxTime) throws IOException, InterruptedException {
 
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
@@ -526,9 +566,9 @@ class TcpSocketReplicator implements Closeable {
             return;
 
         if (attached.isHandShakingComplete())
-            attached.entryReader.entriesFromBuffer();
+            attached.entryReader.entriesFromBuffer(approxTime);
         else
-            doHandShaking(map, socketChannel, attached);
+            doHandShaking(map, attached, approxTime);
 
     }
 
@@ -556,6 +596,7 @@ class TcpSocketReplicator implements Closeable {
         public byte remoteIdentifier = Byte.MIN_VALUE;
         public TcpSocketChannelEntryWriter entryWriter;
 
+
         boolean isHandShakingComplete() {
             return handShakingComplete;
         }
@@ -577,16 +618,21 @@ class TcpSocketReplicator implements Closeable {
         private final ByteBufferBytes in;
         private final EntryCallback entryCallback;
         private final int serializedEntrySize;
+        private long lastSentTime;
+        private long heartBeatPeriod;
 
         /**
          * @param serializedEntrySize the size of the entry
          * @param externalizable      supports reading and writing serialize entries
          * @param packetSize          the max TCP/IP packet size
+         * @param heartBeatPeriod
          */
         TcpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                                    int packetSize) {
+                                    int packetSize,
+                                    long heartBeatPeriod) {
             this.serializedEntrySize = serializedEntrySize;
+            this.heartBeatPeriod = heartBeatPeriod;
             out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
             in = new ByteBufferBytes(out);
             entryCallback = new EntryCallback(externalizable, in);
@@ -644,13 +690,15 @@ class TcpSocketReplicator implements Closeable {
         /**
          * writes the contents of the buffer to the socket
          *
-         * @param socketChannel the socket to publish the buffer to
+         * @param socketChannel         the socket to publish the buffer to
+         * @param isHandshakingComplete
+         * @param approxTime
          * @throws IOException
          */
-        public void writeBufferToSocket(SocketChannel socketChannel) throws IOException {
+        public void writeBufferToSocket(SocketChannel socketChannel, boolean isHandshakingComplete, final long approxTime) throws IOException {
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
-
+                lastSentTime = approxTime;
                 out.limit((int) in.position());
 
                 final int len = socketChannel.write(out);
@@ -667,9 +715,20 @@ class TcpSocketReplicator implements Closeable {
                     in.limit(in.capacity());
                     out.clear();
                 }
+                return;
             }
+
+            final long currentTimeMillis = approxTime;
+            if (isHandshakingComplete && lastSentTime + heartBeatPeriod < currentTimeMillis) {
+                lastSentTime = approxTime;
+                writeHeartBeatToBuffer();
+            }
+
         }
 
+        private void writeHeartBeatToBuffer() {
+            in.writeUnsignedShort(0);
+        }
     }
 
 
@@ -723,6 +782,7 @@ class TcpSocketReplicator implements Closeable {
 
         // we use Integer.MIN_VALUE as N/A
         private int sizeOfNextEntry = Integer.MIN_VALUE;
+        private long lastHeartBeatReceived = System.currentTimeMillis();
 
         /**
          * @param serializedEntrySize the maximum size of an entry include the meta data
@@ -757,9 +817,10 @@ class TcpSocketReplicator implements Closeable {
         /**
          * reads entries from the socket till it is empty
          *
+         * @param approxTime
          * @throws InterruptedException
          */
-        void entriesFromBuffer() throws InterruptedException {
+        void entriesFromBuffer(final long approxTime) throws InterruptedException {
 
             for (; ; ) {
 
@@ -774,8 +835,11 @@ class TcpSocketReplicator implements Closeable {
                     sizeOfNextEntry = out.readUnsignedShort();
                 }
 
-                if (sizeOfNextEntry <= 0)
-                    throw new IllegalStateException("invalid serializedEntrySize=" + sizeOfNextEntry);
+                // this is the heartbeat
+                if (sizeOfNextEntry == 0) {
+                    lastHeartBeatReceived = approxTime;
+                    continue;
+                }
 
                 if (out.remaining() < sizeOfNextEntry) {
                     return;

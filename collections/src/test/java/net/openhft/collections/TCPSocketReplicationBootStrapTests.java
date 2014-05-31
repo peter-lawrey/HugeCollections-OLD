@@ -19,7 +19,6 @@
 package net.openhft.collections;
 
 import org.junit.After;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
@@ -87,11 +86,12 @@ public class TCPSocketReplicationBootStrapTests {
 
     // todo we have to fix this
     @Test
-    @Ignore
-    public void testBootstrapFlippingTheSocketConnection() throws IOException, InterruptedException {
+
+    public void testBootstrapAndHeartbeat() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079, new InetSocketAddress("localhost", 8076));
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8076);
+
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -103,7 +103,6 @@ public class TCPSocketReplicationBootStrapTests {
         } while (lastModificationTime == 0);
 
         final File map2File = map2a.file();
-        Thread.sleep(1);
         map2a.close();
 
         System.out.println("lastModificationTime=" + lastModificationTime);
@@ -113,6 +112,7 @@ public class TCPSocketReplicationBootStrapTests {
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
+                    .canReplicate(true)
                     .create(map2File, Integer.class, CharSequence.class);
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
@@ -123,8 +123,9 @@ public class TCPSocketReplicationBootStrapTests {
         map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
 
         // add data into it
-        waitTillEqual(10000);
+        waitTillEqual(20000);
         assertEquals("ADDED WHEN DISCONNECTED TO MAP1", map1.get(11));
+
 
     }
 
