@@ -313,8 +313,8 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
             }
 
         socketChannels.clear();
-        selector.close();
         executorService.shutdownNow();
+        selector.close();
     }
 
 
