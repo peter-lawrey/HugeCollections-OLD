@@ -38,6 +38,8 @@ import java.util.concurrent.ExecutorService;
 
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a
@@ -60,7 +62,7 @@ class TcpSocketReplicator implements Closeable {
 
     TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                         final int serializedEntrySize,
-                        @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                        @NotNull final EntryExternalizable externalizable,
                         @NotNull final TcpReplication tcpReplication) throws IOException {
 
 
@@ -90,7 +92,7 @@ class TcpSocketReplicator implements Closeable {
 
     private void process(@NotNull final ReplicatedSharedHashMap map,
                          final int serializedEntrySize,
-                         @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                         @NotNull final EntryExternalizable externalizable,
                          @NotNull final TcpReplication tcpReplication) throws IOException {
 
         final byte identifier = map.identifier();
@@ -99,7 +101,7 @@ class TcpSocketReplicator implements Closeable {
         try {
 
             final Queue<SelectableChannel> pendingRegistrations
-                    = connector.asyncConnect(identifier, tcpReplication);
+                    = connector.asyncConnect(identifier, tcpReplication.endpoints(), tcpReplication.serverInetSocketAddress());
 
             for (; ; ) {
 
@@ -271,18 +273,17 @@ class TcpSocketReplicator implements Closeable {
          * used to connect both client and server sockets
          *
          * @param identifier
-         * @param tcpReplication
+         * @param clientEndpoints
+         * @param serverPort
          * @return
          */
         private Queue<SelectableChannel> asyncConnect(
                 final byte identifier,
-                TcpReplication tcpReplication) {
+                final Set<InetSocketAddress> clientEndpoints,
+                final InetSocketAddress serverPort) {
 
             final Queue<SelectableChannel> destination = new ConcurrentLinkedQueue<SelectableChannel>();
-            return asyncConnect0(identifier, tcpReplication.serverInetSocketAddress(),
-                    tcpReplication.endpoints(),
-                    0, destination);
-
+            return asyncConnect0(identifier, serverPort, clientEndpoints, 0, destination);
         }
 
         void setSuccessfullyConnected(final Socket socket) {
@@ -388,7 +389,7 @@ class TcpSocketReplicator implements Closeable {
                         try {
 
                             socketChannel.configureBlocking(false);
-                            socketChannel.socket().setKeepAlive(true);
+
                             socketChannel.socket().setReuseAddress(false);
                             socketChannel.socket().setSoLinger(false, 0);
                             socketChannel.socket().setSoTimeout(100);
@@ -448,9 +449,11 @@ class TcpSocketReplicator implements Closeable {
 
     private void onConnect(short packetSize,
                            int serializedEntrySize,
-                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                           @NotNull final EntryExternalizable externalizable,
                            @NotNull final SelectionKey key,
-                           final byte identifier, Queue<SelectableChannel> pendingRegistrations, final long heartBeatIntervalMilliseconds) throws IOException, InterruptedException {
+                           final byte identifier, Queue<SelectableChannel> pendingRegistrations,
+                           final long heartBeatIntervalMilliseconds) throws IOException, InterruptedException {
+
         final SocketChannel channel = (SocketChannel) key.channel();
         if (channel == null)
             return;
@@ -466,7 +469,7 @@ class TcpSocketReplicator implements Closeable {
         connector.setSuccessfullyConnected(channel.socket());
 
         channel.configureBlocking(false);
-        channel.socket().setKeepAlive(true);
+        channel.socket().setTcpNoDelay(true);
         channel.socket().setSoTimeout(100);
         channel.socket().setSoLinger(false, 0);
 
@@ -506,14 +509,14 @@ class TcpSocketReplicator implements Closeable {
 
     private void doAccept(SelectionKey key,
                           final int serializedEntrySize,
-                          final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                          final EntryExternalizable externalizable,
                           final short packetSize,
                           final int localIdentifier, final long heartBeatPeriod) throws IOException {
         final ServerSocketChannel server = (ServerSocketChannel) key.channel();
         final SocketChannel channel = server.accept();
         channel.configureBlocking(false);
         channel.socket().setReuseAddress(true);
-        channel.socket().setKeepAlive(true);
+        channel.socket().setTcpNoDelay(true);
         channel.socket().setSoTimeout(100);
         channel.socket().setSoLinger(false, 0);
         final Attached attached = new Attached();
@@ -620,7 +623,7 @@ class TcpSocketReplicator implements Closeable {
     static class Attached {
 
         public TcpSocketChannelEntryReader entryReader;
-        public ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator;
+        public ModificationIterator remoteModificationIterator;
         public long remoteTimestamp = Long.MIN_VALUE;
         private boolean handShakingComplete;
         public byte remoteIdentifier = Byte.MIN_VALUE;
@@ -658,7 +661,7 @@ class TcpSocketReplicator implements Closeable {
          * @param heartBeatPeriod
          */
         TcpSocketChannelEntryWriter(final int serializedEntrySize,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    @NotNull final EntryExternalizable externalizable,
                                     int packetSize,
                                     long heartBeatPeriod) {
             this.serializedEntrySize = serializedEntrySize;
@@ -692,7 +695,8 @@ class TcpSocketReplicator implements Closeable {
          *
          * @param modificationIterator Holds a record of which entries have modification.
          */
-        void entriesToBuffer(@NotNull final ReplicatedSharedHashMap.ModificationIterator modificationIterator) throws InterruptedException {
+        void entriesToBuffer(@NotNull final ModificationIterator modificationIterator)
+                throws InterruptedException {
 
             final long start = in.position();
 
@@ -725,7 +729,10 @@ class TcpSocketReplicator implements Closeable {
          * @param approxTime
          * @throws IOException
          */
-        public void writeBufferToSocket(SocketChannel socketChannel, boolean isHandshakingComplete, final long approxTime) throws IOException {
+        public void writeBufferToSocket(SocketChannel socketChannel,
+                                        boolean isHandshakingComplete,
+                                        final long approxTime) throws IOException {
+
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
                 lastSentTime = approxTime;
@@ -767,10 +774,12 @@ class TcpSocketReplicator implements Closeable {
      */
     static class EntryCallback extends VanillaSharedReplicatedHashMap.EntryCallback {
 
-        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+        private final EntryExternalizable externalizable;
         private final ByteBufferBytes in;
 
-        EntryCallback(@NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable, @NotNull final ByteBufferBytes in) {
+        EntryCallback(@NotNull final EntryExternalizable externalizable,
+                      @NotNull final ByteBufferBytes in) {
+
             this.externalizable = externalizable;
             this.in = in;
         }
@@ -805,7 +814,7 @@ class TcpSocketReplicator implements Closeable {
     private static class TcpSocketChannelEntryReader {
 
         public static final int SIZE_OF_UNSIGNED_SHORT = 2;
-        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+        private final EntryExternalizable externalizable;
         private final int serializedEntrySize;
         private final ByteBuffer in;
         private final ByteBufferBytes out;
@@ -820,8 +829,9 @@ class TcpSocketReplicator implements Closeable {
          * @param packetSize          the estimated size of a tcp/ip packet
          */
         TcpSocketChannelEntryReader(final int serializedEntrySize,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                                    @NotNull final EntryExternalizable externalizable,
                                     final short packetSize) {
+
             this.serializedEntrySize = serializedEntrySize;
             in = ByteBuffer.allocate(packetSize + serializedEntrySize);
             this.externalizable = externalizable;
@@ -838,6 +848,7 @@ class TcpSocketReplicator implements Closeable {
          * @throws IOException
          */
         int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
+
             compactBuffer();
             final int len = socketChannel.read(in);
             out.limit(in.position());
