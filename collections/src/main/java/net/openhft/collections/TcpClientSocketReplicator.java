@@ -26,10 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -75,7 +72,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                                                     serializedEntrySize, externalizable, endpoint);
                                         } catch (IOException e) {
                                             if (selector.isOpen())
-                                                LOG.error("", e);
+                                            LOG.error("", e);
                                         }
                                     }
                                 }
@@ -156,6 +153,10 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                 selectedKeys.clear();
 
             }
+
+        } catch (ClosedSelectorException e) {
+            if (LOG.isDebugEnabled())
+                LOG.debug("", e);
         } catch (Exception e) {
             LOG.error("", e);
         } finally {
@@ -163,8 +164,10 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                 try {
                     selector.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("", e);
                 }
+
             close();
         }
     }
