@@ -131,6 +131,11 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                         if (!key.isValid())
                             continue;
 
+
+                        if (key.isAcceptable()) {
+                            doAccept(key, serializedEntrySize, externalizable, packetSize, map.identifier());
+                        }
+
                         if (key.isConnectable()) {
                             onConnect(map, packetSize, serializedEntrySize, externalizable, key);
                         }
@@ -230,14 +235,16 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
             SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
                     IOException {
+
+
                 ServerSocketChannel serverChannel = ServerSocketChannel.open();
                 final ServerSocket serverSocket = serverChannel.socket();
                 closeables.add(serverSocket);
+                closeables.add(serverChannel);
                 serverSocket.setReuseAddress(true);
                 serverSocket.bind(address);
-
+                serverChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
                 serverChannel.configureBlocking(false);
-                serverChannel.register(selector, OP_ACCEPT);
                 return serverChannel;
             }
 
@@ -382,6 +389,30 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         selector.close();
     }
 
+
+    private void doAccept(SelectionKey key,
+                          final int serializedEntrySize,
+                          final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                          final short packetSize,
+                          final int localIdentifier) throws IOException {
+        final ServerSocketChannel server = (ServerSocketChannel) key.channel();
+        final SocketChannel channel = server.accept();
+        channel.configureBlocking(false);
+        channel.socket().setReuseAddress(true);
+        channel.socket().setKeepAlive(true);
+        channel.socket().setSoTimeout(100);
+        channel.socket().setSoLinger(false, 0);
+        final Attached attached = new Attached();
+        channel.register(selector, OP_WRITE | OP_READ, attached);
+
+        attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
+                externalizable, packetSize);
+
+        attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
+                externalizable, packetSize);
+
+        attached.entryWriter.identifierToBuffer(localIdentifier);
+    }
 
 }
 

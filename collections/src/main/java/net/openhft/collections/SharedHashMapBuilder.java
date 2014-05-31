@@ -519,15 +519,15 @@ public final class SharedHashMapBuilder implements Cloneable {
                 tcpReplication.packetSize(),
                 entrySize(),
                 result,
-                tcpReplication.endpoints(), -1);
+                tcpReplication.endpoints(),tcpReplication.serverPort());
 
         result.addCloseable(replicator);
 
-        final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
+       /* final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
                 result, result, tcpReplication.serverPort(),
                 tcpReplication.packetSize(), entrySize());
 
-        result.addCloseable(tcpServerSocketReplicator);
+        result.addCloseable(tcpServerSocketReplicator);*/
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
