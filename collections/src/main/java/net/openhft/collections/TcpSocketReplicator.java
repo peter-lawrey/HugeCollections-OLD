@@ -28,11 +28,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.SocketAddress;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
+import java.util.Collections;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -57,6 +56,7 @@ class TcpSocketReplicator implements Closeable {
 
     private final ExecutorService executorService;
     private final CopyOnWriteArraySet<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+    private final Connector connector = new Connector();
     private final Selector selector;
 
     TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
@@ -97,7 +97,9 @@ class TcpSocketReplicator implements Closeable {
 
         try {
 
-            final Queue<SelectableChannel> newSockets = asyncConnect(identifier, serverEndpoint, endpoints);
+            final Queue<SelectableChannel> newSockets = connector.asyncConnect0(identifier, serverEndpoint,
+                    endpoints,
+                    0, null);
 
             for (; ; ) {
 
@@ -122,7 +124,8 @@ class TcpSocketReplicator implements Closeable {
                             doAccept(key, serializedEntrySize, externalizable, packetSize, map.identifier());
 
                         if (key.isConnectable())
-                            onConnect(map, packetSize, serializedEntrySize, externalizable, key);
+                            onConnect(packetSize, serializedEntrySize, externalizable, key,
+                                    map.identifier(), newSockets);
 
                         if (key.isReadable())
                             onRead(map, key);
@@ -130,9 +133,11 @@ class TcpSocketReplicator implements Closeable {
                         if (key.isWritable())
                             onWrite(key);
 
+
                     } catch (Exception e) {
                         LOG.info("", e);
                         try {
+                            key.channel().provider().openSocketChannel().close();
                             key.channel().close();
                         } catch (IOException ex) {
                             // do nothing
@@ -162,167 +167,221 @@ class TcpSocketReplicator implements Closeable {
     }
 
 
-    /**
-     * used to connect both client and server sockets
-     *
-     * @param identifier
-     * @param clientEndpoints a queue containing the SocketChannel as they become connected
-     * @return
-     */
-    private ConcurrentLinkedQueue<SelectableChannel> asyncConnect(
-            final byte identifier,
-            final @Nullable SocketAddress serverEndpoint,
-            final @NotNull Set<? extends SocketAddress> clientEndpoints) {
+    private class Connector {
 
-        final ConcurrentLinkedQueue<SelectableChannel> result = new ConcurrentLinkedQueue<SelectableChannel>();
 
-        abstract class AbstractConnector implements Runnable {
+        /**
+         * used to connect both client and server sockets
+         *
+         * @param identifier
+         * @param clientEndpoints     a queue containing the SocketChannel as they become connected
+         * @param deferConnectionTime
+         * @param destination
+         * @return
+         */
+        private void asyncClientReconnect(
+                final byte identifier,
+                final SocketAddress clientEndpoints,
+                final long deferConnectionTime, Queue<SelectableChannel> destination) {
 
-            private final SocketAddress address;
+            asyncConnect0(identifier, null, Collections.singleton(clientEndpoints), deferConnectionTime,
+                    destination);
+        }
 
-            abstract SelectableChannel connect(final SocketAddress address, final byte identifier)
-                    throws IOException, InterruptedException;
 
-            AbstractConnector(@NotNull final SocketAddress address) {
-                this.address = address;
-            }
+        /**
+         * used to connect both client and server sockets
+         *
+         * @param identifier
+         * @param clientEndpoints a queue containing the SocketChannel as they become connected
+         * @return
+         */
+        private Queue<SelectableChannel> asyncConnect(
+                final byte identifier,
+                final @Nullable SocketAddress serverEndpoint,
+                final @NotNull Set<? extends SocketAddress> clientEndpoints) {
 
-            public void run() {
-                try {
+            final Queue<SelectableChannel> destination = new ConcurrentLinkedQueue<SelectableChannel>();
+            return asyncConnect0(identifier, serverEndpoint, clientEndpoints, 0, destination);
 
-                    final SelectableChannel socketChannel = connect(this.address, identifier);
-                    closeables.add(socketChannel);
-                    result.add(socketChannel);
-                } catch (InterruptedException e) {
-                    // do nothing
-                } catch (IOException e) {
-                    LOG.error("", e);
+        }
+
+
+        /**
+         * used to connect both client and server sockets
+         *
+         * @param identifier
+         * @param clientEndpoints     a queue containing the SocketChannel as they become connected
+         * @param deferConnectionTime
+         * @param destination
+         * @return
+         */
+        private Queue<SelectableChannel> asyncConnect0(
+                final byte identifier,
+                final @Nullable SocketAddress serverEndpoint,
+                final @NotNull Set<? extends SocketAddress> clientEndpoints,
+                final long deferConnectionTime,
+                Queue<SelectableChannel> destination) {
+
+            final Queue<SelectableChannel> result = destination == null ? new
+                    ConcurrentLinkedQueue<SelectableChannel>() : destination;
+
+            abstract class AbstractConnector implements Runnable {
+
+                private final SocketAddress address;
+
+                abstract SelectableChannel connect(final SocketAddress address, final byte identifier)
+                        throws IOException, InterruptedException;
+
+                AbstractConnector(@NotNull final SocketAddress address) {
+                    this.address = address;
                 }
 
-            }
-
-        }
-
-        class ServerConnector extends AbstractConnector {
-
-            ServerConnector(@NotNull final SocketAddress address) {
-                super(address);
-            }
-
-            SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
-                    IOException {
-
-                ServerSocketChannel serverChannel = ServerSocketChannel.open();
-                final ServerSocket serverSocket = serverChannel.socket();
-                closeables.add(serverSocket);
-                closeables.add(serverChannel);
-                serverSocket.setReuseAddress(true);
-                serverSocket.bind(address);
-                serverChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
-                serverChannel.configureBlocking(false);
-                return serverChannel;
-            }
-
-        }
-
-        class ClientConnector extends AbstractConnector {
-
-            ClientConnector(SocketAddress address) {
-                super(address);
-            }
-
-            /**
-             * blocks until connected
-             *
-             * @param endpoint   the endpoint to connect
-             * @param identifier used for logging only
-             * @throws IOException if we are not successful at connection
-             */
-            SelectableChannel connect(final SocketAddress endpoint,
-                                      final byte identifier)
-                    throws IOException, InterruptedException {
-
-                boolean success = false;
-
-                for (; ; ) {
-
-                    final SocketChannel socketChannel = SocketChannel.open();
-
+                public void run() {
                     try {
 
-                        socketChannel.configureBlocking(false);
-                        socketChannel.socket().setKeepAlive(true);
-                        socketChannel.socket().setReuseAddress(false);
-                        socketChannel.socket().setSoLinger(false, 0);
-                        socketChannel.socket().setSoTimeout(0);
-                        socketChannel.socket().setTcpNoDelay(true);
-                        socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
-                        closeables.add(socketChannel.socket());
-
-                        // todo not sure why we have to have this here,
-                        // but if we don't add it'll fail, no sure why ?
-                        Thread.sleep(500);
-
-                        socketChannel.connect(endpoint);
+                        final SelectableChannel socketChannel = connect(this.address, identifier);
                         closeables.add(socketChannel);
-
-                        if (LOG.isDebugEnabled())
-                            LOG.debug("successfully connected to {}, local-id={}", endpoint, identifier);
-
-                        success = true;
-                        return socketChannel;
-
-                    } catch (IOException e) {
-                        throw e;
+                        result.add(socketChannel);
                     } catch (InterruptedException e) {
-                        throw e;
-                    } finally {
-                        if (!success)
-                            try {
-
-                                try {
-                                    socketChannel.socket().close();
-                                } catch (Exception e) {
-                                    LOG.error("", e);
-                                }
-
-                                socketChannel.close();
-                            } catch (IOException e) {
-                                LOG.error("", e);
-                            }
+                        // do nothing
+                    } catch (IOException e) {
+                        LOG.error("", e);
                     }
 
                 }
 
             }
-        }
 
-        if (serverEndpoint != null) {
-            final Thread thread = new Thread(new ServerConnector(serverEndpoint));
-            thread.setName("server-tcp-connector-" + serverEndpoint);
-            thread.setDaemon(true);
-            thread.start();
-        }
+            class ServerConnector extends AbstractConnector {
 
-        for (final SocketAddress endpoint : clientEndpoints) {
-            final Thread thread = new Thread(new ClientConnector(endpoint));
-            thread.setName("client-tcp-connector-" + endpoint);
-            thread.setDaemon(true);
-            thread.start();
-        }
+                ServerConnector(@NotNull final SocketAddress address) {
+                    super(address);
+                }
 
-        return result;
+                SelectableChannel connect(@NotNull final SocketAddress address, final byte identifier) throws
+                        IOException, InterruptedException {
+                    Thread.sleep(deferConnectionTime);
+                    ServerSocketChannel serverChannel = ServerSocketChannel.open();
+                    final ServerSocket serverSocket = serverChannel.socket();
+                    closeables.add(serverSocket);
+                    closeables.add(serverChannel);
+                    serverSocket.setReuseAddress(true);
+                    serverSocket.bind(address);
+                    serverChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
+                    serverChannel.configureBlocking(false);
+                    return serverChannel;
+                }
+
+            }
+
+            class ClientConnector extends AbstractConnector {
+
+                ClientConnector(SocketAddress address) {
+                    super(address);
+                }
+
+                /**
+                 * blocks until connected
+                 *
+                 * @param endpoint   the endpoint to connect
+                 * @param identifier used for logging only
+                 * @throws IOException if we are not successful at connection
+                 */
+                SelectableChannel connect(final SocketAddress endpoint,
+                                          final byte identifier)
+                        throws IOException, InterruptedException {
+
+                    Thread.sleep(deferConnectionTime);
+                    boolean success = false;
+
+                    for (; ; ) {
+
+                        final SocketChannel socketChannel = SocketChannel.open();
+
+                        try {
+
+                            socketChannel.configureBlocking(false);
+                            socketChannel.socket().setKeepAlive(true);
+                            socketChannel.socket().setReuseAddress(false);
+                            socketChannel.socket().setSoLinger(false, 0);
+                            socketChannel.socket().setSoTimeout(0);
+                            socketChannel.socket().setTcpNoDelay(true);
+                            socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
+                            closeables.add(socketChannel.socket());
+                            socketChannel.connect(endpoint);
+                            closeables.add(socketChannel);
+
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("successfully connected to {}, local-id={}", endpoint, identifier);
+
+                            success = true;
+                            return socketChannel;
+
+                        } catch (IOException e) {
+                            throw e;
+                        } finally {
+                            if (!success)
+                                try {
+
+                                    try {
+                                        socketChannel.socket().close();
+                                    } catch (Exception e) {
+                                        LOG.error("", e);
+                                    }
+
+                                    socketChannel.close();
+                                } catch (IOException e) {
+                                    LOG.error("", e);
+                                }
+                        }
+
+                    }
+
+                }
+            }
+
+            if (serverEndpoint != null) {
+                final Thread thread = new Thread(new ServerConnector(serverEndpoint));
+                thread.setName("server-tcp-connector-" + serverEndpoint);
+                thread.setDaemon(true);
+                thread.start();
+            }
+
+            for (final SocketAddress endpoint : clientEndpoints) {
+                final Thread thread = new Thread(new ClientConnector(endpoint));
+                thread.setName("client-tcp-connector-" + endpoint);
+                thread.setDaemon(true);
+                thread.start();
+            }
+
+            return result;
+        }
     }
 
-    private void onConnect(@NotNull final ReplicatedSharedHashMap map,
-                           short packetSize,
+
+    private void onConnect(short packetSize,
                            int serializedEntrySize,
                            @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                           @NotNull final SelectionKey key) throws IOException, InterruptedException {
+                           @NotNull final SelectionKey key,
+                           final byte identifier, Queue<SelectableChannel> sockets) throws IOException, InterruptedException {
         final SocketChannel channel = (SocketChannel) key.channel();
+        if (channel == null)
+            return;
+        try {
+            if (!channel.finishConnect()) {
+                return;
+            }
+        } catch (ConnectException e) {
 
-        while (!channel.finishConnect()) {
-            Thread.sleep(100);
+
+            final InetAddress inetAddress = channel.socket().getInetAddress();
+            final int port = channel.socket().getPort();
+            final SocketAddress remoteSocketAddress = channel.socket().getRemoteSocketAddress();
+            connector.asyncClientReconnect(identifier, new InetSocketAddress(inetAddress.getHostName(), port)
+                    , 500, sockets);
+
+            throw e;
         }
 
         channel.configureBlocking(false);
@@ -341,8 +400,7 @@ class TcpSocketReplicator implements Closeable {
         channel.register(selector, OP_WRITE | OP_READ, attached);
 
         // register it with the selector and store the ModificationIterator for this key
-        final byte identifier1 = map.identifier();
-        attached.entryWriter.identifierToBuffer(identifier1);
+        attached.entryWriter.identifierToBuffer(identifier);
     }
 
 
