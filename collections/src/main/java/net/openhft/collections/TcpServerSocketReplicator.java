@@ -141,11 +141,11 @@ class TcpServerSocketReplicator extends AbstractTCPReplicator implements Closeab
                         }
 
                         if (key.isReadable()) {
-                            doRead(map, key);
+                            onRead(map, key);
                         }
 
                         if (key.isWritable()) {
-                            doWrite(key);
+                            onWrite(key);
                         }
 
                     } catch (Exception e) {

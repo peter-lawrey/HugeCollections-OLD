@@ -127,15 +127,15 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                             continue;
 
                         if (key.isConnectable()) {
-                            doConnect(map, packetSize, serializedEntrySize, externalizable, key);
+                            onConnect(map, packetSize, serializedEntrySize, externalizable, key);
                         }
 
                         if (key.isReadable()) {
-                            doRead(map, key);
+                            onRead(map, key);
                         }
 
                         if (key.isWritable()) {
-                            doWrite(key);
+                            onWrite(key);
                         }
 
 
@@ -258,7 +258,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         return result;
     }
 
-    private void doConnect(ReplicatedSharedHashMap map,
+    private void onConnect(ReplicatedSharedHashMap map,
                            short packetSize,
                            int serializedEntrySize,
                            ReplicatedSharedHashMap.EntryExternalizable externalizable,
@@ -273,7 +273,6 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         channel.socket().setKeepAlive(true);
         channel.socket().setSoTimeout(100);
         channel.socket().setSoLinger(false, 0);
-
 
         final Attached attached = new Attached();
 
@@ -293,7 +292,6 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
     @Override
     public void close() throws IOException {
-
 
         for (SocketChannel socketChannel : this.socketChannels)
             if (socketChannel != null) {

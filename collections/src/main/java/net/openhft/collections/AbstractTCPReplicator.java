@@ -32,72 +32,89 @@ public class AbstractTCPReplicator {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
 
-    protected void doRead(ReplicatedSharedHashMap map, SelectionKey key) throws IOException, InterruptedException {
-        final SocketChannel socketChannel = (SocketChannel) key.channel();
-        final Attached a = (Attached) key.attachment();
+    /**
+     * used to exchange identifiers and timestamps between the server and client
+     *
+     * @param map
+     * @param socketChannel
+     * @param attached
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void doHandShaking(final ReplicatedSharedHashMap map,
+                               final SocketChannel socketChannel,
+                               final Attached attached) throws IOException, InterruptedException {
 
-        a.entryReader.compact();
-        int len = a.entryReader.read(socketChannel);
+        if (attached.remoteIdentifier == Byte.MIN_VALUE) {
 
-        if (len > 0) {
-
-            if (a.isHandShakingComplete())
-                a.entryReader.readAll(socketChannel);
-            else
-                doHandShaking(map, socketChannel, a);
-        }
-    }
-
-    private void doHandShaking(ReplicatedSharedHashMap map, SocketChannel socketChannel, Attached a) throws IOException, InterruptedException {
-        if (a.remoteIdentifier == Byte.MIN_VALUE) {
-
-            final byte remoteIdentifier = a.entryReader.readIdentifier();
+            final byte remoteIdentifier = attached.entryReader.readIdentifier();
 
             if (remoteIdentifier != Byte.MIN_VALUE) {
-                a.remoteIdentifier = remoteIdentifier;
-                sendTimeStamp(map, a.entryWriter, a, remoteIdentifier);
+                attached.remoteIdentifier = remoteIdentifier;
+                sendTimeStamp(map, attached.entryWriter, attached, remoteIdentifier);
             }
         }
 
+        if (attached.remoteIdentifier != Byte.MIN_VALUE &&
+                attached.remoteTimestamp == Long.MIN_VALUE) {
 
-        if (a.remoteIdentifier != Byte.MIN_VALUE && a.remoteTimestamp == Long
-                .MIN_VALUE) {
-            a.remoteTimestamp = a.entryReader.readTimeStamp();
-            if (a.remoteTimestamp != Long.MIN_VALUE) {
-                a.remoteModificationIterator.dirtyEntries(a.remoteTimestamp);
-                a.setHandShakingComplete();
-                a.entryReader.readAll(socketChannel);
+            attached.remoteTimestamp = attached.entryReader.readTimeStamp();
+
+            if (attached.remoteTimestamp != Long.MIN_VALUE) {
+                attached.remoteModificationIterator.dirtyEntries(attached.remoteTimestamp);
+                attached.setHandShakingComplete();
+                attached.entryReader.readAll(socketChannel);
             }
         }
     }
 
-    protected void doWrite(SelectionKey key) throws InterruptedException, IOException {
+    protected void onWrite(final SelectionKey key) throws InterruptedException, IOException {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
-        final Attached a = (Attached) key.attachment();
+        final Attached attached = (Attached) key.attachment();
 
-        if (a.remoteModificationIterator != null)
-            a.entryWriter.writeAll(socketChannel,
-                    a.remoteModificationIterator);
+        if (attached.remoteModificationIterator != null)
+            attached.entryWriter.writeEntries(
+                    attached.remoteModificationIterator);
 
-        a.entryWriter.sendAll(socketChannel);
+        attached.entryWriter.publish(socketChannel);
     }
 
 
-    void sendTimeStamp(ReplicatedSharedHashMap map,
-                       TcpSocketChannelEntryWriter entryWriter,
-                       Attached a, byte remoteIdentifier) throws IOException {
+    protected void onRead(final ReplicatedSharedHashMap map,
+                          final SelectionKey key) throws IOException, InterruptedException {
+
+        final SocketChannel socketChannel = (SocketChannel) key.channel();
+        final Attached attached = (Attached) key.attachment();
+
+        attached.entryReader.compact();
+
+        int len = attached.entryReader.read(socketChannel);
+        if (len <= 0)
+            return;
+
+        if (attached.isHandShakingComplete())
+            attached.entryReader.readAll(socketChannel);
+        else
+            doHandShaking(map, socketChannel, attached);
+
+    }
+
+    void sendTimeStamp(final ReplicatedSharedHashMap map,
+                       final TcpSocketChannelEntryWriter entryWriter,
+                       final Attached attached,
+                       final byte remoteIdentifier) throws IOException {
+
         LOG.info("remoteIdentifier=" + remoteIdentifier);
+
         if (LOG.isDebugEnabled()) {
-            // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
-            // Subtle gain, but.
             LOG.debug("server-connection id={}, remoteIdentifier={}",
                     map.identifier(), remoteIdentifier);
         }
 
         if (remoteIdentifier == map.identifier())
             throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-        a.remoteModificationIterator =
-                map.acquireModificationIterator(remoteIdentifier);
+
+        attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
 
         entryWriter.writeTimestamp(map.lastModificationTime(remoteIdentifier));
     }
@@ -119,7 +136,6 @@ public class AbstractTCPReplicator {
         void setHandShakingComplete() {
             handShakingComplete = true;
         }
+
     }
-
-
 }

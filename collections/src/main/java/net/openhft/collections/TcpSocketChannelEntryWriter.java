@@ -55,13 +55,11 @@ class TcpSocketChannelEntryWriter {
     /**
      * writes all the entries that have changed, to the tcp socket
      *
-     * @param socketChannel
      * @param modificationIterator
      * @throws InterruptedException
      * @throws java.io.IOException
      */
-    void writeAll(@NotNull final SocketChannel socketChannel,
-                  @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
+    void writeEntries(@NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
 
         final long start = in.position();
@@ -88,29 +86,32 @@ class TcpSocketChannelEntryWriter {
 
     }
 
-    public void sendAll(SocketChannel socketChannel) throws IOException {
+    /**
+     * sends the contents of the buffer to the socket
+     *
+     * @param socketChannel
+     * @throws IOException
+     */
+    public void publish(SocketChannel socketChannel) throws IOException {
         // if we still have some unwritten writer from last time
-        if (in.position() > 0)
-            writeBytes(socketChannel);
-    }
+        if (in.position() > 0) {
 
-    private void writeBytes(@NotNull final SocketChannel socketChannel) throws IOException {
+            out.limit((int) in.position());
 
-        out.limit((int) in.position());
+            final int len = socketChannel.write(out);
 
-        final int len = socketChannel.write(out);
+            if (LOG.isDebugEnabled())
+                LOG.debug("bytes-written=" + len);
 
-        if (LOG.isDebugEnabled())
-            LOG.debug("bytes-written=" + len);
-
-        if (out.remaining() == 0) {
-            out.clear();
-            in.clear();
-        } else {
-            out.compact();
-            in.position(out.position());
-            in.limit(in.capacity());
-            out.clear();
+            if (out.remaining() == 0) {
+                out.clear();
+                in.clear();
+            } else {
+                out.compact();
+                in.position(out.position());
+                in.limit(in.capacity());
+                out.clear();
+            }
         }
     }
 
@@ -151,7 +152,7 @@ class TcpSocketChannelEntryWriter {
 
 
     /**
-     * sends the identity and timestamp of this node to a remote node
+     * writes the timestamp into the buffer
      *
      * @param localIdentifier the current nodes identifier
      * @throws IOException if it failed to send
