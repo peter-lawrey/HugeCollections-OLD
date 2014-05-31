@@ -101,8 +101,6 @@ public class AbstractTCPReplicator {
                        final Attached attached,
                        final byte remoteIdentifier) throws IOException {
 
-        LOG.info("remoteIdentifier=" + remoteIdentifier);
-
         if (LOG.isDebugEnabled()) {
             LOG.debug("server-connection id={}, remoteIdentifier={}",
                     map.identifier(), remoteIdentifier);

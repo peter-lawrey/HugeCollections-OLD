@@ -192,9 +192,6 @@ class TcpServerSocketReplicator extends AbstractTCPReplicator implements Closeab
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
                 externalizable, packetSize);
 
-        // register it with the selector and store the ModificationIterator for this key
-        LOG.info("out=" + localIdentifier);
-
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
 

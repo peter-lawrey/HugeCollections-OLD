@@ -74,7 +74,8 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                                             process(map, packetSize,
                                                     serializedEntrySize, externalizable, endpoint);
                                         } catch (IOException e) {
-                                            LOG.error("", e);
+                                            if (selector.isOpen())
+                                                LOG.error("", e);
                                         }
                                     }
                                 }
@@ -105,7 +106,6 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         try {
 
             final ConcurrentLinkedQueue<SocketChannel> newSockets = asyncConnect(identifier, endpoints);
-
 
             for (; ; ) {
 
@@ -202,7 +202,8 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                  * @throws IOException if we are not successful at connection
                  */
                 private SocketChannel blockingConnect(final InetSocketAddress endpoint,
-                                                      final byte identifier) throws InterruptedException, IOException {
+                                                      final byte identifier)
+                        throws InterruptedException, IOException {
 
                     boolean success = false;
 
@@ -218,6 +219,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
                             socketChannel.socket().setSoLinger(false, 0);
                             socketChannel.socket().setSoTimeout(0);
                             socketChannel.socket().setTcpNoDelay(true);
+                            socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
 
                             // todo not sure why we have to have this here,
                             // but if we don't add it'll fail, no sure why ?
