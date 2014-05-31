@@ -48,11 +48,13 @@ public class TCPSocketReplication4WayMapTest {
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
+        final TcpReplication tcpReplication = new TcpReplication(serverPort,
+                InetSocketAddress).heartBeatInterval(500);
+
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(new TcpReplication(serverPort,
-                        InetSocketAddress))
+                .tcpReplication(tcpReplication)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
@@ -136,7 +138,6 @@ public class TCPSocketReplication4WayMapTest {
         assertTrue("map2.empty", !map2.isEmpty());
 
     }
-
 
 
     /**

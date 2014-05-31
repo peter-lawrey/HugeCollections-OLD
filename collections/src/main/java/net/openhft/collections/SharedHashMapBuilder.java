@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.concurrent.TimeUnit;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
@@ -517,10 +516,9 @@ public final class SharedHashMapBuilder implements Cloneable {
                                             TcpReplication tcpReplication) throws IOException {
 
         result.addCloseable(new TcpSocketReplicator(result,
-                tcpReplication.packetSize(),
                 entrySize(),
                 result,
-                tcpReplication.endpoints(), tcpReplication.serverPort(), TimeUnit.SECONDS.toMillis(5)));
+                tcpReplication));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {

@@ -21,6 +21,7 @@ package net.openhft.collections;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableSet;
@@ -35,6 +36,8 @@ public class TcpReplication implements Cloneable {
     private final int serverPort;
     private final Set<InetSocketAddress> endpoints;
     private short packetSize = 1024 * 8;
+
+    private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
 
     public TcpReplication(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
@@ -91,5 +94,22 @@ public class TcpReplication implements Cloneable {
                 ", endpoints=" + endpoints() +
                 ", packetSize=" + packetSize() +
                 "}";
+    }
+
+    public InetSocketAddress serverInetSocketAddress() {
+        return new InetSocketAddress(serverPort());
+    }
+
+    public long heartBeatInterval() {
+        return heartBeatInterval;
+    }
+
+    /**
+     * @param heartBeatInterval in milliseconds
+     * @return
+     */
+    public TcpReplication heartBeatInterval(long heartBeatInterval) {
+        this.heartBeatInterval = heartBeatInterval;
+        return this;
     }
 }
