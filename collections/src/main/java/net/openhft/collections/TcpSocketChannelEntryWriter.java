@@ -52,6 +52,27 @@ class TcpSocketChannelEntryWriter {
         entryCallback = new EntryCallback(externalizable, in);
     }
 
+
+    /**
+     * writes the timestamp into the buffer
+     *
+     * @param localIdentifier the current nodes identifier
+     * @throws IOException if it failed to send
+     */
+    void identifierToBuffer(final int localIdentifier) throws IOException {
+        in.writeByte(localIdentifier);
+    }
+
+    /**
+     * sends the identity and timestamp of this node to a remote node
+     *
+     * @param timeStampOfLastMessage the last timestamp we received a message from that node
+     * @throws IOException if it failed to send
+     */
+    void timestampToBuffer(final long timeStampOfLastMessage) throws IOException {
+        in.writeLong(timeStampOfLastMessage);
+    }
+
     /**
      * writes all the entries that have changed, to the tcp socket
      *
@@ -59,15 +80,13 @@ class TcpSocketChannelEntryWriter {
      * @throws InterruptedException
      * @throws java.io.IOException
      */
-    void writeEntries(@NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
-
+    void entriesToBuffer(@NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
 
         final long start = in.position();
 
         for (; ; ) {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
-
 
             // if there was no data written to the buffer and we have not written any more data to
             // the buffer, then give up
@@ -87,12 +106,12 @@ class TcpSocketChannelEntryWriter {
     }
 
     /**
-     * sends the contents of the buffer to the socket
+     * writes the contents of the buffer to the socket
      *
-     * @param socketChannel
+     * @param socketChannel the socket to publish the buffer to
      * @throws IOException
      */
-    public void publish(SocketChannel socketChannel) throws IOException {
+    public void writeBufferToSocket(SocketChannel socketChannel) throws IOException {
         // if we still have some unwritten writer from last time
         if (in.position() > 0) {
 
@@ -151,24 +170,5 @@ class TcpSocketChannelEntryWriter {
     }
 
 
-    /**
-     * writes the timestamp into the buffer
-     *
-     * @param localIdentifier the current nodes identifier
-     * @throws IOException if it failed to send
-     */
-    void writeIdentifier(final int localIdentifier) throws IOException {
-        in.writeByte(localIdentifier);
-    }
-
-    /**
-     * sends the identity and timestamp of this node to a remote node
-     *
-     * @param timeStampOfLastMessage the last timestamp we received a message from that node
-     * @throws IOException if it failed to send
-     */
-    void writeTimestamp(final long timeStampOfLastMessage) throws IOException {
-        in.writeLong(timeStampOfLastMessage);
-    }
 }
 

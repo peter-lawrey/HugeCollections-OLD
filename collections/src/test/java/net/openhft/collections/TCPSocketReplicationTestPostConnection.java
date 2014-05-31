@@ -66,7 +66,7 @@ public class TCPSocketReplicationTestPostConnection {
         map2 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
-        waitTillEqual(500);
+        waitTillEqual(1000);
 
         assertEquals(map1, map2);
         assertTrue(!map1.isEmpty());

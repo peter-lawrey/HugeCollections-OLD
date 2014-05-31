@@ -195,7 +195,7 @@ class TcpServerSocketReplicator extends AbstractTCPReplicator implements Closeab
         // register it with the selector and store the ModificationIterator for this key
         LOG.info("out=" + localIdentifier);
 
-        attached.entryWriter.writeIdentifier(localIdentifier);
+        attached.entryWriter.identifierToBuffer(localIdentifier);
     }
 
 

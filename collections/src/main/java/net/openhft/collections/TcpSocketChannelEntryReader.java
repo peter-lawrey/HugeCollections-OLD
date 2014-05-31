@@ -63,8 +63,16 @@ class TcpSocketChannelEntryReader {
         in.clear();
     }
 
-
-    int read(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
+    /**
+     * reads from the socket and writes the contents to the buffer
+     *
+     * @param socketChannel the  socketChannel to read from
+     * @return the number of bytes read
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
+        compactBuffer();
         final int len = socketChannel.read(in);
         out.limit(in.position());
         return len;
@@ -73,12 +81,10 @@ class TcpSocketChannelEntryReader {
     /**
      * reads entries from the socket till it is empty
      *
-     * @param socketChannel
      * @throws IOException
      * @throws InterruptedException
      */
-    void readAll(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
-
+    void entriesFromBuffer() throws IOException, InterruptedException {
 
         for (; ; ) {
 
@@ -108,7 +114,6 @@ class TcpSocketChannelEntryReader {
             out.limit(limit);
             // skip onto the next entry
             out.position(nextEntryPos);
-            // compact();
 
             // to allow the sizeOfNextEntry to be read the next time around
             sizeOfNextEntry = Integer.MIN_VALUE;
@@ -119,7 +124,7 @@ class TcpSocketChannelEntryReader {
     /**
      * compacts the buffer and updates the {@code in} and  {@code out} accordingly
      */
-    public void compact() {
+    private void compactBuffer() {
 
         // the serializedEntrySize used here may not be the maximum size of the entry in its serialized form
         // however, its only use as an indication that the buffer is becoming full and should be compacted
@@ -138,12 +143,12 @@ class TcpSocketChannelEntryReader {
     /**
      * @return -1 if unsuccessful
      */
-    byte readIdentifier() {
+    byte identifierFromBuffer() {
         return (out.remaining() >= 1) ? out.readByte() : Byte.MIN_VALUE;
     }
 
 
-    long readTimeStamp() throws IOException {
+    long timeStampFromBuffer() throws IOException {
         return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
     }
 }

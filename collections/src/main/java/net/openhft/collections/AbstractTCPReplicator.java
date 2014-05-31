@@ -47,7 +47,7 @@ public class AbstractTCPReplicator {
 
         if (attached.remoteIdentifier == Byte.MIN_VALUE) {
 
-            final byte remoteIdentifier = attached.entryReader.readIdentifier();
+            final byte remoteIdentifier = attached.entryReader.identifierFromBuffer();
 
             if (remoteIdentifier != Byte.MIN_VALUE) {
                 attached.remoteIdentifier = remoteIdentifier;
@@ -58,12 +58,12 @@ public class AbstractTCPReplicator {
         if (attached.remoteIdentifier != Byte.MIN_VALUE &&
                 attached.remoteTimestamp == Long.MIN_VALUE) {
 
-            attached.remoteTimestamp = attached.entryReader.readTimeStamp();
+            attached.remoteTimestamp = attached.entryReader.timeStampFromBuffer();
 
             if (attached.remoteTimestamp != Long.MIN_VALUE) {
                 attached.remoteModificationIterator.dirtyEntries(attached.remoteTimestamp);
                 attached.setHandShakingComplete();
-                attached.entryReader.readAll(socketChannel);
+                attached.entryReader.entriesFromBuffer();
             }
         }
     }
@@ -73,10 +73,10 @@ public class AbstractTCPReplicator {
         final Attached attached = (Attached) key.attachment();
 
         if (attached.remoteModificationIterator != null)
-            attached.entryWriter.writeEntries(
+            attached.entryWriter.entriesToBuffer(
                     attached.remoteModificationIterator);
 
-        attached.entryWriter.publish(socketChannel);
+        attached.entryWriter.writeBufferToSocket(socketChannel);
     }
 
 
@@ -86,14 +86,11 @@ public class AbstractTCPReplicator {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
 
-        attached.entryReader.compact();
-
-        int len = attached.entryReader.read(socketChannel);
-        if (len <= 0)
+        if (attached.entryReader.readSocketToBuffer(socketChannel) <= 0)
             return;
 
         if (attached.isHandShakingComplete())
-            attached.entryReader.readAll(socketChannel);
+            attached.entryReader.entriesFromBuffer();
         else
             doHandShaking(map, socketChannel, attached);
 
@@ -116,7 +113,7 @@ public class AbstractTCPReplicator {
 
         attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
 
-        entryWriter.writeTimestamp(map.lastModificationTime(remoteIdentifier));
+        entryWriter.timestampToBuffer(map.lastModificationTime(remoteIdentifier));
     }
 
 
