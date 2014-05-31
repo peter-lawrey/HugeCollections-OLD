@@ -95,9 +95,8 @@ class TcpSocketReplicator implements Closeable {
 
         try {
 
-            final Queue<SelectableChannel> newSockets = connector.asyncConnect0(identifier, serverEndpoint,
-                    endpoints,
-                    0, null);
+            final Queue<SelectableChannel> newSockets = connector.asyncConnect(identifier, serverEndpoint,
+                    endpoints);
 
             for (; ; ) {
 
@@ -229,7 +228,7 @@ class TcpSocketReplicator implements Closeable {
          * used to connect both client and server sockets
          *
          * @param identifier
-         * @param clientEndpoints     a queue containing the SocketChannel as they become connected
+         * @param clientEndpoints      a queue containing the SocketChannel as they become connected
          * @param reconnectionInterval
          * @param destination
          * @return
