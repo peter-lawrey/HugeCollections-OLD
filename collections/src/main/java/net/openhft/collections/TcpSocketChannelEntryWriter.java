@@ -43,6 +43,11 @@ class TcpSocketChannelEntryWriter {
     private final EntryCallback entryCallback;
     private final int serializedEntrySize;
 
+    /**
+     * @param serializedEntrySize the size of the entry
+     * @param externalizable      supports reading and writing serialize entries
+     * @param packetSize          the max TCP/IP packet size
+     */
     TcpSocketChannelEntryWriter(final int serializedEntrySize,
                                 @NotNull final EntryExternalizable externalizable,
                                 int packetSize) {
@@ -57,9 +62,8 @@ class TcpSocketChannelEntryWriter {
      * writes the timestamp into the buffer
      *
      * @param localIdentifier the current nodes identifier
-     * @throws IOException if it failed to send
      */
-    void identifierToBuffer(final int localIdentifier) throws IOException {
+    void identifierToBuffer(final int localIdentifier) {
         in.writeByte(localIdentifier);
     }
 
@@ -67,20 +71,17 @@ class TcpSocketChannelEntryWriter {
      * sends the identity and timestamp of this node to a remote node
      *
      * @param timeStampOfLastMessage the last timestamp we received a message from that node
-     * @throws IOException if it failed to send
      */
-    void timestampToBuffer(final long timeStampOfLastMessage) throws IOException {
+    void timestampToBuffer(final long timeStampOfLastMessage) {
         in.writeLong(timeStampOfLastMessage);
     }
 
     /**
-     * writes all the entries that have changed, to the tcp socket
+     * writes all the entries that have changed, to the buffer which will later be written to TCP/IP
      *
-     * @param modificationIterator
-     * @throws InterruptedException
-     * @throws java.io.IOException
+     * @param modificationIterator Holds a record of which entries have modification.
      */
-    void entriesToBuffer(@NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
+    void entriesToBuffer(@NotNull final ModificationIterator modificationIterator) throws InterruptedException {
 
         final long start = in.position();
 
@@ -168,7 +169,6 @@ class TcpSocketChannelEntryWriter {
             return true;
         }
     }
-
 
 }
 

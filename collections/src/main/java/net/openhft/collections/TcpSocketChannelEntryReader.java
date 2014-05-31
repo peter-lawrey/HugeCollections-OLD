@@ -69,9 +69,8 @@ class TcpSocketChannelEntryReader {
      * @param socketChannel the  socketChannel to read from
      * @return the number of bytes read
      * @throws IOException
-     * @throws InterruptedException
      */
-    int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException, InterruptedException {
+    int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
         compactBuffer();
         final int len = socketChannel.read(in);
         out.limit(in.position());
@@ -81,10 +80,9 @@ class TcpSocketChannelEntryReader {
     /**
      * reads entries from the socket till it is empty
      *
-     * @throws IOException
      * @throws InterruptedException
      */
-    void entriesFromBuffer() throws IOException, InterruptedException {
+    void entriesFromBuffer() throws InterruptedException {
 
         for (; ; ) {
 
@@ -139,16 +137,17 @@ class TcpSocketChannelEntryReader {
         out.position(0);
     }
 
-
     /**
-     * @return -1 if unsuccessful
+     * @return the identifier or -1 if unsuccessful
      */
     byte identifierFromBuffer() {
         return (out.remaining() >= 1) ? out.readByte() : Byte.MIN_VALUE;
     }
 
-
-    long timeStampFromBuffer() throws IOException {
+    /**
+     * @return the timestamp or -1 if unsuccessful
+     */
+    long timeStampFromBuffer() {
         return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
     }
 }
