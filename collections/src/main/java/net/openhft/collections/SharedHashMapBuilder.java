@@ -20,7 +20,6 @@ import net.openhft.lang.Maths;
 import net.openhft.lang.io.ByteBufferBytes;
 
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -516,17 +515,13 @@ public final class SharedHashMapBuilder implements Cloneable {
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
                                             TcpReplication tcpReplication) throws IOException {
 
-        for (final InetSocketAddress endpoint : tcpReplication.endpoints()) {
-            final TcpSocketChannelEntryWriter entryWriter =
-                    new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
-            final TcpClientSocketReplicator replicator =
-                    new TcpClientSocketReplicator(endpoint, result,
-                            tcpReplication.packetSize(), entrySize(), result);
-            result.addCloseable(replicator);
-        }
+        final TcpClientSocketReplicator replicator = new TcpClientSocketReplicator(result,
+                tcpReplication.packetSize(),
+                entrySize(),
+                result,
+                tcpReplication.endpoints());
 
-        final TcpSocketChannelEntryWriter entryWriter =
-                new TcpSocketChannelEntryWriter(entrySize(), result, tcpReplication.packetSize());
+        result.addCloseable(replicator);
 
         final TcpServerSocketReplicator tcpServerSocketReplicator = new TcpServerSocketReplicator(
                 result, result, tcpReplication.serverPort(),

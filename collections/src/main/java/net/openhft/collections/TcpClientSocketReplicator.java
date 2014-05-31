@@ -57,11 +57,11 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
     final CopyOnWriteArraySet<SocketChannel> socketChannels = new CopyOnWriteArraySet<SocketChannel>();
     final Selector selector;
 
-    TcpClientSocketReplicator(@NotNull final InetSocketAddress endpoint,
-                              @NotNull final ReplicatedSharedHashMap map,
+    TcpClientSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
                               final short packetSize,
                               final int serializedEntrySize,
-                              final ReplicatedSharedHashMap.EntryExternalizable externalizable) throws IOException {
+                              @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                              @NotNull final Set<InetSocketAddress> endpoint) throws IOException {
 
         executorService = newSingleThreadExecutor(
                 new NamedThreadFactory("InSocketReplicator-" + map.identifier(), true));
@@ -88,7 +88,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
      * @return
      * @throws ClosedChannelException
      */
-    void selectorRegister(ConcurrentLinkedQueue<SocketChannel> newSockets) throws ClosedChannelException {
+    void register(ConcurrentLinkedQueue<SocketChannel> newSockets) throws ClosedChannelException {
         for (SocketChannel sc = newSockets.poll(); sc != null; sc = newSockets.poll()) {
             sc.register(selector, OP_CONNECT);
         }
@@ -98,7 +98,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
     private void process(ReplicatedSharedHashMap map,
                          final short packetSize, final int serializedEntrySize,
                          final ReplicatedSharedHashMap.EntryExternalizable externalizable,
-                         final InetSocketAddress... endpoints) throws IOException {
+                         final Set<InetSocketAddress> endpoints) throws IOException {
 
         final byte identifier = map.identifier();
 
@@ -109,7 +109,10 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
             for (; ; ) {
 
-                selectorRegister(newSockets);
+                register(newSockets);
+
+                if (!selector.isOpen())
+                    return;
 
                 final int nSelectedKeys = selector.select(100);
                 if (nSelectedKeys == 0) {
@@ -118,7 +121,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
 
                 final Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
-                for (SelectionKey key : selectedKeys) {
+                for (final SelectionKey key : selectedKeys) {
                     try {
                         if (!key.isValid())
                             continue;
@@ -171,7 +174,7 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
      * @param endpoints
      * @return a queue containing the SocketChannel as they become connected
      */
-    private ConcurrentLinkedQueue<SocketChannel> asyncConnect(final byte identifier, InetSocketAddress[] endpoints) {
+    private ConcurrentLinkedQueue<SocketChannel> asyncConnect(final byte identifier, final Set<InetSocketAddress> endpoints) {
 
         final ConcurrentLinkedQueue<SocketChannel> result = new ConcurrentLinkedQueue<SocketChannel>();
 
@@ -270,8 +273,9 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         channel.socket().setKeepAlive(true);
         channel.socket().setSoTimeout(100);
         channel.socket().setSoLinger(false, 0);
+
+
         final Attached attached = new Attached();
-        channel.register(selector, OP_WRITE | OP_READ, attached);
 
         attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
                 externalizable, packetSize);
@@ -279,9 +283,10 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
                 externalizable, packetSize);
 
+        channel.register(selector, OP_WRITE | OP_READ, attached);
+
         // register it with the selector and store the ModificationIterator for this key
         final byte identifier1 = map.identifier();
-        LOG.info("out=" + identifier1);
         attached.entryWriter.writeIdentifier(identifier1);
     }
 
@@ -289,28 +294,26 @@ class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeab
     @Override
     public void close() throws IOException {
 
-        synchronized (selector) {
-            for (SocketChannel socketChannel : this.socketChannels)
-                if (socketChannel != null) {
+
+        for (SocketChannel socketChannel : this.socketChannels)
+            if (socketChannel != null) {
+                try {
                     try {
-                        try {
-                            socketChannel.socket().close();
-                        } catch (IOException e) {
-                            LOG.error("", e);
-                        }
-                    } finally {
-                        try {
-                            socketChannel.close();
-                        } catch (IOException e) {
-                            LOG.error("", e);
-                        }
+                        socketChannel.socket().close();
+                    } catch (IOException e) {
+                        LOG.error("", e);
+                    }
+                } finally {
+                    try {
+                        socketChannel.close();
+                    } catch (IOException e) {
+                        LOG.error("", e);
                     }
                 }
+            }
 
-            socketChannels.clear();
-            selector.close();
-        }
-
+        socketChannels.clear();
+        selector.close();
         executorService.shutdownNow();
     }
 
