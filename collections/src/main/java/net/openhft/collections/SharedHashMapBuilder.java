@@ -515,13 +515,11 @@ public final class SharedHashMapBuilder implements Cloneable {
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
                                             TcpReplication tcpReplication) throws IOException {
 
-        final TcpSocketReplicator replicator = new TcpSocketReplicator(result,
+        result.addCloseable(new TcpSocketReplicator(result,
                 tcpReplication.packetSize(),
                 entrySize(),
                 result,
-                tcpReplication.endpoints(), tcpReplication.serverPort());
-
-        result.addCloseable(replicator);
+                tcpReplication.endpoints(), tcpReplication.serverPort()));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
