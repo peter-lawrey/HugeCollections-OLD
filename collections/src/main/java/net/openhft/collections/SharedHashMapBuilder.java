@@ -519,7 +519,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 tcpReplication.packetSize(),
                 entrySize(),
                 result,
-                tcpReplication.endpoints());
+                tcpReplication.endpoints(), -1);
 
         result.addCloseable(replicator);
 
