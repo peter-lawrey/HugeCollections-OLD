@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -37,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static net.openhft.collections.TcpServerSocketReplicator.Attached;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a
@@ -47,7 +47,7 @@ import static net.openhft.collections.TcpServerSocketReplicator.Attached;
  *
  * @author Rob Austin.
  */
-class TcpClientSocketReplicator implements Closeable {
+class TcpClientSocketReplicator extends AbstractTCPReplicator implements Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpClientSocketReplicator.class.getName());
     private static final int BUFFER_SIZE = 0x100000; // 1Mb
@@ -81,73 +81,42 @@ class TcpClientSocketReplicator implements Closeable {
         );
     }
 
+    /**
+     * Registers the SocketChannel with the selector
+     *
+     * @param newSockets
+     * @return
+     * @throws ClosedChannelException
+     */
+    void selectorRegister(ConcurrentLinkedQueue<SocketChannel> newSockets) throws ClosedChannelException {
+        for (SocketChannel sc = newSockets.poll(); sc != null; sc = newSockets.poll()) {
+            sc.register(selector, OP_CONNECT);
+        }
+    }
+
+
     private void process(ReplicatedSharedHashMap map,
                          final short packetSize, final int serializedEntrySize,
                          final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                          final InetSocketAddress... endpoints) throws IOException {
 
-
-        final ConcurrentLinkedQueue<SocketChannel> newSockets = new ConcurrentLinkedQueue<SocketChannel>();
-
         final byte identifier = map.identifier();
 
         try {
 
-            for (final InetSocketAddress endpoint : endpoints) {
+            final ConcurrentLinkedQueue<SocketChannel> newSockets = asyncConnect(identifier, endpoints);
 
-                final Runnable target = new Runnable() {
-
-                    public void run() {
-                        try {
-                            SocketChannel socketChannel = blockingConnect(endpoint, identifier);
-                            socketChannels.add(socketChannel);
-                            newSockets.add(socketChannel);
-                        } catch (InterruptedException e) {
-                            // do nothing
-                        } catch (IOException e) {
-                            LOG.error("", e);
-                        }
-                    }
-
-                };
-
-                final Thread thread = new Thread(target);
-                thread.setName("connector-" + endpoint);
-                thread.setDaemon(true);
-                thread.start();
-            }
-
-            boolean wasRegistered = false;
 
             for (; ; ) {
 
-
-                for (; ; ) {
-                    final SocketChannel socketChannel = newSockets.poll();
-
-                    if (socketChannel == null)
-                        break;
-                    synchronized (selector) {
-                        if (selector.isOpen()) {
-                            socketChannel.register(selector, OP_CONNECT);
-                            wasRegistered = true;
-                        } else
-                            return;
-                    }
-                }
-
-
-                if (!wasRegistered) {
-                    Thread.sleep(100);
-                    continue;
-                }
+                selectorRegister(newSockets);
 
                 final int nSelectedKeys = selector.select(100);
                 if (nSelectedKeys == 0) {
                     continue;    // nothing to do
                 }
 
-                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                final Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
                 for (SelectionKey key : selectedKeys) {
                     try {
@@ -155,85 +124,15 @@ class TcpClientSocketReplicator implements Closeable {
                             continue;
 
                         if (key.isConnectable()) {
-
-                            final SocketChannel channel = (SocketChannel) key.channel();
-
-                            while (!channel.finishConnect()) {
-                                Thread.sleep(100);
-                            }
-
-
-                            channel.configureBlocking(false);
-                            channel.socket().setKeepAlive(true);
-                            channel.socket().setSoTimeout(100);
-                            channel.socket().setSoLinger(false, 0);
-                            final Attached attached = new Attached();
-                            channel.register(selector, OP_WRITE | OP_READ, attached);
-
-                            attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
-                                    externalizable, packetSize);
-
-                            attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                                    externalizable, packetSize);
-
-
-                            // register it with the selector and store the ModificationIterator for this key
-                            final byte identifier1 = map.identifier();
-                            LOG.info("out=" + identifier1);
-                            attached.entryWriter.writeIdentifier(identifier1);
-
-
+                            doConnect(map, packetSize, serializedEntrySize, externalizable, key);
                         }
 
-
                         if (key.isReadable()) {
-
-                            final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached a = (Attached) key.attachment();
-
-                            a.entryReader.compact();
-                            int len = a.entryReader.read(socketChannel);
-
-                            if (len > 0) {
-
-                                if (!a.handShakingComplete) {
-                                    if (a.remoteIdentifier == Byte.MIN_VALUE) {
-                                        if (len == 8)
-                                            len = 8;
-                                        byte remoteIdentifier = a.entryReader.readIdentifier();
-
-                                        if (remoteIdentifier != Byte.MIN_VALUE) {
-                                            a.remoteIdentifier = remoteIdentifier;
-                                            sendTimeStamp(map, a.entryWriter, a, remoteIdentifier);
-                                        }
-                                    }
-
-
-                                    if (a.remoteIdentifier != Byte.MIN_VALUE && a.remoteTimestamp == Long
-                                            .MIN_VALUE) {
-                                        a.remoteTimestamp = a.entryReader.readTimeStamp();
-                                        if (a.remoteTimestamp != Long.MIN_VALUE) {
-                                            a.remoteModificationIterator.dirtyEntries(a.remoteTimestamp);
-                                            a.handShakingComplete = true;
-                                        }
-                                    }
-                                }
-
-
-                                if (a.handShakingComplete)
-                                    a.entryReader.readAll(socketChannel);
-                            }
-
+                            doRead(map, key);
                         }
 
                         if (key.isWritable()) {
-                            final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached a = (Attached) key.attachment();
-
-                            if (a.remoteModificationIterator != null)
-                                a.entryWriter.writeAll(socketChannel, a.remoteModificationIterator);
-
-                            a.entryWriter.sendAll(socketChannel);
+                            doWrite(key);
                         }
 
 
@@ -267,121 +166,125 @@ class TcpClientSocketReplicator implements Closeable {
         }
     }
 
-    private void sendTimeStamp(ReplicatedSharedHashMap map, TcpSocketChannelEntryWriter entryWriter, Attached a, byte remoteIdentifier) throws IOException {
-        LOG.info("remoteIdentifier=" + remoteIdentifier);
-        if (LOG.isDebugEnabled()) {
-            // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
-            // Subtle gain, but.
-            LOG.debug("server-connection id={}, remoteIdentifier={}",
-                    map.identifier(), remoteIdentifier);
-        }
-
-        if (remoteIdentifier == map.identifier())
-            throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-        a.remoteModificationIterator =
-                map.acquireModificationIterator(remoteIdentifier);
-
-        entryWriter.writeTimestamp(map.lastModificationTime(remoteIdentifier));
-    }
-
     /**
-     * blocks until connected
-     *
-     * @param endpoint   the endpoint to connect
-     * @param identifier used for logging only
-     * @throws Exception if we are not successful at connection
+     * @param identifier
+     * @param endpoints
+     * @return a queue containing the SocketChannel as they become connected
      */
+    private ConcurrentLinkedQueue<SocketChannel> asyncConnect(final byte identifier, InetSocketAddress[] endpoints) {
 
-    private SocketChannel blockingConnect(final InetSocketAddress endpoint,
-                                          final byte identifier) throws InterruptedException, IOException {
+        final ConcurrentLinkedQueue<SocketChannel> result = new ConcurrentLinkedQueue<SocketChannel>();
 
-        boolean success = false;
+        for (final InetSocketAddress endpoint : endpoints) {
 
-        for (; ; ) {
+            final Runnable target = new Runnable() {
 
-            final SocketChannel socketChannel = SocketChannel.open();
-
-            try {
-
-                socketChannel.configureBlocking(false);
-                socketChannel.socket().setKeepAlive(true);
-                socketChannel.socket().setReuseAddress(false);
-                socketChannel.socket().setSoLinger(false, 0);
-                socketChannel.socket().setSoTimeout(0);
-                socketChannel.socket().setTcpNoDelay(true);
-
-                // todo not sure why we have to have this here,
-                // but if we don't add it'll fail !
-                Thread.sleep(500);
-
-                socketChannel.connect(endpoint);
-                socketChannelRef.set(socketChannel);
-
-                if (LOG.isDebugEnabled())
-                    LOG.debug("successfully connected to {}, local-id={}", endpoint, identifier);
-                success = true;
-                return socketChannel;
-
-            } catch (IOException e) {
-                throw e;
-            } catch (InterruptedException e) {
-                throw e;
-            } finally {
-                if (!success)
+                public void run() {
                     try {
-                        socketChannel.close();
+                        SocketChannel socketChannel = blockingConnect(endpoint, identifier);
+                        socketChannels.add(socketChannel);
+                        result.add(socketChannel);
+                    } catch (InterruptedException e) {
+                        // do nothing
                     } catch (IOException e) {
                         LOG.error("", e);
                     }
-            }
-
-        }
-
-    }
-
-
-    private void connect(InetSocketAddress endpoint,
-                         ReplicatedSharedHashMap map,
-                         Selector selector) throws Exception {
-        SocketChannel socketChannel;
-
-        for (; ; ) {
-
-            socketChannel = SocketChannel.open();
-            socketChannel.configureBlocking(false);
-            socketChannel.socket().setKeepAlive(true);
-            socketChannel.socket().setReuseAddress(false);
-            socketChannel.socket().setSoLinger(false, 0);
-            socketChannel.socket().setSoTimeout(0);
-            socketChannel.socket().setTcpNoDelay(true);
-
-            try {
-
-                // todo not sure why we have to have this here,
-                // but if we don't add it'll fail !
-                Thread.sleep(200);
-
-                socketChannel.connect(endpoint);
-                socketChannelRef.set(socketChannel);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("successfully connected to {}, local-id={}",
-                            endpoint, map.identifier());
                 }
 
-                break;
-            } catch (InterruptedException e) {
-                throw e;
-            } catch (Exception e) {
-                socketChannel.close();
-                LOG.error("", e);
-                throw e;
-            }
+                /**
+                 * blocks until connected
+                 *
+                 * @param endpoint   the endpoint to connect
+                 * @param identifier used for logging only
+                 * @throws IOException if we are not successful at connection
+                 */
+                private SocketChannel blockingConnect(final InetSocketAddress endpoint,
+                                                      final byte identifier) throws InterruptedException, IOException {
 
+                    boolean success = false;
+
+                    for (; ; ) {
+
+                        final SocketChannel socketChannel = SocketChannel.open();
+
+                        try {
+
+                            socketChannel.configureBlocking(false);
+                            socketChannel.socket().setKeepAlive(true);
+                            socketChannel.socket().setReuseAddress(false);
+                            socketChannel.socket().setSoLinger(false, 0);
+                            socketChannel.socket().setSoTimeout(0);
+                            socketChannel.socket().setTcpNoDelay(true);
+
+                            // todo not sure why we have to have this here,
+                            // but if we don't add it'll fail, no sure why ?
+                            Thread.sleep(500);
+
+                            socketChannel.connect(endpoint);
+                            socketChannelRef.set(socketChannel);
+
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("successfully connected to {}, local-id={}", endpoint, identifier);
+                            success = true;
+                            return socketChannel;
+
+                        } catch (IOException e) {
+                            throw e;
+                        } catch (InterruptedException e) {
+                            throw e;
+                        } finally {
+                            if (!success)
+                                try {
+                                    socketChannel.close();
+                                } catch (IOException e) {
+                                    LOG.error("", e);
+                                }
+                        }
+
+                    }
+
+                }
+
+            };
+
+            final Thread thread = new Thread(target);
+            thread.setName("connector-" + endpoint);
+            thread.setDaemon(true);
+            thread.start();
+        }
+        return result;
+    }
+
+    private void doConnect(ReplicatedSharedHashMap map,
+                           short packetSize,
+                           int serializedEntrySize,
+                           ReplicatedSharedHashMap.EntryExternalizable externalizable,
+                           SelectionKey key) throws IOException, InterruptedException {
+        final SocketChannel channel = (SocketChannel) key.channel();
+
+        while (!channel.finishConnect()) {
+            Thread.sleep(100);
         }
 
-        socketChannel.register(selector, OP_CONNECT);
+        channel.configureBlocking(false);
+        channel.socket().setKeepAlive(true);
+        channel.socket().setSoTimeout(100);
+        channel.socket().setSoLinger(false, 0);
+        final Attached attached = new Attached();
+        channel.register(selector, OP_WRITE | OP_READ, attached);
+
+        attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
+                externalizable, packetSize);
+
+        attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
+                externalizable, packetSize);
+
+        // register it with the selector and store the ModificationIterator for this key
+        final byte identifier1 = map.identifier();
+        LOG.info("out=" + identifier1);
+        attached.entryWriter.writeIdentifier(identifier1);
     }
+
 
     @Override
     public void close() throws IOException {

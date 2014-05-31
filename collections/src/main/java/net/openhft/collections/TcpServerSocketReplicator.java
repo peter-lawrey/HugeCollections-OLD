@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutorService;
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
  * Used with a {@link ReplicatedSharedHashMap} to send data between the maps using nio, non blocking, server
@@ -47,7 +46,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  * @author Rob Austin.
  * @see TcpClientSocketReplicator
  */
-class TcpServerSocketReplicator implements Closeable {
+class TcpServerSocketReplicator extends AbstractTCPReplicator implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(TcpServerSocketReplicator.class.getName());
@@ -134,84 +133,19 @@ class TcpServerSocketReplicator implements Closeable {
 
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
                 for (SelectionKey key : selectedKeys) {
-                    if (key.isAcceptable()) {
 
-                        final ServerSocketChannel server = (ServerSocketChannel) key.channel();
-                        final SocketChannel channel = server.accept();
-                        channel.configureBlocking(false);
-                        channel.socket().setKeepAlive(true);
-                        channel.socket().setSoTimeout(100);
-                        channel.socket().setSoLinger(false, 0);
-                        final Attached attached = new Attached();
-                        channel.register(selector, OP_WRITE | OP_READ, attached);
-
-                        attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
-                                externalizable, packetSize);
-
-                        attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                                externalizable, packetSize);
-
-                        // register it with the selector and store the ModificationIterator for this key
-                        LOG.info("out=" + localIdentifier);
-
-                        attached.entryWriter.writeIdentifier(localIdentifier);
-
-
-                    }
                     try {
 
+                        if (key.isAcceptable()) {
+                            doAccept(key);
+                        }
 
                         if (key.isReadable()) {
-
-                            final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached a = (Attached) key.attachment();
-
-                            a.entryReader.compact();
-                            int len = a.entryReader.read(socketChannel);
-
-                            if (len > 0) {
-
-                                if (!a.handShakingComplete) {
-                                    if (a.remoteIdentifier == Byte.MIN_VALUE) {
-                                        byte remoteIdentifier = a.entryReader.readIdentifier();
-
-                                        if (remoteIdentifier == 0) {
-                                            LOG.info("");
-                                        }
-
-                                        if (remoteIdentifier != Byte.MIN_VALUE) {
-                                            a.remoteIdentifier = remoteIdentifier;
-                                            sendTimeStamp(a, remoteIdentifier);
-                                        }
-                                    }
-
-
-                                    if (a.remoteIdentifier != Byte.MIN_VALUE && a.remoteTimestamp == Long
-                                            .MIN_VALUE) {
-                                        a.remoteTimestamp = a.entryReader.readTimeStamp();
-                                        if (a.remoteTimestamp != Long.MIN_VALUE) {
-                                            a.remoteModificationIterator.dirtyEntries(a.remoteTimestamp);
-                                            a.handShakingComplete = true;
-                                        }
-                                    }
-                                }
-
-
-                                if (a.handShakingComplete)
-                                    a.entryReader.readAll(socketChannel);
-                            }
-
-
+                            doRead(map, key);
                         }
+
                         if (key.isWritable()) {
-                            final SocketChannel socketChannel = (SocketChannel) key.channel();
-                            final Attached a = (Attached) key.attachment();
-
-                            if (a.remoteModificationIterator != null)
-                                a.entryWriter.writeAll(socketChannel,
-                                        a.remoteModificationIterator);
-
-                            a.entryWriter.sendAll(socketChannel);
+                            doWrite(key);
                         }
 
                     } catch (Exception e) {
@@ -242,32 +176,28 @@ class TcpServerSocketReplicator implements Closeable {
         }
     }
 
-    private void sendTimeStamp(Attached a, byte remoteIdentifier) throws IOException {
-        LOG.info("remoteIdentifier=" + remoteIdentifier);
-        if (LOG.isDebugEnabled()) {
-            // Pre-check prevents autoboxing of identifiers, i. e. garbage creation.
-            // Subtle gain, but.
-            LOG.debug("server-connection id={}, remoteIdentifier={}",
-                    map.identifier(), remoteIdentifier);
-        }
+    private void doAccept(SelectionKey key) throws IOException {
+        final ServerSocketChannel server = (ServerSocketChannel) key.channel();
+        final SocketChannel channel = server.accept();
+        channel.configureBlocking(false);
+        channel.socket().setKeepAlive(true);
+        channel.socket().setSoTimeout(100);
+        channel.socket().setSoLinger(false, 0);
+        final Attached attached = new Attached();
+        channel.register(selector, OP_WRITE | OP_READ, attached);
 
-        if (remoteIdentifier == map.identifier())
-            throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-        a.remoteModificationIterator =
-                map.acquireModificationIterator(remoteIdentifier);
+        attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
+                externalizable, packetSize);
 
-        a.entryWriter.writeTimestamp(map.lastModificationTime(remoteIdentifier));
+        attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
+                externalizable, packetSize);
+
+        // register it with the selector and store the ModificationIterator for this key
+        LOG.info("out=" + localIdentifier);
+
+        attached.entryWriter.writeIdentifier(localIdentifier);
     }
 
-    static class Attached {
-
-        public TcpSocketChannelEntryReader entryReader;
-        public ModificationIterator remoteModificationIterator;
-        public long remoteTimestamp = Long.MIN_VALUE;
-        public boolean handShakingComplete;
-        public byte remoteIdentifier = Byte.MIN_VALUE;
-        public TcpSocketChannelEntryWriter entryWriter;
-    }
 
 }
 
