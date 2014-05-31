@@ -118,8 +118,9 @@ class TcpSocketReplicator implements Closeable {
                 // its less resource intensive to set this less frequently and use an approximation
                 long approxTime = System.currentTimeMillis();
 
-                // we add a 10% safety margin, due time fluctuations on the network
                 final long heartBeatInterval = tcpReplication.heartBeatInterval();
+
+                // we add a 10% safety margin, due time fluctuations on the network
                 final long approxTimeOutTime = approxTime - (long) (heartBeatInterval * 1.10);
 
                 final Set<SelectionKey> selectedKeys = selector.selectedKeys();
@@ -133,11 +134,9 @@ class TcpSocketReplicator implements Closeable {
                             doAccept(key, serializedEntrySize, externalizable, packetSize,
                                     map.identifier(), heartBeatInterval);
 
-                        if (key.isConnectable()) {
-
+                        if (key.isConnectable())
                             onConnect(packetSize, serializedEntrySize, externalizable, key,
                                     map.identifier(), pendingRegistrations, heartBeatInterval);
-                        }
 
                         if (key.isReadable())
                             onRead(map, key, approxTime);
@@ -148,22 +147,16 @@ class TcpSocketReplicator implements Closeable {
                         checkHeartbeat(key, approxTimeOutTime, identifier, pendingRegistrations);
 
                     } catch (ClosedSelectorException e) {
-                        if (LOG.isDebugEnabled())
-                            LOG.debug("", e);
-                        close(key);
+                        quietClose(key, e);
                     } catch (ClosedChannelException e) {
-                        if (LOG.isDebugEnabled())
-                            LOG.debug("", e);
-                        close(key);
+                        quietClose(key, e);
                     } catch (ConnectException e) {
-                        if (LOG.isDebugEnabled())
-                            LOG.debug("", e);
-                        close(key);
+                        quietClose(key, e);
                     } catch (Exception e) {
                         LOG.info("", e);
                         close(key);
-
                     }
+
                 }
                 selectedKeys.clear();
 
@@ -190,6 +183,18 @@ class TcpSocketReplicator implements Closeable {
                 }
             close();
         }
+    }
+
+    /**
+     * closes by only logs the exception at debug
+     *
+     * @param key
+     * @param e
+     */
+    private void quietClose(SelectionKey key, Exception e) {
+        if (LOG.isDebugEnabled())
+            LOG.debug("", e);
+        close(key);
     }
 
     private void close(SelectionKey key) {
