@@ -52,7 +52,7 @@ public class TCPSocketReplicationIntValueTest {
     @Before
     public void setup() throws IOException {
         value = new IntValue$$Native();
-        value.bytes(new ByteBufferBytes(ByteBuffer.allocateDirect(8)), 0);
+        value.bytes(new ByteBufferBytes(ByteBuffer.allocateDirect(4)), 0);
         map1 = newTcpSocketShmIntValueString((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
         map2 = newTcpSocketShmIntValueString((byte) 2, 8077);
     }
