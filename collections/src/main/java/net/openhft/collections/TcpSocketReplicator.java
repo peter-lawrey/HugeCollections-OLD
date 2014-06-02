@@ -58,6 +58,7 @@ class TcpSocketReplicator implements Closeable {
     private final CopyOnWriteArraySet<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final Connector connector = new Connector();
     private final Selector selector;
+    private SelectableChannel serverSocketChannel;
 
 
     TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
@@ -111,7 +112,6 @@ class TcpSocketReplicator implements Closeable {
                     return;
 
                 final int nSelectedKeys = selector.select(100);
-
 
                 if (nSelectedKeys == 0) {
                     continue;    // nothing to do
@@ -215,11 +215,8 @@ class TcpSocketReplicator implements Closeable {
 
         final Attached attached = (Attached) key.attachment();
 
-        if (attached == null)
-            return;
-
-        final boolean isServerConnection = key.channel() instanceof ServerSocketChannel;
-        if (isServerConnection)
+        // we wont attempt to reconnect the server socket
+        if (key.channel() == serverSocketChannel || attached == null)
             return;
 
         final SocketChannel channel = (SocketChannel) key.channel();
@@ -611,9 +608,10 @@ class TcpSocketReplicator implements Closeable {
      */
     private void register(@NotNull final Queue<SelectableChannel> selectableChannels) throws ClosedChannelException {
         for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
-            if (sc instanceof ServerSocketChannel)
+            if (sc instanceof ServerSocketChannel) {
                 sc.register(selector, OP_ACCEPT);
-            else
+                this.serverSocketChannel = sc;
+            } else
                 sc.register(selector, OP_CONNECT);
         }
     }
