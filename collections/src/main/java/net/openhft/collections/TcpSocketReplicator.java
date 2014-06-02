@@ -626,7 +626,6 @@ class TcpSocketReplicator implements Closeable {
         public byte remoteIdentifier = Byte.MIN_VALUE;
         public TcpSocketChannelEntryWriter entryWriter;
 
-
         boolean isHandShakingComplete() {
             return handShakingComplete;
         }
@@ -830,7 +829,7 @@ class TcpSocketReplicator implements Closeable {
                                             final short packetSize) {
 
             this.serializedEntrySize = serializedEntrySize;
-            in = ByteBuffer.allocate(packetSize + serializedEntrySize);
+            in = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
             this.externalizable = externalizable;
             out = new ByteBufferBytes(in);
             out.limit(0);

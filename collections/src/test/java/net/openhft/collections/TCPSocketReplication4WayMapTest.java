@@ -19,6 +19,7 @@
 package net.openhft.collections;
 
 
+import net.openhft.lang.values.IntValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,6 +58,22 @@ public class TCPSocketReplication4WayMapTest {
                 .tcpReplication(tcpReplication)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
+    }
+
+    static SharedHashMap<IntValue, CharSequence> newTcpSocketShmIntValueString(
+            final byte identifier,
+            final int serverPort,
+            final InetSocketAddress... InetSocketAddress) throws IOException {
+
+        final TcpReplication tcpReplication = new TcpReplication(serverPort,
+                InetSocketAddress).heartBeatInterval(1000);
+
+        return new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier(identifier)
+                .tcpReplication(tcpReplication)
+                .entries(20000)
+                .create(getPersistenceFile(), IntValue.class, CharSequence.class);
     }
 
 
