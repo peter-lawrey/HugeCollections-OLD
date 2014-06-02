@@ -386,9 +386,9 @@ class TcpSocketReplicator implements Closeable {
                             socketChannel.configureBlocking(false);
                             socketChannel.socket().setReuseAddress(false);
                             socketChannel.socket().setSoLinger(false, 0);
-                            socketChannel.socket().setSoTimeout(100);
+                            socketChannel.socket().setSoTimeout(0);
                             socketChannel.socket().setTcpNoDelay(true);
-                            socketChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
+
                             closeables.add(socketChannel.socket());
                             socketChannel.connect(endpoint);
                             closeables.add(socketChannel);
@@ -464,7 +464,7 @@ class TcpSocketReplicator implements Closeable {
 
         channel.configureBlocking(false);
         channel.socket().setTcpNoDelay(true);
-        channel.socket().setSoTimeout(100);
+        channel.socket().setSoTimeout(0);
         channel.socket().setSoLinger(false, 0);
 
         final Attached attached = new Attached();
@@ -511,8 +511,9 @@ class TcpSocketReplicator implements Closeable {
         channel.configureBlocking(false);
         channel.socket().setReuseAddress(true);
         channel.socket().setTcpNoDelay(true);
-        channel.socket().setSoTimeout(100);
+        channel.socket().setSoTimeout(0);
         channel.socket().setSoLinger(false, 0);
+
         final Attached attached = new Attached();
         channel.register(selector, OP_WRITE | OP_READ, attached);
 
@@ -578,7 +579,6 @@ class TcpSocketReplicator implements Closeable {
         if (attached.remoteModificationIterator != null)
             attached.entryWriter.entriesToBuffer(
                     attached.remoteModificationIterator);
-
 
         attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime);
     }
@@ -654,14 +654,14 @@ class TcpSocketReplicator implements Closeable {
          * @param serializedEntrySize the size of the entry
          * @param externalizable      supports reading and writing serialize entries
          * @param packetSize          the max TCP/IP packet size
-         * @param heartBeatPeriod
+         * @param heartBeatInterval   the frequency of the heartbeat
          */
         TcpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final EntryExternalizable externalizable,
                                     int packetSize,
-                                    long heartBeatPeriod) {
+                                    long heartBeatInterval) {
             this.serializedEntrySize = serializedEntrySize;
-            this.heartBeatPeriod = heartBeatPeriod;
+            this.heartBeatPeriod = heartBeatInterval;
             out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
             in = new ByteBufferBytes(out);
             entryCallback = new EntryCallback(externalizable, in);

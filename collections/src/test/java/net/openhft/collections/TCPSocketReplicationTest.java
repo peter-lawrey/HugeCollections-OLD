@@ -136,8 +136,8 @@ public class TCPSocketReplicationTest {
     public void testSoakTestWithRandomData() throws IOException, InterruptedException {
         final long start = System.currentTimeMillis();
         System.out.print("SoakTesting ");
-        for (int j = 1; j < 100 * 1000; j++) {
-            if (j % 5000 == 0)
+        for (int j = 1; j < 900 * 1000; j++) {
+            if (j % 9000 == 0)
                 System.out.print(".");
             Random rnd = new Random(j);
             for (int i = 1; i < 10; i++) {
