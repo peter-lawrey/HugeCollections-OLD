@@ -55,6 +55,7 @@ public class TCPSocketReplication4WayMapTest {
                 .entries(1000)
                 .identifier(identifier)
                 .tcpReplication(tcpReplication)
+                .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 

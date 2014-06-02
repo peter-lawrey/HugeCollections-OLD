@@ -221,8 +221,7 @@ class TcpSocketReplicator implements Closeable {
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
-        final long lastHeartBeat = attached.entryReader.lastHeartBeatReceived;
-        if (timeOutTime > lastHeartBeat) {
+        if (timeOutTime > attached.entryReader.lastHeartBeatReceived) {
             connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
@@ -567,7 +566,7 @@ class TcpSocketReplicator implements Closeable {
             if (attached.remoteTimestamp != Long.MIN_VALUE) {
                 attached.remoteModificationIterator.dirtyEntries(attached.remoteTimestamp);
                 attached.setHandShakingComplete();
-                attached.entryReader.entriesFromBuffer(approxTime);
+                attached.entryReader.entriesFromBuffer();
             }
         }
     }
@@ -593,8 +592,10 @@ class TcpSocketReplicator implements Closeable {
         if (attached.entryReader.readSocketToBuffer(socketChannel) <= 0)
             return;
 
+        attached.entryReader.lastHeartBeatReceived = approxTime;
+
         if (attached.isHandShakingComplete())
-            attached.entryReader.entriesFromBuffer(approxTime);
+            attached.entryReader.entriesFromBuffer();
         else
             doHandShaking(map, attached, approxTime);
 
@@ -824,9 +825,9 @@ class TcpSocketReplicator implements Closeable {
          * @param externalizable      supports reading and writing serialize entries
          * @param packetSize          the estimated size of a tcp/ip packet
          */
-        TcpSocketChannelEntryReader(final int serializedEntrySize,
-                                    @NotNull final EntryExternalizable externalizable,
-                                    final short packetSize) {
+        private TcpSocketChannelEntryReader(final int serializedEntrySize,
+                                            @NotNull final EntryExternalizable externalizable,
+                                            final short packetSize) {
 
             this.serializedEntrySize = serializedEntrySize;
             in = ByteBuffer.allocate(packetSize + serializedEntrySize);
@@ -843,7 +844,7 @@ class TcpSocketReplicator implements Closeable {
          * @return the number of bytes read
          * @throws IOException
          */
-        int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
+        private int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
 
             compactBuffer();
             final int len = socketChannel.read(in);
@@ -854,10 +855,9 @@ class TcpSocketReplicator implements Closeable {
         /**
          * reads entries from the socket till it is empty
          *
-         * @param approxTime
          * @throws InterruptedException
          */
-        void entriesFromBuffer(final long approxTime) throws InterruptedException {
+        private void entriesFromBuffer() throws InterruptedException {
 
             for (; ; ) {
 
@@ -873,10 +873,8 @@ class TcpSocketReplicator implements Closeable {
                 }
 
                 // this is the heartbeat
-                if (sizeOfNextEntry == 0) {
-                    lastHeartBeatReceived = approxTime;
+                if (sizeOfNextEntry == 0)
                     continue;
-                }
 
                 if (out.remaining() < sizeOfNextEntry) {
                     return;

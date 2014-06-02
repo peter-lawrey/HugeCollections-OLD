@@ -20,11 +20,13 @@ package net.openhft.collections;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Random;
 
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
@@ -101,7 +103,7 @@ public class TCPSocketReplicationTest {
     @Test
     public void testBufferOverflow() throws IOException, InterruptedException {
 
-        for (int i = 0; i < 1024; i++) {
+        for (int i = 0; i < map1.builder().entries(); i++) {
             map1.put(i, "EXAMPLE-1");
         }
 
@@ -128,6 +130,72 @@ public class TCPSocketReplicationTest {
         }
 
     }
+
+
+    @Test
+    public void testSoakTestWithRandomData() throws IOException, InterruptedException {
+        final long start = System.currentTimeMillis();
+        System.out.print("SoakTesting ");
+        for (int j = 1; j < 100 * 1000; j++) {
+            if (j % 5000 == 0)
+                System.out.print(".");
+            Random rnd = new Random(j);
+            for (int i = 1; i < 10; i++) {
+
+                final int select = rnd.nextInt(2);
+                final SharedHashMap<Integer, CharSequence> map = select > 0 ? map1 : map2;
+
+
+                switch (rnd.nextInt(2)) {
+                    case 0:
+                        map.put(rnd.nextInt(1000) /* + select * 100 */, "test");
+                        break;
+                    case 1:
+                        map.remove(rnd.nextInt(1000) /*+ select * 100 */);
+                        break;
+                }
+            }
+
+        }
+
+        waitTillEqual(5000);
+
+        final long time = System.currentTimeMillis() - start;
+
+        //assertTrue("timeTaken="+time, time < 2200);
+        System.out.println("\ntime taken millis=" + time);
+
+    }
+
+    @Ignore
+    @Test
+    public void testObjectAllocationWithYourKit() throws IOException, InterruptedException {
+
+
+        System.out.print("SoakTesting ");
+        for (; ; ) {
+
+            Random rnd = new Random(0);
+            for (int i = 1; i < 10; i++) {
+
+                final int select = rnd.nextInt(2);
+                final SharedHashMap<Integer, CharSequence> map = select > 0 ? map1 : map2;
+
+                switch (rnd.nextInt(2)) {
+                    case 0:
+                        map.put(rnd.nextInt(1000) /* + select * 100 */, "test");
+                        break;
+                    case 1:
+                        map.remove(rnd.nextInt(1000) /*+ select * 100 */);
+                        break;
+                }
+            }
+
+        }
+
+
+    }
+
 
 }
 
