@@ -188,7 +188,7 @@ class TcpSocketReplicator implements Closeable {
     }
 
     /**
-     * closes by only logs the exception at debug
+     * closes and only logs the exception at debug
      *
      * @param key
      * @param e
@@ -221,7 +221,6 @@ class TcpSocketReplicator implements Closeable {
         final boolean isServerConnection = key.channel() instanceof ServerSocketChannel;
         if (isServerConnection)
             return;
-
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
@@ -389,7 +388,6 @@ class TcpSocketReplicator implements Closeable {
                         try {
 
                             socketChannel.configureBlocking(false);
-
                             socketChannel.socket().setReuseAddress(false);
                             socketChannel.socket().setSoLinger(false, 0);
                             socketChannel.socket().setSoTimeout(100);
