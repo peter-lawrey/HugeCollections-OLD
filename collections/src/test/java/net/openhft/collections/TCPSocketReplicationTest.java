@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
 
+import static net.openhft.collections.Builder.getPersistenceFile;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -159,6 +160,52 @@ public class TCPSocketReplicationTest {
         }
 
         waitTillEqual(5000);
+
+        final long time = System.currentTimeMillis() - start;
+
+        assertTrue("timeTaken=" + time, time < 6000);
+
+    }
+
+
+    @Test
+    public void testSoakTestWithRandomDataWithSimpleSHM() throws IOException, InterruptedException {
+
+        map2 = new SharedHashMapBuilder()
+                .entries(1000)
+
+                .entries(20000)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+        map2 = new SharedHashMapBuilder()
+                .entries(1000)
+
+                .entries(20000)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+
+        final long start = System.currentTimeMillis();
+        System.out.print("SoakTesting ");
+        for (int j = 1; j < 900 * 1000; j++) {
+            if (j % 9000 == 0)
+                System.out.print(".");
+            Random rnd = new Random(j);
+            for (int i = 1; i < 10; i++) {
+
+                final int select = rnd.nextInt(2);
+                final SharedHashMap<Integer, CharSequence> map = select > 0 ? map1 : map2;
+
+
+                switch (rnd.nextInt(2)) {
+                    case 0:
+                        map.put(rnd.nextInt(1000) /* + select * 100 */, "test");
+                        break;
+                    case 1:
+                        map.remove(rnd.nextInt(1000) /*+ select * 100 */);
+                        break;
+                }
+            }
+
+        }
+
 
         final long time = System.currentTimeMillis() - start;
 
