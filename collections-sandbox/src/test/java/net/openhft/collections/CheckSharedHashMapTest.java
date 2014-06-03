@@ -48,5 +48,11 @@ public class CheckSharedHashMapTest {
         // todo add the others
 
 
+        // todo
+        checkSharedHashMap.close();
+
+        // todo uncomment
+        //  checkSharedHashMap.size();
+
     }
 }

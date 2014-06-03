@@ -89,6 +89,8 @@ public class CheckSharedHashMap<K, V> implements SharedHashMap<K, V> {
 
     @Override
     public int size() {
+
+        // if closed  then don't call size but throw a "runtime exception" !
         return delegate.size();
     }
 
@@ -149,7 +151,7 @@ public class CheckSharedHashMap<K, V> implements SharedHashMap<K, V> {
     @NotNull
     @Override
     public Set<Entry<K, V>> entrySet() {
-        return (Set) delegate.values();
+        return (Set) delegate.entrySet();
     }
 
 
