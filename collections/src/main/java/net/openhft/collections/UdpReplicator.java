@@ -52,7 +52,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
  * with the TCP Replicator.
  */
-class UdpReplicator implements Closeable {
+class UdpReplicator  implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
@@ -306,14 +306,21 @@ class UdpReplicator implements Closeable {
                 }
 
                 // we'll look int a 100ms period
-                if (byteWritten > throttleMegaBytesPer100ms) {
+                if (byteWritten + out.remaining() > throttleMegaBytesPer100ms) {
                     final long currentTimeMillis = System.currentTimeMillis();
-                    if (time + 100 <= currentTimeMillis) {
+
+
+                    if (time + 100 > currentTimeMillis) {
                         // we've sent too much data so rejecting this message
-                        if (LOG.isDebugEnabled())
+                        if (LOG.isDebugEnabled()) {
                             LOG.debug("THROTTLED : the UDP message skipped due to throttling.");
+                        }
+                        out.clear();
+                        in.clear();
+                        byteWritten = 0;
                         return;
                     }
+
                     time = currentTimeMillis;
                 }
 
