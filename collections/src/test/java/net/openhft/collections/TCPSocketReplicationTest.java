@@ -163,7 +163,7 @@ public class TCPSocketReplicationTest {
 
         final long time = System.currentTimeMillis() - start;
 
-        assertTrue("timeTaken=" + time, time < 6000);
+        assertTrue("timeTaken=" + time, time < 10000);
 
     }
 
