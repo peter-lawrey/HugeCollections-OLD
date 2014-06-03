@@ -49,13 +49,13 @@ public class TCPSocketReplication4WayMapTest {
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
-        final TcpReplication tcpReplication = new TcpReplication(serverPort,
+        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
                 InetSocketAddress).heartBeatInterval(1000);
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplication)
+                .tcpReplication(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -65,13 +65,13 @@ public class TCPSocketReplication4WayMapTest {
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
-        final TcpReplication tcpReplication = new TcpReplication(serverPort,
+        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
                 InetSocketAddress).heartBeatInterval(1000);
 
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplication)
+                .tcpReplication(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), IntValue.class, CharSequence.class);
     }

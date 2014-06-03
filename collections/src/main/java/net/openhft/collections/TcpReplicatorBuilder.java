@@ -29,17 +29,17 @@ import static java.util.Collections.unmodifiableSet;
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
- * @see SharedHashMapBuilder#tcpReplication(TcpReplication)
+ * @see SharedHashMapBuilder#tcpReplication(TcpReplicatorBuilder)
  */
-public class TcpReplication implements Cloneable {
+public class TcpReplicatorBuilder implements Cloneable {
 
-    private final int serverPort;
-    private final Set<InetSocketAddress> endpoints;
+    private int serverPort;
+    private Set<InetSocketAddress> endpoints;
     private short packetSize = 1024 * 8;
 
     private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
 
-    public TcpReplication(int serverPort, InetSocketAddress... endpoints) {
+    public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
         for (final InetSocketAddress endpoint : endpoints) {
             if (endpoint.getPort() == serverPort && "localhost".equals(endpoint.getHostName()))
@@ -57,7 +57,7 @@ public class TcpReplication implements Cloneable {
         return endpoints;
     }
 
-    public TcpReplication packetSize(short packetSize) {
+    public TcpReplicatorBuilder packetSize(short packetSize) {
         this.packetSize = packetSize;
         return this;
     }
@@ -71,21 +71,13 @@ public class TcpReplication implements Cloneable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        TcpReplication that = (TcpReplication) o;
+        TcpReplicatorBuilder that = (TcpReplicatorBuilder) o;
 
         if (serverPort() != that.serverPort()) return false;
         if (!endpoints().equals(that.endpoints())) return false;
         return packetSize() == that.packetSize();
     }
 
-    @Override
-    protected TcpReplication clone() {
-        try {
-            return (TcpReplication) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);
-        }
-    }
 
     @Override
     public String toString() {
@@ -108,8 +100,34 @@ public class TcpReplication implements Cloneable {
      * @param heartBeatInterval in milliseconds
      * @return
      */
-    public TcpReplication heartBeatInterval(long heartBeatInterval) {
+    public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval) {
         this.heartBeatInterval = heartBeatInterval;
+        return this;
+    }
+
+    @Override
+    public TcpReplicatorBuilder clone() {
+        try {
+            final TcpReplicatorBuilder result = (TcpReplicatorBuilder) super.clone();
+
+
+            result.serverPort(this.serverPort());
+            result.endpoints(this.endpoints());
+            result.packetSize(this.packetSize());
+            result.heartBeatInterval(this.heartBeatInterval());
+            return result;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private TcpReplicatorBuilder endpoints(Set<InetSocketAddress> endpoints) {
+        this.endpoints = endpoints;
+        return this;
+    }
+
+    private TcpReplicatorBuilder serverPort(int serverPort) {
+        this.serverPort = serverPort;
         return this;
     }
 }

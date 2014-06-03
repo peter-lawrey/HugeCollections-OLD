@@ -49,22 +49,21 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  *
  * @author Rob Austin.
  */
-class TcpSocketReplicator implements Closeable {
+class TcpReplicator implements Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TcpSocketReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final int BUFFER_SIZE = 0x100000; // 1Mb
 
     private final ExecutorService executorService;
-    private final CopyOnWriteArraySet<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final Connector connector = new Connector();
     private final Selector selector;
     private SelectableChannel serverSocketChannel;
 
-
-    TcpSocketReplicator(@NotNull final ReplicatedSharedHashMap map,
-                        final int serializedEntrySize,
-                        @NotNull final EntryExternalizable externalizable,
-                        @NotNull final TcpReplication tcpReplication) throws IOException {
+    TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
+                  final int serializedEntrySize,
+                  @NotNull final EntryExternalizable externalizable,
+                  @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
 
 
         this.selector = Selector.open();
@@ -79,7 +78,7 @@ class TcpSocketReplicator implements Closeable {
                                                  process(map,
                                                          serializedEntrySize,
                                                          externalizable,
-                                                         tcpReplication);
+                                                         tcpReplicatorBuilder);
 
                                              } catch (IOException e) {
                                                  if (selector.isOpen())
@@ -94,15 +93,15 @@ class TcpSocketReplicator implements Closeable {
     private void process(@NotNull final ReplicatedSharedHashMap map,
                          final int serializedEntrySize,
                          @NotNull final EntryExternalizable externalizable,
-                         @NotNull final TcpReplication tcpReplication) throws IOException {
+                         @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
 
         final byte identifier = map.identifier();
-        final short packetSize = tcpReplication.packetSize();
+        final short packetSize = tcpReplicatorBuilder.packetSize();
 
         try {
 
             final Queue<SelectableChannel> pendingRegistrations
-                    = connector.asyncConnect(identifier, tcpReplication.endpoints(), tcpReplication.serverInetSocketAddress());
+                    = connector.asyncConnect(identifier, tcpReplicatorBuilder.endpoints(), tcpReplicatorBuilder.serverInetSocketAddress());
 
             for (; ; ) {
 
@@ -120,7 +119,7 @@ class TcpSocketReplicator implements Closeable {
                 // its less resource intensive to set this less frequently and use an approximation
                 long approxTime = System.currentTimeMillis();
 
-                final long heartBeatInterval = tcpReplication.heartBeatInterval();
+                final long heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval();
 
                 // we add a 10% safety margin, due time fluctuations on the network
                 final long approxTimeOutTime = approxTime - (long) (heartBeatInterval * 1.10);

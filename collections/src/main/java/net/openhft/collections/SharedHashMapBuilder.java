@@ -18,6 +18,8 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.io.ByteBufferBytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -27,6 +29,8 @@ import java.util.EnumSet;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
+    private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
+
     static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
@@ -34,6 +38,7 @@ public final class SharedHashMapBuilder implements Cloneable {
     // used when configuring the number of segments.
     private int minSegments = -1;
     private int actualSegments = -1;
+
     // used when reading the number of entries per
     private int actualEntriesPerSegment = -1;
 
@@ -55,21 +60,45 @@ public final class SharedHashMapBuilder implements Cloneable {
     // replication
     private boolean canReplicate;
     private byte identifier = Byte.MIN_VALUE;
-    private TcpReplication tcpReplication;
-    private short udpPort = Short.MIN_VALUE;
+    private TcpReplicatorBuilder tcpReplicatorBuilder;
+
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
+    private UdpReplicatorBuilder udpReplicatorBuilder;
+
 
     @Override
     public SharedHashMapBuilder clone() {
+
         try {
-            SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
+            final SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
+            result.actualSegments(actualSegments);
+            result.actualEntriesPerSegment(actualEntriesPerSegment());
+            result.entries(entries);
+            result.entrySize(entrySize);
+            result.errorListener(errorListener);
+            result.generatedKeyType(generatedKeyType);
+            result.generatedValueType(generatedValueType);
+            result.lockTimeOutMS(lockTimeOutMS);
+            result.minSegments(minSegments);
+            result.actualSegments(actualSegments);
+            result.actualEntriesPerSegment(actualEntriesPerSegment);
+            result.putReturnsNull(putReturnsNull);
+            result.removeReturnsNull(removeReturnsNull);
+            result.replicas(replicas);
+            result.transactional(transactional);
+            result.metaDataBytes(metaDataBytes);
+            result.eventListener(eventListener);
             if (tcpReplication() != null)
                 result.tcpReplication(tcpReplication().clone());
+            if (udpReplication() != null)
+                result.udpReplication(udpReplication().clone());
             return result;
+
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
         }
     }
+
 
     /**
      * Set minimum number of segments. See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
@@ -240,11 +269,19 @@ public final class SharedHashMapBuilder implements Cloneable {
         final VanillaSharedReplicatedHashMap<K, V> result =
                 new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
 
-        if (tcpReplication != null)
-            applyTcpReplication(result, tcpReplication);
+        if (tcpReplicatorBuilder != null)
+            applyTcpReplication(result, tcpReplicatorBuilder);
 
-        if (udpPort != Short.MIN_VALUE)
-            applyUdpReplication(result, udpPort);
+
+        if (udpReplicatorBuilder != null) {
+            if (tcpReplicatorBuilder == null)
+                LOG.warn("MISSING TCP REPLICATION : The UdpReplicator only attempts to read data (" +
+                        "it does not enforce or guarantee delivery), you should use the UdpReplicator if " +
+                        "you have a large number of nodes, and you wish to receive the data before it " +
+                        "becomes available on TCP/IP. So should be used in conjunction with a TCP " +
+                        "Replicator");
+            applyUdpReplication(result, udpReplicatorBuilder);
+        }
         return result;
 
     }
@@ -429,7 +466,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", canReplicate=" + canReplicate() +
                 ", identifier=" + identifier() +
                 ", tcpReplication=" + tcpReplication() +
-                ", udpPort=" + udpPort() +
+                ", udpReplication=" + udpReplication() +
                 ", timeProvider=" + timeProvider() +
                 '}';
     }
@@ -441,33 +478,67 @@ public final class SharedHashMapBuilder implements Cloneable {
 
         SharedHashMapBuilder that = (SharedHashMapBuilder) o;
 
-        if (actualSegments() != that.actualSegments()) return false;
-        if (minSegments() != that.minSegments()) return false;
-        if (actualEntriesPerSegment() != that.actualEntriesPerSegment()) return false;
-        if (entrySize() != that.entrySize()) return false;
-        if (entryAndValueAlignment() != that.entryAndValueAlignment()) return false;
-        if (entries() != that.entries()) return false;
-        if (replicas() != that.replicas()) return false;
-        if (transactional() != that.transactional()) return false;
-        if (lockTimeOutMS() != that.lockTimeOutMS()) return false;
-        if (metaDataBytes() != that.metaDataBytes()) return false;
-        if (!eventListener().equals(that.eventListener())) return false;
-        if (!errorListener().equals(that.errorListener())) return false;
-        if (putReturnsNull() != that.putReturnsNull()) return false;
-        if (removeReturnsNull() != that.removeReturnsNull()) return false;
-        if (generatedKeyType() != that.generatedKeyType()) return false;
-        if (generatedValueType() != that.generatedValueType()) return false;
-        if (largeSegments() != that.largeSegments()) return false;
-        if (canReplicate() != that.canReplicate()) return false;
-        if (identifier() != that.identifier()) return false;
-        if (!tcpReplication().equals(that.tcpReplication())) return false;
-        if (udpPort() != that.udpPort()) return false;
-        if (!timeProvider().equals(that.timeProvider())) return false;
+        if (actualEntriesPerSegment != that.actualEntriesPerSegment) return false;
+        if (actualSegments != that.actualSegments) return false;
+        if (canReplicate != that.canReplicate) return false;
+        if (entries != that.entries) return false;
+        if (entrySize != that.entrySize) return false;
+        if (generatedKeyType != that.generatedKeyType) return false;
+        if (generatedValueType != that.generatedValueType) return false;
+        if (identifier != that.identifier) return false;
+        if (largeSegments != that.largeSegments) return false;
+        if (lockTimeOutMS != that.lockTimeOutMS) return false;
+        if (metaDataBytes != that.metaDataBytes) return false;
+        if (minSegments != that.minSegments) return false;
+        if (putReturnsNull != that.putReturnsNull) return false;
+        if (removeReturnsNull != that.removeReturnsNull) return false;
+        if (replicas != that.replicas) return false;
+        if (transactional != that.transactional) return false;
+
+        if (alignment != that.alignment) return false;
+        if (errorListener != null ? !errorListener.equals(that.errorListener) : that.errorListener != null)
+            return false;
+        if (eventListener != null ? !eventListener.equals(that.eventListener) : that.eventListener != null)
+            return false;
+        if (tcpReplicatorBuilder != null ? !tcpReplicatorBuilder.equals(that.tcpReplicatorBuilder) : that.tcpReplicatorBuilder != null)
+            return false;
+        if (timeProvider != null ? !timeProvider.equals(that.timeProvider) : that.timeProvider != null)
+            return false;
+        if (udpReplicatorBuilder != null ? !udpReplicatorBuilder.equals(that.udpReplicatorBuilder) : that.udpReplicatorBuilder != null)
+            return false;
+
         return true;
     }
 
+    @Override
+    public int hashCode() {
+        int result = minSegments;
+        result = 31 * result + actualSegments;
+        result = 31 * result + actualEntriesPerSegment;
+        result = 31 * result + entrySize;
+        result = 31 * result + (alignment != null ? alignment.hashCode() : 0);
+        result = 31 * result + (int) (entries ^ (entries >>> 32));
+        result = 31 * result + replicas;
+        result = 31 * result + (transactional ? 1 : 0);
+        result = 31 * result + (int) (lockTimeOutMS ^ (lockTimeOutMS >>> 32));
+        result = 31 * result + metaDataBytes;
+        result = 31 * result + (eventListener != null ? eventListener.hashCode() : 0);
+        result = 31 * result + (errorListener != null ? errorListener.hashCode() : 0);
+        result = 31 * result + (putReturnsNull ? 1 : 0);
+        result = 31 * result + (removeReturnsNull ? 1 : 0);
+        result = 31 * result + (generatedKeyType ? 1 : 0);
+        result = 31 * result + (generatedValueType ? 1 : 0);
+        result = 31 * result + (largeSegments ? 1 : 0);
+        result = 31 * result + (canReplicate ? 1 : 0);
+        result = 31 * result + (int) identifier;
+        result = 31 * result + (tcpReplicatorBuilder != null ? tcpReplicatorBuilder.hashCode() : 0);
+        result = 31 * result + (timeProvider != null ? timeProvider.hashCode() : 0);
+        result = 31 * result + (udpReplicatorBuilder != null ? udpReplicatorBuilder.hashCode() : 0);
+        return result;
+    }
+
     public boolean canReplicate() {
-        return canReplicate || tcpReplication != null || udpPort != Short.MIN_VALUE;
+        return canReplicate || tcpReplicatorBuilder != null || udpReplicatorBuilder != null;
     }
 
     public SharedHashMapBuilder canReplicate(boolean canReplicate) {
@@ -475,16 +546,9 @@ public final class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder udpPort(short udpPort) {
-        this.udpPort = udpPort;
-        return this;
-    }
 
-    public short udpPort() {
-        return udpPort;
-    }
-
-    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result, short updPort)
+    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
+                                            UdpReplicatorBuilder udpReplicatorBuilder)
             throws IOException {
 
         // the udp modification modification iterator will not be stored in shared memory
@@ -507,18 +571,19 @@ public final class SharedHashMapBuilder implements Cloneable {
                 new UdpReplicator.UdpSocketChannelEntryReader(entrySize(), result);
 
         final UdpReplicator udpReplicator =
-                new UdpReplicator(result, updPort, entryWriter, entryReader, udpModIterator);
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entryWriter, entryReader, udpModIterator);
+
         result.addCloseable(udpReplicator);
     }
 
 
     private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
-                                            TcpReplication tcpReplication) throws IOException {
+                                            TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
 
-        result.addCloseable(new TcpSocketReplicator(result,
+        result.addCloseable(new TcpReplicator(result,
                 entrySize(),
                 result,
-                tcpReplication));
+                tcpReplicatorBuilder.clone()));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
@@ -543,13 +608,23 @@ public final class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder tcpReplication(TcpReplication tcpReplication) {
-        this.tcpReplication = tcpReplication;
+    public SharedHashMapBuilder tcpReplication(TcpReplicatorBuilder tcpReplicatorBuilder) {
+        this.tcpReplicatorBuilder = tcpReplicatorBuilder;
         return this;
     }
 
-    public TcpReplication tcpReplication() {
-        return tcpReplication;
+    public TcpReplicatorBuilder tcpReplication() {
+        return tcpReplicatorBuilder;
     }
 
+
+    public UdpReplicatorBuilder udpReplication() {
+        return udpReplicatorBuilder;
+    }
+
+
+    public SharedHashMapBuilder udpReplication(UdpReplicatorBuilder udpReplicatorBuilder) {
+        this.udpReplicatorBuilder = udpReplicatorBuilder;
+        return this;
+    }
 }
