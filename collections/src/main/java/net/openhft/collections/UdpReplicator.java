@@ -195,9 +195,12 @@ class UdpReplicator implements Closeable {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
                             serverConnector.reconnect(socketChannel);
+                        } catch (IOException e) {
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("", e);
+                            serverConnector.reconnect(socketChannel);
                         }
                     }
-
 
                 } catch (Exception e) {
 
