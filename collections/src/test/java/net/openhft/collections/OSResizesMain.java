@@ -27,7 +27,7 @@ import java.util.Arrays;
 /**
  * This example shows that the OS resizes the usage of a SHM as needed.  It is not as critical to worry about this.
  * <p>
- * System memory: 7.7 GB, Extents of map: 137.5 GB, disk used: 21MB, addressRange: 7eec7afbd000-7f0c7c000000
+ * System memory: 7.7 GB, Extents of map: 2199.0 GB, disk used: 13MB, addressRange: 7d380b7bd000-7f380c000000
  * </p>
  */
 public class OSResizesMain {
