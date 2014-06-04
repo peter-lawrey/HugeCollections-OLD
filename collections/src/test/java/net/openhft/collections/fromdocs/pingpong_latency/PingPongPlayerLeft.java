@@ -33,11 +33,10 @@ public class PingPongPlayerLeft {
     @Test
     @Ignore
     public void bondExample() throws IOException, InterruptedException {
-
         String TMP = System.getProperty("java.io.tmpdir");
         SharedHashMap<String, BondVOInterface> shmLeft = new SharedHashMapBuilder()
                 .generatedValueType(true)
-                .entrySize(320)
+                .entrySize(64)
                 .create(
                         new File(TMP + "/BondPortfolioSHM"),
                         String.class,
@@ -46,22 +45,22 @@ public class PingPongPlayerLeft {
         playPingPong(shmLeft, 4, 5, true);
     }
 
-    static void playPingPong(SharedHashMap<String, BondVOInterface> shmLeft, double _coupon, double _coupon2, boolean setFirst) {
-        BondVOInterface bondOffHeap1 = newDirectReference(BondVOInterface.class);
-        BondVOInterface bondOffHeap2 = newDirectReference(BondVOInterface.class);
-        BondVOInterface bondOffHeap3 = newDirectReference(BondVOInterface.class);
-        BondVOInterface bondOffHeap4 = newDirectReference(BondVOInterface.class);
+    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst) {
+        BondVOInterface bond1 = newDirectReference(BondVOInterface.class);
+        BondVOInterface bond2 = newDirectReference(BondVOInterface.class);
+        BondVOInterface bond3 = newDirectReference(BondVOInterface.class);
+        BondVOInterface bond4 = newDirectReference(BondVOInterface.class);
 
-        shmLeft.acquireUsing("369604101", bondOffHeap1);
-        shmLeft.acquireUsing("369604102", bondOffHeap2);
-        shmLeft.acquireUsing("369604103", bondOffHeap3);
-        shmLeft.acquireUsing("369604104", bondOffHeap4);
+        shm.acquireUsing("369604101", bond1);
+        shm.acquireUsing("369604102", bond2);
+        shm.acquireUsing("369604103", bond3);
+        shm.acquireUsing("369604104", bond4);
         System.out.printf("\n\nPingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock\n");
         if (setFirst) {
-            bondOffHeap1.setCoupon(_coupon);
-            bondOffHeap2.setCoupon(_coupon);
-            bondOffHeap3.setCoupon(_coupon);
-            bondOffHeap4.setCoupon(_coupon);
+            bond1.setCoupon(_coupon);
+            bond2.setCoupon(_coupon);
+            bond3.setCoupon(_coupon);
+            bond4.setCoupon(_coupon);
         }
         int timeToCallNanoTime = 30;
         int runs = 1000000;
@@ -69,10 +68,10 @@ public class PingPongPlayerLeft {
         for (int j = 0; j < 10; j++) {
             for (int i = 0; i < runs; i++) {
                 long _start = System.nanoTime(); //
-                while (!bondOffHeap1.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bondOffHeap2.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bondOffHeap3.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bondOffHeap4.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bond1.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bond2.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bond3.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bond4.compareAndSwapCoupon(_coupon, _coupon2)) ;
 
                 timings[i] = (System.nanoTime() - _start - timeToCallNanoTime) / 4;
             }

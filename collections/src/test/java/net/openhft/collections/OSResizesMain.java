@@ -27,14 +27,14 @@ import java.util.Arrays;
 /**
  * This example shows that the OS resizes the usage of a SHM as needed.  It is not as critical to worry about this.
  * <p>
- * System memory: 7.7 GB, Extents of map: 137.5 GB, disk used: 21MB, addressRange: 7eec7afbd000-7f0c7c000000
+ * System memory: 7.7 GB, Extents of map: 2199.0 GB, disk used: 13MB, addressRange: 7d380b7bd000-7f380c000000
  * </p>
  */
 public class OSResizesMain {
     public static void main(String[] args) throws IOException, InterruptedException {
         File file = File.createTempFile("over-sized", "deleteme");
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
-                .entrySize(64 * 1024)
+                .entrySize(1024 * 1024)
                 .entries(1024 * 1024)
                 .create(file, String.class, String.class);
         for (int i = 0; i < 1000; i++) {
