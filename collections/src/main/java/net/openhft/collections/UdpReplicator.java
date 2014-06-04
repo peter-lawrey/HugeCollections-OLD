@@ -29,18 +29,21 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.DatagramChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
+import java.nio.channels.*;
 import java.util.Iterator;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.TcpReplicator.AbstractConnector.Details;
+import static net.openhft.collections.TcpReplicator.EntryCallback;
 
 
 /**
@@ -70,9 +73,11 @@ class UdpReplicator implements Closeable {
     @NotNull
     private final UdpReplicatorBuilder udpReplicatorBuilder;
     private final int throttleInterval = 100;
-
+    final Selector selector = Selector.open();
     private long maxBytesInInterval;
     private static final int BITS_IN_A_BYTE = 8;
+
+    private Throttler throttler;
 
     /**
      * @param map
@@ -92,7 +97,7 @@ class UdpReplicator implements Closeable {
         this.localIdentifier = map.identifier();
         this.udpModificationIterator = udpModificationIterator;
 
-        this.writer =  new UdpReplicator.UdpSocketChannelEntryWriter(entrySize, externalizable);
+        this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(entrySize, externalizable);
 
         this.reader = new UdpReplicator.UdpSocketChannelEntryReader(entrySize, externalizable);
 
@@ -108,6 +113,7 @@ class UdpReplicator implements Closeable {
                 try {
                     process();
                 } catch (Exception e) {
+                    LOG.error("", e);
                     close();
 
                 }
@@ -138,21 +144,23 @@ class UdpReplicator implements Closeable {
     private void process() throws Exception {
 
 
-        final Selector selector = Selector.open();
-
-        connectClient(udpReplicatorBuilder.port()).register(selector, SelectionKey.OP_READ);
-
-        final DatagramChannel server = connectServer(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port());
-        server.register(selector, SelectionKey.OP_WRITE);
+        connectClient(udpReplicatorBuilder.port()).register(selector, OP_READ);
 
 
-        final Throttler throttler = new Throttler(server, selector);
+        final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port());
+        final Queue<SelectableChannel> pendingRegistrations = new ConcurrentLinkedQueue<SelectableChannel>();
+        Details connectionDetails = new Details(address, pendingRegistrations, closeables, 0, localIdentifier);
+        final ServerConnector serverConnector = new ServerConnector(connectionDetails);
+
+        serverConnector.asyncConnect();
+
 
         for (; ; ) {
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
             final int n = selector.select(100);
 
+            register(pendingRegistrations);
             throttler.checkThrottleInterval();
 
             if (n == 0) {
@@ -198,37 +206,26 @@ class UdpReplicator implements Closeable {
 
             }
         }
+
+
     }
 
     /**
-     * @param broadcastAddress the UDP broadcast address Directed broadcast,
+     * Registers the SocketChannel with the selector
      *
-     *
-     *                         for example a broadcast address of 192.168.0.255  has an IP range of
-     *                         192.168.0.1 - 192.168.0.254
-     *
-     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
-     * @throws IOException
+     * @param selectableChannels the SelectableChannel to register
+     * @throws ClosedChannelException
      */
-    private DatagramChannel connectServer(final String broadcastAddress, final int port) throws IOException {
-
-        final DatagramChannel server = DatagramChannel.open();
-        final InetSocketAddress hostAddress = new InetSocketAddress(broadcastAddress, port);
-
-        // Create a non-blocking socket channel
-        server.socket().setBroadcast(true);
-        server.configureBlocking(false);
-
-        // Kick off connection establishment
-        server.connect(hostAddress);
-        server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
-                .setOption(StandardSocketOptions.SO_BROADCAST, true)
-                .setOption(StandardSocketOptions.SO_REUSEADDR, true);
-
-        closeables.add(server);
-        return server;
+    private void register(@NotNull final Queue<SelectableChannel> selectableChannels) throws ClosedChannelException {
+        for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
+            if (sc instanceof DatagramChannel) {
+                sc.register(selector, OP_WRITE);
+                throttler = new Throttler(sc, selector);
+            } else
+                sc.register(selector, OP_READ);
+        }
     }
+
 
     private DatagramChannel connectClient(final int port) throws IOException {
         final DatagramChannel client = DatagramChannel.open();
@@ -250,7 +247,7 @@ class UdpReplicator implements Closeable {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
-        private final TcpReplicator.EntryCallback entryCallback;
+        private final EntryCallback entryCallback;
         private long byteWritten;
         private long time;
 
@@ -259,7 +256,7 @@ class UdpReplicator implements Closeable {
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
-            entryCallback = new TcpReplicator.EntryCallback(externalizable, in);
+            entryCallback = new EntryCallback(externalizable, in);
         }
 
         /**
@@ -370,11 +367,11 @@ class UdpReplicator implements Closeable {
     private class Throttler {
 
         private long lastTime = System.currentTimeMillis();
-        private final DatagramChannel server;
+        private final SelectableChannel server;
         private long byteWritten;
         private Selector selector;
 
-        Throttler(DatagramChannel server, Selector selector) {
+        Throttler(SelectableChannel server, Selector selector) {
             this.server = server;
             this.selector = selector;
         }
@@ -392,7 +389,7 @@ class UdpReplicator implements Closeable {
 
             lastTime = time;
             byteWritten = 0;
-            server.register(selector, SelectionKey.OP_WRITE);
+            server.register(selector, OP_WRITE);
         }
 
 
@@ -413,6 +410,50 @@ class UdpReplicator implements Closeable {
                     LOG.debug("Throttling UDP writes");
             }
         }
+    }
+
+
+    private class ServerConnector extends TcpReplicator.AbstractConnector {
+
+        private final Details details;
+
+        private ServerConnector(Details connectionDetails) {
+            super(connectionDetails);
+            this.details = connectionDetails;
+        }
+
+        SelectableChannel connect() throws
+                IOException, InterruptedException {
+            final DatagramChannel server = DatagramChannel.open();
+
+            // Create a non-blocking socket channel
+            server.socket().setBroadcast(true);
+            server.configureBlocking(false);
+
+            // Kick off connection establishment
+            try {
+                server.connect(details.address);
+            } catch (IOException e) {
+
+                details.reconnectionInterval = 100;
+                asyncConnect();
+            }
+            server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+                    .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
+                    .setOption(StandardSocketOptions.SO_BROADCAST, true)
+                    .setOption(StandardSocketOptions.SO_REUSEADDR, true);
+
+            details.closeables.add(server);
+            return server;
+        }
+
+        private void asyncConnect() {
+            final Thread thread = new Thread(new ServerConnector(details));
+            thread.setName("server-tcp-connector-" + details.address);
+            thread.setDaemon(true);
+            thread.start();
+        }
+
     }
 
 

@@ -48,6 +48,15 @@ public class UdpReplicatorBuilder implements Cloneable {
         return broadcastAddress;
     }
 
+    /**
+     * @param broadcastAddress the UDP broadcast address Directed broadcast,
+     *
+     *
+     *                         for example a broadcast address of 192.168.0.255  has an IP range of
+     *                         192.168.0.1 - 192.168.0.254
+     *
+     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
+     */
     public UdpReplicatorBuilder broadcastAddress(String broadcastAddress) {
         this.broadcastAddress = broadcastAddress;
         return this;
