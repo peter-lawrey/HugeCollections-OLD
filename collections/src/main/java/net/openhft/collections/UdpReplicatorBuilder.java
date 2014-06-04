@@ -21,7 +21,6 @@ package net.openhft.collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 
@@ -40,24 +39,10 @@ public class UdpReplicatorBuilder implements Cloneable {
      */
     public UdpReplicatorBuilder(int port, long throttle) throws UnknownHostException {
         this.port = port;
-        broadcastAddress = defaultBroadcastAddress();
+        broadcastAddress = "255.255.255.255";
         this.throttle = throttle;
     }
 
-    /**
-     * by default we will only broadcast to the local subnet
-     *
-     * @return the broadcastAddress to the local subnet
-     */
-    private String defaultBroadcastAddress() throws UnknownHostException {
-        String address = InetAddress.getLocalHost().getHostAddress();
-        final int i = address.lastIndexOf('.');
-
-        if (i == -1 && i > 0)
-            throw new IllegalStateException("invalid IP address, address=" + address);
-
-        return address.substring(0, i) + ".255";
-    }
 
     public String broadcastAddress() {
         return broadcastAddress;
@@ -81,8 +66,7 @@ public class UdpReplicatorBuilder implements Cloneable {
     public String toString() {
         return "UdpReplication{" +
                 "broadcastAddress='" + broadcastAddress + '\'' +
-                ", port=" + port +
-                '}';
+                ", port=" + port + '}';
     }
 
     public long throttle() {
