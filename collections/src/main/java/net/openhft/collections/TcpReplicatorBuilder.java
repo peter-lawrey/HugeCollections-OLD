@@ -109,8 +109,6 @@ public class TcpReplicatorBuilder implements Cloneable {
     public TcpReplicatorBuilder clone() {
         try {
             final TcpReplicatorBuilder result = (TcpReplicatorBuilder) super.clone();
-
-
             result.serverPort(this.serverPort());
             result.endpoints(this.endpoints());
             result.packetSize(this.packetSize());
