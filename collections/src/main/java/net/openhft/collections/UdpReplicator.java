@@ -100,7 +100,6 @@ class UdpReplicator implements Closeable {
         this.udpModificationIterator = udpModificationIterator;
 
         this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(entrySize, externalizable);
-
         this.reader = new UdpReplicator.UdpSocketChannelEntryReader(entrySize, externalizable);
 
         // throttling is calculated at bytes in a period, minus the size of on entry
@@ -190,7 +189,7 @@ class UdpReplicator implements Closeable {
                         final DatagramChannel socketChannel = (DatagramChannel) key.channel();
                         try {
                             int len = writer.writeAll(socketChannel, udpModificationIterator);
-                            throttler.exceedMaxBytesCheck(len);
+                            throttler.checkUnregisterSelector(len);
                         } catch (NotYetConnectedException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
@@ -204,7 +203,6 @@ class UdpReplicator implements Closeable {
 
                 } catch (Exception e) {
 
-                    //   if (key.channel().isOpen())
                     LOG.error("", e);
 
                     // Close channel and nudge selector
@@ -232,7 +230,10 @@ class UdpReplicator implements Closeable {
         for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
             if (sc instanceof DatagramChannel) {
                 sc.register(selector, OP_WRITE);
-                throttler = new Throttler((DatagramChannel) sc, selector);
+
+                if (throttleInterval > 0)
+                    throttler = new Throttler((DatagramChannel) sc, selector, throttleInterval,
+                            maxBytesInInterval, serverConnector);
             } else
                 sc.register(selector, OP_READ);
         }
@@ -260,8 +261,6 @@ class UdpReplicator implements Closeable {
         private final ByteBuffer out;
         private final ByteBufferBytes in;
         private final EntryCallback entryCallback;
-        private long byteWritten;
-        private long time;
 
         UdpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
@@ -325,8 +324,8 @@ class UdpReplicator implements Closeable {
          * @param serializedEntrySize the maximum size of an entry include the meta data
          * @param externalizable      supports reading and writing serialize entries
          */
-        public UdpSocketChannelEntryReader(final int serializedEntrySize,
-                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+        UdpSocketChannelEntryReader(final int serializedEntrySize,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
             // we make the buffer twice as large just to give ourselves headroom
             in = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             this.externalizable = externalizable;
@@ -376,16 +375,25 @@ class UdpReplicator implements Closeable {
      * throttles 'writes' to ensure the network is not swamped, this is achieved by periodically
      * de-registering the write selector during periods of high volume.
      */
-    private class Throttler {
+    private static class Throttler {
 
         private long lastTime = System.currentTimeMillis();
         private final DatagramChannel server;
         private long byteWritten;
         private Selector selector;
+        private final int throttleInterval;
+        private final long maxBytesInInterval;
+        private final ServerConnector serverConnector;
 
-        Throttler(DatagramChannel server, Selector selector) {
+        Throttler(DatagramChannel server,
+                  Selector selector,
+                  int throttleInterval,
+                  long maxBytesInInterval, ServerConnector serverConnector) {
             this.server = server;
             this.selector = selector;
+            this.throttleInterval = throttleInterval;
+            this.maxBytesInInterval = maxBytesInInterval;
+            this.serverConnector = serverConnector;
         }
 
         /**
@@ -414,12 +422,12 @@ class UdpReplicator implements Closeable {
 
         /**
          * checks the number of bytes written in the interval, so see if we should de-register the 'write' on
-         * the selector.
+         * the selector, If it has it deRegisters the selector
          *
          * @param len the number of bytes just written
          * @throws ClosedChannelException
          */
-        public void exceedMaxBytesCheck(int len) throws ClosedChannelException {
+        public void checkUnregisterSelector(int len) throws ClosedChannelException {
             byteWritten += len;
             if (byteWritten > maxBytesInInterval) {
 
