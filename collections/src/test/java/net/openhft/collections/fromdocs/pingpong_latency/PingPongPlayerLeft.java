@@ -3,14 +3,29 @@ package net.openhft.collections.fromdocs.pingpong_latency;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
-import net.openhft.lang.model.DataValueClasses;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
-import static net.openhft.lang.model.DataValueClasses.*;
+import static net.openhft.lang.model.DataValueClasses.newDirectReference;
 
+/* on an i7-4500 laptop.
+
+PingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock
+#0:  compareAndSwapCoupon() 50/90/99%tile was 41 / 52 / 132
+#1:  compareAndSwapCoupon() 50/90/99%tile was 40 / 56 / 119
+#2:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
+#3:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 56
+#4:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
+#5:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
+#6:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 55
+#7:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 55
+#8:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
+#9:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
+
+ */
 public class PingPongPlayerLeft {
 
     @Test
@@ -43,16 +58,22 @@ public class PingPongPlayerLeft {
             bondOffHeap3.setCoupon(_coupon);
             bondOffHeap4.setCoupon(_coupon);
         }
-        for (int i = 0; i < 500000; i++) {
-            long _start = System.nanoTime(); //
-            while (!bondOffHeap1.compareAndSwapCoupon(_coupon, _coupon2)) ;
-            while (!bondOffHeap2.compareAndSwapCoupon(_coupon, _coupon2)) ;
-            while (!bondOffHeap3.compareAndSwapCoupon(_coupon, _coupon2)) ;
-            while (!bondOffHeap4.compareAndSwapCoupon(_coupon, _coupon2)) ;
+        int timeToCallNanoTime = 30;
+        int runs = 1000000;
+        long[] timings = new long[runs];
+        for (int j = 0; j < 10; j++) {
+            for (int i = 0; i < runs; i++) {
+                long _start = System.nanoTime(); //
+                while (!bondOffHeap1.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bondOffHeap2.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bondOffHeap3.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                while (!bondOffHeap4.compareAndSwapCoupon(_coupon, _coupon2)) ;
 
-            long _duration = System.nanoTime() - _start;
-            System.out.printf("#%d:  1 x _bondEntryV.getCoupon() (last _coupon=[%.2f %%]) in %,d nanos\n",
-                    i, _coupon, _duration / 4);
+                timings[i] = (System.nanoTime() - _start - timeToCallNanoTime) / 4;
+            }
+            Arrays.sort(timings);
+            System.out.printf("#%d:  compareAndSwapCoupon() 50/90/99%%tile was %,d / %,d / %,d%n",
+                    j, timings[runs / 2], timings[runs * 9 / 10], timings[runs * 99 / 100]);
         }
     }
 }
