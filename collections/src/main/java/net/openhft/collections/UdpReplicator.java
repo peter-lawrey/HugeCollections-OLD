@@ -452,6 +452,7 @@ class UdpReplicator implements Closeable {
             } catch (IOException e) {
                 details.reconnectionInterval = 100;
                 reconnect(server);
+                return null;
             }
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                     .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)

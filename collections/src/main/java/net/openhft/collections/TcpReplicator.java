@@ -265,6 +265,8 @@ class TcpReplicator implements Closeable {
                 if (details.reconnectionInterval > 0)
                     Thread.sleep(details.reconnectionInterval);
                 final SelectableChannel socketChannel = connect();
+                if (socketChannel == null)
+                    return;
                 details.closeables.add(socketChannel);
                 details.pendingRegistrations.add(socketChannel);
             } catch (InterruptedException e) {
