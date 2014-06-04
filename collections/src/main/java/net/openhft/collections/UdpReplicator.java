@@ -194,7 +194,7 @@ class UdpReplicator implements Closeable {
                         } catch (NotYetConnectedException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
-                            reconnect(socketChannel);
+                            serverConnector.reconnect(socketChannel);
                         }
                     }
 
@@ -218,15 +218,6 @@ class UdpReplicator implements Closeable {
 
     }
 
-    private void reconnect(DatagramChannel socketChannel) {
-        try {
-            socketChannel.close();
-        } catch (IOException e1) {
-            LOG.error("", e1);
-        }
-
-        serverConnector.asyncConnect();
-    }
 
     /**
      * Registers the SocketChannel with the selector
@@ -413,7 +404,7 @@ class UdpReplicator implements Closeable {
             } catch (IOException e) {
                 if (LOG.isDebugEnabled())
                     LOG.debug("", e);
-                reconnect(server);
+                serverConnector.reconnect(server);
             }
         }
 
@@ -459,9 +450,8 @@ class UdpReplicator implements Closeable {
             try {
                 server.connect(details.address);
             } catch (IOException e) {
-
                 details.reconnectionInterval = 100;
-                asyncConnect();
+                reconnect(server);
             }
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                     .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
@@ -477,6 +467,16 @@ class UdpReplicator implements Closeable {
             thread.setName("server-tcp-connector-" + details.address);
             thread.setDaemon(true);
             thread.start();
+        }
+
+        private void reconnect(DatagramChannel socketChannel) {
+            try {
+                socketChannel.close();
+            } catch (IOException e1) {
+                LOG.error("", e1);
+            }
+
+            serverConnector.asyncConnect();
         }
 
     }
