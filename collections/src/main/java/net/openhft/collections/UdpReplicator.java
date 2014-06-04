@@ -133,11 +133,13 @@ class UdpReplicator implements Closeable {
     public void close() {
         executorService.shutdownNow();
 
-        for (Closeable closeable : closeables) {
-            try {
-                closeable.close();
-            } catch (IOException e) {
-                LOG.error("", e);
+        synchronized (closeables) {
+            for (Closeable closeable : closeables) {
+                try {
+                    closeable.close();
+                } catch (IOException e) {
+                    LOG.error("", e);
+                }
             }
         }
     }
@@ -245,13 +247,14 @@ class UdpReplicator implements Closeable {
 
         final InetSocketAddress hostAddress = new InetSocketAddress(port);
         client.configureBlocking(false);
+        synchronized (closeables) {
+            client.bind(hostAddress);
 
-        client.bind(hostAddress);
+            if (LOG.isDebugEnabled())
+                LOG.debug("Listening on port " + port);
 
-        if (LOG.isDebugEnabled())
-            LOG.debug("Listening on port " + port);
-
-        closeables.add(client);
+            closeables.add(client);
+        }
         return client;
     }
 
@@ -459,7 +462,10 @@ class UdpReplicator implements Closeable {
 
             // Kick off connection establishment
             try {
-                server.connect(details.address);
+                synchronized (details.closeables) {
+                    server.connect(details.address);
+                    details.closeables.add(server);
+                }
             } catch (IOException e) {
                 details.reconnectionInterval = 100;
                 reconnect(server);
@@ -470,7 +476,7 @@ class UdpReplicator implements Closeable {
                     .setOption(StandardSocketOptions.SO_BROADCAST, true)
                     .setOption(StandardSocketOptions.SO_REUSEADDR, true);
 
-            details.closeables.add(server);
+
             return server;
         }
 
