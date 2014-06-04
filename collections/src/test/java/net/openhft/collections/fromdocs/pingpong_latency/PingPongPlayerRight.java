@@ -20,7 +20,7 @@ public class PingPongPlayerRight {
         String TMP = System.getProperty("java.io.tmpdir");
         SharedHashMap<String, BondVOInterface> shmLeft = new SharedHashMapBuilder()
                 .generatedValueType(true)
-                .entrySize(320)
+                .entrySize(64)
                 .create(
                         new File(TMP + "/BondPortfolioSHM"),
                         String.class,

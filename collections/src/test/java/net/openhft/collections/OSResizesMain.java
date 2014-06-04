@@ -34,7 +34,7 @@ public class OSResizesMain {
     public static void main(String[] args) throws IOException, InterruptedException {
         File file = File.createTempFile("over-sized", "deleteme");
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
-                .entrySize(64 * 1024)
+                .entrySize(1024 * 1024)
                 .entries(1024 * 1024)
                 .create(file, String.class, String.class);
         for (int i = 0; i < 1000; i++) {
