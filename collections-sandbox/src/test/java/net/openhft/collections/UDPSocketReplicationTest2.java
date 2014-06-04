@@ -26,6 +26,8 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 
+import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
+
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
  *
@@ -38,10 +40,12 @@ public class UDPSocketReplicationTest2 {
             final int identifier,
             final int udpPort) throws IOException {
 
+
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, MEGA_BITS.toBits(1));
         return new SharedHashMapBuilder()
-                .entries(1000)
+                .entries(2000)
                 .identifier((byte) identifier)
-                .udpPort((short) udpPort)
+                .udpReplication(udpReplicatorBuilder)
                 .create(Builder.getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
@@ -51,7 +55,6 @@ public class UDPSocketReplicationTest2 {
     @Before
     public void setup() throws IOException {
         map1 = newUdpSocketShmIntString(1, 1234);
-
     }
 
     @After
