@@ -44,7 +44,7 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
+   public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {

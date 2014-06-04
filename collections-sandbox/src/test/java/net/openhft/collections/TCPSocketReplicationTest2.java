@@ -26,7 +26,7 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 
-import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
+import static net.openhft.collections.Builder.getPersistenceFile;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -34,27 +34,22 @@ import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
  * @author Rob Austin.
  */
 
-public class UDPSocketReplicationTest2 {
-
-    static SharedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
-            final int identifier,
-            final int udpPort) throws IOException {
-
-
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, MEGA_BITS.toBits(1));
-        return new SharedHashMapBuilder()
-                .entries(2000)
-                .identifier((byte) identifier)
-                .udpReplication(udpReplicatorBuilder)
-                .create(Builder.getPersistenceFile(), Integer.class, CharSequence.class);
-    }
+public class TCPSocketReplicationTest2 {
 
     private SharedHashMap<Integer, CharSequence> map1;
 
-
     @Before
     public void setup() throws IOException {
-        map1 = newUdpSocketShmIntString(1, 1234);
+
+        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079)
+                .heartBeatInterval(1000);
+
+        map1 = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 1)
+                .tcpReplication(tcpReplicatorBuilder)
+                .entries(20000)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
     @After
@@ -75,7 +70,7 @@ public class UDPSocketReplicationTest2 {
     public void testContinueToPublish() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
-                map1.put(i, "EXAMPLE-1");
+                map1.put(i * 2, "EXAMPLE-1");
             }
         }
     }

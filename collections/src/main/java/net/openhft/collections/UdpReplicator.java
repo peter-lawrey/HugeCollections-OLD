@@ -466,6 +466,7 @@ class UdpReplicator implements Closeable {
                 return null;
             }
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+                    .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, false)
                     .setOption(StandardSocketOptions.SO_BROADCAST, true)
                     .setOption(StandardSocketOptions.SO_REUSEADDR, true);
 
