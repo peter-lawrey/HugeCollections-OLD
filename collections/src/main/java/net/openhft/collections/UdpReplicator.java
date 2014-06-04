@@ -192,8 +192,9 @@ class UdpReplicator implements Closeable {
                             int len = writer.writeAll(socketChannel, udpModificationIterator);
                             throttler.exceedMaxBytesCheck(len);
                         } catch (IOException e) {
-                            socketChannel.close();
-                            serverConnector.asyncConnect();
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("", e);
+                            reconnect(socketChannel);
                         }
                     }
 
@@ -217,6 +218,16 @@ class UdpReplicator implements Closeable {
 
     }
 
+    private void reconnect(DatagramChannel socketChannel) {
+        try {
+            socketChannel.close();
+        } catch (IOException e1) {
+            LOG.error("", e1);
+        }
+
+        serverConnector.asyncConnect();
+    }
+
     /**
      * Registers the SocketChannel with the selector
      *
@@ -227,7 +238,7 @@ class UdpReplicator implements Closeable {
         for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
             if (sc instanceof DatagramChannel) {
                 sc.register(selector, OP_WRITE);
-                throttler = new Throttler(sc, selector);
+                throttler = new Throttler((DatagramChannel) sc, selector);
             } else
                 sc.register(selector, OP_READ);
         }
@@ -374,11 +385,11 @@ class UdpReplicator implements Closeable {
     private class Throttler {
 
         private long lastTime = System.currentTimeMillis();
-        private final SelectableChannel server;
+        private final DatagramChannel server;
         private long byteWritten;
         private Selector selector;
 
-        Throttler(SelectableChannel server, Selector selector) {
+        Throttler(DatagramChannel server, Selector selector) {
             this.server = server;
             this.selector = selector;
         }
@@ -396,15 +407,13 @@ class UdpReplicator implements Closeable {
 
             lastTime = time;
             byteWritten = 0;
+
             try {
                 server.register(selector, OP_WRITE);
             } catch (IOException e) {
-                try {
-                    server.close();
-                } catch (IOException e1) {
-                    LOG.error("", e);
-                }
-                serverConnector.asyncConnect();
+                if (LOG.isDebugEnabled())
+                    LOG.debug("", e);
+                reconnect(server);
             }
         }
 
