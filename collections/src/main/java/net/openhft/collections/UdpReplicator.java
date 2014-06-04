@@ -191,7 +191,7 @@ class UdpReplicator implements Closeable {
                         try {
                             int len = writer.writeAll(socketChannel, udpModificationIterator);
                             throttler.exceedMaxBytesCheck(len);
-                        } catch (IOException e) {
+                        } catch (NotYetConnectedException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
                             reconnect(socketChannel);
