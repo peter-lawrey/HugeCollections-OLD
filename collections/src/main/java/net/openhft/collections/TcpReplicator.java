@@ -147,6 +147,8 @@ class TcpReplicator implements Closeable {
 
                         checkHeartbeat(key, approxTimeOutTime, identifier, pendingRegistrations);
 
+                    } catch (CancelledKeyException e) {
+                        quietClose(key, e);
                     } catch (ClosedSelectorException e) {
                         quietClose(key, e);
                     } catch (ClosedChannelException e) {

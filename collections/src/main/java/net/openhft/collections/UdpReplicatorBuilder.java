@@ -51,7 +51,6 @@ public class UdpReplicatorBuilder implements Cloneable {
      */
     private String defaultBroadcastAddress() throws UnknownHostException {
         String address = InetAddress.getLocalHost().getHostAddress();
-
         final int i = address.lastIndexOf('.');
 
         if (i == -1 && i > 0)

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -36,6 +37,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
@@ -52,7 +54,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
  * with the TCP Replicator.
  */
-class UdpReplicator  implements Closeable {
+class UdpReplicator implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
@@ -67,30 +69,38 @@ class UdpReplicator  implements Closeable {
     private final UdpSocketChannelEntryReader socketChannelEntryReader;
     @NotNull
     private final UdpReplicatorBuilder udpReplicatorBuilder;
+    private final int throttleInterval = 100;
 
-    private long throttleMbPer100ms;
+    private long maxBytesInInterval;
+    private static final int BITS_IN_A_BYTE = 8;
 
     /**
      * @param map
      * @param udpReplicatorBuilder
-     * @param socketChannelEntryWriter
-     * @param socketChannelEntryReader
      * @param udpModificationIterator
+     * @param entrySize
+     * @param externalizable
      * @throws IOException
      */
     UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
-                  @NotNull final UdpSocketChannelEntryWriter socketChannelEntryWriter,
-                  @NotNull final UdpSocketChannelEntryReader socketChannelEntryReader,
-                  @NotNull final ModificationIterator udpModificationIterator) throws IOException {
+                  @NotNull final ModificationIterator udpModificationIterator, int entrySize,
+                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) throws
+            IOException {
+
         this.udpReplicatorBuilder = udpReplicatorBuilder;
         this.localIdentifier = map.identifier();
-        this.socketChannelEntryWriter = socketChannelEntryWriter;
-        this.socketChannelEntryReader = socketChannelEntryReader;
         this.udpModificationIterator = udpModificationIterator;
 
-        // mega bytes per 100 ms
-        this.throttleMbPer100ms = udpReplicatorBuilder.throttle() / 800;
+        this.socketChannelEntryWriter =
+                new UdpReplicator.UdpSocketChannelEntryWriter(entrySize, externalizable);
+
+        this.socketChannelEntryReader =
+                new UdpReplicator.UdpSocketChannelEntryReader(entrySize, externalizable);
+
+        // throttling is calculated at bytes in a period, minus the size of on entry
+        this.maxBytesInInterval = (TimeUnit.SECONDS.toMillis(udpReplicatorBuilder.throttle()) *
+                throttleInterval * BITS_IN_A_BYTE) - entrySize;
 
         executorService = newSingleThreadExecutor(new NamedThreadFactory("UdpReplicator-" + localIdentifier, true));
 
@@ -135,13 +145,18 @@ class UdpReplicator  implements Closeable {
 
         connectClient(udpReplicatorBuilder.port()).register(selector, SelectionKey.OP_READ);
 
-        connectServer(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port()).register(selector, SelectionKey.OP_WRITE);
+        final DatagramChannel server = connectServer(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port());
+        server.register(selector, SelectionKey.OP_WRITE);
 
+
+        final Throttler throttler = new Throttler(server, selector);
 
         for (; ; ) {
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
-            final int n = selector.select();
+            final int n = selector.select(100);
+
+            throttler.checkThrottleInterval();
 
             if (n == 0) {
                 continue;    // nothing to do
@@ -166,9 +181,11 @@ class UdpReplicator  implements Closeable {
 
                     if (key.isWritable()) {
                         final DatagramChannel socketChannel = (DatagramChannel) key.channel();
-                        socketChannelEntryWriter.writeAll(socketChannel,
+                        int len = socketChannelEntryWriter.writeAll(socketChannel,
                                 udpModificationIterator,
-                                throttleMbPer100ms);
+                                maxBytesInInterval);
+
+                        throttler.exceedMaxBytesCheck(len);
                     }
 
 
@@ -235,7 +252,7 @@ class UdpReplicator  implements Closeable {
     }
 
 
-    static class UdpSocketChannelEntryWriter {
+    private static class UdpSocketChannelEntryWriter {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
@@ -243,8 +260,8 @@ class UdpReplicator  implements Closeable {
         private long byteWritten;
         private long time;
 
-        public UdpSocketChannelEntryWriter(final int serializedEntrySize,
-                                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+        UdpSocketChannelEntryWriter(final int serializedEntrySize,
+                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
@@ -269,9 +286,9 @@ class UdpReplicator  implements Closeable {
          * @throws InterruptedException
          * @throws IOException
          */
-        void writeAll(@NotNull final DatagramChannel socketChannel,
-                      @NotNull final ModificationIterator modificationIterator,
-                      final long throttleMegaBytesPer100ms) throws InterruptedException, IOException {
+        int writeAll(@NotNull final DatagramChannel socketChannel,
+                     @NotNull final ModificationIterator modificationIterator,
+                     final long throttleMegaBytesPer100ms) throws InterruptedException, IOException {
 
             out.clear();
             in.clear();
@@ -280,56 +297,15 @@ class UdpReplicator  implements Closeable {
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
             if (!wasDataRead)
-                return;
+                return 0;
 
             // we'll write the size inverted at the start
             in.writeShort(0, ~(in.readUnsignedShort(2)));
             out.limit((int) in.position());
 
-
-            //  Throttling
-            //
-            //  An implementation of a token bucket algorithm which is useful for
-            //  providing rate limited access to a portion of code.
-            //  The implementation is a "leaky bucket" in the sense that the bucket has a
-            //  finite capacity and any added tokens that would exceed this capacity will "overflow"
-            //  out of the bucket and be lost forever.
-            //
-            //   This implementation is not the traditional way that you would write this, but it is
-            //   written like this so that we reduce the calls to System.currentTimeMillis()
-
-            try {
-
-                if (throttleMegaBytesPer100ms == 0) {
-                    socketChannel.write(out);
-                    return;
-                }
-
-                // we'll look int a 100ms period
-                if (byteWritten + out.remaining() > throttleMegaBytesPer100ms) {
-                    final long currentTimeMillis = System.currentTimeMillis();
+            return socketChannel.write(out);
 
 
-                    if (time + 100 > currentTimeMillis) {
-                        // we've sent too much data so rejecting this message
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("THROTTLED : the UDP message skipped due to throttling.");
-                        }
-                        out.clear();
-                        in.clear();
-                        byteWritten = 0;
-                        return;
-                    }
-
-                    time = currentTimeMillis;
-                }
-
-                byteWritten += socketChannel.write(out);
-
-            } catch (IOException e) {
-                if (LOG.isDebugEnabled())
-                    LOG.debug("", e);
-            }
         }
 
 
@@ -338,7 +314,7 @@ class UdpReplicator  implements Closeable {
     public static final int SIZE_OF_SHORT = 2;
     public static final int SIZE_OF_UNSIGNED_SHORT = 2;
 
-    static class UdpSocketChannelEntryReader {
+    private static class UdpSocketChannelEntryReader {
 
         private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
         private final ByteBuffer in;
@@ -393,6 +369,53 @@ class UdpReplicator  implements Closeable {
             externalizable.readExternalEntry(out);
         }
 
+    }
+
+    /**
+     * throttles 'writes' to ensure the network is not swamped, this is achieved by periodically
+     * de-registering the write selector during periods of high volume.
+     */
+    private class Throttler {
+
+        private long lastTime = System.currentTimeMillis();
+        private final DatagramChannel server;
+        private long byteWritten;
+        private Selector selector;
+
+        Throttler(DatagramChannel server, Selector selector) {
+            this.server = server;
+            this.selector = selector;
+        }
+
+        /**
+         * re register the 'write' on the selector if the throttleInterval has passed
+         *
+         * @throws ClosedChannelException
+         */
+        public void checkThrottleInterval() throws ClosedChannelException {
+            final long time = System.currentTimeMillis();
+
+            if (lastTime + throttleInterval >= time)
+                return;
+
+            lastTime = time;
+            byteWritten = 0;
+            server.register(selector, SelectionKey.OP_WRITE);
+        }
+
+
+        /**
+         * checks the number of bytes written in the interval, so see if we should de-register the 'write' on
+         * the selector.
+         *
+         * @param len the number of bytes just written
+         * @throws ClosedChannelException
+         */
+        public void exceedMaxBytesCheck(int len) throws ClosedChannelException {
+            byteWritten += len;
+            if (byteWritten > maxBytesInInterval)
+                server.register(selector, 0);
+        }
     }
 
 
