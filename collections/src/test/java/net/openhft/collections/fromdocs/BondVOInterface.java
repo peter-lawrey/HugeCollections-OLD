@@ -34,6 +34,8 @@ public interface BondVOInterface {
 
     long addAtomicMaturityDate(long toAdd);
 
+    boolean compareAndSwapCoupon(double expected, double value);
+
     double getCoupon();
 
     void setCoupon(double coupon);
