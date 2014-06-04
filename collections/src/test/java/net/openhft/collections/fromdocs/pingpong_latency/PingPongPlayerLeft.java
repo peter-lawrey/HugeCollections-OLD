@@ -3,6 +3,7 @@ package net.openhft.collections.fromdocs.pingpong_latency;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -28,13 +29,17 @@ PingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock
  */
 public class PingPongPlayerLeft {
 
+
     @Test
+    @Ignore
     public void bondExample() throws IOException, InterruptedException {
+
+        String TMP = System.getProperty("java.io.tmpdir");
         SharedHashMap<String, BondVOInterface> shmLeft = new SharedHashMapBuilder()
                 .generatedValueType(true)
                 .entrySize(320)
                 .create(
-                        new File("/dev/shm/BondPortfolioSHM"),
+                        new File(TMP + "/BondPortfolioSHM"),
                         String.class,
                         BondVOInterface.class
                 );
