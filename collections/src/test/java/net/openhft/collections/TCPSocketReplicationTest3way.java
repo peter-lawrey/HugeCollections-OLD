@@ -44,9 +44,10 @@ public class TCPSocketReplicationTest3way {
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078));
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078));
-        map3 = newTcpSocketShmIntString((byte) 3, 8078);
+        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077),
+                new InetSocketAddress("localhost", 8079));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8079));
+        map3 = newTcpSocketShmIntString((byte) 3, 8079);
     }
 
     @After

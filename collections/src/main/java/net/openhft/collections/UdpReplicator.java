@@ -27,42 +27,70 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Iterator;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 
-class UdpReplicator implements Closeable {
+/**
+ * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
+ *
+ * @see SharedHashMapBuilder#udpReplication
+ *
+ *
+ * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ), typically, you
+ * should use the UdpReplicator if you have a large number of nodes, and you wish to receive the data before
+ * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
+ * with the TCP Replicator.
+ */
+class UdpReplicator  implements Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
 
-    private final int port;
-    private final DatagramChannel datagramChannel;
     private final UdpSocketChannelEntryWriter socketChannelEntryWriter;
     private final byte localIdentifier;
 
     private final ExecutorService executorService;
+    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+
     private final ModificationIterator udpModificationIterator;
     private final UdpSocketChannelEntryReader socketChannelEntryReader;
+    @NotNull
+    private final UdpReplicatorBuilder udpReplicatorBuilder;
 
+    private long throttleMbPer100ms;
+
+    /**
+     * @param map
+     * @param udpReplicatorBuilder
+     * @param socketChannelEntryWriter
+     * @param socketChannelEntryReader
+     * @param udpModificationIterator
+     * @throws IOException
+     */
     UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
-                  final int port,
+                  @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
                   @NotNull final UdpSocketChannelEntryWriter socketChannelEntryWriter,
                   @NotNull final UdpSocketChannelEntryReader socketChannelEntryReader,
                   @NotNull final ModificationIterator udpModificationIterator) throws IOException {
-        this.port = port;
-        this.datagramChannel = DatagramChannel.open();
+        this.udpReplicatorBuilder = udpReplicatorBuilder;
         this.localIdentifier = map.identifier();
         this.socketChannelEntryWriter = socketChannelEntryWriter;
         this.socketChannelEntryReader = socketChannelEntryReader;
         this.udpModificationIterator = udpModificationIterator;
+
+        // mega bytes per 100 ms
+        this.throttleMbPer100ms = udpReplicatorBuilder.throttle() / 800;
 
         executorService = newSingleThreadExecutor(new NamedThreadFactory("UdpReplicator-" + localIdentifier, true));
 
@@ -73,12 +101,7 @@ class UdpReplicator implements Closeable {
                 try {
                     process();
                 } catch (Exception e) {
-                    LOG.error("", e);
-                    try {
-                        datagramChannel.close();
-                    } catch (IOException e1) {
-                        LOG.error("", e1);
-                    }
+                    close();
 
                 }
             }
@@ -88,44 +111,32 @@ class UdpReplicator implements Closeable {
 
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         executorService.shutdownNow();
 
-        if (datagramChannel != null)
-            datagramChannel.close();
+        for (Closeable closeable : closeables) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                LOG.error("", e);
+            }
+        }
     }
 
     /**
-     * binds to the server socket and process data
-     * This method will block until interrupted
+     * binds to the server socket and process data This method will block until interrupted
      *
      * @throws Exception
      */
     private void process() throws Exception {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Listening on port " + port);
-        }
+
         final Selector selector = Selector.open();
 
-        //224.0.0.0 through 239.255.255.255
-        InetSocketAddress hostAddress = new InetSocketAddress("224.0.0.0", port);
+        connectClient(udpReplicatorBuilder.port()).register(selector, SelectionKey.OP_READ);
 
+        connectServer(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port()).register(selector, SelectionKey.OP_WRITE);
 
-        // Kick off connection establishment
-        datagramChannel.connect(hostAddress);
-     /*   datagramChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true)
-                .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
-                .setOption(StandardSocketOptions.SO_BROADCAST, true)
-                .setOption(StandardSocketOptions.SO_REUSEADDR, true);
-*/
-
-        // Create a non-blocking socket channel
-        datagramChannel.socket().setBroadcast(true);
-        // datagramChannel.socket().bind(hostAddress);
-        datagramChannel.configureBlocking(false);
-
-        this.datagramChannel.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ);
 
         for (; ; ) {
             // this may block for a long time, upon return the
@@ -155,13 +166,15 @@ class UdpReplicator implements Closeable {
 
                     if (key.isWritable()) {
                         final DatagramChannel socketChannel = (DatagramChannel) key.channel();
-                        socketChannelEntryWriter.writeAll(socketChannel, udpModificationIterator);
+                        socketChannelEntryWriter.writeAll(socketChannel,
+                                udpModificationIterator,
+                                throttleMbPer100ms);
                     }
 
 
                 } catch (Exception e) {
 
-                    if (this.datagramChannel.isOpen())
+                    if (key.channel().isOpen())
                         LOG.error("", e);
 
                     // Close channel and nudge selector
@@ -176,19 +189,66 @@ class UdpReplicator implements Closeable {
         }
     }
 
+    /**
+     * @param broadcastAddress the UDP broadcast address Directed broadcast,
+     *
+     *
+     *                         for example a broadcast address of 192.168.0.255  has an IP range of
+     *                         192.168.0.1 - 192.168.0.254
+     *
+     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
+     * @throws IOException
+     */
+    private DatagramChannel connectServer(final String broadcastAddress, final int port) throws IOException {
+
+        final DatagramChannel server = DatagramChannel.open();
+        final InetSocketAddress hostAddress = new InetSocketAddress(broadcastAddress, port);
+
+        // Create a non-blocking socket channel
+        server.socket().setBroadcast(true);
+        server.configureBlocking(false);
+
+        // Kick off connection establishment
+        server.connect(hostAddress);
+        server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+                .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
+                .setOption(StandardSocketOptions.SO_BROADCAST, true)
+                .setOption(StandardSocketOptions.SO_REUSEADDR, true);
+
+        closeables.add(server);
+        return server;
+    }
+
+    private DatagramChannel connectClient(final int port) throws IOException {
+        final DatagramChannel client = DatagramChannel.open();
+
+        final InetSocketAddress hostAddress = new InetSocketAddress(port);
+        client.configureBlocking(false);
+
+        client.bind(hostAddress);
+
+        if (LOG.isDebugEnabled())
+            LOG.debug("Listening on port " + port);
+
+        closeables.add(client);
+        return client;
+    }
+
 
     static class UdpSocketChannelEntryWriter {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
-        private final TcpSocketChannelEntryWriter.EntryCallback entryCallback;
+        private final TcpReplicator.EntryCallback entryCallback;
+        private long byteWritten;
+        private long time;
 
         public UdpSocketChannelEntryWriter(final int serializedEntrySize,
                                            @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
-            entryCallback = new TcpSocketChannelEntryWriter.EntryCallback(externalizable, in);
+            entryCallback = new TcpReplicator.EntryCallback(externalizable, in);
         }
 
         /**
@@ -199,8 +259,19 @@ class UdpReplicator implements Closeable {
          * @throws InterruptedException
          * @throws java.io.IOException
          */
+
+        /**
+         * update that are throttled are rejected.
+         *
+         * @param socketChannel             the socketChannel that we will write to
+         * @param modificationIterator      modificationIterator that relates to this channel
+         * @param throttleMegaBytesPer100ms mega bytes per 100ms
+         * @throws InterruptedException
+         * @throws IOException
+         */
         void writeAll(@NotNull final DatagramChannel socketChannel,
-                      @NotNull final ModificationIterator modificationIterator) throws InterruptedException, IOException {
+                      @NotNull final ModificationIterator modificationIterator,
+                      final long throttleMegaBytesPer100ms) throws InterruptedException, IOException {
 
             out.clear();
             in.clear();
@@ -214,9 +285,53 @@ class UdpReplicator implements Closeable {
             // we'll write the size inverted at the start
             in.writeShort(0, ~(in.readUnsignedShort(2)));
             out.limit((int) in.position());
-            socketChannel.write(out);
 
+
+            //  Throttling
+            //
+            //  An implementation of a token bucket algorithm which is useful for
+            //  providing rate limited access to a portion of code.
+            //  The implementation is a "leaky bucket" in the sense that the bucket has a
+            //  finite capacity and any added tokens that would exceed this capacity will "overflow"
+            //  out of the bucket and be lost forever.
+            //
+            //   This implementation is not the traditional way that you would write this, but it is
+            //   written like this so that we reduce the calls to System.currentTimeMillis()
+
+            try {
+
+                if (throttleMegaBytesPer100ms == 0) {
+                    socketChannel.write(out);
+                    return;
+                }
+
+                // we'll look int a 100ms period
+                if (byteWritten + out.remaining() > throttleMegaBytesPer100ms) {
+                    final long currentTimeMillis = System.currentTimeMillis();
+
+
+                    if (time + 100 > currentTimeMillis) {
+                        // we've sent too much data so rejecting this message
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("THROTTLED : the UDP message skipped due to throttling.");
+                        }
+                        out.clear();
+                        in.clear();
+                        byteWritten = 0;
+                        return;
+                    }
+
+                    time = currentTimeMillis;
+                }
+
+                byteWritten += socketChannel.write(out);
+
+            } catch (IOException e) {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("", e);
+            }
         }
+
 
     }
 
@@ -246,7 +361,7 @@ class UdpReplicator implements Closeable {
         /**
          * reads entries from the socket till it is empty
          *
-         * @param socketChannel
+         * @param socketChannel the socketChannel that we will read from
          * @throws IOException
          * @throws InterruptedException
          */
@@ -255,7 +370,9 @@ class UdpReplicator implements Closeable {
             out.clear();
             in.clear();
 
-            final int bytesRead = socketChannel.read(in);
+            socketChannel.receive(in);
+
+            final int bytesRead = in.position();
 
             if (bytesRead < SIZE_OF_SHORT + SIZE_OF_UNSIGNED_SHORT)
                 return;

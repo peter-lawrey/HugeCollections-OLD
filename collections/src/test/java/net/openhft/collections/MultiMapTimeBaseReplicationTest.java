@@ -23,7 +23,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import static org.junit.Assert.assertEquals;
@@ -274,40 +273,9 @@ public class MultiMapTimeBaseReplicationTest {
     }
 
 
-    // @Ignore
-    @Test
-    public void testSoakTestWithRandomData() throws IOException, InterruptedException {
-
-        System.out.print("SoakTesting ");
-        for (int j = 1; j < 100; j++) {
-            if (j % 10 == 0)
-                System.out.print(".");
-            Random rnd = new Random(j);
-            for (int i = 1; i < 10; i++) {
-
-                final int select = rnd.nextInt(2);
-                final ReplicatedSharedHashMap<Integer, Integer> map = select > 0 ? map1 : map2;
 
 
-                switch (rnd.nextInt(2)) {
-                    case 0:
-                        map.put(rnd.nextInt(10) /* + select * 100 */, i);
-                        break;
-                    case 1:
-                        map.remove(rnd.nextInt(8) /*+ select * 100 */);
-                        break;
-                }
-            }
 
-            waitTillEqual(5000);
-
-            assertEquals("j=" + j, map1, map2);
-
-
-        }
-        System.out.println("");
-
-    }
 
 
 }

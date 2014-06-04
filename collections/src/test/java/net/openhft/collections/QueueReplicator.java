@@ -34,8 +34,8 @@ import static java.lang.System.arraycopy;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
 /**
- * This class replicates data from one ReplicatedShareHashMap to another using a queue
- * it was originally written to test the logic in the {@code VanillaSharedReplicatedHashMap}
+ * This class replicates data from one ReplicatedShareHashMap to another using a queue it was originally
+ * written to test the logic in the {@code VanillaSharedReplicatedHashMap}
  *
  * @author Rob Austin.
  */
@@ -65,7 +65,9 @@ public class QueueReplicator<K, V> {
 
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(r, "reader-map" + externalizable);
+                final Thread thread = new Thread(r, "reader-map" + externalizable);
+                thread.setDaemon(true);
+                return thread;
             }
 
         }).execute(new Runnable() {

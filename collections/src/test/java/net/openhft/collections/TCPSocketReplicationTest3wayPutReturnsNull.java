@@ -52,7 +52,7 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
                 .entries(1000)
                 .putReturnsNull(true)
                 .identifier(identifier)
-                .tcpReplication(new SharedHashMapBuilder.TcpReplication(serverPort,
+                .tcpReplication(new TcpReplicatorBuilder(serverPort,
                         InetSocketAddress))
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }

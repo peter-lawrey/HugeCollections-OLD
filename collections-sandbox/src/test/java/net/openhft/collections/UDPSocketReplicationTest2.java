@@ -26,47 +26,38 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 
-import static net.openhft.collections.Builder.getPersistenceFile;
-import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
-
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
  *
  * @author Rob Austin.
  */
 
-public class UDPSocketReplicationTest {
+public class UDPSocketReplicationTest2 {
 
     static SharedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
             final int identifier,
             final int udpPort) throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, MEGA_BITS.toBits(50));
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)
-                .udpReplication(udpReplicatorBuilder)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                .udpPort((short) udpPort)
+                .create(Builder.getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
-    //  private SharedHashMap<Integer, CharSequence> map1;
-    private SharedHashMap<Integer, CharSequence> map2;
+    private SharedHashMap<Integer, CharSequence> map1;
+
 
     @Before
     public void setup() throws IOException {
-        //      map1 = newUdpSocketShmIntString(1, 1234);
-        map2 = newUdpSocketShmIntString(2, 1234);
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        map1 = newUdpSocketShmIntString(1, 1234);
+
     }
 
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map2}) {
+        for (final Closeable closeable : new Closeable[]{map1}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -78,12 +69,12 @@ public class UDPSocketReplicationTest {
 
     @Test
     @Ignore
-    public void testBufferOverflow() throws IOException, InterruptedException {
-
-        for (int i = 0; i < 1024; i++) {
-            Thread.sleep(1000);
+    public void testContinueToPublish() throws IOException, InterruptedException {
+        for (; ; ) {
+            for (int i = 0; i < 1024; i++) {
+                map1.put(i, "EXAMPLE-1");
+            }
         }
-
     }
 
 
