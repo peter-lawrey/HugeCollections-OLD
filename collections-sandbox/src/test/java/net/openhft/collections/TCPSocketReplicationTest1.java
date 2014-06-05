@@ -44,7 +44,7 @@ public class TCPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 new InetSocketAddress("192.168.0.254", 8079))
-                .heartBeatInterval(1000);
+                .heartBeatInterval(2000);
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
@@ -72,7 +72,9 @@ public class TCPSocketReplicationTest1 {
     public void testContinueToReceive() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
-                map1.put(i * 2, "EXAMPLE-1");
+               Thread.sleep(1000);
+           //     map1.put(i * 2, "E1");
+               // System.out.println(map1);
             }
         }
     }

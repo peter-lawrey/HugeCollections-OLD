@@ -216,6 +216,9 @@ class TcpReplicator implements Closeable {
         if (key.channel() == serverSocketChannel || attached == null)
             return;
 
+        if (!attached.isHandShakingComplete())
+            return;
+
         final SocketChannel channel = (SocketChannel) key.channel();
 
         if (timeOutTime > attached.entryReader.lastHeartBeatReceived) {
@@ -559,7 +562,7 @@ class TcpReplicator implements Closeable {
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
                 externalizable, packetSize, heartBeatPeriod);
-        attached.isServer =true;
+        attached.isServer = true;
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
 
@@ -794,6 +797,9 @@ class TcpReplicator implements Closeable {
             if (isHandshakingComplete && lastSentTime + heartBeatPeriod < currentTimeMillis) {
                 lastSentTime = approxTime;
                 writeHeartBeatToBuffer();
+                if (LOG.isDebugEnabled())
+                    LOG.debug("sending heartbeat");
+                writeBufferToSocket(socketChannel, isHandshakingComplete, approxTime);
             }
 
         }
