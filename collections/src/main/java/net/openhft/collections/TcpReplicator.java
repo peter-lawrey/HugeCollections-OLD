@@ -359,6 +359,10 @@ class TcpReplicator implements Closeable {
                 final long reconnectionInterval,
                 Queue<SelectableChannel> destination) {
 
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("reconnecting to identifier=" + identifier);
+            }
             final Queue<SelectableChannel> result = destination == null ? new
                     ConcurrentLinkedQueue<SelectableChannel>() : destination;
 
@@ -628,10 +632,17 @@ class TcpReplicator implements Closeable {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
 
-        if (attached.entryReader.readSocketToBuffer(socketChannel, map.identifier(),
-                this.pendingRegistrations,
-                connector) <= 0)
-            return;
+        try {
+            if (attached.entryReader.readSocketToBuffer(socketChannel
+            ) <= 0)
+                return;
+
+        } catch (IOException e) {
+            if (!attached.isServer)
+                connector.asyncReconnect(map.identifier(), socketChannel.socket(), pendingRegistrations);
+            throw e;
+        }
+
 
         if (LOG.isDebugEnabled())
             LOG.debug("heartbeat or data received.");
@@ -887,27 +898,16 @@ class TcpReplicator implements Closeable {
         /**
          * reads from the socket and writes the contents to the buffer
          *
-         * @param socketChannel        the  socketChannel to read from
-         * @param identifier
-         * @param pendingRegistrations
-         * @param connector1
+         * @param socketChannel the  socketChannel to read from
          * @return the number of bytes read
          * @throws IOException
          */
-        private int readSocketToBuffer(@NotNull final SocketChannel socketChannel,
-                                       final byte identifier,
-                                       final Queue<SelectableChannel> pendingRegistrations, final Connector connector1) throws IOException {
+        private int readSocketToBuffer(@NotNull final SocketChannel socketChannel) throws IOException {
 
             compactBuffer();
-            try {
-                final int len = socketChannel.read(in);
-                out.limit(in.position());
-                return len;
-            } catch (IOException e) {
-                connector1.asyncReconnect(identifier, socketChannel.socket(), pendingRegistrations);
-                throw e;
-            }
-
+            final int len = socketChannel.read(in);
+            out.limit(in.position());
+            return len;
         }
 
         /**
