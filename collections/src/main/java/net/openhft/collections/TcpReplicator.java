@@ -60,7 +60,7 @@ class TcpReplicator implements Closeable {
     private final Connector connector = new Connector();
     private final Selector selector;
     private SelectableChannel serverSocketChannel;
-    private Queue<SelectableChannel> pendingRegistrations;
+    private Queue<SelectableChannel> pendingRegistrations = new ConcurrentLinkedQueue<SelectableChannel>();
 
     TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
                   final int serializedEntrySize,
@@ -100,7 +100,7 @@ class TcpReplicator implements Closeable {
 
         try {
 
-            pendingRegistrations = connector.asyncConnect(identifier, tcpReplicatorBuilder.endpoints(),
+            connector.asyncConnect(identifier, tcpReplicatorBuilder.endpoints(),
                     tcpReplicatorBuilder.serverInetSocketAddress());
 
             for (; ; ) {
@@ -136,7 +136,7 @@ class TcpReplicator implements Closeable {
 
                         if (key.isConnectable())
                             onConnect(packetSize, serializedEntrySize, externalizable, key,
-                                    map.identifier(), pendingRegistrations, heartBeatInterval);
+                                    map.identifier(), heartBeatInterval);
 
                         if (key.isReadable())
                             onRead(map, key, approxTime);
@@ -222,7 +222,7 @@ class TcpReplicator implements Closeable {
         final SocketChannel channel = (SocketChannel) key.channel();
 
         if (timeOutTime < attached.entryReader.lastHeartBeatReceived) {
-            connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
+            connector.asyncReconnect(identifier, channel.socket());
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
         }
@@ -249,10 +249,10 @@ class TcpReplicator implements Closeable {
             final byte identifier;
 
             Details(@NotNull SocketAddress address,
-                    Queue<SelectableChannel> pendingRegistrations,
                     Set<Closeable> closeables,
                     long reconnectionInterval,
-                    byte identifier) {
+                    byte identifier,
+                    final Queue<SelectableChannel> pendingRegistrations) {
                 this.address = address;
                 this.pendingRegistrations = pendingRegistrations;
                 this.closeables = closeables;
@@ -269,8 +269,9 @@ class TcpReplicator implements Closeable {
                     final SelectableChannel socketChannel = connect();
                     if (socketChannel == null)
                         return;
-                    details.closeables.add(socketChannel);
                     details.pendingRegistrations.add(socketChannel);
+                    details.closeables.add(socketChannel);
+
                 }
 
             } catch (InterruptedException e) {
@@ -291,17 +292,15 @@ class TcpReplicator implements Closeable {
          * used to connect both client and server sockets
          *
          * @param identifier
-         * @param socket              a queue containing the SocketChannel as they become connected
-         * @param pendingRegistration
+         * @param clientSocket a queue containing the SocketChannel as they become connected
          * @return
          */
         private void asyncReconnect(
                 final byte identifier,
-                final Socket socket,
-                final Queue<SelectableChannel> pendingRegistration) {
+                final Socket clientSocket) {
 
-            final InetSocketAddress inetSocketAddress = new InetSocketAddress(socket.getInetAddress()
-                    .getHostName(), socket.getPort());
+            final InetSocketAddress inetSocketAddress = new InetSocketAddress(clientSocket.getInetAddress()
+                    .getHostName(), clientSocket.getPort());
 
             final Integer lastAttempts = connectionAttempts.get(connectionAttempts);
             final Integer attempts = lastAttempts == null ? 1 : lastAttempts + 1;
@@ -313,8 +312,7 @@ class TcpReplicator implements Closeable {
             if (reconnectionInterval > 20 * 1000)
                 reconnectionInterval = 20 * 1000;
 
-            asyncConnect0(identifier, null, Collections.singleton(inetSocketAddress), reconnectionInterval,
-                    pendingRegistration);
+            asyncConnect0(identifier, null, Collections.singleton(inetSocketAddress), reconnectionInterval);
         }
 
 
@@ -326,13 +324,12 @@ class TcpReplicator implements Closeable {
          * @param serverPort
          * @return
          */
-        private Queue<SelectableChannel> asyncConnect(
+        private void asyncConnect(
                 final byte identifier,
                 final Set<InetSocketAddress> clientEndpoints,
                 final InetSocketAddress serverPort) {
 
-            final Queue<SelectableChannel> destination = new ConcurrentLinkedQueue<SelectableChannel>();
-            return asyncConnect0(identifier, serverPort, clientEndpoints, 0, destination);
+            asyncConnect0(identifier, serverPort, clientEndpoints, 0);
         }
 
         void setSuccessfullyConnected(final Socket socket) {
@@ -349,27 +346,23 @@ class TcpReplicator implements Closeable {
          * @param identifier
          * @param clientEndpoints      a queue containing the SocketChannel as they become connected
          * @param reconnectionInterval
-         * @param destination
          * @return
          */
-        private Queue<SelectableChannel> asyncConnect0(
+        private void asyncConnect0(
                 final byte identifier,
                 final @Nullable SocketAddress serverEndpoint,
                 final @NotNull Set<? extends SocketAddress> clientEndpoints,
-                final long reconnectionInterval,
-                Queue<SelectableChannel> destination) {
+                final long reconnectionInterval) {
 
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("reconnecting to identifier=" + identifier);
             }
-            final Queue<SelectableChannel> result = destination == null ? new
-                    ConcurrentLinkedQueue<SelectableChannel>() : destination;
 
             if (serverEndpoint != null) {
                 final Details details = new Details
-                        (serverEndpoint, destination, closeables,
-                                reconnectionInterval, identifier);
+                        (serverEndpoint, closeables,
+                                reconnectionInterval, identifier, pendingRegistrations);
 
                 final Thread thread = new Thread(new ServerConnector(details));
                 thread.setName("server-tcp-connector-" + serverEndpoint);
@@ -378,15 +371,15 @@ class TcpReplicator implements Closeable {
             }
 
             for (final SocketAddress endpoint : clientEndpoints) {
-                final Details details = new Details(endpoint, destination, closeables,
-                        reconnectionInterval, identifier);
+                final Details details = new Details(endpoint, closeables,
+                        reconnectionInterval, identifier, pendingRegistrations);
                 final Thread thread = new Thread(new ClientConnector(details));
                 thread.setName("client-tcp-connector-" + endpoint);
                 thread.setDaemon(true);
                 thread.start();
             }
 
-            return result;
+
         }
     }
 
@@ -404,17 +397,12 @@ class TcpReplicator implements Closeable {
                 IOException, InterruptedException {
 
             ServerSocketChannel serverChannel = ServerSocketChannel.open();
-            synchronized (details.closeables) {
-                final ServerSocket serverSocket = serverChannel.socket();
-                details.closeables.add(serverSocket);
-                details.closeables.add(serverChannel);
-
-                serverSocket.setReuseAddress(true);
-                serverSocket.bind(details.address);
-            }
 
             serverChannel.socket().setReceiveBufferSize(BUFFER_SIZE);
             serverChannel.configureBlocking(false);
+            final ServerSocket serverSocket = serverChannel.socket();
+            serverSocket.setReuseAddress(true);
+            serverSocket.bind(details.address);
             return serverChannel;
 
         }
@@ -489,7 +477,7 @@ class TcpReplicator implements Closeable {
                            int serializedEntrySize,
                            @NotNull final EntryExternalizable externalizable,
                            @NotNull final SelectionKey key,
-                           final byte identifier, Queue<SelectableChannel> pendingRegistrations,
+                           final byte identifier,
                            final long heartBeatIntervalMilliseconds) throws IOException, InterruptedException {
 
         final SocketChannel channel = (SocketChannel) key.channel();
@@ -500,7 +488,8 @@ class TcpReplicator implements Closeable {
                 return;
             }
         } catch (ConnectException e) {
-            connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
+            quietClose(key, e);
+            connector.asyncReconnect(identifier, channel.socket());
             throw e;
         }
 
@@ -619,10 +608,18 @@ class TcpReplicator implements Closeable {
         final Attached attached = (Attached) key.attachment();
 
         if (attached.remoteModificationIterator != null)
-            attached.entryWriter.entriesToBuffer(
-                    attached.remoteModificationIterator);
+            attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator);
 
-        attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime);
+        try {
+            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime);
+        } catch (IOException e) {
+            quietClose(key, e);
+            if (!attached.isServer)
+                connector.asyncReconnect(attached.remoteIdentifier, socketChannel.socket());
+            throw e;
+
+        }
+
     }
 
     private void onRead(final ReplicatedSharedHashMap map,
@@ -639,7 +636,7 @@ class TcpReplicator implements Closeable {
 
         } catch (IOException e) {
             if (!attached.isServer)
-                connector.asyncReconnect(map.identifier(), socketChannel.socket(), pendingRegistrations);
+                connector.asyncReconnect(map.identifier(), socketChannel.socket());
             throw e;
         }
 
@@ -662,7 +659,8 @@ class TcpReplicator implements Closeable {
      * @param selectableChannels the SelectableChannel to register
      * @throws ClosedChannelException
      */
-    private void register(@NotNull final Queue<SelectableChannel> selectableChannels) throws ClosedChannelException {
+    private void register(@NotNull final Queue<SelectableChannel> selectableChannels) throws
+            ClosedChannelException {
         for (SelectableChannel sc = selectableChannels.poll(); sc != null; sc = selectableChannels.poll()) {
             if (sc instanceof ServerSocketChannel) {
                 sc.register(selector, OP_ACCEPT);

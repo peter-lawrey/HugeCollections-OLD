@@ -108,7 +108,7 @@ class UdpReplicator implements Closeable {
 
         final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<SelectableChannel>();
-        Details connectionDetails = new Details(address, pendingRegistrations, closeables, 0, localIdentifier);
+        Details connectionDetails = new Details(address, closeables, 0, localIdentifier, pendingRegistrations);
         serverConnector = new ServerConnector(connectionDetails);
 
         executorService = newSingleThreadExecutor(new NamedThreadFactory("UdpReplicator-" + localIdentifier, true));

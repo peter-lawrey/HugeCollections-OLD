@@ -60,7 +60,7 @@ public class TCPSocketReplicationBootStrapTests {
         final File map2File = map2a.file();
         map2a.close();
 
-        System.out.println("lastModificationTime=" + lastModificationTime);
+
 
         {
             // restart map 2 but don't connect it to map one
