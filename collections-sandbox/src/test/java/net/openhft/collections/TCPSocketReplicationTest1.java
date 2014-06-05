@@ -73,7 +73,7 @@ public class TCPSocketReplicationTest1 {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
                 Thread.sleep(1000);
-                map1.put(i * 2, "E1");
+       //         map1.put(i * 2, "E1");
                 System.out.println(map1);
             }
         }

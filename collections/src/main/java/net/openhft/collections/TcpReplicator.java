@@ -120,8 +120,6 @@ class TcpReplicator implements Closeable {
                 final long approxTime = System.currentTimeMillis();
                 final long heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval();
 
-                // we add a 10% safety margin, due time fluctuations on the network
-                final long approxTimeOutTime = approxTime + (long) (heartBeatInterval * 1.10);
 
                 final Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
@@ -144,7 +142,9 @@ class TcpReplicator implements Closeable {
                         if (key.isWritable())
                             onWrite(key, approxTime);
 
-                        checkHeartbeat(key, approxTimeOutTime, identifier, pendingRegistrations);
+                        // we add a 10% safety margin tot he timeout time,
+                        // due time fluctuations on the network
+                        checkHeartbeat(key, approxTime, identifier, (long) (heartBeatInterval * 1.10));
 
                     } catch (CancelledKeyException e) {
                         quietClose(key, e);
@@ -206,9 +206,9 @@ class TcpReplicator implements Closeable {
     }
 
     private void checkHeartbeat(SelectionKey key,
-                                final long timeOutTime,
+                                final long approxTimeOutTime,
                                 final byte identifier,
-                                final Queue<SelectableChannel> pendingRegistrations) throws ConnectException {
+                                final double timeout) throws ConnectException {
 
         final Attached attached = (Attached) key.attachment();
 
@@ -221,7 +221,7 @@ class TcpReplicator implements Closeable {
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
-        if (timeOutTime < attached.entryReader.lastHeartBeatReceived) {
+        if (approxTimeOutTime > attached.entryReader.lastHeartBeatReceived + timeout) {
             connector.asyncReconnect(identifier, channel.socket());
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
@@ -630,8 +630,7 @@ class TcpReplicator implements Closeable {
         final Attached attached = (Attached) key.attachment();
 
         try {
-            if (attached.entryReader.readSocketToBuffer(socketChannel
-            ) <= 0)
+            if (attached.entryReader.readSocketToBuffer(socketChannel) <= 0)
                 return;
 
         } catch (IOException e) {
