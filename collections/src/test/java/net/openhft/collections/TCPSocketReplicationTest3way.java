@@ -103,6 +103,30 @@ public class TCPSocketReplicationTest3way {
 
 
     @Test
+    public void testClear() throws IOException, InterruptedException {
+
+        assertEquals(null, map1.put(1, "EXAMPLE-1"));
+        assertEquals(null, map1.put(2, "EXAMPLE-2"));
+        assertNotEquals(null, map1.put(2, "EXAMPLE-1"));
+
+        assertEquals(null, map2.put(5, "EXAMPLE-2"));
+        assertEquals(null, map2.put(6, "EXAMPLE-2"));
+
+        map1.clear();
+
+        map2.put(5, "EXAMPLE-2");
+
+        // allow time for the recompilation to resolve
+        waitTillEqual(5000);
+
+        assertEquals(map1, map2);
+        assertEquals(map3, map3);
+        assertTrue(!map1.isEmpty());
+
+    }
+
+
+    @Test
     public void testPutIfAbsent() throws IOException, InterruptedException {
 
         assertEquals(null, map1.putIfAbsent(1, "EXAMPLE-1"));

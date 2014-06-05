@@ -473,7 +473,6 @@ class TcpReplicator implements Closeable {
                             LOG.error("", e);
                         }
                 }
-
             }
 
         }

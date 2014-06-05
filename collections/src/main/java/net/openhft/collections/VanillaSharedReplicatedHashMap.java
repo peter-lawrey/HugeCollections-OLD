@@ -866,20 +866,13 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
          * removes all the entries
          */
         void clear() {
-            lock();
-            try {
-                // we have to make sure that every calls notifies on remove,
-                // so that the replicators can pick it up
-                for (K k : keySet()) {
-                    VanillaSharedReplicatedHashMap.this.remove(k);
-                }
 
-                hashLookupLiveOnly.clear();
-                resetSize();
-
-            } finally {
-                unlock();
+            // we have to make sure that every calls notifies on remove,
+            // so that the replicators can pick it up
+            for (K k : keySet()) {
+                VanillaSharedReplicatedHashMap.this.remove(k);
             }
+
         }
 
         void visit(IntIntMultiMap.EntryConsumer entryConsumer) {

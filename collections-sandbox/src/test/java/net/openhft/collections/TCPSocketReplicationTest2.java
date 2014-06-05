@@ -70,7 +70,9 @@ public class TCPSocketReplicationTest2 {
     public void testContinueToPublish() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
+                Thread.sleep(1000);
                 map2.put(i * 2, "EXAMPLE-1");
+                System.out.println(map2);
             }
         }
     }
