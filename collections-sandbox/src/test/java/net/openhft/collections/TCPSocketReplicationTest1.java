@@ -37,7 +37,7 @@ import static net.openhft.collections.Builder.getPersistenceFile;
 
 public class TCPSocketReplicationTest1 {
 
-    private SharedHashMap<Integer, CharSequence> map3;
+    private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
     public void setup() throws IOException {
@@ -46,9 +46,9 @@ public class TCPSocketReplicationTest1 {
                 new InetSocketAddress("192.168.0.254", 8079))
                 .heartBeatInterval(1000);
 
-        map3 = new SharedHashMapBuilder()
+        map1 = new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) 3)
+                .identifier((byte) 1)
                 .tcpReplication(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
@@ -57,7 +57,7 @@ public class TCPSocketReplicationTest1 {
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map3}) {
+        for (final Closeable closeable : new Closeable[]{map1}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -69,10 +69,11 @@ public class TCPSocketReplicationTest1 {
 
     @Test
     @Ignore
-    public void testContinueToPublish() throws IOException, InterruptedException {
+    public void testContinueToReceive() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
-                System.out.println(map3);
+                Thread.sleep(1000);
+                System.out.println(map1);
             }
         }
     }
