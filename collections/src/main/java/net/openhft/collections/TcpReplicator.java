@@ -121,7 +121,7 @@ class TcpReplicator implements Closeable {
                 final long heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval();
 
                 // we add a 10% safety margin, due time fluctuations on the network
-                final long approxTimeOutTime = approxTime - (long) (heartBeatInterval * 1.10);
+                final long approxTimeOutTime = approxTime + (long) (heartBeatInterval * 1.10);
 
                 final Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
@@ -221,7 +221,7 @@ class TcpReplicator implements Closeable {
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
-        if (timeOutTime > attached.entryReader.lastHeartBeatReceived) {
+        if (timeOutTime < attached.entryReader.lastHeartBeatReceived) {
             connector.asyncReconnect(identifier, channel.socket(), pendingRegistrations);
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
@@ -633,6 +633,9 @@ class TcpReplicator implements Closeable {
                 connector) <= 0)
             return;
 
+        if (LOG.isDebugEnabled())
+            LOG.debug("heartbeat or data received.");
+
         attached.entryReader.lastHeartBeatReceived = approxTime;
 
         if (attached.isHandShakingComplete())
@@ -924,12 +927,16 @@ class TcpReplicator implements Closeable {
                         return;
                     }
 
-                    sizeOfNextEntry = out.readUnsignedShort();
+                    int value = out.readUnsignedShort();
+
+                    // this is the heartbeat
+                    if (value == 0)
+                        continue;
+
+                    //this is the heart beat
+                    sizeOfNextEntry = value;
                 }
 
-                // this is the heartbeat
-                if (sizeOfNextEntry == 0)
-                    continue;
 
                 if (out.remaining() < sizeOfNextEntry) {
                     return;
