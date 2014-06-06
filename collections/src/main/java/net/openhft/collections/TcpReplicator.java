@@ -492,7 +492,7 @@ class TcpReplicator implements Closeable {
             if (!channel.finishConnect()) {
                 return;
             }
-        } catch (ConnectException e) {
+        } catch (SocketException e) {
             quietClose(key, e);
             connector.asyncReconnect(identifier, channel.socket());
             throw e;
