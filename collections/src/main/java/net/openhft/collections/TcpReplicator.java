@@ -312,14 +312,11 @@ class TcpReplicator implements Closeable {
 
             final Integer lastAttempts = connectionAttempts.get(inetSocketAddress);
             final Integer attempts = lastAttempts == null ? 1 : lastAttempts + 1;
-            connectionAttempts.put(inetSocketAddress, attempts);
 
-            int reconnectionInterval = (attempts * attempts) * 100;
+            if (attempts < 5)
+                connectionAttempts.put(inetSocketAddress, attempts);
 
-            // limit the reconnectionInterval to 20 seconds
-            if (reconnectionInterval > 20 * 1000)
-                reconnectionInterval = 20 * 1000;
-
+            long reconnectionInterval = attempts * 1000;
             asyncConnect0(identifier, null, Collections.singleton(inetSocketAddress), reconnectionInterval);
         }
 
