@@ -449,9 +449,6 @@ class TcpReplicator implements Closeable {
                         socketChannel.connect(details.address);
                         details.closeables.add(socketChannel);
                     }
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("successfully connected to {}, local-id={}", details.address,
-                                details.identifier);
 
                     success = true;
                     return socketChannel;
@@ -499,6 +496,9 @@ class TcpReplicator implements Closeable {
         }
 
         connector.setSuccessfullyConnected(channel.socket());
+        if (LOG.isDebugEnabled())
+            LOG.debug("successfully connected to {}, local-id={}", channel.socket().getInetAddress(),
+                    identifier);
 
         channel.configureBlocking(false);
         channel.socket().setTcpNoDelay(true);
