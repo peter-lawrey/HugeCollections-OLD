@@ -552,7 +552,7 @@ class TcpReplicator implements Closeable {
                 externalizable, packetSize);
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                externalizable, packetSize, heartBeatPeriod);
+                externalizable, packetSize, attached.remoteHeartbeatInterval);
         attached.isServer = true;
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
@@ -587,8 +587,12 @@ class TcpReplicator implements Closeable {
                         map.identifier(), remoteIdentifier);
             }
 
-            if (remoteIdentifier == map.identifier())
-                throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
+            if (remoteIdentifier == map.identifier()) {
+                throw new IllegalStateException("Where are connecting to a remote " +
+                        "map with the same " +
+                        "identifier as this map, identifier=" + map.identifier() + ", " +
+                        "please change either this maps identifier or the remote one");
+            }
 
             attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
             writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
@@ -633,7 +637,7 @@ class TcpReplicator implements Closeable {
             attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator);
 
         try {
-            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime);
+            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime, attached.entryWriter.remoteHeartbeatInterval);
         } catch (IOException e) {
             quietClose(key, e);
             if (!attached.isServer)
@@ -732,20 +736,20 @@ class TcpReplicator implements Closeable {
         private final EntryCallback entryCallback;
         private final int serializedEntrySize;
         private long lastSentTime;
-        private long heartBeatPeriod;
+        private long remoteHeartbeatInterval;
 
         /**
-         * @param serializedEntrySize the size of the entry
-         * @param externalizable      supports reading and writing serialize entries
-         * @param packetSize          the max TCP/IP packet size
-         * @param heartBeatInterval   the frequency of the heartbeat
+         * @param serializedEntrySize     the size of the entry
+         * @param externalizable          supports reading and writing serialize entries
+         * @param packetSize              the max TCP/IP packet size
+         * @param remoteHeartbeatInterval the frequency of the heartbeat
          */
         TcpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final EntryExternalizable externalizable,
                                     int packetSize,
-                                    long heartBeatInterval) {
+                                    long remoteHeartbeatInterval) {
             this.serializedEntrySize = serializedEntrySize;
-            this.heartBeatPeriod = heartBeatInterval;
+            this.remoteHeartbeatInterval = remoteHeartbeatInterval;
             out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
             in = new ByteBufferBytes(out);
             entryCallback = new EntryCallback(externalizable, in);
@@ -804,14 +808,16 @@ class TcpReplicator implements Closeable {
         /**
          * writes the contents of the buffer to the socket
          *
-         * @param socketChannel         the socket to publish the buffer to
+         * @param socketChannel           the socket to publish the buffer to
          * @param isHandshakingComplete
          * @param approxTime
+         * @param remoteHeartbeatInterval
          * @throws IOException
          */
         private void writeBufferToSocket(SocketChannel socketChannel,
                                          boolean isHandshakingComplete,
-                                         final long approxTime) throws IOException {
+                                         final long approxTime,
+                                         final long remoteHeartbeatInterval) throws IOException {
 
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
@@ -835,13 +841,12 @@ class TcpReplicator implements Closeable {
                 return;
             }
 
-            final long currentTimeMillis = approxTime;
-            if (isHandshakingComplete && lastSentTime + heartBeatPeriod < currentTimeMillis) {
+            if (isHandshakingComplete && lastSentTime + remoteHeartbeatInterval < approxTime) {
                 lastSentTime = approxTime;
                 writeHeartbeatToBuffer();
                 if (LOG.isDebugEnabled())
                     LOG.debug("sending heartbeat");
-                writeBufferToSocket(socketChannel, isHandshakingComplete, approxTime);
+                writeBufferToSocket(socketChannel, true, approxTime, remoteHeartbeatInterval);
             }
 
         }
