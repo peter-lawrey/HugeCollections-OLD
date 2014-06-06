@@ -302,6 +302,7 @@ class TcpReplicator implements Closeable {
 
         private final Map<InetSocketAddress, Integer> connectionAttempts = new HashMap<InetSocketAddress, Integer>();
 
+
         /**
          * used to connect both client and server sockets
          *
@@ -316,14 +317,28 @@ class TcpReplicator implements Closeable {
             final InetSocketAddress inetSocketAddress = new InetSocketAddress(clientSocket.getInetAddress()
                     .getHostName(), clientSocket.getPort());
 
-            final Integer lastAttempts = connectionAttempts.get(inetSocketAddress);
+            asyncReconnect(identifier, inetSocketAddress);
+        }
+
+        /**
+         * used to connect both client and server sockets
+         *
+         * @param identifier
+         * @param clientSocket a queue containing the SocketChannel as they become connected
+         * @return
+         */
+        private void asyncReconnect(
+                final byte identifier,
+                final InetSocketAddress clientSocket) {
+
+            final Integer lastAttempts = connectionAttempts.get(clientSocket);
             final Integer attempts = lastAttempts == null ? 1 : lastAttempts + 1;
 
             if (attempts < 5)
-                connectionAttempts.put(inetSocketAddress, attempts);
+                connectionAttempts.put(clientSocket, attempts);
 
             long reconnectionInterval = attempts * 1000;
-            asyncConnect0(identifier, null, Collections.singleton(inetSocketAddress), reconnectionInterval);
+            asyncConnect0(identifier, null, Collections.singleton(clientSocket), reconnectionInterval);
         }
 
 
@@ -456,7 +471,8 @@ class TcpReplicator implements Closeable {
                         try {
                             socketChannel.connect(details.address);
                         } catch (UnresolvedAddressException e) {
-                            TcpReplicator.this.connector.asyncReconnect(identifier, socketChannel.socket());
+                            TcpReplicator.this.connector.asyncReconnect(identifier,
+                                    (InetSocketAddress) details.address);
                             throw e;
                         }
                         details.closeables.add(socketChannel);
