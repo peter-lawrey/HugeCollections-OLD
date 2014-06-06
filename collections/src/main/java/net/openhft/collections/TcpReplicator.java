@@ -246,7 +246,7 @@ class TcpReplicator implements Closeable {
         }
 
 
-        abstract SelectableChannel connect() throws IOException, InterruptedException;
+        abstract SelectableChannel connect(byte identifier) throws IOException, InterruptedException;
 
         static class Details {
 
@@ -270,21 +270,27 @@ class TcpReplicator implements Closeable {
         }
 
         public void run() {
+            SelectableChannel socketChannel = null;
             try {
                 if (details.reconnectionInterval > 0)
                     Thread.sleep(details.reconnectionInterval);
+                else
+                    details.reconnectionInterval = 500;
                 synchronized (details.closeables) {
-                    final SelectableChannel socketChannel = connect();
+                    socketChannel = connect(details.identifier);
                     if (socketChannel == null)
                         return;
                     details.pendingRegistrations.add(socketChannel);
                     details.closeables.add(socketChannel);
-
                 }
 
-            } catch (InterruptedException e) {
-                // do nothing
-            } catch (IOException e) {
+            } catch (Exception e) {
+                if (socketChannel != null)
+                    try {
+                        socketChannel.close();
+                    } catch (IOException e1) {
+                        //
+                    }
                 LOG.error("", e);
             }
 
@@ -398,7 +404,7 @@ class TcpReplicator implements Closeable {
             this.details = details;
         }
 
-        SelectableChannel connect() throws
+        SelectableChannel connect(final byte identifier) throws
                 IOException, InterruptedException {
 
             ServerSocketChannel serverChannel = ServerSocketChannel.open();
@@ -415,7 +421,7 @@ class TcpReplicator implements Closeable {
     }
 
 
-    private static class ClientConnector extends AbstractConnector {
+    private class ClientConnector extends AbstractConnector {
 
         private final Details details;
 
@@ -426,9 +432,10 @@ class TcpReplicator implements Closeable {
 
         /**
          * blocks until connected
+         *
+         * @param identifier
          */
-        SelectableChannel connect()
-                throws IOException, InterruptedException {
+        SelectableChannel connect(final byte identifier) throws IOException, InterruptedException {
 
             boolean success = false;
 
@@ -446,15 +453,18 @@ class TcpReplicator implements Closeable {
 
                     synchronized (details.closeables) {
                         details.closeables.add(socketChannel.socket());
-                        socketChannel.connect(details.address);
+                        try {
+                            socketChannel.connect(details.address);
+                        } catch (UnresolvedAddressException e) {
+                            TcpReplicator.this.connector.asyncReconnect(identifier, socketChannel.socket());
+                            throw e;
+                        }
                         details.closeables.add(socketChannel);
                     }
 
                     success = true;
                     return socketChannel;
 
-                } catch (IOException e) {
-                    throw e;
                 } finally {
                     if (!success)
                         try {

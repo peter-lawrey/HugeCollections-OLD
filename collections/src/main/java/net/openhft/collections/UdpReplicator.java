@@ -452,7 +452,7 @@ class UdpReplicator implements Closeable {
             this.details = connectionDetails;
         }
 
-        SelectableChannel connect() throws
+        SelectableChannel connect(final byte identifier) throws
                 IOException, InterruptedException {
             final DatagramChannel server = DatagramChannel.open();
 
