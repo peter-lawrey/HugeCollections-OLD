@@ -35,7 +35,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -882,9 +881,6 @@ class TcpReplicator implements Closeable {
 
 
             if (isHandshakingComplete && lastSentTime + heartBeatInterval < approxTime) {
-                System.out.println("lastSentTime=" + TimeUnit.MILLISECONDS.toSeconds(lastSentTime) +
-                        ",remoteHeartbeatInterval=" + TimeUnit.MILLISECONDS.toSeconds(heartBeatInterval)
-                        + ",approxTime=" + TimeUnit.MILLISECONDS.toSeconds(approxTime));
                 lastSentTime = approxTime;
                 writeHeartbeatToBuffer();
                 if (LOG.isDebugEnabled())

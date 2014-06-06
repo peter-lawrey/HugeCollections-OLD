@@ -66,7 +66,7 @@ public class TCPSocketReplication4WayMapTest {
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatInterval(1000);
+                InetSocketAddress).heartBeatInterval(100);
 
         return new SharedHashMapBuilder()
                 .entries(1000)
