@@ -35,6 +35,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -222,6 +223,7 @@ class TcpReplicator implements Closeable {
             if (LOG.isDebugEnabled())
                 LOG.debug("lost connection, attempting to reconnect. identifier=" + identifier);
             try {
+                channel.socket().close();
                 channel.close();
             } catch (IOException e) {
                 LOG.debug("", e);
@@ -603,6 +605,7 @@ class TcpReplicator implements Closeable {
 
             attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
             writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
+            writer.writeRemoteHeartbeatInterval(localHeartbeatInterval);
         }
 
         if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE) {
@@ -611,10 +614,6 @@ class TcpReplicator implements Closeable {
 
             if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE)
                 return;
-
-            writer.writeRemoteHeartbeatInterval(localHeartbeatInterval);
-            attached.remoteModificationIterator.dirtyEntries(attached.remoteBootstrapTimestamp);
-
         }
 
         if (!attached.hasRemoteHeartbeatInterval) {
@@ -624,6 +623,11 @@ class TcpReplicator implements Closeable {
             if (value == Long.MIN_VALUE)
                 return;
 
+            if (value < 0) {
+                LOG.error("value=" + value);
+            }
+
+
             // we add a 10% safety margin to the timeout time due to latency fluctuations on the network,
             // in other words we wont consider a connection to have
             // timed out, unless the heartbeat interval has exceeded 10% of the expected time.
@@ -632,6 +636,7 @@ class TcpReplicator implements Closeable {
 
             // now we're finished we can get on with reading the entries
             attached.setHandShakingComplete();
+            attached.remoteModificationIterator.dirtyEntries(attached.remoteBootstrapTimestamp);
             reader.entriesFromBuffer();
         }
     }
@@ -826,6 +831,7 @@ class TcpReplicator implements Closeable {
 
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
+
                 lastSentTime = approxTime;
                 out.limit((int) in.position());
 
@@ -847,6 +853,9 @@ class TcpReplicator implements Closeable {
             }
 
             if (isHandshakingComplete && lastSentTime + remoteHeartbeatInterval < approxTime) {
+                System.out.println("lastSentTime=" + TimeUnit.MILLISECONDS.toSeconds(lastSentTime) +
+                        ",remoteHeartbeatInterval=" + TimeUnit.MILLISECONDS.toSeconds(remoteHeartbeatInterval)
+                        + ",approxTime=" + TimeUnit.MILLISECONDS.toSeconds(approxTime));
                 lastSentTime = approxTime;
                 writeHeartbeatToBuffer();
                 if (LOG.isDebugEnabled())
