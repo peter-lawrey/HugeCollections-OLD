@@ -80,10 +80,12 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
 
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map3 = newTcpSocketShmIntString((byte) 3, 8078, new InetSocketAddress("localhost", 8079));
-        map4 = newTcpSocketShmIntString((byte) 4, 8079);
+        map1 = newTcpSocketShmIntString((byte) 1, 8086, new InetSocketAddress("localhost", 8087),
+                new InetSocketAddress("localhost", 8088), new InetSocketAddress("localhost", 8089));
+        map2 = newTcpSocketShmIntString((byte) 2, 8087, new InetSocketAddress("localhost", 8088),
+                new InetSocketAddress("localhost", 8089));
+        map3 = newTcpSocketShmIntString((byte) 3, 8088, new InetSocketAddress("localhost", 8089));
+        map4 = newTcpSocketShmIntString((byte) 4, 8089);
     }
 
     @After
