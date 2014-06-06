@@ -20,7 +20,10 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.io.*;
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.io.MappedStore;
+import net.openhft.lang.io.MultiStoreBytes;
+import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -472,8 +475,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 }
                 // key is not found
                 if (LOG.isDebugEnabled())
-                    LOG.debug("Segment.remoteRemove() : key=" + AbstractBytes.toString(keyBytes)
-                            .trim() + " was not found");
+                    LOG.debug("Segment.remoteRemove() : key=" + keyBytes.toString().trim() + " was not " +
+                            "found");
             } finally {
                 unlock();
             }
@@ -953,12 +956,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         if (debugEnabled) {
             if (isDeleted) {
                 LOG.debug("WRITING ENTRY TO DEST -  into local-id={}, remove(key={})",
-                        localIdentifier, AbstractBytes.toString(entry).trim());
+                        localIdentifier, entry.toString().trim());
             } else {
                 message = String.format(
                         "WRITING ENTRY TO DEST  -  into local-id=%d, put(key=%s,",
-                        localIdentifier, AbstractBytes.toString(entry).trim()
-                );
+                        localIdentifier, entry.toString().trim());
             }
         }
 
@@ -975,7 +977,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         destination.write(entry);
 
         if (debugEnabled) {
-            LOG.debug(message + "value=" + AbstractBytes.toString(entry).trim() + ")");
+            LOG.debug(message + "value=" + entry.toString().trim() + ")");
         }
     }
 
@@ -1027,7 +1029,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             if (debugEnabled) {
                 LOG.debug(
                         "READING FROM SOURCE -  into local-id={}, remote={}, remove(key={})",
-                        localIdentifier, remoteIdentifier, AbstractBytes.toString(source).trim()
+                        localIdentifier, remoteIdentifier, source.toString().trim()
                 );
             }
 
@@ -1040,8 +1042,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         if (debugEnabled) {
             message = String.format(
                     "READING FROM SOURCE -  into local-id=%d, remote-id=%d, put(key=%s,",
-                    localIdentifier, remoteIdentifier, AbstractBytes.toString(source).trim()
-            );
+                    localIdentifier, remoteIdentifier, source.toString().trim());
         }
 
         final long valuePosition = keyLimit;
@@ -1053,7 +1054,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         if (debugEnabled) {
             source.limit(valueLimit);
             source.position(valuePosition);
-            LOG.debug(message + "value=" + AbstractBytes.toString(source).trim() + ")");
+            LOG.debug(message + "value=" + source.toString().trim() + ")");
         }
     }
 
