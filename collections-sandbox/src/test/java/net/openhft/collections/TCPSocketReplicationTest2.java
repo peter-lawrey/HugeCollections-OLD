@@ -42,7 +42,7 @@ public class TCPSocketReplicationTest2 {
     public void setup() throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079)
-                .heartBeatInterval(1000);
+                .heartBeatInterval(10000);
 
         map2 = new SharedHashMapBuilder()
                 .entries(1000)

@@ -310,7 +310,7 @@ class TcpReplicator implements Closeable {
             final InetSocketAddress inetSocketAddress = new InetSocketAddress(clientSocket.getInetAddress()
                     .getHostName(), clientSocket.getPort());
 
-            final Integer lastAttempts = connectionAttempts.get(connectionAttempts);
+            final Integer lastAttempts = connectionAttempts.get(inetSocketAddress);
             final Integer attempts = lastAttempts == null ? 1 : lastAttempts + 1;
             connectionAttempts.put(inetSocketAddress, attempts);
 
