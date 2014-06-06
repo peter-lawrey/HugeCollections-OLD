@@ -142,7 +142,6 @@ class TcpReplicator implements Closeable {
                         if (key.isWritable())
                             onWrite(key, approxTime);
 
-
                         checkHeartbeat(key, approxTime, identifier);
 
                     } catch (CancelledKeyException e) {
@@ -214,12 +213,20 @@ class TcpReplicator implements Closeable {
         if (key.channel() == serverSocketChannel || attached == null)
             return;
 
-        if (!attached.isHandShakingComplete())
+        if (attached.isServer || !attached.isHandShakingComplete())
             return;
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
         if (approxTimeOutTime > attached.entryReader.lastHeartBeatReceived + attached.remoteHeartbeatInterval) {
+            if (LOG.isDebugEnabled())
+                LOG.debug("lost connection, attempting to reconnect. identifier=" + identifier);
+            try {
+                channel.close();
+            } catch (IOException e) {
+                LOG.debug("", e);
+            }
+
             connector.asyncReconnect(identifier, channel.socket());
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
@@ -504,7 +511,7 @@ class TcpReplicator implements Closeable {
                 externalizable, packetSize);
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                externalizable, packetSize, heartBeatIntervalMilliseconds);
+                externalizable, packetSize);
 
         channel.register(selector, OP_WRITE | OP_READ, attached);
 
@@ -552,7 +559,7 @@ class TcpReplicator implements Closeable {
                 externalizable, packetSize);
 
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
-                externalizable, packetSize, attached.remoteHeartbeatInterval);
+                externalizable, packetSize);
         attached.isServer = true;
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
@@ -637,7 +644,8 @@ class TcpReplicator implements Closeable {
             attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator);
 
         try {
-            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(), approxTime, attached.entryWriter.remoteHeartbeatInterval);
+            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(),
+                    approxTime, attached.remoteHeartbeatInterval);
         } catch (IOException e) {
             quietClose(key, e);
             if (!attached.isServer)
@@ -736,20 +744,17 @@ class TcpReplicator implements Closeable {
         private final EntryCallback entryCallback;
         private final int serializedEntrySize;
         private long lastSentTime;
-        private long remoteHeartbeatInterval;
+
 
         /**
-         * @param serializedEntrySize     the size of the entry
-         * @param externalizable          supports reading and writing serialize entries
-         * @param packetSize              the max TCP/IP packet size
-         * @param remoteHeartbeatInterval the frequency of the heartbeat
+         * @param serializedEntrySize the size of the entry
+         * @param externalizable      supports reading and writing serialize entries
+         * @param packetSize          the max TCP/IP packet size
          */
         TcpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final EntryExternalizable externalizable,
-                                    int packetSize,
-                                    long remoteHeartbeatInterval) {
+                                    int packetSize) {
             this.serializedEntrySize = serializedEntrySize;
-            this.remoteHeartbeatInterval = remoteHeartbeatInterval;
             out = ByteBuffer.allocateDirect(packetSize + serializedEntrySize);
             in = new ByteBufferBytes(out);
             entryCallback = new EntryCallback(externalizable, in);
