@@ -157,7 +157,7 @@ public class TCPSocketReplicationTest {
             }
 
         }
-
+        System.out.println("");
         waitTillEqual(5000);
 
     }

@@ -137,14 +137,13 @@ class TcpReplicator implements Closeable {
                                     map.identifier(), heartBeatInterval);
 
                         if (key.isReadable())
-                            onRead(map, key, approxTime);
+                            onRead(map, key, approxTime, tcpReplicatorBuilder.heartBeatInterval());
 
                         if (key.isWritable())
                             onWrite(key, approxTime);
 
-                        // we add a 10% safety margin tot he timeout time,
-                        // due time fluctuations on the network
-                        checkHeartbeat(key, approxTime, identifier, (long) (heartBeatInterval * 1.10));
+
+                        checkHeartbeat(key, approxTime, identifier);
 
                     } catch (CancelledKeyException e) {
                         quietClose(key, e);
@@ -207,8 +206,7 @@ class TcpReplicator implements Closeable {
 
     private void checkHeartbeat(SelectionKey key,
                                 final long approxTimeOutTime,
-                                final byte identifier,
-                                final double timeout) throws ConnectException {
+                                final byte identifier) throws ConnectException {
 
         final Attached attached = (Attached) key.attachment();
 
@@ -221,7 +219,7 @@ class TcpReplicator implements Closeable {
 
         final SocketChannel channel = (SocketChannel) key.channel();
 
-        if (approxTimeOutTime > attached.entryReader.lastHeartBeatReceived + timeout) {
+        if (approxTimeOutTime > attached.entryReader.lastHeartBeatReceived + attached.remoteHeartbeatInterval) {
             connector.asyncReconnect(identifier, channel.socket());
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
                     .remoteIdentifier + " (attempting an automatic reconnection)");
@@ -564,42 +562,66 @@ class TcpReplicator implements Closeable {
      *
      * @param map
      * @param attached
+     * @param localHeartbeatInterval
      * @throws java.io.IOException
      * @throws InterruptedException
      */
     private void doHandShaking(final ReplicatedSharedHashMap map,
-                               final Attached attached) throws IOException, InterruptedException {
+                               final Attached attached,
+                               final long localHeartbeatInterval) throws IOException, InterruptedException {
+
+        final TcpSocketChannelEntryWriter writer = attached.entryWriter;
+        final TcpSocketChannelEntryReader reader = attached.entryReader;
 
         if (attached.remoteIdentifier == Byte.MIN_VALUE) {
 
-            final byte remoteIdentifier = attached.entryReader.identifierFromBuffer();
+            final byte remoteIdentifier = reader.identifierFromBuffer();
 
-            if (remoteIdentifier != Byte.MIN_VALUE) {
-                attached.remoteIdentifier = remoteIdentifier;
+            if (remoteIdentifier == Byte.MIN_VALUE)
+                return;
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("server-connection id={}, remoteIdentifier={}",
-                            map.identifier(), remoteIdentifier);
-                }
+            attached.remoteIdentifier = remoteIdentifier;
 
-                if (remoteIdentifier == map.identifier())
-                    throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
-
-                attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
-                attached.entryWriter.timestampToBuffer(map.lastModificationTime(remoteIdentifier));
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("server-connection id={}, remoteIdentifier={}",
+                        map.identifier(), remoteIdentifier);
             }
+
+            if (remoteIdentifier == map.identifier())
+                throw new IllegalStateException("Non unique identifiers id=" + map.identifier());
+
+            attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier);
+            writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
         }
 
-        if (attached.remoteIdentifier != Byte.MIN_VALUE &&
-                attached.remoteTimestamp == Long.MIN_VALUE) {
+        if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE) {
 
-            attached.remoteTimestamp = attached.entryReader.timeStampFromBuffer();
+            attached.remoteBootstrapTimestamp = reader.remoteBootstrapTimestamp();
 
-            if (attached.remoteTimestamp != Long.MIN_VALUE) {
-                attached.remoteModificationIterator.dirtyEntries(attached.remoteTimestamp);
-                attached.setHandShakingComplete();
-                attached.entryReader.entriesFromBuffer();
-            }
+            if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE)
+                return;
+
+            writer.writeRemoteHeartbeatInterval(localHeartbeatInterval);
+            attached.remoteModificationIterator.dirtyEntries(attached.remoteBootstrapTimestamp);
+
+        }
+
+        if (!attached.hasRemoteHeartbeatInterval) {
+
+            long value = reader.remoteHeartbeatIntervalFromBuffer();
+
+            if (value == Long.MIN_VALUE)
+                return;
+
+            // we add a 10% safety margin to the timeout time due to latency fluctuations on the network,
+            // in other words we wont consider a connection to have
+            // timed out, unless the heartbeat interval has exceeded 10% of the expected time.
+            attached.remoteHeartbeatInterval = (long) (value * 1.1);
+            attached.hasRemoteHeartbeatInterval = true;
+
+            // now we're finished we can get on with reading the entries
+            attached.setHandShakingComplete();
+            reader.entriesFromBuffer();
         }
     }
 
@@ -624,7 +646,8 @@ class TcpReplicator implements Closeable {
 
     private void onRead(final ReplicatedSharedHashMap map,
                         final SelectionKey key,
-                        final long approxTime) throws IOException, InterruptedException {
+                        final long approxTime,
+                        final long localHeartbeatInterval) throws IOException, InterruptedException {
 
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
@@ -648,7 +671,7 @@ class TcpReplicator implements Closeable {
         if (attached.isHandShakingComplete())
             attached.entryReader.entriesFromBuffer();
         else
-            doHandShaking(map, attached);
+            doHandShaking(map, attached, localHeartbeatInterval);
 
     }
 
@@ -673,9 +696,16 @@ class TcpReplicator implements Closeable {
 
         public TcpSocketChannelEntryReader entryReader;
         public ModificationIterator remoteModificationIterator;
-        public long remoteTimestamp = Long.MIN_VALUE;
+
+
+        public long remoteBootstrapTimestamp = Long.MIN_VALUE;
         private boolean handShakingComplete;
         public byte remoteIdentifier = Byte.MIN_VALUE;
+
+        // the frequency the remote node will send a heartbeat
+        public long remoteHeartbeatInterval = 100;
+        public boolean hasRemoteHeartbeatInterval;
+
         public TcpSocketChannelEntryWriter entryWriter;
         public boolean isServer;
 
@@ -686,6 +716,7 @@ class TcpReplicator implements Closeable {
         void setHandShakingComplete() {
             handShakingComplete = true;
         }
+
 
     }
 
@@ -735,7 +766,7 @@ class TcpReplicator implements Closeable {
          *
          * @param timeStampOfLastMessage the last timestamp we received a message from that node
          */
-        void timestampToBuffer(final long timeStampOfLastMessage) {
+        void writeRemoteBootstrapTimestamp(final long timeStampOfLastMessage) {
             in.writeLong(timeStampOfLastMessage);
         }
 
@@ -778,9 +809,9 @@ class TcpReplicator implements Closeable {
          * @param approxTime
          * @throws IOException
          */
-        public void writeBufferToSocket(SocketChannel socketChannel,
-                                        boolean isHandshakingComplete,
-                                        final long approxTime) throws IOException {
+        private void writeBufferToSocket(SocketChannel socketChannel,
+                                         boolean isHandshakingComplete,
+                                         final long approxTime) throws IOException {
 
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
@@ -807,7 +838,7 @@ class TcpReplicator implements Closeable {
             final long currentTimeMillis = approxTime;
             if (isHandshakingComplete && lastSentTime + heartBeatPeriod < currentTimeMillis) {
                 lastSentTime = approxTime;
-                writeHeartBeatToBuffer();
+                writeHeartbeatToBuffer();
                 if (LOG.isDebugEnabled())
                     LOG.debug("sending heartbeat");
                 writeBufferToSocket(socketChannel, isHandshakingComplete, approxTime);
@@ -815,8 +846,15 @@ class TcpReplicator implements Closeable {
 
         }
 
-        private void writeHeartBeatToBuffer() {
+        /**
+         * used to send an single zero byte if we have not send any data for up to the localHeartbeatInterval
+         */
+        private void writeHeartbeatToBuffer() {
             in.writeUnsignedShort(0);
+        }
+
+        private void writeRemoteHeartbeatInterval(long localHeartbeatInterval) {
+            in.writeLong(localHeartbeatInterval);
         }
     }
 
@@ -982,7 +1020,11 @@ class TcpReplicator implements Closeable {
         /**
          * @return the timestamp or -1 if unsuccessful
          */
-        long timeStampFromBuffer() {
+        long remoteBootstrapTimestamp() {
+            return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
+        }
+
+        public long remoteHeartbeatIntervalFromBuffer() {
             return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
         }
     }

@@ -97,10 +97,12 @@ public class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param heartBeatInterval in milliseconds
+     * @param heartBeatInterval in milliseconds, must be greater than ZERO
      * @return
      */
     public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval) {
+        if (heartBeatInterval <= 0) throw new IllegalArgumentException("heartBeatInterval must be greater " +
+                "than zero");
         this.heartBeatInterval = heartBeatInterval;
         return this;
     }
