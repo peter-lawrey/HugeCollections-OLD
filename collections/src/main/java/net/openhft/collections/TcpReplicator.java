@@ -232,7 +232,7 @@ class TcpReplicator implements Closeable {
 
             connector.asyncReconnect(identifier, channel.socket());
             throw new ConnectException("LostConnection : missed heartbeat from identifier=" + attached
-                    .remoteIdentifier + " (attempting an automatic reconnection)");
+                    .remoteIdentifier + " attempting to reconnect");
         }
     }
 
