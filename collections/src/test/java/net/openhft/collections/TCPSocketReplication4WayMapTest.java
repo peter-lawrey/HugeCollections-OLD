@@ -150,7 +150,7 @@ public class TCPSocketReplication4WayMapTest {
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000);
+        waitTillEqual(5000);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
