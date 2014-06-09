@@ -71,22 +71,21 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         this.tcpReplicatorBuilder = tcpReplicatorBuilder;
 
-        if (tcpReplicatorBuilder.throttle() > 0) {
+        if (tcpReplicatorBuilder.throttle() > 0)
             throttler = new Throttler(selector, 100, serializedEntrySize, tcpReplicatorBuilder.throttle());
 
-            this.executorService.execute(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                process(map, serializedEntrySize, externalizable, tcpReplicatorBuilder);
-                            } catch (Exception e) {
-                                LOG.error("", e);
-                            }
+        this.executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            process(map, serializedEntrySize, externalizable, tcpReplicatorBuilder);
+                        } catch (Exception e) {
+                            LOG.error("", e);
                         }
                     }
-            );
-        }
+                }
+        );
     }
 
 
@@ -368,7 +367,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                             }
 
                             socketChannel.close();
-                            throttler.remove(socketChannel);
+                            if (throttler != null)
+                                throttler.remove(socketChannel);
                         } catch (IOException e) {
                             LOG.error("", e);
                         }

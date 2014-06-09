@@ -51,8 +51,6 @@ abstract class AbstractChannelReplicator implements Closeable {
     final Selector selector;
     final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
 
-    final int throttleInterval = 100;
-
 
     AbstractChannelReplicator(String name) throws IOException {
         executorService = Executors.newSingleThreadExecutor(
@@ -155,7 +153,7 @@ abstract class AbstractChannelReplicator implements Closeable {
                     final SelectionKey selectionKey = selectableChannel.keyFor(selector);
                     if (selectionKey != null) {
                         attachment = selectionKey.attachment();
-                        selectableChannel.register(selector, OP_WRITE, attachment);
+                        selectableChannel.register(selector, OP_WRITE | SelectionKey.OP_READ, attachment);
                     }
 
                 } catch (IOException e) {
@@ -185,7 +183,8 @@ abstract class AbstractChannelReplicator implements Closeable {
             if (byteWritten > maxBytesInInterval) {
 
                 for (SelectableChannel channel : channels) {
-                    channel.register(selector, 0);
+                    final SelectionKey selectionKey = channel.keyFor(selector);
+                    channel.register(selector, SelectionKey.OP_READ, selectionKey.attachment());
 
                     if (LOG.isDebugEnabled())
                         LOG.debug("Throttling UDP writes");

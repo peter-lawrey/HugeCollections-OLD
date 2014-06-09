@@ -44,7 +44,7 @@ public class TCPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 new InetSocketAddress("192.168.0.254", 8079))
-                .throttle(300)
+                //.throttle(300)
                 .heartBeatInterval(1000);
 
 
@@ -74,7 +74,7 @@ public class TCPSocketReplicationTest1 {
     public void testContinueToReceive() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
-               // Thread.sleep(100);
+          Thread.sleep(100);
                 map1.put(i * 2, "E1");
                 System.out.println(map1);
             }
