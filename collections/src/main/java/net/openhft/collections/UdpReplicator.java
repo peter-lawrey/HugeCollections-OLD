@@ -202,7 +202,6 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
             if (LOG.isDebugEnabled())
                 LOG.debug("Listening on port " + port);
-            client.register(selector, OP_READ);
             closeables.add(client);
         }
         return client;

@@ -150,9 +150,10 @@ abstract class AbstractChannelReplicator implements Closeable {
 
                 try {
                     final SelectionKey selectionKey = selectableChannel.keyFor(selector);
-                    attachment = selectionKey.attachment();
-                    selectableChannel.register(selector, OP_WRITE, attachment);
-
+                    if (selectionKey != null) {
+                        attachment = selectionKey.attachment();
+                        selectableChannel.register(selector, OP_WRITE, attachment);
+                    }
 
                 } catch (IOException e) {
                     if (LOG.isDebugEnabled())

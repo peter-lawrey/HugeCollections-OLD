@@ -55,7 +55,7 @@ public class UDPSocketReplicationTest {
     @Before
     public void setup() throws IOException {
         //      map1 = newUdpSocketShmIntString(1, 1234);
-        map2 = newUdpSocketShmIntString(2, 1234);
+        map2 = newUdpSocketShmIntString(1, 1234);
         try {
             Thread.sleep(500);
         } catch (InterruptedException e) {
@@ -81,7 +81,8 @@ public class UDPSocketReplicationTest {
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
-            Thread.sleep(1000);
+            Thread.sleep(5000);
+            map2.put(i*2, "E");
             System.out.println("" + map2);
         }
 
