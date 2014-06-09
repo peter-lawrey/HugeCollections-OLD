@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
@@ -51,7 +52,6 @@ abstract class AbstractChannelReplicator implements Closeable {
     final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
 
     final int throttleInterval = 100;
-    long maxBytesInInterval;
 
 
     AbstractChannelReplicator(String name) throws IOException {
@@ -115,11 +115,14 @@ abstract class AbstractChannelReplicator implements Closeable {
 
         Throttler(@NotNull Selector selector,
                   int throttleInterval,
-                  long maxBytesInInterval) {
+                  long serializedEntrySize,
+                  long bitsPerSecond) {
 
             this.selector = selector;
             this.throttleInterval = throttleInterval;
-            this.maxBytesInInterval = maxBytesInInterval;
+            this.maxBytesInInterval = (TimeUnit.SECONDS.toMillis(bitsPerSecond) /
+                    (throttleInterval * BITS_IN_A_BYTE))
+                    - serializedEntrySize;
         }
 
         public void add(SelectableChannel selectableChannel) {
@@ -171,13 +174,13 @@ abstract class AbstractChannelReplicator implements Closeable {
 
 
         /**
-         * checks the number of bytes written in the interval, so see if we should de-register the 'write' on
-         * the selector, If it has it deRegisters the selector
+         * checks the number of bytes written in this interval, if this number of bytes exceeds a threshold,
+         * the selected will de-register the socket that is being written to, until the interval is finished.
          *
          * @param len the number of bytes just written
          * @throws ClosedChannelException
          */
-        public void checkUnregisterSelector(int len) throws ClosedChannelException {
+        public void contemplateUnregistringWriteSocket(int len) throws ClosedChannelException {
             byteWritten += len;
             if (byteWritten > maxBytesInInterval) {
 
@@ -197,28 +200,18 @@ abstract class AbstractChannelReplicator implements Closeable {
 
         private final SocketAddress address;
 
-        private final Set<Closeable> closeables;
-
         private final byte identifier;
 
         Details(@NotNull SocketAddress address,
-                @NotNull Set<Closeable> closeables,
                 byte identifier) {
 
             this.address = address;
-            this.closeables = closeables;
             this.identifier = identifier;
         }
 
         public SocketAddress getAddress() {
             return address;
         }
-
-
-        public Set<Closeable> getCloseables() {
-            return closeables;
-        }
-
 
         public byte getIdentifier() {
             return identifier;
@@ -227,7 +220,7 @@ abstract class AbstractChannelReplicator implements Closeable {
 
     }
 
-    static abstract class AbstractConnector {
+    abstract class AbstractConnector {
 
         int connectionAttempts;
 
@@ -272,12 +265,12 @@ abstract class AbstractChannelReplicator implements Closeable {
                         if (reconnectionInterval > 0)
                             Thread.sleep(reconnectionInterval);
 
-                        synchronized (details.closeables) {
+                        synchronized (AbstractChannelReplicator.this.closeables) {
                             socketChannel = doConnect();
                             if (socketChannel == null)
                                 return;
 
-                            details.closeables.add(socketChannel);
+                            AbstractChannelReplicator.this.closeables.add(socketChannel);
                             AbstractConnector.this.socketChannel = socketChannel;
                         }
 
@@ -294,6 +287,7 @@ abstract class AbstractChannelReplicator implements Closeable {
 
                 }
             });
+
             thread.setName(name);
             thread.setDaemon(true);
             thread.start();

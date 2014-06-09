@@ -52,9 +52,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final int BUFFER_SIZE = 0x100000; // 1Mb
 
-    //  private final DelegatingConnector delegatingConnector = new DelegatingConnector();
-    private SelectableChannel serverSocketChannel;
-
     private final Queue<Runnable> pendingRegistrations = new
             ConcurrentLinkedQueue<Runnable>();
 
@@ -64,27 +61,32 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             ConcurrentHashMap<SocketAddress, AbstractConnector>();
     private Throttler throttler;
 
+
     TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
-                  final int serializedEntrySize,
                   @NotNull final EntryExternalizable externalizable,
-                  @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
+                  @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder,
+                  final int serializedEntrySize) throws IOException {
 
         super("TcpSocketReplicator-" + map.identifier());
 
         this.tcpReplicatorBuilder = tcpReplicatorBuilder;
 
-        this.executorService.execute(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            process(map, serializedEntrySize, externalizable, tcpReplicatorBuilder);
-                        } catch (Exception e) {
-                            LOG.error("", e);
+        if (tcpReplicatorBuilder.throttle() > 0) {
+            throttler = new Throttler(selector, 100, serializedEntrySize, tcpReplicatorBuilder.throttle());
+
+            this.executorService.execute(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                process(map, serializedEntrySize, externalizable, tcpReplicatorBuilder);
+                            } catch (Exception e) {
+                                LOG.error("", e);
+                            }
                         }
                     }
-                }
-        );
+            );
+        }
     }
 
 
@@ -99,11 +101,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         try {
 
             final InetSocketAddress address = tcpReplicatorBuilder.serverInetSocketAddress();
-            final Details serverDetails = new Details(address, closeables, identifier);
+            final Details serverDetails = new Details(address, identifier);
             connectorBySocket.put(address, new ServerConnector(serverDetails));
 
             for (InetSocketAddress client : tcpReplicatorBuilder.endpoints()) {
-                final Details clientDetails = new Details(client, closeables, identifier);
+                final Details clientDetails = new Details(client, identifier);
                 connectorBySocket.put(client, new ClientConnector(clientDetails));
             }
 
@@ -111,9 +113,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 connector.connect();
             }
 
-            if (tcpReplicatorBuilder.throttle() > 0)
-                throttler = new Throttler(selector, throttleInterval,
-                        maxBytesInInterval);
 
             for (; ; ) {
 
@@ -228,10 +227,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         final Attached attached = (Attached) key.attachment();
 
         // we wont attempt to reconnect the server socket
-        if (key.channel() == serverSocketChannel || attached == null)
-            return;
-
-        if (attached.isServer || !attached.isHandShakingComplete())
+        if (attached == null || attached.isServer || !attached.isHandShakingComplete())
             return;
 
         final SocketChannel channel = (SocketChannel) key.channel();
@@ -328,8 +324,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                     socketChannel.socket().setSoTimeout(0);
                     socketChannel.socket().setTcpNoDelay(true);
 
-                    final Set<Closeable> closeables = details.getCloseables();
-                    synchronized (closeables) {
+                    synchronized (TcpReplicator.this.closeables) {
 
                         closeables.add(socketChannel.socket());
                         try {
@@ -517,7 +512,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 LOG.error("value=" + value);
             }
 
-
             // we add a 10% safety margin to the timeout time due to latency fluctuations on the network,
             // in other words we wont consider a connection to have
             // timed out, unless the heartbeat interval has exceeded 10% of the expected time.
@@ -535,12 +529,20 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         final SocketChannel socketChannel = (SocketChannel) key.channel();
         final Attached attached = (Attached) key.attachment();
 
+        if (attached == null)
+            return;
+
         if (attached.remoteModificationIterator != null)
             attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator);
 
         try {
-            attached.entryWriter.writeBufferToSocket(socketChannel, attached.isHandShakingComplete(),
+            int len = attached.entryWriter.writeBufferToSocket(socketChannel,
+                    attached.isHandShakingComplete(),
                     approxTime);
+
+            if (this.throttler != null)
+                this.throttler.contemplateUnregistringWriteSocket(len);
+
         } catch (IOException e) {
             quietClose(key, e);
             if (!attached.isServer)
@@ -701,9 +703,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
          * @param approxTime
          * @throws IOException
          */
-        private void writeBufferToSocket(SocketChannel socketChannel,
-                                         boolean isHandshakingComplete,
-                                         final long approxTime) throws IOException {
+        private int writeBufferToSocket(SocketChannel socketChannel,
+                                        boolean isHandshakingComplete,
+                                        final long approxTime) throws IOException {
 
             // if we still have some unwritten writer from last time
             if (in.position() > 0) {
@@ -725,7 +727,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                     in.limit(in.capacity());
                     out.clear();
                 }
-                return;
+                return len;
             }
 
 
@@ -734,9 +736,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 writeHeartbeatToBuffer();
                 if (LOG.isDebugEnabled())
                     LOG.debug("sending heartbeat");
-                writeBufferToSocket(socketChannel, true, approxTime);
+                return writeBufferToSocket(socketChannel, true, approxTime);
             }
 
+            return 0;
         }
 
         /**

@@ -38,6 +38,7 @@ public class TcpReplicatorBuilder implements Cloneable {
     private short packetSize = 1024 * 8;
 
     private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
+    private long throttle;
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
@@ -131,7 +132,19 @@ public class TcpReplicatorBuilder implements Cloneable {
         return this;
     }
 
-    public int throttle() {
-        return 0;
+    /**
+     * @return bits per seconds
+     */
+    public long throttle() {
+        return this.throttle;
+    }
+
+    /**
+     * @param throttle bits per seconds
+     * @return this
+     */
+    public TcpReplicatorBuilder throttle(long throttle) {
+        this.throttle = throttle;
+        return this;
     }
 }

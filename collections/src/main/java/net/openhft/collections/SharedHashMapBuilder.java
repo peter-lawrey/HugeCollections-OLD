@@ -576,9 +576,9 @@ public final class SharedHashMapBuilder implements Cloneable {
                                             TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
 
         result.addCloseable(new TcpReplicator(result,
-                entrySize(),
                 result,
-                tcpReplicatorBuilder.clone()));
+                tcpReplicatorBuilder.clone(),
+                entrySize()));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {

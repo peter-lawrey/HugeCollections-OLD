@@ -33,14 +33,12 @@ public class UdpReplicatorBuilder implements Cloneable {
     private long throttle;
 
     /**
-     * @param port     udp port
-     * @param throttle bits per seconds
+     * @param port udp port
      * @throws UnknownHostException
      */
-    public UdpReplicatorBuilder(int port, long throttle) throws UnknownHostException {
+    public UdpReplicatorBuilder(int port) throws UnknownHostException {
         this.port = port;
         broadcastAddress = "255.255.255.255";
-        this.throttle = throttle;
     }
 
 
@@ -78,6 +76,9 @@ public class UdpReplicatorBuilder implements Cloneable {
                 ", port=" + port + '}';
     }
 
+    /**
+     * @return throttle bits per seconds
+     */
     public long throttle() {
         return this.throttle;
     }
@@ -106,67 +107,4 @@ public class UdpReplicatorBuilder implements Cloneable {
         }
     }
 
-
-    enum Unit {
-
-        BITS {
-            public long toBits(long v) {
-                return v;
-            }
-
-            public long toMegaBits(long v) {
-                return v / _MB;
-            }
-
-            public long toGigaBits(long v) {
-                return v / _GB;
-            }
-        },
-
-        MEGA_BITS {
-            public long toBits(long v) {
-                return v * _MB;
-            }
-
-            public long toMegaBits(long v) {
-                return v;
-            }
-
-            public long toGigaBits(long v) {
-                return (v * _MB) / _GB;
-            }
-        },
-
-        GIGA_BITS {
-            public long toBits(long v) {
-                return v * _GB;
-            }
-
-            public long toMegaBits(long v) {
-                return (v * _GB) / _MB;
-            }
-
-            public long toGigaBits(long v) {
-                return v;
-            }
-        };
-
-
-        public long toBits(long duration) {
-            throw new AbstractMethodError();
-        }
-
-        long toMegaBits(long value) {
-            throw new AbstractMethodError();
-        }
-
-
-        public long toGigaBits(long v) {
-            throw new AbstractMethodError();
-        }
-
-        static long _MB = 52428800;
-        static long _GB = 1073741824;
-
-    }
 }
