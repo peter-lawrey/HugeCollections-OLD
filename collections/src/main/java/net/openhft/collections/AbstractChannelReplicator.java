@@ -26,9 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.Selector;
+import java.nio.channels.*;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -48,7 +46,7 @@ abstract class AbstractChannelReplicator implements Closeable {
     final ExecutorService executorService;
     final Selector selector;
     final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
-    Throttler throttler;
+
     final int throttleInterval = 100;
     long maxBytesInInterval;
 
@@ -60,6 +58,23 @@ abstract class AbstractChannelReplicator implements Closeable {
         closeables.add(selector);
     }
 
+
+    /**
+     * Registers the SocketChannel with the selector
+     *
+     * @param selectableChannels the SelectableChannel to register
+     * @throws ClosedChannelException
+     */
+    void register(@NotNull final Queue<Runnable> selectableChannels) throws
+            ClosedChannelException {
+        for (Runnable runnable = selectableChannels.poll(); runnable != null; runnable = selectableChannels.poll()) {
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                LOG.info("", e);
+            }
+        }
+    }
 
     @Override
     public void close() {
@@ -77,101 +92,9 @@ abstract class AbstractChannelReplicator implements Closeable {
         executorService.shutdownNow();
     }
 
-
-    static class Details {
-
-        private final SocketAddress address;
-        private final Queue<SelectableChannel> pendingRegistrations;
-        private final Set<Closeable> closeables;
-        private long reconnectionInterval;
-        private final byte identifier;
-
-        Details(@NotNull SocketAddress address,
-                @NotNull Set<Closeable> closeables,
-                long reconnectionInterval,
-                byte identifier,
-                @NotNull Queue<SelectableChannel> pendingRegistrations) {
-            this.address = address;
-            this.pendingRegistrations = pendingRegistrations;
-            this.closeables = closeables;
-            this.reconnectionInterval = reconnectionInterval;
-            this.identifier = identifier;
-        }
-
-        public SocketAddress getAddress() {
-            return address;
-        }
-
-        public Queue<SelectableChannel> getPendingRegistrations() {
-            return pendingRegistrations;
-        }
-
-        public Set<Closeable> getCloseables() {
-            return closeables;
-        }
-
-        public long getReconnectionInterval() {
-            return reconnectionInterval;
-        }
-
-        public byte getIdentifier() {
-            return identifier;
-        }
-
-        public void setReconnectionInterval(int reconnectionInterval) {
-            this.reconnectionInterval = reconnectionInterval;
-        }
+    static class AbstractAttached {
+        AbstractConnector connector;
     }
-
-    static abstract class AbstractConnector implements Runnable {
-
-        private final Details details;
-
-        public AbstractConnector(@NotNull final Details details) {
-            this.details = details;
-        }
-
-        abstract SelectableChannel connect() throws IOException, InterruptedException;
-
-        final void reconnect(SelectableChannel server) throws IOException, InterruptedException {
-            try {
-                server.close();
-            } catch (IOException e1) {
-                LOG.error("", e1);
-            }
-
-            connect();
-        }
-
-        public void run() {
-            SelectableChannel socketChannel = null;
-            try {
-                if (details.reconnectionInterval > 0)
-                    Thread.sleep(details.reconnectionInterval);
-                else
-                    details.reconnectionInterval = 500;
-                synchronized (details.closeables) {
-                    socketChannel = connect();
-                    if (socketChannel == null)
-                        return;
-                    details.pendingRegistrations.add(socketChannel);
-                    details.closeables.add(socketChannel);
-                }
-
-            } catch (Exception e) {
-                if (socketChannel != null)
-                    try {
-                        socketChannel.close();
-                    } catch (IOException e1) {
-                        //
-                    }
-                LOG.error("", e);
-            }
-
-        }
-
-    }
-
 
     /**
      * throttles 'writes' to ensure the network is not swamped, this is achieved by periodically
@@ -180,23 +103,28 @@ abstract class AbstractChannelReplicator implements Closeable {
     static class Throttler {
 
         private long lastTime = System.currentTimeMillis();
-        private final Set<SelectableChannel> channels;
+        private final Set<SelectableChannel> channels = new CopyOnWriteArraySet<SelectableChannel>();
         private long byteWritten;
         private Selector selector;
         private final int throttleInterval;
         private final long maxBytesInInterval;
-        private final AbstractConnector serverConnector;
 
-        Throttler(@NotNull Set<SelectableChannel> channels,
-                  @NotNull Selector selector,
+
+        Throttler(@NotNull Selector selector,
                   int throttleInterval,
-                  long maxBytesInInterval,
-                  @NotNull AbstractConnector serverConnector) {
-            this.channels = channels;
+                  long maxBytesInInterval) {
+
             this.selector = selector;
             this.throttleInterval = throttleInterval;
             this.maxBytesInInterval = maxBytesInInterval;
-            this.serverConnector = serverConnector;
+        }
+
+        public void add(SelectableChannel selectableChannel) {
+            channels.add(selectableChannel);
+        }
+
+        public void remove(SelectableChannel socketChannel) {
+            channels.remove(socketChannel);
         }
 
         /**
@@ -213,14 +141,23 @@ abstract class AbstractChannelReplicator implements Closeable {
             lastTime = time;
             byteWritten = 0;
 
-            for (SelectableChannel channel : channels) {
+            for (SelectableChannel selectableChannel : channels) {
+
+                Object attachment = null;
+
                 try {
-                    channel.register(selector, OP_WRITE);
+                    final SelectionKey selectionKey = selectableChannel.keyFor(selector);
+                    attachment = selectionKey.attachment();
+                    selectableChannel.register(selector, OP_WRITE, attachment);
+
+
                 } catch (IOException e) {
                     if (LOG.isDebugEnabled())
                         LOG.debug("", e);
                     try {
-                        serverConnector.reconnect(channel);
+
+                        if (attachment != null)
+                            ((AbstractAttached) attachment).connector.connect();
                     } catch (Exception e1) {
                         LOG.error("", e);
                     }
@@ -249,5 +186,121 @@ abstract class AbstractChannelReplicator implements Closeable {
             }
         }
 
+
     }
+
+    static class Details {
+
+        private final SocketAddress address;
+        private final Queue<Runnable> pendingRegistrations;
+        private final Set<Closeable> closeables;
+
+        private final byte identifier;
+
+        Details(@NotNull SocketAddress address,
+                @NotNull Set<Closeable> closeables,
+                byte identifier,
+                @NotNull Queue<Runnable> pendingRegistrations) {
+            this.address = address;
+            this.pendingRegistrations = pendingRegistrations;
+            this.closeables = closeables;
+
+            this.identifier = identifier;
+        }
+
+        public SocketAddress getAddress() {
+            return address;
+        }
+
+
+        public Set<Closeable> getCloseables() {
+            return closeables;
+        }
+
+
+        public byte getIdentifier() {
+            return identifier;
+        }
+
+
+    }
+
+    static abstract class AbstractConnector {
+
+        int connectionAttempts;
+
+        private final String name;
+        private final Details details;
+
+        private volatile SelectableChannel socketChannel;
+
+        public AbstractConnector(String name, @NotNull final Details details) {
+            this.name = name;
+            this.details = details;
+        }
+
+        abstract SelectableChannel doConnect() throws IOException, InterruptedException;
+
+        /**
+         * if its already connected then the existing connection is close and its reconnected
+         *
+         * @throws IOException
+         * @throws InterruptedException
+         */
+        public final void connect() {
+            try {
+                if (socketChannel != null)
+                    socketChannel.close();
+                socketChannel = null;
+
+            } catch (IOException e1) {
+                LOG.error("", e1);
+            }
+
+
+            final long reconnectionInterval = connectionAttempts * 100;
+            if (connectionAttempts < 5)
+                connectionAttempts++;
+
+            final Thread thread = new Thread(new Runnable() {
+
+                public void run() {
+                    SelectableChannel socketChannel = null;
+                    try {
+                        if (reconnectionInterval > 0)
+                            Thread.sleep(reconnectionInterval);
+
+                        synchronized (details.closeables) {
+                            socketChannel = doConnect();
+                            if (socketChannel == null)
+                                return;
+
+                            details.closeables.add(socketChannel);
+                            AbstractConnector.this.socketChannel = socketChannel;
+                        }
+
+                    } catch (Exception e) {
+                        if (socketChannel != null)
+                            try {
+                                socketChannel.close();
+                                AbstractConnector.this.socketChannel = null;
+                            } catch (IOException e1) {
+                                //
+                            }
+                        LOG.error("", e);
+                    }
+
+                }
+            });
+            thread.setName(name);
+            thread.setDaemon(true);
+            thread.start();
+
+        }
+
+        public void setSuccessfullyConnected() {
+            connectionAttempts = 0;
+        }
+    }
+
 }

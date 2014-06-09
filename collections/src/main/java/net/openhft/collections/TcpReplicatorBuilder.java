@@ -130,4 +130,8 @@ public class TcpReplicatorBuilder implements Cloneable {
         this.serverPort = serverPort;
         return this;
     }
+
+    public int throttle() {
+        return 0;
+    }
 }

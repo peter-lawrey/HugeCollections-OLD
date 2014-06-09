@@ -61,9 +61,8 @@ public class TCPSocketReplicationBootStrapTests {
         map2a.close();
 
 
-
         {
-            // restart map 2 but don't connect it to map one
+            // restart map 2 but don't doConnect it to map one
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
@@ -74,7 +73,7 @@ public class TCPSocketReplicationBootStrapTests {
             map2b.close();
         }
 
-        // now restart map2a and connect it to map1, map1 should bootstrap the missing entry
+        // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
         map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
 
         // add data into it
@@ -105,10 +104,8 @@ public class TCPSocketReplicationBootStrapTests {
         final File map2File = map2a.file();
         map2a.close();
 
-        System.out.println("lastModificationTime=" + lastModificationTime);
-
         {
-            // restart map 2 but don't connect it to map one
+            // restart map 2 but don't doConnect it to map one
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
@@ -119,7 +116,7 @@ public class TCPSocketReplicationBootStrapTests {
             map2b.close();
         }
 
-        // now restart map2a and connect it to map1, map1 should bootstrap the missing entry
+        // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
         map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
 
         // add data into it
