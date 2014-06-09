@@ -99,11 +99,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         try {
 
             final InetSocketAddress address = tcpReplicatorBuilder.serverInetSocketAddress();
-            final Details serverDetails = new Details(address, closeables, identifier, pendingRegistrations);
+            final Details serverDetails = new Details(address, closeables, identifier);
             connectorBySocket.put(address, new ServerConnector(serverDetails));
 
             for (InetSocketAddress client : tcpReplicatorBuilder.endpoints()) {
-                final Details clientDetails = new Details(client, closeables, identifier, pendingRegistrations);
+                final Details clientDetails = new Details(client, closeables, identifier);
                 connectorBySocket.put(client, new ClientConnector(clientDetails));
             }
 

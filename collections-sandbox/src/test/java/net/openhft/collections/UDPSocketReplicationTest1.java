@@ -25,9 +25,9 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
-import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -35,38 +35,29 @@ import static net.openhft.collections.UdpReplicatorBuilder.Unit.MEGA_BITS;
  * @author Rob Austin.
  */
 
-public class UDPSocketReplicationTest {
+public class UDPSocketReplicationTest1 {
 
-    static SharedHashMap<Integer, CharSequence> newUdpSocketShmIntString(
-            final int identifier,
-            final int udpPort) throws IOException {
-
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, MEGA_BITS.toBits(50));
-        return new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier((byte) identifier)
-                .udpReplication(udpReplicatorBuilder)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
-    }
-
-    //  private SharedHashMap<Integer, CharSequence> map1;
-    private SharedHashMap<Integer, CharSequence> map2;
+    private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
     public void setup() throws IOException {
-        //      map1 = newUdpSocketShmIntString(1, 1234);
-        map2 = newUdpSocketShmIntString(2, 1234);
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
+        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
+                new InetSocketAddress("192.168.0.254", 8079))
+                .heartBeatInterval(1000);
+
+        map1 = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 1)
+                .tcpReplication(tcpReplicatorBuilder)
+                .entries(20000)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
     @After
     public void tearDown() throws InterruptedException {
 
-        for (final Closeable closeable : new Closeable[]{map2}) {
+        for (final Closeable closeable : new Closeable[]{map1}) {
             try {
                 closeable.close();
             } catch (IOException e) {
@@ -78,13 +69,14 @@ public class UDPSocketReplicationTest {
 
     @Test
     @Ignore
-    public void testBufferOverflow() throws IOException, InterruptedException {
-
-        for (int i = 0; i < 1024; i++) {
-            Thread.sleep(1000);
-            System.out.println("" + map2);
+    public void testContinueToReceive() throws IOException, InterruptedException {
+        for (; ; ) {
+            for (int i = 0; i < 1024; i++) {
+                Thread.sleep(1000);
+       //         map1.put(i * 2, "E1");
+                System.out.println(map1);
+            }
         }
-
     }
 
 

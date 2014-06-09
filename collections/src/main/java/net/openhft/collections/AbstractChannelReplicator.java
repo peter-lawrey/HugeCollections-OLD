@@ -26,7 +26,10 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.channels.*;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -192,19 +195,17 @@ abstract class AbstractChannelReplicator implements Closeable {
     static class Details {
 
         private final SocketAddress address;
-        private final Queue<Runnable> pendingRegistrations;
+
         private final Set<Closeable> closeables;
 
         private final byte identifier;
 
         Details(@NotNull SocketAddress address,
                 @NotNull Set<Closeable> closeables,
-                byte identifier,
-                @NotNull Queue<Runnable> pendingRegistrations) {
-            this.address = address;
-            this.pendingRegistrations = pendingRegistrations;
-            this.closeables = closeables;
+                byte identifier) {
 
+            this.address = address;
+            this.closeables = closeables;
             this.identifier = identifier;
         }
 

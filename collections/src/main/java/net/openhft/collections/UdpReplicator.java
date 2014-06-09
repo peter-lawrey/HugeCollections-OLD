@@ -29,7 +29,6 @@ import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
-import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -95,8 +94,8 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
         final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(), udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
-        final Details connectionDetails = new Details(address, closeables, map.identifier(),
-                pendingRegistrations);
+        final Details connectionDetails = new Details(address, closeables, map.identifier()
+        );
         serverConnector = new ServerConnector(connectionDetails);
 
         executorService.execute(new Runnable() {
@@ -145,14 +144,8 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
                 continue;    // nothing to do
             }
 
-            // get an iterator over the set of selected keys
-            final Iterator it = selector.selectedKeys().iterator();
-
             final Set<SelectionKey> selectionKeys = selector.selectedKeys();
             for (final SelectionKey key : selectionKeys) {
-
-                // remove key from selected set, it's been handled
-                it.remove();
 
                 try {
 
@@ -184,15 +177,15 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
                     // Close channel and nudge selector
                     try {
                         key.channel().close();
-                        throttler.remove( key.channel());
+                        throttler.remove(key.channel());
                         closeables.remove(key.channel());
                     } catch (IOException ex) {
                         // do nothing
                     }
                 }
-
-                selectionKeys.clear();
             }
+
+            selectionKeys.clear();
         }
 
 
