@@ -124,8 +124,9 @@
     <build>
         <plugins>
 
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
+
+<!--
+                 <plugin><groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-scm-publish-plugin</artifactId>
                 <configuration>
                     <checkoutDirectory>${project.build.directory}/scmpublish/javadoc</checkoutDirectory>
@@ -137,6 +138,7 @@
                     <scmBranch>gh-pages</scmBranch>
                 </configuration>
             </plugin>
+-->
 
             <plugin>
                 <groupId>org.apache.felix</groupId>
