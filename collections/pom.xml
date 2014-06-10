@@ -133,7 +133,7 @@
                     </checkinComment>
                     <content>${project.reporting.outputDirectory}</content>
                     <skipDeletedFiles>true</skipDeletedFiles>
-                    <pubScmUrl>sscm:git:git@github.com:OpenHFT/HugeCollections/apidocs</pubScmUrl>
+                    <pubScmUrl>sscm:git:git@github.com:OpenHFT/HugeCollections</pubScmUrl>
                     <scmBranch>gh-pages</scmBranch>
                 </configuration>
             </plugin>
