@@ -36,8 +36,10 @@ public class TcpReplicatorBuilder implements Cloneable {
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
     private short packetSize = 1024 * 8;
+    private int throttleBucketInterval = 100;
 
     private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
+    private long throttle;
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
@@ -97,10 +99,12 @@ public class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param heartBeatInterval in milliseconds
+     * @param heartBeatInterval in milliseconds, must be greater than ZERO
      * @return
      */
     public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval) {
+        if (heartBeatInterval <= 0) throw new IllegalArgumentException("heartBeatInterval must be greater " +
+                "than zero");
         this.heartBeatInterval = heartBeatInterval;
         return this;
     }
@@ -126,6 +130,39 @@ public class TcpReplicatorBuilder implements Cloneable {
 
     private TcpReplicatorBuilder serverPort(int serverPort) {
         this.serverPort = serverPort;
+        return this;
+    }
+
+    /**
+     * @return bits per seconds
+     */
+    public long throttle() {
+        return this.throttle;
+    }
+
+    /**
+     * @param throttle the preferred maximum bit per seconds, this mehtod has
+     * @return this
+     */
+    public TcpReplicatorBuilder throttle(long throttle) {
+        this.throttle = throttle;
+        return this;
+    }
+
+
+    /**
+     * @return in milliseconds the size of the bucket for the token bucket algorithm
+     */
+    public int throttleBucketInterval() {
+        return throttleBucketInterval;
+    }
+
+    /**
+     * @param throttleBucketInterval in milliseconds the size of the bucket for the token bucket algorithm
+     * @return this
+     */
+    public TcpReplicatorBuilder throttleBucketInterval(int throttleBucketInterval) {
+        this.throttleBucketInterval = throttleBucketInterval;
         return this;
     }
 }

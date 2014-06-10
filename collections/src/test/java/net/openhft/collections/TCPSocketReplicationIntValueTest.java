@@ -187,30 +187,6 @@ public class TCPSocketReplicationIntValueTest {
 
     }
 
-    @Ignore
-    @Test
-    public void testObjectAllocationWithYourKit() throws IOException, InterruptedException {
-
-
-        System.out.print("SoakTesting ");
-        for (; ; ) {
-
-            for (int j = 1; j < 2000; j++) {
-
-                for (int i = 0; i < 1000; i += 2) {
-
-                    map1.put(set(i), "test");
-                    map2.put(set(i + 1), "test");
-                }
-            }
-
-
-        }
-
-
-    }
-
-
 }
 
 

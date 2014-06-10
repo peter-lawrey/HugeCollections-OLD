@@ -23,7 +23,7 @@ package net.openhft.collections;
  * with the aim of possibly later providing and optimization to System.currentTimeMillis()
  * on every call to put(), get() and remove()
  *
- * Subclasses should be immutable, because {@link SharedHashMapBuilder} don't make defensive copies.
+ * Subclasses should be immutable, because {@link SharedHashMapBuilder} doesn't make defensive copies.
  *
  * @author Rob Austin.
  */

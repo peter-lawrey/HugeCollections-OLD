@@ -44,13 +44,13 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
+   public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatInterval(1000);
+                InetSocketAddress).heartBeatInterval(100);
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
@@ -66,7 +66,7 @@ public class TCPSocketReplication4WayMapTest {
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatInterval(1000);
+                InetSocketAddress).heartBeatInterval(100);
 
         return new SharedHashMapBuilder()
                 .entries(1000)
@@ -80,10 +80,12 @@ public class TCPSocketReplication4WayMapTest {
     @Before
     public void setup() throws IOException {
 
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078), new InetSocketAddress("localhost", 8079));
-        map3 = newTcpSocketShmIntString((byte) 3, 8078, new InetSocketAddress("localhost", 8079));
-        map4 = newTcpSocketShmIntString((byte) 4, 8079);
+        map1 = newTcpSocketShmIntString((byte) 1, 8086, new InetSocketAddress("localhost", 8087),
+                new InetSocketAddress("localhost", 8088), new InetSocketAddress("localhost", 8089));
+        map2 = newTcpSocketShmIntString((byte) 2, 8087, new InetSocketAddress("localhost", 8088),
+                new InetSocketAddress("localhost", 8089));
+        map3 = newTcpSocketShmIntString((byte) 3, 8088, new InetSocketAddress("localhost", 8089));
+        map4 = newTcpSocketShmIntString((byte) 4, 8089);
     }
 
     @After
@@ -126,7 +128,7 @@ public class TCPSocketReplication4WayMapTest {
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000);
+        waitTillEqual(5000);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
@@ -148,7 +150,7 @@ public class TCPSocketReplication4WayMapTest {
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000);
+        waitTillEqual(5000);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
