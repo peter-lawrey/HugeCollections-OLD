@@ -47,7 +47,6 @@ public class OSResizesMain {
                 file.length() / 1e9,
                 run("du", "-h", file.getAbsolutePath()).split("\\s")[0],
                 run("grep", "over-sized", "/proc/" + Jvm.getProcessId() + "/maps").split("\\s")[0]);
-
         map.close();
         file.delete();
     }
