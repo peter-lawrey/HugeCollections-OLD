@@ -1,23 +1,23 @@
 -classpath
-'/Users/robaustin/IdeaProjects/OpenHFT/HugeCollections/collections/target/classes:/Library/Java/JavaVirtualMachines/jdk1.8.0_05.jdk/Contents/Home/jre/../lib/tools.jar:/Users/robaustin/.m2/repository/net/openhft/lang/6.4.5-SNAPSHOT/lang-6.4.5-SNAPSHOT.jar:/Users/robaustin/.m2/repository/com/intellij/annotations/12.0/annotations-12.0.jar:/Users/robaustin/.m2/repository/org/slf4j/slf4j-api/1.7.6/slf4j-api-1.7.6.jar'
+'/home/rob/TeamCity/buildAgent/work/856706d2d3eb9450/collections/target/classes:/opt/jdk1.7.0_51/jre/../lib/tools.jar:/home/rob/.m2/repository/net/openhft/lang/6.4.5-SNAPSHOT/lang-6.4.5-SNAPSHOT.jar:/home/rob/.m2/repository/com/intellij/annotations/12.0/annotations-12.0.jar:/home/rob/.m2/repository/org/slf4j/slf4j-api/1.7.6/slf4j-api-1.7.6.jar'
 -encoding
 'UTF-8'
 -protected
 -sourcepath
-'/Users/robaustin/IdeaProjects/OpenHFT/HugeCollections/collections/src/main/java'
+'/home/rob/TeamCity/buildAgent/work/856706d2d3eb9450/collections/src/main/java'
 -author
 -bottom
 'Copyright &#169; 2014. All rights reserved.'
 -charset
 'UTF-8'
 -d
-'/Users/robaustin/IdeaProjects/OpenHFT/HugeCollections/collections/target/site/apidocs'
+'/home/rob/TeamCity/buildAgent/work/856706d2d3eb9450/collections/target/site/apidocs'
 -docencoding
 'UTF-8'
 -doctitle
 'OpenHFT/HugeCollections/collections 3.1.0-SNAPSHOT API'
 -linkoffline
-'http://docs.oracle.com/javase/6/docs/api' '/Users/robaustin/IdeaProjects/OpenHFT/HugeCollections/collections/target/javadoc-bundle-options'
+'http://docs.oracle.com/javase/6/docs/api' '/home/rob/TeamCity/buildAgent/work/856706d2d3eb9450/collections/target/javadoc-bundle-options'
 -use
 -version
 -windowtitle
