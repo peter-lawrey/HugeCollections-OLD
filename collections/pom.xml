@@ -121,7 +121,6 @@
     </dependencies>
 
 
-
     <build>
         <plugins>
 
@@ -130,11 +129,11 @@
                 <artifactId>maven-scm-publish-plugin</artifactId>
                 <configuration>
                     <checkoutDirectory>${project.build.directory}/scmpublish/javadoc</checkoutDirectory>
-                    <checkinComment>Publishing javadoc for ${project.artifactId}:${project.version}</checkinComment>
+                    <checkinComment>Publishing javadoc for ${project.artifactId}:${project.version}
+                    </checkinComment>
                     <content>${project.reporting.outputDirectory}</content>
                     <skipDeletedFiles>true</skipDeletedFiles>
-                    <pubScmUrl>sscm:git:git@github.com:OpenHFT/HugeCollections/apidocs
-                    </pubScmUrl>
+                    <pubScmUrl>sscm:git:git@github.com:OpenHFT/HugeCollections/apidocs</pubScmUrl>
                     <scmBranch>gh-pages</scmBranch>
                 </configuration>
             </plugin>
