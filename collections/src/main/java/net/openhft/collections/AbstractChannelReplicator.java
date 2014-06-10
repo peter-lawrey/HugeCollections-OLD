@@ -110,7 +110,6 @@ abstract class AbstractChannelReplicator implements Closeable {
         private final int throttleInterval;
         private final long maxBytesInInterval;
 
-
         Throttler(@NotNull Selector selector,
                   int throttleInterval,
                   long serializedEntrySize,
@@ -145,28 +144,16 @@ abstract class AbstractChannelReplicator implements Closeable {
             lastTime = time;
             byteWritten = 0;
 
+
+            if (LOG.isDebugEnabled())
+                LOG.debug("Removing OP_WRITE on all channels");
+
             for (SelectableChannel selectableChannel : channels) {
 
-                Object attachment = null;
+                final SelectionKey selectionKey = selectableChannel.keyFor(selector);
+                if (selectionKey != null)
+                    selectionKey.interestOps(selectionKey.interestOps() | OP_WRITE);
 
-                try {
-                    final SelectionKey selectionKey = selectableChannel.keyFor(selector);
-                    if (selectionKey != null) {
-                        attachment = selectionKey.attachment();
-                        selectableChannel.register(selector, OP_WRITE | SelectionKey.OP_READ, attachment);
-                    }
-
-                } catch (IOException e) {
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("", e);
-                    try {
-
-                        if (attachment != null)
-                            ((AbstractAttached) attachment).connector.connect();
-                    } catch (Exception e1) {
-                        LOG.error("", e);
-                    }
-                }
             }
         }
 
@@ -184,7 +171,8 @@ abstract class AbstractChannelReplicator implements Closeable {
 
                 for (SelectableChannel channel : channels) {
                     final SelectionKey selectionKey = channel.keyFor(selector);
-                    channel.register(selector, SelectionKey.OP_READ, selectionKey.attachment());
+
+                    selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
 
                     if (LOG.isDebugEnabled())
                         LOG.debug("Throttling UDP writes");
@@ -192,8 +180,8 @@ abstract class AbstractChannelReplicator implements Closeable {
             }
         }
 
-
     }
+
 
     static class Details {
 

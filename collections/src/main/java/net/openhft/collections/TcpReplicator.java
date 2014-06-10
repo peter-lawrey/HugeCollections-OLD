@@ -72,7 +72,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         this.tcpReplicatorBuilder = tcpReplicatorBuilder;
 
         if (tcpReplicatorBuilder.throttle() > 0)
-            throttler = new Throttler(selector, 100, serializedEntrySize, tcpReplicatorBuilder.throttle());
+            throttler = new Throttler(selector, tcpReplicatorBuilder.throttleBucketInterval(),
+                    serializedEntrySize,
+                    tcpReplicatorBuilder.throttle());
 
         this.executorService.execute(
                 new Runnable() {
@@ -341,8 +343,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                                 attached.connector = ClientConnector.this;
                                 try {
                                     socketChannel.register(selector, OP_CONNECT, attached);
-                                    if (throttler != null)
-                                        throttler.add(socketChannel);
+
                                 } catch (ClosedChannelException e) {
                                     if (socketChannel.isOpen())
                                         LOG.error("", e);
@@ -416,7 +417,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         attached.entryWriter = new TcpSocketChannelEntryWriter(serializedEntrySize,
                 externalizable, packetSize, tcpReplicatorBuilder.heartBeatInterval());
 
+
         channel.register(selector, OP_WRITE | OP_READ, attached);
+
+        if (throttler != null)
+            throttler.add(channel);
 
         // register it with the selector and store the ModificationIterator for this key
         attached.entryWriter.identifierToBuffer(identifier);
@@ -436,8 +441,12 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         channel.socket().setSoTimeout(0);
         channel.socket().setSoLinger(false, 0);
 
+
         final Attached attached = new Attached();
         channel.register(selector, OP_WRITE | OP_READ, attached);
+
+        if (throttler != null)
+            throttler.add(channel);
 
         attached.entryReader = new TcpSocketChannelEntryReader(serializedEntrySize,
                 externalizable, packetSize);

@@ -36,6 +36,7 @@ public class TcpReplicatorBuilder implements Cloneable {
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
     private short packetSize = 1024 * 8;
+    private int throttleBucketInterval = 100;
 
     private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
     private long throttle;
@@ -140,11 +141,28 @@ public class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param throttle bits per seconds
+     * @param throttle the preferred maximum bit per seconds, this mehtod has
      * @return this
      */
     public TcpReplicatorBuilder throttle(long throttle) {
         this.throttle = throttle;
+        return this;
+    }
+
+
+    /**
+     * @return in milliseconds the size of the bucket for the token bucket algorithm
+     */
+    public int throttleBucketInterval() {
+        return throttleBucketInterval;
+    }
+
+    /**
+     * @param throttleBucketInterval in milliseconds the size of the bucket for the token bucket algorithm
+     * @return this
+     */
+    public TcpReplicatorBuilder throttleBucketInterval(int throttleBucketInterval) {
+        this.throttleBucketInterval = throttleBucketInterval;
         return this;
     }
 }
