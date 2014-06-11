@@ -41,13 +41,15 @@ public class TCPSocketReplicationTest1 {
     static final InetSocketAddress[] NO_SERVERS = {};
     public static final String HOST_SERVER = System.getProperty("server", "server");
     static final InetSocketAddress[] ONE_SERVER = {new InetSocketAddress(HOST_SERVER, 8079)};
+    public static final String HOST_SERVER2 = System.getProperty("server2", "server2");
+    static final InetSocketAddress[] TWO_SERVER = {new InetSocketAddress(HOST_SERVER2, 8079)};
     private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
     public void setup() throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
-                hostId == 0 ? NO_SERVERS : ONE_SERVER)
+                hostId == 0 ? NO_SERVERS : hostId == 1 ? ONE_SERVER : TWO_SERVER)
 //                .throttle(1000)
                 .throttleBucketIntervalMS(100)
                 .heartBeatIntervalMS(1000);
