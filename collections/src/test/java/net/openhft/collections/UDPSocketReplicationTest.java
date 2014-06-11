@@ -40,7 +40,7 @@ public class UDPSocketReplicationTest {
             final int identifier,
             final int udpPort) throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort);
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, "255.255.255.255");
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)

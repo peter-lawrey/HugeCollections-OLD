@@ -30,6 +30,8 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -49,7 +51,7 @@ abstract class AbstractChannelReplicator implements Closeable {
 
     final ExecutorService executorService;
     final Selector selector;
-    final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+    final Set<Closeable> closeables = Collections.synchronizedSet(new LinkedHashSet<Closeable>());
 
 
     AbstractChannelReplicator(String name) throws IOException {
@@ -91,10 +93,6 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
         closeables.clear();
         executorService.shutdownNow();
-    }
-
-    static class AbstractAttached {
-        AbstractConnector connector;
     }
 
     /**
@@ -165,10 +163,9 @@ abstract class AbstractChannelReplicator implements Closeable {
          * @param len the number of bytes just written
          * @throws ClosedChannelException
          */
-        public void contemplateUnregistringWriteSocket(int len) throws ClosedChannelException {
+        public void contemplateUnregisterWriteSocket(int len) throws ClosedChannelException {
             byteWritten += len;
             if (byteWritten > maxBytesInInterval) {
-
                 for (SelectableChannel channel : channels) {
                     final SelectionKey selectionKey = channel.keyFor(selector);
 
@@ -179,7 +176,6 @@ abstract class AbstractChannelReplicator implements Closeable {
                 }
             }
         }
-
     }
 
 
@@ -203,8 +199,6 @@ abstract class AbstractChannelReplicator implements Closeable {
         public byte getIdentifier() {
             return identifier;
         }
-
-
     }
 
     abstract class AbstractConnector {

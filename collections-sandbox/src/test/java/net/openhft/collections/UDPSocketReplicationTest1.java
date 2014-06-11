@@ -44,7 +44,7 @@ public class UDPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 new InetSocketAddress("192.168.0.254", 8079))
-                .heartBeatInterval(1000);
+                .heartBeatIntervalMS(1000);
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
@@ -73,7 +73,7 @@ public class UDPSocketReplicationTest1 {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
                 Thread.sleep(1000);
-       //         map1.put(i * 2, "E1");
+                //         map1.put(i * 2, "E1");
                 System.out.println(map1);
             }
         }

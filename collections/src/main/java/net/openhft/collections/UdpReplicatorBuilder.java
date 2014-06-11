@@ -18,27 +18,29 @@
 
 package net.openhft.collections;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.UnknownHostException;
 
 
 public class UdpReplicatorBuilder implements Cloneable {
-
-    private static final Logger LOG = LoggerFactory.getLogger(UdpReplicatorBuilder.class.getName());
 
     private String broadcastAddress;
     private int port;
     private long throttle;
 
     /**
-     * @param port udp port
+     * @param port             udp port
+     * @param broadcastAddress the UDP broadcast address Directed broadcast,
+     *                         <p/>
+     *                         <p/>
+     *                         for example a broadcast address of 192.168.0.255  has an IP range of
+     *                         192.168.0.0 - 192.168.0.254
+     *                         <p/>
+     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      * @throws UnknownHostException
      */
-    public UdpReplicatorBuilder(int port) throws UnknownHostException {
+    public UdpReplicatorBuilder(int port, String broadcastAddress) throws UnknownHostException {
         this.port = port;
-        broadcastAddress = "255.255.255.255";
+        this.broadcastAddress = broadcastAddress;
     }
 
 
@@ -48,11 +50,11 @@ public class UdpReplicatorBuilder implements Cloneable {
 
     /**
      * @param broadcastAddress the UDP broadcast address Directed broadcast,
-     *
-     *
+     *                         <p/>
+     *                         <p/>
      *                         for example a broadcast address of 192.168.0.255  has an IP range of
-     *                         192.168.0.1 - 192.168.0.254
-     *
+     *                         192.168.0.0 - 192.168.0.254
+     *                         <p/>
      *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      */
     public UdpReplicatorBuilder broadcastAddress(String broadcastAddress) {
@@ -85,23 +87,19 @@ public class UdpReplicatorBuilder implements Cloneable {
 
 
     /**
-     * @param throttle bits per seconds
+     * @param throttleInBitsPerSecond bits per seconds
      * @return this
      */
-    public UdpReplicatorBuilder throttle(long throttle) {
-        this.throttle = throttle;
+    public UdpReplicatorBuilder throttle(long throttleInBitsPerSecond) {
+        this.throttle = throttleInBitsPerSecond;
         return this;
     }
 
+    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
     @Override
     public UdpReplicatorBuilder clone() {
         try {
-            final UdpReplicatorBuilder result = (UdpReplicatorBuilder) super.clone();
-            result.broadcastAddress(this.broadcastAddress());
-            result.port(this.port());
-            result.broadcastAddress(this.broadcastAddress());
-            result.throttle(this.throttle());
-            return result;
+            return (UdpReplicatorBuilder) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
         }

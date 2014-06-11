@@ -19,8 +19,14 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
+    <parent>
+        <groupId>net.openhft</groupId>
+        <artifactId>root-parent-pom</artifactId>
+        <version>1.0.1</version>
+        <relativePath/>
+    </parent>
+
     <modelVersion>4.0.0</modelVersion>
-    <groupId>net.openhft</groupId>
     <artifactId>HugeCollections</artifactId>
     <version>3.0f-SNAPSHOT</version>
     <packaging>pom</packaging>
