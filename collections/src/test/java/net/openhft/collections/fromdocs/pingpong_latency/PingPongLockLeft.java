@@ -1,12 +1,25 @@
+/*
+ * Copyright 2014 Higher Frequency Trading
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.openhft.collections.fromdocs.pingpong_latency;
 
+import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
-import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
-import org.junit.Ignore;
-import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -27,25 +40,14 @@ PingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock
 #9:  compareAndSwapCoupon() 50/90/99%tile was 39 / 48 / 54
 
  */
-public class PingPongPlayerLeft {
+public class PingPongLockLeft {
+    public static void main(String... ignored) throws IOException, InterruptedException {
+        SharedHashMap<String, BondVOInterface> shm = PingPongCASLeft.acquireSHM();
 
-
-    @Test
-    @Ignore
-    public void bondExample() throws IOException, InterruptedException {
-        String TMP = System.getProperty("java.io.tmpdir");
-        SharedHashMap<String, BondVOInterface> shmLeft = new SharedHashMapBuilder()
-                .generatedValueType(true)
-                .entrySize(64)
-                .create(
-                        new File(TMP + "/BondPortfolioSHM"),
-                        String.class,
-                        BondVOInterface.class
-                );
-        playPingPong(shmLeft, 4, 5, true);
+        playPingPong(shm, 4, 5, true, "PingPongLockLEFT");
     }
 
-    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst) {
+    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst, final String desc) throws InterruptedException {
         BondVOInterface bond1 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond2 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond3 = newDirectReference(BondVOInterface.class);
@@ -55,7 +57,7 @@ public class PingPongPlayerLeft {
         shm.acquireUsing("369604102", bond2);
         shm.acquireUsing("369604103", bond3);
         shm.acquireUsing("369604104", bond4);
-        System.out.printf("\n\nPingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock\n");
+        System.out.printf("\n\n" + desc + ": Timing 1 x off-heap operations on " + shm.file() + "\n");
         if (setFirst) {
             bond1.setCoupon(_coupon);
             bond2.setCoupon(_coupon);
@@ -67,17 +69,33 @@ public class PingPongPlayerLeft {
         long[] timings = new long[runs];
         for (int j = 0; j < 10; j++) {
             for (int i = 0; i < runs; i++) {
-                long _start = System.nanoTime(); //
-                while (!bond1.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bond2.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bond3.compareAndSwapCoupon(_coupon, _coupon2)) ;
-                while (!bond4.compareAndSwapCoupon(_coupon, _coupon2)) ;
+                long _start = System.nanoTime();
+                toggleCoupon(bond1, _coupon, _coupon2);
+                toggleCoupon(bond2, _coupon, _coupon2);
+                toggleCoupon(bond3, _coupon, _coupon2);
+                toggleCoupon(bond4, _coupon, _coupon2);
 
                 timings[i] = (System.nanoTime() - _start - timeToCallNanoTime) / 4;
             }
             Arrays.sort(timings);
             System.out.printf("#%d:  compareAndSwapCoupon() 50/90/99%%tile was %,d / %,d / %,d%n",
                     j, timings[runs / 2], timings[runs * 9 / 10], timings[runs * 99 / 100]);
+        }
+    }
+
+    private static void toggleCoupon(BondVOInterface bond, double _coupon, double _coupon2) throws InterruptedException {
+        for (int i = 0; ; i++) {
+            bond.busyLockEntry();
+            try {
+                if (bond.getCoupon() == _coupon) {
+                    bond.setCoupon(_coupon2);
+                    return;
+                }
+                if (i > 1000)
+                    Thread.yield();
+            } finally {
+                bond.unlockEntry();
+            }
         }
     }
 }
