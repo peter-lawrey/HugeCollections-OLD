@@ -26,6 +26,7 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.TreeMap;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -36,22 +37,25 @@ import static net.openhft.collections.Builder.getPersistenceFile;
  */
 
 public class TCPSocketReplicationTest1 {
-
+    static final int hostId = Integer.getInteger("hostId");
+    static final InetSocketAddress[] NO_SERVERS = {};
+    public static final String HOST_SERVER = System.getProperty("server", "server");
+    static final InetSocketAddress[] ONE_SERVER = {new InetSocketAddress(HOST_SERVER, 8079)};
     private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
     public void setup() throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
-                new InetSocketAddress("192.168.0.254", 8079))
-                .throttle(10)
-                .throttleBucketIntervalMS(2000)
+                hostId == 0 ? NO_SERVERS : ONE_SERVER)
+//                .throttle(1000)
+                .throttleBucketIntervalMS(100)
                 .heartBeatIntervalMS(1000);
 
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) 1)
+                .identifier((byte) (1 + hostId))
                 .tcpReplication(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
@@ -59,7 +63,6 @@ public class TCPSocketReplicationTest1 {
 
     @After
     public void tearDown() throws InterruptedException {
-
         for (final Closeable closeable : new Closeable[]{map1}) {
             try {
                 closeable.close();
@@ -73,16 +76,14 @@ public class TCPSocketReplicationTest1 {
     @Test
     @Ignore
     public void testContinueToReceive() throws IOException, InterruptedException {
-        for (; ; ) {
-            for (int i = 0; i < 1024; i++) {
+        for (int j = 1; ; j++) {
+            for (int i = 0; i < 100; i += 10) {
                 Thread.sleep(500);
-                map1.put(i * 2, "E1");
-                System.out.println(map1);
+                map1.put(i * 10 + hostId, "E" + j);
+                System.out.println(new TreeMap<Integer, CharSequence>(map1).descendingMap());
             }
         }
     }
-
-
 }
 
 
