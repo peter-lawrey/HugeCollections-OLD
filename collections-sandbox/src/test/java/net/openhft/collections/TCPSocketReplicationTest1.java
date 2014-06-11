@@ -42,7 +42,7 @@ public class TCPSocketReplicationTest1 {
     public static final String HOST_SERVER = System.getProperty("server", "server");
     static final InetSocketAddress[] ONE_SERVER = {new InetSocketAddress(HOST_SERVER, 8079)};
     public static final String HOST_SERVER2 = System.getProperty("server2", "server2");
-    static final InetSocketAddress[] TWO_SERVER = {new InetSocketAddress(HOST_SERVER2, 8079)};
+    static final InetSocketAddress[] TWO_SERVER = {new InetSocketAddress(HOST_SERVER, 8079), new InetSocketAddress(HOST_SERVER2, 8079)};
     private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
