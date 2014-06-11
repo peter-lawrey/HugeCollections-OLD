@@ -24,18 +24,17 @@ import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.Copyable;
 
 public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.LongValue> {
-    private static final int __VOL__VALUE = 0;
-    private static final int VALUE = 8;
+    private static final int VALUE = 0;
 
     private Bytes _bytes;
     private long _offset;
 
     public void setOrderedValue(long $) {
-        _bytes.writeOrderedLong(_offset + __VOL__VALUE, $);
+        _bytes.writeOrderedLong(_offset, $);
     }
 
     public long getVolatileValue() {
-        return _bytes.readVolatileLong(_offset + __VOL__VALUE);
+        return _bytes.readVolatileLong(_offset);
     }
 
     public void setValue(long $) {
