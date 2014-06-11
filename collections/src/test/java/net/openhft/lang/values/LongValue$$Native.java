@@ -35,6 +35,7 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         _bytes.writeLong(_offset + VALUE, $);
     }
 
+    //
     public long getValue() {
         return _bytes.readLong(_offset + VALUE);
     }
