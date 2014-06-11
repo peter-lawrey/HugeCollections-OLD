@@ -23,22 +23,11 @@ import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.Copyable;
 
 public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.LongValue> {
-    private static final int __VOL__VALUE = 0;
-    private static final int VALUE = 8;
+    private static final int VALUE = 0;
 
 
     private Bytes _bytes;
     private long _offset;
-
-
-
-    public void setOrderedValue(long $) {
-        _bytes.writeOrderedLong(_offset + __VOL__VALUE, $);
-    }
-
-    public long getVolatileValue() {
-        return _bytes.readVolatileLong(_offset + __VOL__VALUE);
-    }
 
 
 
@@ -50,6 +39,16 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         return _bytes.readLong(_offset + VALUE);
     }
 
+
+
+    public void setOrderedValue(long $) {
+        _bytes.writeOrderedLong(_offset + VALUE, $);
+    }
+
+    public long getVolatileValue() {
+        return _bytes.readVolatileLong(_offset + VALUE);
+    }
+
     public long addValue(long $) {
         return _bytes.addLong(_offset + VALUE, $);
     }    public long addAtomicValue(long $) {
@@ -58,18 +57,15 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         return _bytes.compareAndSwapLong(_offset + VALUE, _1, _2);
     }    @Override
          public void copyFrom(net.openhft.lang.values.LongValue from) {
-        setOrderedValue(from.getVolatileValue());
         setValue(from.getValue());
     }
 
     @Override
     public void writeMarshallable(Bytes out) {
-        out.writeLong(getVolatileValue());
         out.writeLong(getValue());
     }
     @Override
     public void readMarshallable(Bytes in) {
-        setOrderedValue(in.readLong());
         setValue(in.readLong());
     }
     @Override
@@ -87,7 +83,7 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
     }
     @Override
     public int maxSize() {
-        return 16;
+        return 8;
     }
     public int hashCode() {
         long lhc = longHashCode();
@@ -95,8 +91,7 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
     }
 
     public long longHashCode() {
-        return (calcLongHashCode(getVolatileValue())) * 10191 +
-                calcLongHashCode(getValue());
+        return calcLongHashCode(getValue());
     }
 
     public boolean equals(Object o) {
@@ -104,7 +99,6 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         if (!(o instanceof LongValue)) return false;
         LongValue that = (LongValue) o;
 
-        if(!isEqual(getVolatileValue(), that.getVolatileValue())) return false;
         if(!isEqual(getValue(), that.getValue())) return false;
         return true;
     }
@@ -113,9 +107,7 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         if (_bytes == null) return "bytes is null";
         StringBuilder sb = new StringBuilder();
         sb.append("LongValue{ ");
-        sb.append("__vol__Value= ").append(getVolatileValue());
-        sb.append(", ")
-        ;            sb.append("value= ").append(getValue());
+        sb.append("value= ").append(getValue());
         sb.append(" }");
         return sb.toString();
     }
