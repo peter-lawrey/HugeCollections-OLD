@@ -80,9 +80,9 @@ public class TCPSocketReplicationTest1 {
     public void testContinueToReceive() throws IOException, InterruptedException {
         for (int j = 1; ; j++) {
             for (int i = 0; i < 100; i += 10) {
-                Thread.sleep(500);
+                Thread.sleep(20);
                 map1.put(i * 10 + hostId, "E" + j);
-                System.out.println(new TreeMap<Integer, CharSequence>(map1).descendingMap());
+                System.out.println(new TreeMap(map1));
             }
         }
     }

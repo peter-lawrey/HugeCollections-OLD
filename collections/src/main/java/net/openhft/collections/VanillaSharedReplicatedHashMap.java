@@ -404,10 +404,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
 
-                    if (shouldIgnore(entry, timestamp, localIdentifier))
-                        return null;
                     // skip the is deleted flag
-                    entry.skip(1);
+                    entry.skip(10);
 
                     return onKeyPresentOnAcquire(key, usingValue, offset, entry);
                 } else {

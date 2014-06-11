@@ -42,7 +42,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a
  * socket connection
- *
+ * <p/>
  * {@see net.openhft.collections.OutSocketReplicator}
  *
  * @author Rob Austin.
@@ -154,7 +154,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                             onWrite(key, approxTime);
 
                         checkHeartbeat(key, approxTime, identifier);
-
+                        // TODO only sleep when not busy.
+                        Thread.sleep(10);
                     } catch (CancelledKeyException e) {
                         quietClose(key, e);
                     } catch (ClosedSelectorException e) {
