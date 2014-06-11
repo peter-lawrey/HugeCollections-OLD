@@ -47,7 +47,7 @@ public enum BitUnit {
         }
 
         public long toGigaBits(long v) {
-            return (v * _MB) / _GB;
+            return v / (_GB / _MB);
         }
     },
 
@@ -57,7 +57,7 @@ public enum BitUnit {
         }
 
         public long toMegaBits(long v) {
-            return (v * _GB) / _MB;
+            return v * (_GB / _MB);
         }
 
         public long toGigaBits(long v) {
@@ -79,6 +79,7 @@ public enum BitUnit {
         throw new AbstractMethodError();
     }
 
-    private static long _MB = 52428800;
-    private static long _GB = 1073741824;
+    private static long _KB = 1000;
+    private static long _MB = 1000 * _KB;
+    private static long _GB = 1000 * _MB;
 }

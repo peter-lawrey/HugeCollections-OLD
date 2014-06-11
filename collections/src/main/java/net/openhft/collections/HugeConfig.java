@@ -52,6 +52,7 @@ public class HugeConfig implements Cloneable {
     private int smallEntrySize;
     private int capacity;
 
+    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
     public HugeConfig clone() {
         try {
             return (HugeConfig) super.clone();

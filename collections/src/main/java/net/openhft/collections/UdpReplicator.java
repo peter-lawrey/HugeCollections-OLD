@@ -89,7 +89,8 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
         // throttling is calculated at bytes in a period, minus the size of on entry
         if (udpReplicatorBuilder.throttle() > 0)
-            throttler = new Throttler(selector, 100, serializedEntrySize, udpReplicatorBuilder.throttle());
+            throttler = new Throttler(selector, 100,
+                    serializedEntrySize, udpReplicatorBuilder.throttle());
 
 
         final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(),
@@ -98,8 +99,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
         final Details connectionDetails = new Details(address, map.identifier());
         serverConnector = new ServerConnector(connectionDetails);
 
-        executorService.execute(new Runnable() {
-
+        this.executorService.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -108,28 +108,24 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
                     LOG.error("", e);
                 }
             }
-
         });
     }
 
 
     /**
      * binds to the server socket and process data This method will block until interrupted
-     *
-     * @throws Exception
      */
     private void process() throws Exception {
-
 
         connectClient(udpReplicatorBuilder.port()).register(selector, OP_READ);
         serverConnector.connect();
 
-        for (; ; ) {
+        while (selector.isOpen()) {
+            register(this.pendingRegistrations);
+
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
             final int n = selector.select(100);
-
-            register(this.pendingRegistrations);
 
             if (throttler != null)
                 throttler.checkThrottleInterval();
@@ -153,7 +149,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
                         try {
                             int len = writer.writeAll(socketChannel, udpModificationIterator);
                             if (throttler != null)
-                                throttler.contemplateUnregistringWriteSocket(len);
+                                throttler.contemplateUnregisterWriteSocket(len);
                         } catch (NotYetConnectedException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);

@@ -45,8 +45,8 @@ public class TCPSocketReplicationTest1 {
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 new InetSocketAddress("192.168.0.254", 8079))
                 .throttle(10)
-                .throttleBucketInterval(2000)
-                .heartBeatInterval(1000);
+                .throttleBucketIntervalMS(2000)
+                .heartBeatIntervalMS(1000);
 
 
         map1 = new SharedHashMapBuilder()

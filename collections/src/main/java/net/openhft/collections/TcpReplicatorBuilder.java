@@ -35,10 +35,10 @@ public class TcpReplicatorBuilder implements Cloneable {
 
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
-    private short packetSize = 1024 * 8;
-    private int throttleBucketInterval = 100;
+    private int packetSize = 1024 * 8;
+    private int throttleBucketIntervalMS = 100;
 
-    private long heartBeatInterval = TimeUnit.SECONDS.toMillis(20);
+    private int heartBeatIntervalMS = (int) TimeUnit.SECONDS.toMillis(20);
     private long throttle;
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
@@ -59,12 +59,12 @@ public class TcpReplicatorBuilder implements Cloneable {
         return endpoints;
     }
 
-    public TcpReplicatorBuilder packetSize(short packetSize) {
+    public TcpReplicatorBuilder packetSize(int packetSize) {
         this.packetSize = packetSize;
         return this;
     }
 
-    public short packetSize() {
+    public int packetSize() {
         return packetSize;
     }
 
@@ -94,29 +94,27 @@ public class TcpReplicatorBuilder implements Cloneable {
         return new InetSocketAddress(serverPort());
     }
 
-    public long heartBeatInterval() {
-        return heartBeatInterval;
+    public int heartBeatInterval() {
+        return heartBeatIntervalMS;
     }
 
     /**
      * @param heartBeatInterval in milliseconds, must be greater than ZERO
      * @return
      */
-    public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval) {
+    public TcpReplicatorBuilder heartBeatIntervalMS(int heartBeatInterval) {
         if (heartBeatInterval <= 0) throw new IllegalArgumentException("heartBeatInterval must be greater " +
                 "than zero");
-        this.heartBeatInterval = heartBeatInterval;
+        this.heartBeatIntervalMS = heartBeatInterval;
         return this;
     }
 
+    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
     @Override
     public TcpReplicatorBuilder clone() {
         try {
             final TcpReplicatorBuilder result = (TcpReplicatorBuilder) super.clone();
-            result.serverPort(this.serverPort());
-            result.endpoints(this.endpoints());
-            result.packetSize(this.packetSize());
-            result.heartBeatInterval(this.heartBeatInterval());
+            result.endpoints(new HashSet<InetSocketAddress>(this.endpoints()));
             return result;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
@@ -141,11 +139,11 @@ public class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param throttle the preferred maximum bit per seconds, this mehtod has
+     * @param throttleInBitPerSecond the preferred maximum bit per seconds.
      * @return this
      */
-    public TcpReplicatorBuilder throttle(long throttle) {
-        this.throttle = throttle;
+    public TcpReplicatorBuilder throttle(long throttleInBitPerSecond) {
+        this.throttle = throttleInBitPerSecond;
         return this;
     }
 
@@ -153,16 +151,20 @@ public class TcpReplicatorBuilder implements Cloneable {
     /**
      * @return in milliseconds the size of the bucket for the token bucket algorithm
      */
-    public int throttleBucketInterval() {
-        return throttleBucketInterval;
+    public int throttleBucketIntervalMS() {
+        return throttleBucketIntervalMS;
     }
 
     /**
      * @param throttleBucketInterval in milliseconds the size of the bucket for the token bucket algorithm
      * @return this
      */
-    public TcpReplicatorBuilder throttleBucketInterval(int throttleBucketInterval) {
-        this.throttleBucketInterval = throttleBucketInterval;
+    public TcpReplicatorBuilder throttleBucketIntervalMS(int throttleBucketInterval) {
+        this.throttleBucketIntervalMS = throttleBucketInterval;
         return this;
+    }
+
+    public int minIntervalMS() {
+        return Math.min(throttleBucketIntervalMS, heartBeatIntervalMS);
     }
 }
