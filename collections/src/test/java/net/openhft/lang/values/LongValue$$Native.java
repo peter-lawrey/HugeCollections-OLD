@@ -15,8 +15,10 @@
  */
 
 package net.openhft.lang.values;
-
 import static net.openhft.lang.Compare.*;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
@@ -35,7 +37,6 @@ public class LongValue$$Native implements LongValue, BytesMarshallable, Byteable
         _bytes.writeLong(_offset + VALUE, $);
     }
 
-    //
     public long getValue() {
         return _bytes.readLong(_offset + VALUE);
     }
