@@ -78,24 +78,25 @@ public class TCPSocketReplicationTest1 {
     @Test
     @Ignore
     public void testContinueToReceive() throws IOException, InterruptedException {
-
+        Thread.sleep(1000);
         long count = 0;
         long start = System.nanoTime();
         StringBuilder sb = new StringBuilder();
-        for (int j = 1; j <= 1000000; j++) {
+        for (int j = 0; j < 1000000; j++) {
 //            if (i )
 //            Thread.sleep(5);
-            for (int i = 0; i < 100; i += 10) {
+            for (int i = 0; i < 200; i += 10) {
                 sb.setLength(0);
                 sb.append('E').append(j);
                 map1.put(i * 10 + hostId, sb);
                 count++;
             }
-            if (j % 10000 == 0)
+            if (j == 0 || (j + 1) % 50000 == 0)
                 System.out.println(new TreeMap(map1));
         }
         long time = System.nanoTime() - start;
-        System.out.printf("Average write time was %.1f us%n", count * 1e3 / time);
+        System.out.printf("Throughput %.2f Mputs/s%n", count * 1e3 / time);
+        Thread.sleep(1000);
     }
 }
 
