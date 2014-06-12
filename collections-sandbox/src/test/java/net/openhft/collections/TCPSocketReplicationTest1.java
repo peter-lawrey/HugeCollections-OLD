@@ -81,14 +81,17 @@ public class TCPSocketReplicationTest1 {
 
         long count = 0;
         long start = System.nanoTime();
+        StringBuilder sb = new StringBuilder();
         for (int j = 1; j <= 1000000; j++) {
 //            if (i )
 //            Thread.sleep(5);
             for (int i = 0; i < 100; i += 10) {
-                map1.put(i * 10 + hostId, "E" + j);
+                sb.setLength(0);
+                sb.append('E').append(j);
+                map1.put(i * 10 + hostId, sb);
                 count++;
             }
-            if (j % 100 == 0)
+            if (j % 10000 == 0)
                 System.out.println(new TreeMap(map1));
         }
         long time = System.nanoTime() - start;
