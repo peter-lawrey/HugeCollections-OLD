@@ -447,7 +447,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", generatedValueType=" + generatedValueType() +
                 ", largeSegments=" + largeSegments() +
                 ", canReplicate=" + canReplicate() +
-                ", identifier=" + identifier() +
+                ", identifier=" + identifierToString() +
                 ", tcpReplication=" + tcpReplication() +
                 ", udpReplication=" + udpReplication() +
                 ", timeProvider=" + timeProvider() +
@@ -579,6 +579,10 @@ public final class SharedHashMapBuilder implements Cloneable {
             throw new IllegalStateException("identifier is not set.");
 
         return identifier;
+    }
+
+    private String identifierToString() {
+        return identifier == Byte.MIN_VALUE ? "identifier is not set" : (identifier + "");
     }
 
     public SharedHashMapBuilder identifier(byte identifier) {
