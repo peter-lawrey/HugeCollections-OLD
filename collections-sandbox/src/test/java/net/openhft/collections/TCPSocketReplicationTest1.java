@@ -78,13 +78,21 @@ public class TCPSocketReplicationTest1 {
     @Test
     @Ignore
     public void testContinueToReceive() throws IOException, InterruptedException {
-        for (int j = 1; ; j++) {
+
+        long count = 0;
+        long start = System.nanoTime();
+        for (int j = 1; j <= 1000000; j++) {
+//            if (i )
+//            Thread.sleep(5);
             for (int i = 0; i < 100; i += 10) {
-                Thread.sleep(20);
                 map1.put(i * 10 + hostId, "E" + j);
-                System.out.println(new TreeMap(map1));
+                count++;
             }
+            if (j % 100 == 0)
+                System.out.println(new TreeMap(map1));
         }
+        long time = System.nanoTime() - start;
+        System.out.printf("Average write time was %.1f us%n", count * 1e3 / time);
     }
 }
 

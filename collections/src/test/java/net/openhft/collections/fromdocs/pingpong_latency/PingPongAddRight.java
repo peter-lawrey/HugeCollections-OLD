@@ -16,17 +16,23 @@
 
 package net.openhft.collections.fromdocs.pingpong_latency;
 
+import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
-import static net.openhft.collections.fromdocs.pingpong_latency.PingPongLockLeft.playPingPong;
+import static net.openhft.collections.fromdocs.pingpong_latency.PingPongAddLeft.playPingPong;
+import static net.openhft.lang.model.DataValueClasses.newDirectReference;
 
-public class PingPongLockRight {
-    public static void main(String... ignored) throws IOException, InterruptedException {
+public class PingPongAddRight {
+    public static void main(String... ignored) throws IOException {
         SharedHashMap<String, BondVOInterface> shm = PingPongCASLeft.acquireSHM();
 
-        playPingPong(shm, 5, 4, false, "PingPongLockRIGHT");
+        playPingPong(shm, -1, false, "PingPongAddRIGHT");
     }
+
 }

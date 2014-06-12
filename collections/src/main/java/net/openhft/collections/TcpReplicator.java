@@ -162,6 +162,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                         quietClose(key, e);
                     } catch (IOException e) {
                         quietClose(key, e);
+                    } catch (InterruptedException e) {
+                        quietClose(key, e);
                     } catch (Exception e) {
                         LOG.info("", e);
                         close(key);
