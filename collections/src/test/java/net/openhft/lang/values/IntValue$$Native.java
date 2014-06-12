@@ -15,9 +15,10 @@
  */
 
 package net.openhft.lang.values;
-
 import static net.openhft.lang.Compare.*;
-
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.model.Byteable;
@@ -26,16 +27,11 @@ import net.openhft.lang.model.Copyable;
 public class IntValue$$Native implements IntValue, BytesMarshallable, Byteable, Copyable<net.openhft.lang.values.IntValue> {
     private static final int VALUE = 0;
 
+
     private Bytes _bytes;
     private long _offset;
 
-    public void setOrderedValue(int $) {
-        _bytes.writeOrderedInt(_offset + VALUE, $);
-    }
 
-    public int getVolatileValue() {
-        return _bytes.readVolatileInt(_offset + VALUE);
-    }
 
     public void setValue(int $) {
         _bytes.writeInt(_offset + VALUE, $);
@@ -45,81 +41,67 @@ public class IntValue$$Native implements IntValue, BytesMarshallable, Byteable, 
         return _bytes.readInt(_offset + VALUE);
     }
 
+
+
+    public void setOrderedValue(int $) {
+        _bytes.writeOrderedInt(_offset + VALUE, $);
+    }
+
+    public int getVolatileValue() {
+        return _bytes.readVolatileInt(_offset + VALUE);
+    }
+
     public int addValue(int $) {
         return _bytes.addInt(_offset + VALUE, $);
-    }
-
-    public int addAtomicValue(int $) {
+    }    public int addAtomicValue(int $) {
         return _bytes.addAtomicInt(_offset + VALUE, $);
-    }
-
-    public boolean compareAndSwapValue(int _1, int _2) {
+    }    public boolean compareAndSwapValue(int _1, int _2) {
         return _bytes.compareAndSwapInt(_offset + VALUE, _1, _2);
-    }
-
-    public boolean tryLockNanosValue(long nanos) {
+    }    public boolean tryLockNanosValue(long nanos) {
         return _bytes.tryLockNanosInt(_offset + VALUE, nanos);
-    }
-
-    public boolean tryLockValue() {
+    }    public boolean tryLockValue() {
         return _bytes.tryLockInt(_offset + VALUE);
-    }
-
-    public void unlockValue() {
+    }    public void unlockValue() {
         _bytes.unlockInt(_offset + VALUE);
-    }
-
-    public void busyLockValue() throws InterruptedException {
+    }    public void busyLockValue() throws InterruptedException {
         _bytes.busyLockInt(_offset + VALUE);
-    }
-
-    @Override
-    public void copyFrom(net.openhft.lang.values.IntValue from) {
-        setOrderedValue(from.getVolatileValue());
+    }    @Override
+         public void copyFrom(net.openhft.lang.values.IntValue from) {
         setValue(from.getValue());
     }
 
     @Override
     public void writeMarshallable(Bytes out) {
-        out.writeInt(getVolatileValue());
         out.writeInt(getValue());
     }
-
     @Override
     public void readMarshallable(Bytes in) {
-        setOrderedValue(in.readInt());
         setValue(in.readInt());
     }
-
     @Override
     public void bytes(Bytes bytes, long offset) {
         this._bytes = bytes;
         this._offset = offset;
     }
-
     @Override
     public Bytes bytes() {
         return _bytes;
     }
-
     @Override
     public long offset() {
         return _offset;
     }
-
     @Override
     public int maxSize() {
-        return 8;
+        return 4;
     }
-
     public int hashCode() {
         long lhc = longHashCode();
         return (int) ((lhc >>> 32) ^ lhc);
     }
 
     public long longHashCode() {
-        return (calcLongHashCode(getVolatileValue())) * 10191 +
-                calcLongHashCode(getValue());
+        return calcLongHashCode(getValue());
     }
 
     public boolean equals(Object o) {
@@ -127,8 +109,7 @@ public class IntValue$$Native implements IntValue, BytesMarshallable, Byteable, 
         if (!(o instanceof IntValue)) return false;
         IntValue that = (IntValue) o;
 
-        if (!isEqual(getVolatileValue(), that.getVolatileValue())) return false;
-        if (!isEqual(getValue(), that.getValue())) return false;
+        if(!isEqual(getValue(), that.getValue())) return false;
         return true;
     }
 
@@ -136,9 +117,6 @@ public class IntValue$$Native implements IntValue, BytesMarshallable, Byteable, 
         if (_bytes == null) return "bytes is null";
         StringBuilder sb = new StringBuilder();
         sb.append("IntValue{ ");
-        sb.append("__vol__Value= ").append(getVolatileValue());
-        sb.append(", ")
-        ;
         sb.append("value= ").append(getValue());
         sb.append(" }");
         return sb.toString();
