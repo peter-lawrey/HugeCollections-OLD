@@ -18,8 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
@@ -36,7 +34,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static java.nio.channels.SelectionKey.*;
@@ -65,15 +62,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     // used to instruct the selector thread to set OP_WRITE on a key correlated by the bit index in the
     // bitset
-    private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
-            ByteBuffer.allocate(16)));
 
     private final AtomicReferenceArray<SelectionKey> selectionKeys =
             new AtomicReferenceArray<SelectionKey>(128);
 
-    // called when ever there is a
-    private AtomicBoolean opWriteChanged = new AtomicBoolean();
-
+    private KeyInterestUpdater opWriteUpdater = new KeyInterestUpdater(OP_WRITE, selectionKeys);
 
     TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
                   @NotNull final EntryExternalizable externalizable,
@@ -175,13 +168,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
                 }
 
-                if (opWriteChanged.getAndSet(false)) {
-                    for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
-                        changeOfOpWriteRequired.clear(i);
-                        final SelectionKey key = selectionKeys.get((int) i);
-                        key.interestOps(key.interestOps() | OP_WRITE);
-                    }
-                }
+                opWriteUpdater.update();
 
                 if (nSelectedKeys == 0)
                     continue;    // go back and check pendingRegistrations
@@ -688,9 +675,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
          */
         @Override
         public void onChange() {
-            TcpReplicator.this.opWriteChanged.set(true);
+
             if (remoteIdentifier != Byte.MIN_VALUE)
-                TcpReplicator.this.changeOfOpWriteRequired.set(remoteIdentifier);
+                TcpReplicator.this.opWriteUpdater.set(remoteIdentifier);
 
             // enableWrite = true;
             selector.wakeup();
@@ -1046,6 +1033,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
         }
     }
+
 
 }
 

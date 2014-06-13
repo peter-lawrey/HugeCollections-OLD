@@ -18,6 +18,9 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.collection.ATSDirectBitSet;
+import net.openhft.lang.collection.DirectBitSet;
+import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -26,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -38,6 +42,8 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
@@ -275,6 +281,40 @@ abstract class AbstractChannelReplicator implements Closeable {
         public void setSuccessfullyConnected() {
             connectionAttempts = 0;
         }
+    }
+
+    static class KeyInterestUpdater {
+
+        private AtomicBoolean wasChanged = new AtomicBoolean();
+
+        private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
+                ByteBuffer.allocate(16)));
+
+        private final AtomicReferenceArray<SelectionKey> selectionKeys;
+        private final int op;
+
+        KeyInterestUpdater(int op, final AtomicReferenceArray<SelectionKey> selectionKeys) {
+            this.op = op;
+            this.selectionKeys = selectionKeys;
+        }
+
+        public void update() {
+            if (wasChanged.getAndSet(false)) {
+                for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
+                    changeOfOpWriteRequired.clear(i);
+                    final SelectionKey key = selectionKeys.get((int) i);
+                    key.interestOps(key.interestOps() | op);
+                }
+            }
+        }
+
+        public void set(int i) {
+
+            changeOfOpWriteRequired.set(i);
+            wasChanged.set(true);
+        }
+
+
     }
 
 }
