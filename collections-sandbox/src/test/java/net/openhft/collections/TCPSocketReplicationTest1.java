@@ -26,7 +26,6 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.TreeMap;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -57,7 +56,7 @@ public class TCPSocketReplicationTest1 {
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) (1 + hostId))
+                .identifier((byte) 2)
                 .tcpReplication(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
@@ -83,16 +82,9 @@ public class TCPSocketReplicationTest1 {
         long start = System.nanoTime();
         StringBuilder sb = new StringBuilder();
         for (int j = 0; j < 1000000; j++) {
-//            if (i )
-//            Thread.sleep(5);
-            for (int i = 0; i < 200; i += 10) {
-                sb.setLength(0);
-                sb.append('E').append(j);
-                map1.put(i * 10 + hostId, sb);
-                count++;
-            }
-            if (j == 0 || (j + 1) % 50000 == 0)
-                System.out.println(new TreeMap(map1));
+            Thread.sleep(1000);
+            map1.put(j, "A");
+            System.out.println(map1);
         }
         long time = System.nanoTime() - start;
         System.out.printf("Throughput %.2f Mputs/s%n", count * 1e3 / time);

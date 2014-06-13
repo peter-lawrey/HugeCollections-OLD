@@ -203,6 +203,14 @@ abstract class AbstractChannelReplicator implements Closeable {
         public byte localIdentifier() {
             return localIdentifier;
         }
+
+        @Override
+        public String toString() {
+            return "Details{" +
+                    "address=" + address +
+                    ", localIdentifier=" + localIdentifier +
+                    '}';
+        }
     }
 
     abstract class AbstractConnector {

@@ -234,6 +234,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         void monitor(long approxTime) {
             for (long i = activeKeys.nextSetBit(0); i >= 0; i = activeKeys.nextSetBit(i + 1)) {
+                Attached attachment = null;
                 try {
 
                     SelectionKey key = selectionKeysStore[(int) i];
@@ -243,18 +244,27 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                         continue;
                     }
 
-                    Attached attachment = (Attached) key.attachment();
+                    attachment = (Attached) key.attachment();
 
                     if (attachment == null || attachment.remoteModificationIterator == null)
                         continue;
 
-                    heartbeatCheckShouldSend(approxTime, key, attachment);
-                    heartbeatCheckHasReceived(key, approxTime);
+                    try {
+                        heartbeatCheckShouldSend(approxTime, key, attachment);
+                    } catch (Exception e) {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("", e);
+                    }
 
-                } catch (CancelledKeyException e) {
-                    throw e;
+                    try {
+                        heartbeatCheckHasReceived(key, approxTime);
+                    } catch (Exception e) {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("", e);
+                    }
                 } catch (Exception e) {
-                    LOG.error("key.interestOps()=", e);
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("", e);
                 }
 
             }
@@ -352,6 +362,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             this.details = details;
         }
 
+
+        @Override
+        public String toString() {
+            return "ServerConnector{" +
+                    "" + details +
+                    '}';
+        }
+
         SelectableChannel doConnect() throws
                 IOException, InterruptedException {
 
@@ -398,6 +416,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         private ClientConnector(@NotNull Details details) {
             super("TCP-ClientConnector-" + details.localIdentifier());
             this.details = details;
+        }
+
+
+        @Override
+        public String toString() {
+            return "ClientConnector{" +
+                    "" + details +
+                    '}';
         }
 
         /**
