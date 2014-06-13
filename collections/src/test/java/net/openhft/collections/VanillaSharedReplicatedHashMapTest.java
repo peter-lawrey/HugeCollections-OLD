@@ -71,7 +71,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .entries(size)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .canReplicate(canReplicate)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
@@ -100,7 +100,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .entries(size)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .canReplicate(canReplicate)
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
@@ -111,7 +111,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .canReplicate(canReplicate)
-                .identifier((byte)1)
+                .identifier((byte) 1)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
@@ -256,8 +256,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 */
 
     /**
-     * get returns the correct element at the given key,
-     * or null if not present
+     * get returns the correct element at the given key, or null if not present
      */
     @Test
     public void testGet() throws IOException {

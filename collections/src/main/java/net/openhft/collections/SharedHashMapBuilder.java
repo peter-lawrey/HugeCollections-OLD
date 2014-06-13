@@ -25,7 +25,6 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.EnumSet;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
@@ -130,15 +129,12 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     /**
      * Specifies alignment of address in memory of entries and independently of address in memory of values
-     * within entries.
-     * <p/>
-     * <p>Useful when values of the map are updated intensively, particularly fields with volatile access,
-     * because it doesn't work well if the value crosses cache lines. Also, on some (nowadays rare)
-     * architectures any misaligned memory access is more expensive than aligned.
-     * <p/>
-     * <p>Note that specified {@link #entrySize()} will be aligned according to this alignment. I. e. if you
-     * set {@code entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size
-     * will be 24 (20 aligned to 8 bytes).
+     * within entries. <p/> <p>Useful when values of the map are updated intensively, particularly fields with
+     * volatile access, because it doesn't work well if the value crosses cache lines. Also, on some (nowadays
+     * rare) architectures any misaligned memory access is more expensive than aligned. <p/> <p>Note that
+     * specified {@link #entrySize()} will be aligned according to this alignment. I. e. if you set {@code
+     * entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size will be 24
+     * (20 aligned to 8 bytes).
      *
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment()
@@ -149,8 +145,7 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Returns alignment of addresses in memory of entries and independently of values within entries.
-     * <p/>
+     * Returns alignment of addresses in memory of entries and independently of values within entries. <p/>
      * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
      *
      * @see #entryAndValueAlignment(Alignment)
@@ -538,18 +533,20 @@ public final class SharedHashMapBuilder implements Cloneable {
         final ByteBufferBytes updModIteratorBytes =
                 new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
 
+
+        final UdpReplicator udpReplicator =
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result);
+
         final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
                 result.new ModificationIterator(
-                        null,
-                        EnumSet.allOf(ReplicatedSharedHashMap.EventType.class),
                         updModIteratorBytes,
-                        result.eventListener
-                );
+                        result.eventListener,
+                        udpReplicator);
+
+        udpReplicator.setModificationIterator(udpModIterator);
 
         result.eventListener = udpModIterator;
 
-        final UdpReplicator udpReplicator =
-                new UdpReplicator(result, udpReplicatorBuilder.clone(), udpModIterator, entrySize(), result);
 
         result.addCloseable(udpReplicator);
     }

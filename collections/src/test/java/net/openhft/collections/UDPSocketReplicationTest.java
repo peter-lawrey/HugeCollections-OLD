@@ -81,7 +81,7 @@ public class UDPSocketReplicationTest {
 
         for (int i = 0; i < 1024; i++) {
             Thread.sleep(5000);
-            map2.put(i*2, "E");
+            map2.put(i * 2, "E");
             System.out.println("" + map2);
         }
 

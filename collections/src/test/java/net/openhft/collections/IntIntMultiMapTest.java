@@ -17,30 +17,31 @@
 package net.openhft.collections;
 
 
-import com.google.common.collect.*;
-import org.junit.Ignore;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.*;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
- * User: peter
- * Date: 09/12/13
+ * User: peter Date: 09/12/13
  */
 @RunWith(value = Parameterized.class)
 public class IntIntMultiMapTest {
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
-        return Arrays.asList(new Object[][] {
-                { VanillaIntIntMultiMap.class },
-                { VanillaShortShortMultiMap.class }
+        return Arrays.asList(new Object[][]{
+                {VanillaIntIntMultiMap.class},
+                {VanillaShortShortMultiMap.class}
         });
     }
+
     private Class<? extends IntIntMultiMap> c;
     IntIntMultiMap map;
     Multimap<Integer, Integer> referenceMap = HashMultimap.create();
@@ -61,6 +62,7 @@ public class IntIntMultiMapTest {
     private void multiMapEquals() {
         class Action implements IntIntMultiMap.EntryConsumer {
             int mapSize = 0;
+
             @Override
             public void accept(int key, int value) {
                 mapSize++;

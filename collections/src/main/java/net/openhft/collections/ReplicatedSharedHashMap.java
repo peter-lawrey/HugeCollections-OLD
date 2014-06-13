@@ -30,8 +30,8 @@ import java.io.IOException;
 public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
     /**
-     * Used in conjunction with map replication, all put events that originate from a remote node
-     * will be processed using this method.
+     * Used in conjunction with map replication, all put events that originate from a remote node will be
+     * processed using this method.
      *
      * @param key        key with which the specified value is to be associated
      * @param value      value to be associated with the specified key
@@ -43,8 +43,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     V put(K key, V value, byte identifier, long timeStamp);
 
     /**
-     * Used in conjunction with map replication, all remove events that originate from a remote node
-     * will be processed using this method.
+     * Used in conjunction with map replication, all remove events that originate from a remote node will be
+     * processed using this method.
      *
      * @param key        key with which the specified value is associated
      * @param value      value expected to be associated with the specified key
@@ -57,46 +57,44 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
 
     /**
-     * Provides the unique Identifier associated with this map instance.
-     * <p>
-     * An identifier is used to determine which replicating node made the change.
-     * <p>
-     * If two nodes update their map at the same time with different values, we have to deterministically resolve which
-     * update wins, because of eventual consistency both nodes should end up locally holding the same data.
-     * Although it is rare two remote nodes could receive an update to their maps at exactly the same time for the same
-     * key, we have to handle this edge case, its therefore important not to rely on timestamps alone to reconcile the
-     * updates. Typically the update with the newest timestamp should win,  but in this example both timestamps are the
-     * same, and the decision made to one node should be identical to the decision made to the other. We resolve this
-     * simple dilemma by using a node identifier, each node will have a unique identifier, the update from the node
-     * with the smallest identifier wins.
+     * Provides the unique Identifier associated with this map instance. <p> An identifier is used to
+     * determine which replicating node made the change. <p> If two nodes update their map at the same time
+     * with different values, we have to deterministically resolve which update wins, because of eventual
+     * consistency both nodes should end up locally holding the same data. Although it is rare two remote
+     * nodes could receive an update to their maps at exactly the same time for the same key, we have to
+     * handle this edge case, its therefore important not to rely on timestamps alone to reconcile the
+     * updates. Typically the update with the newest timestamp should win,  but in this example both
+     * timestamps are the same, and the decision made to one node should be identical to the decision made to
+     * the other. We resolve this simple dilemma by using a node identifier, each node will have a unique
+     * identifier, the update from the node with the smallest identifier wins.
      *
      * @return the unique Identifier associated with this map instance
      */
     byte identifier();
 
     /**
-     * Gets (if it does not exist, creates) an instance of ModificationIterator dedicated for
-     * the remote node with the given identifier. It doesn't mean the returned ModificationIterator
-     * iterates though entries originating from that remote node, on the contrary, the iterator
-     * should be used to send the updates originating from this map to that remote node.
+     * Gets (if it does not exist, creates) an instance of ModificationIterator dedicated for the remote node
+     * with the given identifier. It doesn't mean the returned ModificationIterator iterates though entries
+     * originating from that remote node, on the contrary, the iterator should be used to send the updates
+     * originating from this map to that remote node.
      *
-     * @param remoteIdentifier the identifier of the remote node
-     * @return the ModificationIterator dedicated for replication to the remote node with the given
-     * identifier
+     * @param remoteIdentifier     the identifier of the remote node
+     * @param modificationNotifier called when ever there is a change applied to the modification iterator
+     * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
-    ModificationIterator acquireModificationIterator(byte remoteIdentifier) throws IOException;
+    ModificationIterator acquireModificationIterator(byte remoteIdentifier,
+                                                     ModificationNotifier modificationNotifier) throws IOException;
 
 
     /**
-     * Used in conjunction with replication, to back filling data from a remote node that this node may have missed
-     * updates while it has not been running.
+     * Used in conjunction with replication, to back filling data from a remote node that this node may have
+     * missed updates while it has not been running.
      *
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      * @see #identifier()
      */
     long lastModificationTime(byte identifier);
-
 
     /**
      * Event types which should be replicated.
@@ -113,14 +111,30 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         REMOVE
     }
 
+
+    interface ModificationNotifier {
+        public static ModificationNotifier NOP = new ModificationNotifier() {
+            @Override
+            public void onChange() {
+            }
+        };
+
+        /**
+         * called when ever there is a change applied to the modification iterator
+         */
+        void onChange();
+    }
+
+
     /**
-     * Holds a record of which entries have modification.
-     * Each remote map supported will require a corresponding ModificationIterator instance
+     * Holds a record of which entries have modification. Each remote map supported will require a
+     * corresponding ModificationIterator instance
      */
     interface ModificationIterator {
 
         /**
-         * @return {@code true} if the is another entry to be received via {@link #nextEntry(EntryCallback callback)}
+         * @return {@code true} if the is another entry to be received via {@link #nextEntry(EntryCallback
+         * callback)}
          */
         boolean hasNext();
 
@@ -128,17 +142,18 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * A non-blocking call that provides the entry that has changed to {@code callback.onEntry()}.
          *
          * @param callback a callback which will be called when a new entry becomes available.
-         * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method,
-         * {@code false} if the entry was not accepted or was not available
+         * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method, {@code
+         * false} if the entry was not accepted or was not available
          */
         boolean nextEntry(@NotNull final EntryCallback callback);
 
         /**
-         * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer.
-         * It means all these entries will be considered as "new" by this ModificationIterator
-         * and iterated once again no matter if they have already been.
+         * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer. It means all
+         * these entries will be considered as "new" by this ModificationIterator and iterated once again no
+         * matter if they have already been.
          *
-         * <p>This functionality is used to publish recently modified entries to a new remote node as it connects.
+         * <p>This functionality is used to publish recently modified entries to a new remote node as it
+         * connects.
          *
          * @param fromTimeStamp the timestamp from which all entries should be dirty
          */
@@ -146,18 +161,18 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     }
 
     /**
-     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes entry)}
-     * which will get called whenever a put() or remove() has occurred to the map
+     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes
+     *entry)} which will get called whenever a put() or remove() has occurred to the map
      */
     abstract class EntryCallback {
 
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
          *
-         * @param entry the entry you will receive, this does not have to be locked, as locking is already provided from
-         *              the caller.
-         * @return {@code false} if this entry should be ignored because the identifier of the source node is not from
-         * one of our changes, WARNING even though we check the identifier in the
+         * @param entry the entry you will receive, this does not have to be locked, as locking is already
+         *              provided from the caller.
+         * @return {@code false} if this entry should be ignored because the identifier of the source node is
+         * not from one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
         public abstract boolean onEntry(final NativeBytes entry);
@@ -189,16 +204,17 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * The map implements this method to save its contents.
          *
          * @param entry       the byte location of the entry to be stored
-         * @param destination a buffer the entry will be written to, the segment may reject this operation and add zeroBytes,
-         *                    if the identifier in the entry did not match the maps local identifier
+         * @param destination a buffer the entry will be written to, the segment may reject this operation and
+         *                    add zeroBytes, if the identifier in the entry did not match the maps local
+         *                    identifier
          */
         void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
 
         /**
-         * The map implements this method to restore its contents. This method must read
-         * the values in the same sequence and with the same types as were written by {@code writeExternalEntry()}.
-         * This method is typically called when we receive a remote replication event,
-         * this event could originate from either a remote {@code put(K key, V value)} or {@code remove(Object key)}
+         * The map implements this method to restore its contents. This method must read the values in the
+         * same sequence and with the same types as were written by {@code writeExternalEntry()}. This method
+         * is typically called when we receive a remote replication event, this event could originate from
+         * either a remote {@code put(K key, V value)} or {@code remove(Object key)}
          */
         void readExternalEntry(@NotNull Bytes source);
 

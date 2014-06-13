@@ -108,7 +108,7 @@ public class TCPSocketReplicationTest {
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000);
+        waitTillEqual(9000);
 
         assertEquals(map1, map2);
         assertTrue(!map2.isEmpty());

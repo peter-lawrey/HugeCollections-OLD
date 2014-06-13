@@ -33,28 +33,28 @@ public class SHMMetaDataTest {
         File file = new File(TMP, "testAccessTimes");
         final AtomicLong timeStamps = new AtomicLong(1);
         SharedMapEventListener<String, String, SharedHashMap<String, String>> listener =
-                new SharedMapEventListener<String, String,SharedHashMap<String, String>>() {
+                new SharedMapEventListener<String, String, SharedHashMap<String, String>>() {
 
-            @Override
-            public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
-                assertEquals(8, metaDataBytes);
-                entry.writeLong(0, timeStamps.incrementAndGet());
-            }
+                    @Override
+                    public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
+                        assertEquals(8, metaDataBytes);
+                        entry.writeLong(0, timeStamps.incrementAndGet());
+                    }
 
-            @Override
-            public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value, long pos, SharedSegment segment) {
-                assertEquals(8, metaDataBytes);
-                if (added)
-                    assertEquals(0, entry.readLong());
-                entry.writeLong(0, timeStamps.incrementAndGet());
-            }
+                    @Override
+                    public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value, long pos, SharedSegment segment) {
+                        assertEquals(8, metaDataBytes);
+                        if (added)
+                            assertEquals(0, entry.readLong());
+                        entry.writeLong(0, timeStamps.incrementAndGet());
+                    }
 
-            @Override
-            public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value, int pos, SharedSegment segment) {
-                assertEquals(8, metaDataBytes);
-                System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
-            }
-        };
+                    @Override
+                    public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value, int pos, SharedSegment segment) {
+                        assertEquals(8, metaDataBytes);
+                        System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
+                    }
+                };
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
                 .metaDataBytes(8)
                 .eventListener(listener)

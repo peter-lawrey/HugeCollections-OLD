@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier;
 import static net.openhft.collections.TcpReplicator.EntryCallback;
 
 
@@ -50,7 +51,7 @@ import static net.openhft.collections.TcpReplicator.EntryCallback;
  * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
  * with the TCP Replicator.
  */
-class UdpReplicator extends AbstractChannelReplicator implements Closeable {
+class UdpReplicator extends AbstractChannelReplicator implements ModificationNotifier, Closeable {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(UdpReplicator.class.getName());
@@ -58,7 +59,8 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
     private final UdpSocketChannelEntryWriter writer;
     private final UdpSocketChannelEntryReader reader;
 
-    private final ModificationIterator udpModificationIterator;
+
+    private ModificationIterator modificationIterator;
     private Throttler throttler;
     @NotNull
     private final UdpReplicatorBuilder udpReplicatorBuilder;
@@ -66,23 +68,30 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
     private final ServerConnector serverConnector;
     private final Queue<Runnable> pendingRegistrations;
 
+    private SelectableChannel writeChannel;
+
+    @Override
+    public void close() {
+        writeChannel = null;
+        super.close();
+    }
+
     /**
      * @param map
      * @param udpReplicatorBuilder
-     * @param udpModificationIterator
      * @param serializedEntrySize
      * @param externalizable
      * @throws IOException
      */
     UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
-                  @NotNull final ModificationIterator udpModificationIterator, int serializedEntrySize,
+                  int serializedEntrySize,
                   @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) throws
             IOException {
         super("UdpReplicator-" + map.identifier());
 
         this.udpReplicatorBuilder = udpReplicatorBuilder;
-        this.udpModificationIterator = udpModificationIterator;
+
 
         this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(serializedEntrySize, externalizable);
         this.reader = new UdpReplicator.UdpSocketChannelEntryReader(serializedEntrySize, externalizable);
@@ -121,7 +130,9 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
         serverConnector.connect();
 
         while (selector.isOpen()) {
-            register(this.pendingRegistrations);
+
+            if (!pendingRegistrations.isEmpty())
+                register(this.pendingRegistrations);
 
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
@@ -147,7 +158,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
                     if (key.isWritable()) {
                         final DatagramChannel socketChannel = (DatagramChannel) key.channel();
                         try {
-                            int len = writer.writeAll(socketChannel, udpModificationIterator);
+                            int len = writer.writeAll(socketChannel, modificationIterator);
                             if (throttler != null)
                                 throttler.contemplateUnregisterWriteSocket(len);
                         } catch (NotYetConnectedException e) {
@@ -199,8 +210,30 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
         return client;
     }
 
+    @Override
+    public void onChange() {
+        enableWrites();
+    }
 
-    private static class UdpSocketChannelEntryWriter {
+    private void enableWrites() {
+        try {
+            final SelectionKey selectionKey = writeChannel.keyFor(this.selector);
+            selectionKey.interestOps(selectionKey.interestOps() | OP_WRITE);
+        } catch (Exception e) {
+            LOG.error("", e);
+        }
+    }
+
+    private void disableWrites() {
+        try {
+            final SelectionKey selectionKey = writeChannel.keyFor(this.selector);
+            selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
+        } catch (Exception e) {
+            LOG.error("", e);
+        }
+    }
+
+    private class UdpSocketChannelEntryWriter {
 
         private final ByteBuffer out;
         private final ByteBufferBytes in;
@@ -208,10 +241,12 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
         UdpSocketChannelEntryWriter(final int serializedEntrySize,
                                     @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             in = new ByteBufferBytes(out);
             entryCallback = new EntryCallback(externalizable, in);
+
         }
 
         /**
@@ -240,14 +275,20 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
             final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
 
-            if (!wasDataRead)
+            if (!wasDataRead) {
+                disableWrites();
                 return 0;
+            }
 
             // we'll write the size inverted at the start
             in.writeShort(0, ~(in.readUnsignedShort(2)));
             out.limit((int) in.position());
 
             return socketChannel.write(out);
+
+        }
+
+        public void enableWrites() {
 
         }
     }
@@ -318,7 +359,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
         private final Details details;
 
         private ServerConnector(Details connectionDetails) {
-            super("UDP-Connector", connectionDetails);
+            super("UDP-Connector");
             this.details = connectionDetails;
         }
 
@@ -333,7 +374,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
             // Kick off connection establishment
             try {
                 synchronized (UdpReplicator.this.closeables) {
-                    server.connect(details.getAddress());
+                    server.connect(details.address());
                     UdpReplicator.this.closeables.add(server);
                 }
             } catch (IOException e) {
@@ -352,6 +393,7 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
 
                     try {
                         server.register(selector, OP_WRITE);
+                        writeChannel = server;
                         if (throttler != null)
                             throttler.add(server);
                     } catch (ClosedChannelException e) {
@@ -365,6 +407,10 @@ class UdpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
 
+    }
+
+    public void setModificationIterator(ModificationIterator modificationIterator) {
+        this.modificationIterator = modificationIterator;
     }
 
 

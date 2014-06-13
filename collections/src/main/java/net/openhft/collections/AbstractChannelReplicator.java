@@ -53,7 +53,6 @@ abstract class AbstractChannelReplicator implements Closeable {
     final Selector selector;
     final Set<Closeable> closeables = Collections.synchronizedSet(new LinkedHashSet<Closeable>());
 
-
     AbstractChannelReplicator(String name) throws IOException {
         executorService = Executors.newSingleThreadExecutor(
                 new NamedThreadFactory(name, true));
@@ -78,6 +77,7 @@ abstract class AbstractChannelReplicator implements Closeable {
             }
         }
     }
+
 
     @Override
     public void close() {
@@ -183,21 +183,20 @@ abstract class AbstractChannelReplicator implements Closeable {
 
         private final SocketAddress address;
 
-        private final byte identifier;
+        private final byte localIdentifier;
 
-        Details(@NotNull SocketAddress address,
-                byte identifier) {
+        Details(@NotNull SocketAddress address, byte localIdentifier) {
 
             this.address = address;
-            this.identifier = identifier;
+            this.localIdentifier = localIdentifier;
         }
 
-        public SocketAddress getAddress() {
+        public SocketAddress address() {
             return address;
         }
 
-        public byte getIdentifier() {
-            return identifier;
+        public byte localIdentifier() {
+            return localIdentifier;
         }
     }
 
@@ -206,13 +205,11 @@ abstract class AbstractChannelReplicator implements Closeable {
         int connectionAttempts;
 
         private final String name;
-        private final Details details;
 
         private volatile SelectableChannel socketChannel;
 
-        public AbstractConnector(String name, @NotNull final Details details) {
+        public AbstractConnector(String name) {
             this.name = name;
-            this.details = details;
         }
 
         abstract SelectableChannel doConnect() throws IOException, InterruptedException;
