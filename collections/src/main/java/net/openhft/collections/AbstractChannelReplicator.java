@@ -43,7 +43,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
@@ -226,7 +225,7 @@ abstract class AbstractChannelReplicator implements Closeable {
          * @throws IOException
          * @throws InterruptedException
          */
-        public final void connect() {
+        public final void connectLater() {
             try {
                 if (socketChannel != null)
                     socketChannel.close();
@@ -236,10 +235,23 @@ abstract class AbstractChannelReplicator implements Closeable {
                 LOG.error("", e1);
             }
 
-
             final long reconnectionInterval = connectionAttempts * 100;
             if (connectionAttempts < 5)
                 connectionAttempts++;
+            doConnect(reconnectionInterval);
+
+        }
+
+        /**
+         * connects or reconnects immediately
+         */
+        public void connect() {
+            doConnect(0);
+        }
+
+
+        private void doConnect(final long reconnectionInterval) {
+
 
             final Thread thread = new Thread(new Runnable() {
 
@@ -275,7 +287,6 @@ abstract class AbstractChannelReplicator implements Closeable {
             thread.setName(name);
             thread.setDaemon(true);
             thread.start();
-
         }
 
         public void setSuccessfullyConnected() {
@@ -283,6 +294,11 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
+
+    /**
+     * add interestOps to "selector keys", which has to be done on the same thread as the selector This class,
+     * allows via {@link net.openhft.collections.AbstractChannelReplicator .KeyInterestUpdater#set(int)}  to
+     */
     static class KeyInterestUpdater {
 
         private AtomicBoolean wasChanged = new AtomicBoolean();
@@ -290,27 +306,35 @@ abstract class AbstractChannelReplicator implements Closeable {
         private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
                 ByteBuffer.allocate(16)));
 
-        private final AtomicReferenceArray<SelectionKey> selectionKeys;
+        private final SelectionKey[] selectionKeys;
         private final int op;
 
-        KeyInterestUpdater(int op, final AtomicReferenceArray<SelectionKey> selectionKeys) {
+        KeyInterestUpdater(int op, final SelectionKey[] selectionKeys) {
             this.op = op;
             this.selectionKeys = selectionKeys;
         }
 
-        public void update() {
+        public void applyUpdates() {
             if (wasChanged.getAndSet(false)) {
                 for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
                     changeOfOpWriteRequired.clear(i);
-                    final SelectionKey key = selectionKeys.get((int) i);
-                    key.interestOps(key.interestOps() | op);
+                    final SelectionKey key = selectionKeys[(int) i];
+                    try {
+                        key.interestOps(key.interestOps() | op);
+                    } catch (Exception e) {
+                        LOG.debug("", e);
+                    }
                 }
             }
         }
 
-        public void set(int i) {
-
-            changeOfOpWriteRequired.set(i);
+        /**
+         * @param keyIndex the index of the key that has changed, the list of keys is provided by the
+         *                 constructor {@link net.openhft.collections.AbstractChannelReplicator.KeyInterestUpdater#KeyInterestUpdater(int,
+         *                 java.nio.channels.SelectionKey[]) <java.nio.channels.SelectionKey>)}
+         */
+        public void set(int keyIndex) {
+            changeOfOpWriteRequired.set(keyIndex);
             wasChanged.set(true);
         }
 

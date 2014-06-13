@@ -127,7 +127,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     private void process() throws Exception {
 
         connectClient(udpReplicatorBuilder.port()).register(selector, OP_READ);
-        serverConnector.connect();
+        serverConnector.connectLater();
 
         while (selector.isOpen()) {
 
@@ -164,11 +164,11 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
                         } catch (NotYetConnectedException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
-                            serverConnector.connect();
+                            serverConnector.connectLater();
                         } catch (IOException e) {
                             if (LOG.isDebugEnabled())
                                 LOG.debug("", e);
-                            serverConnector.connect();
+                            serverConnector.connectLater();
                         }
                     }
 
@@ -378,7 +378,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
                     UdpReplicator.this.closeables.add(server);
                 }
             } catch (IOException e) {
-                connect();
+                connectLater();
                 return null;
             }
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
