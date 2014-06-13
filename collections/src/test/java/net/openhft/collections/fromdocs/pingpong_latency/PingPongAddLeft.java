@@ -18,21 +18,23 @@ package net.openhft.collections.fromdocs.pingpong_latency;
 
 import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
+import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
 import static net.openhft.lang.model.DataValueClasses.newDirectReference;
 
-public class PingPongLockLeft {
-    public static void main(String... ignored) throws IOException, InterruptedException {
+public class PingPongAddLeft {
+    public static void main(String... ignored) throws IOException {
         SharedHashMap<String, BondVOInterface> shm = PingPongCASLeft.acquireSHM();
 
-        playPingPong(shm, 4, 5, true, "PingPongLockLEFT");
+        playPingPong(shm, +1, true, "PingPongAddLEFT");
     }
 
-    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst, final String desc) throws InterruptedException {
+    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double add, boolean setFirst, final String desc) {
         BondVOInterface bond1 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond2 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond3 = newDirectReference(BondVOInterface.class);
@@ -42,45 +44,28 @@ public class PingPongLockLeft {
         shm.acquireUsing("369604102", bond2);
         shm.acquireUsing("369604103", bond3);
         shm.acquireUsing("369604104", bond4);
-        System.out.printf("\n\n" + desc + ": Timing 1 x off-heap operations on " + shm.file() + "\n");
+        System.out.printf("\n\n" + desc + ": Timing off-heap operations on /dev/shm/RDR_DIM_Mock\n");
         if (setFirst) {
-            bond1.setCoupon(_coupon);
-            bond2.setCoupon(_coupon);
-            bond3.setCoupon(_coupon);
-            bond4.setCoupon(_coupon);
+            bond1.setCoupon(add);
+            bond2.setCoupon(add);
+            bond3.setCoupon(add);
+            bond4.setCoupon(add);
         }
         int timeToCallNanoTime = 30;
         int runs = 1000000;
         long[] timings = new long[runs];
-        for (int j = 0; j < 10; j++) {
+        for (int j = 0; j < 100; j++) {
             for (int i = 0; i < runs; i++) {
                 long _start = System.nanoTime();
-                toggleCoupon(bond1, _coupon, _coupon2);
-                toggleCoupon(bond2, _coupon, _coupon2);
-                toggleCoupon(bond3, _coupon, _coupon2);
-                toggleCoupon(bond4, _coupon, _coupon2);
-
+                bond1.addAtomicCoupon(add);
+                bond2.addAtomicCoupon(add);
+                bond3.addAtomicCoupon(add);
+                bond4.addAtomicCoupon(add);
                 timings[i] = (System.nanoTime() - _start - timeToCallNanoTime) / 4;
             }
             Arrays.sort(timings);
-            System.out.printf("#%d:  lock,compare,set,unlock 50/90/99%%tile was %,d / %,d / %,d%n",
+            System.out.printf("#%d:  atomic add coupon 50/90/99%%tile was %,d / %,d / %,d%n",
                     j, timings[runs / 2], timings[runs * 9 / 10], timings[runs * 99 / 100]);
-        }
-    }
-
-    private static void toggleCoupon(BondVOInterface bond, double _coupon, double _coupon2) throws InterruptedException {
-        for (int i = 0; ; i++) {
-            bond.busyLockEntry();
-            try {
-                if (bond.getCoupon() == _coupon) {
-                    bond.setCoupon(_coupon2);
-                    return;
-                }
-                if (i > 1000)
-                    Thread.yield();
-            } finally {
-                bond.unlockEntry();
-            }
         }
     }
 }

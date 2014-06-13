@@ -4,8 +4,6 @@ import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.collections.fromdocs.BondVOInterface;
-import org.junit.Ignore;
-import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,10 +30,10 @@ public class PingPongCASLeft {
     public static void main(String... ignored) throws IOException {
         SharedHashMap<String, BondVOInterface> shm = PingPongCASLeft.acquireSHM();
 
-        playPingPong(shm, 4, 5, true);
+        playPingPong(shm, 4, 5, true, "PingPongCASLEFT");
     }
 
-    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst) {
+    static void playPingPong(SharedHashMap<String, BondVOInterface> shm, double _coupon, double _coupon2, boolean setFirst, final String desc) {
         BondVOInterface bond1 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond2 = newDirectReference(BondVOInterface.class);
         BondVOInterface bond3 = newDirectReference(BondVOInterface.class);
@@ -45,7 +43,7 @@ public class PingPongCASLeft {
         shm.acquireUsing("369604102", bond2);
         shm.acquireUsing("369604103", bond3);
         shm.acquireUsing("369604104", bond4);
-        System.out.printf("\n\nPingPongLEFT: Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock\n");
+        System.out.printf("\n\n" + desc + ": Timing 1 x off-heap operations on /dev/shm/RDR_DIM_Mock\n");
         if (setFirst) {
             bond1.setCoupon(_coupon);
             bond2.setCoupon(_coupon);
