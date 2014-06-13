@@ -18,6 +18,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.collection.ATSDirectBitSet;
+import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
@@ -34,6 +36,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static java.nio.channels.SelectionKey.*;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
@@ -59,7 +63,16 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             ConcurrentHashMap<SocketAddress, AbstractConnector>();
     private Throttler throttler;
 
-    private volatile boolean enableWrite;
+    // used to instruct the selector thread to set OP_WRITE on a key correlated by the bit index in the
+    // bitset
+    private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
+            ByteBuffer.allocate(16)));
+
+    private final AtomicReferenceArray<SelectionKey> selectionKeys =
+            new AtomicReferenceArray<SelectionKey>(128);
+
+    // called when ever there is a
+    private AtomicBoolean opWriteChanged = new AtomicBoolean();
 
 
     TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
@@ -154,20 +167,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
                         }
 
-
-                        if (attachment != null && attachment.remoteModificationIterator != null
-                                && attachment.remoteModificationIterator.hasNext()) {
-
-                            int ops = key.interestOps();
-
-                            if (LOG.isDebugEnabled())
-                                LOG.debug("Enabling OP_WRITE to remoteIdentifier=" + attachment
-                                        .remoteIdentifier + ", localIdentifier=" + map.identifier());
-
-                            if ((ops & (OP_CONNECT | OP_ACCEPT)) == 0)
-                                key.interestOps(ops | OP_WRITE);
-
-                        }
                     } catch (CancelledKeyException e) {
                         throw e;
                     } catch (Exception e) {
@@ -176,6 +175,13 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
                 }
 
+                if (opWriteChanged.getAndSet(false)) {
+                    for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
+                        changeOfOpWriteRequired.clear(i);
+                        final SelectionKey key = selectionKeys.get((int) i);
+                        key.interestOps(key.interestOps() | OP_WRITE);
+                    }
+                }
 
                 if (nSelectedKeys == 0)
                     continue;    // go back and check pendingRegistrations
@@ -519,12 +525,13 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
      * @param map
      * @param attached
      * @param localHeartbeatInterval
+     * @param key
      * @throws java.io.IOException
      * @throws InterruptedException
      */
     private void doHandShaking(final ReplicatedSharedHashMap map,
                                final Attached attached,
-                               final long localHeartbeatInterval) throws IOException, InterruptedException {
+                               final long localHeartbeatInterval, final SelectionKey key) throws IOException, InterruptedException {
 
         final TcpSocketChannelEntryWriter writer = attached.entryWriter;
         final TcpSocketChannelEntryReader reader = attached.entryReader;
@@ -537,6 +544,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 return;
 
             attached.remoteIdentifier = remoteIdentifier;
+            selectionKeys.set(remoteIdentifier, key);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("server-connection id={}, remoteIdentifier={}",
@@ -643,7 +651,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         if (attached.isHandShakingComplete())
             attached.entryReader.entriesFromBuffer();
         else
-            doHandShaking(map, attached, localHeartbeatInterval);
+            doHandShaking(map, attached, localHeartbeatInterval, key);
 
     }
 
@@ -663,7 +671,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         public long remoteHeartbeatInterval = 100;
         public boolean hasRemoteHeartbeatInterval;
 
-        public volatile boolean enableWrite;
+        //  public volatile boolean enableWrite;
 
         public boolean isServer;
 
@@ -680,8 +688,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
          */
         @Override
         public void onChange() {
-            TcpReplicator.this.enableWrite = true;
-            enableWrite = true;
+            TcpReplicator.this.opWriteChanged.set(true);
+            if (remoteIdentifier != Byte.MIN_VALUE)
+                TcpReplicator.this.changeOfOpWriteRequired.set(remoteIdentifier);
+
+            // enableWrite = true;
             selector.wakeup();
         }
     }
