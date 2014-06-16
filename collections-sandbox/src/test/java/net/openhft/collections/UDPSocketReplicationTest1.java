@@ -25,7 +25,6 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -42,15 +41,13 @@ public class UDPSocketReplicationTest1 {
     @Before
     public void setup() throws IOException {
 
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
-                new InetSocketAddress("192.168.0.254", 8079))
-                .deletedModIteratorFileOnExit(true)
-                .heartBeatIntervalMS(1000);
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8079, "192.168.0.254");
+
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) 1)
-                .tcpReplication(tcpReplicatorBuilder)
+                .udpReplicatorBuilder(udpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -74,7 +71,7 @@ public class UDPSocketReplicationTest1 {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
                 Thread.sleep(1000);
-                //         map1.put(i * 2, "E1");
+                map1.put(i * 2, "E1");
                 System.out.println(map1);
             }
         }

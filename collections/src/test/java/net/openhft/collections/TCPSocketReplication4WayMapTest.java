@@ -55,7 +55,7 @@ public class TCPSocketReplication4WayMapTest {
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -71,7 +71,7 @@ public class TCPSocketReplication4WayMapTest {
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), IntValue.class, CharSequence.class);
     }

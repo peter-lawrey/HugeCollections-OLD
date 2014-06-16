@@ -43,7 +43,7 @@ import static net.openhft.collections.TcpReplicator.EntryCallback;
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
- * @see SharedHashMapBuilder#udpReplication
+ * @see SharedHashMapBuilder#udpReplicatorBuilder
  *
  *
  * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ), typically, you

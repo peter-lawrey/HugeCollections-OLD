@@ -57,7 +57,7 @@ public class TCPSocketReplicationTest1 {
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) 2)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }

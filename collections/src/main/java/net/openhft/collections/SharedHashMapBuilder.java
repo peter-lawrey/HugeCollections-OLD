@@ -70,10 +70,10 @@ public final class SharedHashMapBuilder implements Cloneable {
 
         try {
             final SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
-            if (tcpReplication() != null)
-                result.tcpReplication(tcpReplication().clone());
-            if (udpReplication() != null)
-                result.udpReplication(udpReplication().clone());
+            if (tcpReplicatorBuilder() != null)
+                result.tcpReplicatorBuilder(tcpReplicatorBuilder().clone());
+            if (udpReplicatorBuilder() != null)
+                result.udpReplicatorBuilder(udpReplicatorBuilder().clone());
             return result;
 
         } catch (CloneNotSupportedException e) {
@@ -443,8 +443,8 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", largeSegments=" + largeSegments() +
                 ", canReplicate=" + canReplicate() +
                 ", identifier=" + identifierToString() +
-                ", tcpReplication=" + tcpReplication() +
-                ", udpReplication=" + udpReplication() +
+                ", tcpReplicatorBuilder=" + tcpReplicatorBuilder() +
+                ", udpReplicatorBuilder=" + udpReplicatorBuilder() +
                 ", timeProvider=" + timeProvider() +
                 '}';
     }
@@ -587,22 +587,22 @@ public final class SharedHashMapBuilder implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder tcpReplication(TcpReplicatorBuilder tcpReplicatorBuilder) {
+    public SharedHashMapBuilder tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
         this.tcpReplicatorBuilder = tcpReplicatorBuilder;
         return this;
     }
 
-    public TcpReplicatorBuilder tcpReplication() {
+    public TcpReplicatorBuilder tcpReplicatorBuilder() {
         return tcpReplicatorBuilder;
     }
 
 
-    public UdpReplicatorBuilder udpReplication() {
+    public UdpReplicatorBuilder udpReplicatorBuilder() {
         return udpReplicatorBuilder;
     }
 
 
-    public SharedHashMapBuilder udpReplication(UdpReplicatorBuilder udpReplicatorBuilder) {
+    public SharedHashMapBuilder udpReplicatorBuilder(UdpReplicatorBuilder udpReplicatorBuilder) {
         this.udpReplicatorBuilder = udpReplicatorBuilder;
         return this;
     }

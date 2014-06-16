@@ -57,7 +57,7 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
                 .entries(1000)
                 .putReturnsNull(true)
                 .identifier(identifier)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 

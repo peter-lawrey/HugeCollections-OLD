@@ -29,7 +29,7 @@ import static java.util.Collections.unmodifiableSet;
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
- * @see SharedHashMapBuilder#tcpReplication(TcpReplicatorBuilder)
+ * @see SharedHashMapBuilder#tcpReplicatorBuilder(TcpReplicatorBuilder)
  */
 public class TcpReplicatorBuilder implements Cloneable {
 
