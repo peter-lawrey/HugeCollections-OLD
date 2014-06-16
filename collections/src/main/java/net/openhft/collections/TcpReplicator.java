@@ -747,10 +747,12 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         public TcpSocketChannelEntryReader entryReader;
         public TcpSocketChannelEntryWriter entryWriter;
+
         public ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator;
         public AbstractConnector connector;
         public long remoteBootstrapTimestamp = Long.MIN_VALUE;
         private boolean handShakingComplete;
+
         public byte remoteIdentifier = Byte.MIN_VALUE;
         public byte localIdentifier;
 
@@ -758,8 +760,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         public long remoteHeartbeatInterval = 100;
         public boolean hasRemoteHeartbeatInterval;
 
-        //  public volatile boolean enableWrite;
 
+        // true if its socket is a ServerSocket
         public boolean isServer;
 
         boolean isHandShakingComplete() {
@@ -931,8 +933,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
         /**
-         * removes back in the OP_WRITE from the selector, otherwise it'll spin loop It will get added back in
-         * as soon as we have data to write. This will only occur once handshaking is complete
+         * removes back in the OP_WRITE from the selector, otherwise it'll spin loop. The OP_WRITE will get
+         * added back in as soon as we have data to write
          *
          * @param socketChannel the socketChannel we wish to stop writing to
          * @param attached      data associated with the socketChannels key
@@ -955,7 +957,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 }
 
             } catch (Exception e) {
-
                 LOG.error("", e);
             }
 
@@ -1001,8 +1002,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     /**
      * Reads map entries from a socket, this could be a client or server socket
-     *
-     * @author Rob Austin.
      */
     private static class TcpSocketChannelEntryReader {
 
@@ -1035,7 +1034,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         /**
-         * reads from the socket and writes the contents to the buffer
+         * reads from the socket and writes them to the buffer
          *
          * @param socketChannel the  socketChannel to read from
          * @return the number of bytes read
@@ -1050,7 +1049,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         /**
-         * reads entries from the socket till it is empty
+         * reads entries from the buffer till empty
          *
          * @throws InterruptedException
          */
@@ -1097,7 +1096,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         /**
-         * compacts the buffer and updates the {@code in} and  {@code out} accordingly
+         * compacts the buffer and updates the {@code in} and {@code out} accordingly
          */
         private void compactBuffer() {
 
@@ -1135,8 +1134,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
     /**
-     * add interestOps to "selector keys", which has to be done on the same thread as the selector This class,
-     * allows via {@link net.openhft.collections.AbstractChannelReplicator .KeyInterestUpdater#set(int)}  to
+     * sets interestOps to "selector keys",The change to interestOps much be on the same thread as the
+     * selector. This  class, allows via {@link net.openhft.collections.AbstractChannelReplicator
+     * .KeyInterestUpdater#set(int)}  to holds a pending change  in interestOps ( via a bitset ), this change
+     * is  processed later on the same thread as the selector
      */
     private static class KeyInterestUpdater {
 

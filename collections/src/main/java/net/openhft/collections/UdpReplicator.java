@@ -81,15 +81,15 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
     /**
      * @param map
+     * @param externalizable
      * @param udpReplicatorBuilder
      * @param serializedEntrySize
-     * @param externalizable
      * @throws IOException
      */
     UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
+                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
-                  int serializedEntrySize,
-                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) throws
+                  int serializedEntrySize) throws
             IOException {
         super("UdpReplicator-" + map.identifier());
 
