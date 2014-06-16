@@ -44,6 +44,7 @@ public class UDPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 new InetSocketAddress("192.168.0.254", 8079))
+                .deletedModIteratorFileOnExit(true)
                 .heartBeatIntervalMS(1000);
 
         map1 = new SharedHashMapBuilder()

@@ -48,12 +48,16 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
             final int serverPort,
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
+        TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
+                InetSocketAddress);
+
+        tcpReplicatorBuilder.deletedModIteratorFileOnExit(true);
+
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .putReturnsNull(true)
                 .identifier(identifier)
-                .tcpReplication(new TcpReplicatorBuilder(serverPort,
-                        InetSocketAddress))
+                .tcpReplication(tcpReplicatorBuilder)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
