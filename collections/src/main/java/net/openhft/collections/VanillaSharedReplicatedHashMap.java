@@ -261,7 +261,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      */
     @Override
     public ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                            ModificationNotifier modificationNotifier)
+                                                            ModificationNotifier modificationNotifier,
+                                                            boolean deletedBackingFileOnExit)
             throws IOException {
 
         final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
@@ -277,6 +278,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
 
+            if (deletedBackingFileOnExit) {
+                modificationIteratorFile.delete();
+                modificationIteratorFile.deleteOnExit();
+            }
+            //  if (ms.file().deleteOnExit();)
             // create a new modification iterator
             final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
                     modIterBitSetSizeInBytes());

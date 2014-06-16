@@ -78,13 +78,15 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * originating from that remote node, on the contrary, the iterator should be used to send the updates
      * originating from this map to that remote node.
      *
-     * @param remoteIdentifier     the identifier of the remote node
-     * @param modificationNotifier called when ever there is a change applied to the modification iterator
+     * @param remoteIdentifier         the identifier of the remote node
+     * @param modificationNotifier     called when ever there is a change applied to the modification
+     *                                 iterator
+     * @param deletedBackingFileOnExit deleted the file the backs the modification iterator upon exit
      * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
     ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                     ModificationNotifier modificationNotifier) throws IOException;
+                                                     ModificationNotifier modificationNotifier, boolean deletedBackingFileOnExit) throws IOException;
 
 
     /**
@@ -95,21 +97,6 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @see #identifier()
      */
     long lastModificationTime(byte identifier);
-
-    /**
-     * Event types which should be replicated.
-     */
-    enum EventType {
-        /**
-         * For entry insertions and value updates (when the key is already present in the map).
-         */
-        PUT,
-
-        /**
-         * For entry removals.
-         */
-        REMOVE
-    }
 
 
     interface ModificationNotifier {

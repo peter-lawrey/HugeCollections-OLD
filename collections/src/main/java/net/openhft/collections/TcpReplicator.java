@@ -630,7 +630,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                         "please change either this maps identifier or the remote one");
             }
 
-            attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier, attached);
+            attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier,
+                    attached, tcpReplicatorBuilder.deletedModIteratorFileOnExit());
+
             writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
 
             // tell the remote node, what are heartbeat interval is
