@@ -37,6 +37,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.nio.channels.SelectionKey.*;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
@@ -358,10 +359,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         private final Details details;
 
         private ServerConnector(@NotNull Details details) {
-            super("TCP-ServerConnector-" + details.localIdentifier());
+            super("TCP-ServerConnector-" + details.localIdentifier(), closeables);
             this.details = details;
         }
-
 
         @Override
         public String toString() {
@@ -413,7 +413,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         private final Details details;
 
         private ClientConnector(@NotNull Details details) {
-            super("TCP-ClientConnector-" + details.localIdentifier());
+            super("TCP-ClientConnector-" + details.localIdentifier(), closeables);
             this.details = details;
         }
 
@@ -640,9 +640,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE) {
-
             attached.remoteBootstrapTimestamp = reader.remoteBootstrapTimestamp();
-
             if (attached.remoteBootstrapTimestamp == Long.MIN_VALUE)
                 return;
         }
@@ -1133,6 +1131,53 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         public long remoteHeartbeatIntervalFromBuffer() {
             return (out.remaining() >= 8) ? out.readLong() : Long.MIN_VALUE;
         }
+    }
+
+
+    /**
+     * add interestOps to "selector keys", which has to be done on the same thread as the selector This class,
+     * allows via {@link net.openhft.collections.AbstractChannelReplicator .KeyInterestUpdater#set(int)}  to
+     */
+    private static class KeyInterestUpdater {
+
+        private AtomicBoolean wasChanged = new AtomicBoolean();
+
+        private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
+                ByteBuffer.allocate(16)));
+
+        private final SelectionKey[] selectionKeys;
+        private final int op;
+
+        KeyInterestUpdater(int op, final SelectionKey[] selectionKeys) {
+            this.op = op;
+            this.selectionKeys = selectionKeys;
+        }
+
+        public void applyUpdates() {
+            if (wasChanged.getAndSet(false)) {
+                for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
+                    changeOfOpWriteRequired.clear(i);
+                    final SelectionKey key = selectionKeys[(int) i];
+                    try {
+                        key.interestOps(key.interestOps() | op);
+                    } catch (Exception e) {
+                        LOG.debug("", e);
+                    }
+                }
+            }
+        }
+
+        /**
+         * @param keyIndex the index of the key that has changed, the list of keys is provided by the
+         *                 constructor {@link net.openhft.collections.TcpReplicator.KeyInterestUpdater(int,
+         *                 java.nio.channels.SelectionKey[]) <java.nio.channels.SelectionKey>)}
+         */
+        public void set(int keyIndex) {
+            changeOfOpWriteRequired.set(keyIndex);
+            wasChanged.set(true);
+        }
+
+
     }
 
 

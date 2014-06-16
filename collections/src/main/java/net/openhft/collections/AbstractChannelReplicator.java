@@ -18,9 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.collection.DirectBitSet;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.thread.NamedThreadFactory;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -29,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -42,7 +38,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
@@ -183,15 +178,15 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-
+    /**
+     * details about the socket connection
+     */
     static class Details {
 
         private final SocketAddress address;
-
         private final byte localIdentifier;
 
-        Details(@NotNull SocketAddress address, byte localIdentifier) {
-
+        Details(@NotNull final SocketAddress address, final byte localIdentifier) {
             this.address = address;
             this.localIdentifier = localIdentifier;
         }
@@ -213,16 +208,18 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-    abstract class AbstractConnector {
+    abstract static class AbstractConnector {
 
         int connectionAttempts;
 
         private final String name;
 
         private volatile SelectableChannel socketChannel;
+        private Set<Closeable> closeables;
 
-        public AbstractConnector(String name) {
+        public AbstractConnector(String name, Set<Closeable> closeables) {
             this.name = name;
+            this.closeables = closeables;
         }
 
         abstract SelectableChannel doConnect() throws IOException, InterruptedException;
@@ -269,12 +266,13 @@ abstract class AbstractChannelReplicator implements Closeable {
                         if (reconnectionInterval > 0)
                             Thread.sleep(reconnectionInterval);
 
-                        synchronized (AbstractChannelReplicator.this.closeables) {
+
+                        synchronized (closeables) {
                             socketChannel = doConnect();
                             if (socketChannel == null)
                                 return;
 
-                            AbstractChannelReplicator.this.closeables.add(socketChannel);
+                            closeables.add(socketChannel);
                             AbstractConnector.this.socketChannel = socketChannel;
                         }
 
@@ -302,51 +300,5 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-
-    /**
-     * add interestOps to "selector keys", which has to be done on the same thread as the selector This class,
-     * allows via {@link net.openhft.collections.AbstractChannelReplicator .KeyInterestUpdater#set(int)}  to
-     */
-    static class KeyInterestUpdater {
-
-        private AtomicBoolean wasChanged = new AtomicBoolean();
-
-        private final DirectBitSet changeOfOpWriteRequired = new ATSDirectBitSet(new ByteBufferBytes(
-                ByteBuffer.allocate(16)));
-
-        private final SelectionKey[] selectionKeys;
-        private final int op;
-
-        KeyInterestUpdater(int op, final SelectionKey[] selectionKeys) {
-            this.op = op;
-            this.selectionKeys = selectionKeys;
-        }
-
-        public void applyUpdates() {
-            if (wasChanged.getAndSet(false)) {
-                for (long i = changeOfOpWriteRequired.nextSetBit(0); i >= 0; i = changeOfOpWriteRequired.nextSetBit(i + 1)) {
-                    changeOfOpWriteRequired.clear(i);
-                    final SelectionKey key = selectionKeys[(int) i];
-                    try {
-                        key.interestOps(key.interestOps() | op);
-                    } catch (Exception e) {
-                        LOG.debug("", e);
-                    }
-                }
-            }
-        }
-
-        /**
-         * @param keyIndex the index of the key that has changed, the list of keys is provided by the
-         *                 constructor {@link net.openhft.collections.AbstractChannelReplicator.KeyInterestUpdater#KeyInterestUpdater(int,
-         *                 java.nio.channels.SelectionKey[]) <java.nio.channels.SelectionKey>)}
-         */
-        public void set(int keyIndex) {
-            changeOfOpWriteRequired.set(keyIndex);
-            wasChanged.set(true);
-        }
-
-
-    }
 
 }

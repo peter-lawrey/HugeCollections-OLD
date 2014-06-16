@@ -59,9 +59,9 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     private final UdpSocketChannelEntryWriter writer;
     private final UdpSocketChannelEntryReader reader;
 
-
     private ModificationIterator modificationIterator;
     private Throttler throttler;
+
     @NotNull
     private final UdpReplicatorBuilder udpReplicatorBuilder;
 
@@ -69,8 +69,11 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     private final Queue<Runnable> pendingRegistrations;
 
     private SelectableChannel writeChannel;
+    private volatile boolean shouldEnableOpWrite;
+
 
     @Override
+
     public void close() {
         writeChannel = null;
         super.close();
@@ -91,7 +94,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         super("UdpReplicator-" + map.identifier());
 
         this.udpReplicatorBuilder = udpReplicatorBuilder;
-
 
         this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(serializedEntrySize, externalizable);
         this.reader = new UdpReplicator.UdpSocketChannelEntryReader(serializedEntrySize, externalizable);
@@ -137,6 +139,9 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             // this may block for a long time, upon return the
             // selected set contains keys of the ready channels
             final int n = selector.select(100);
+
+            if (shouldEnableOpWrite)
+                enableWrites();
 
             if (throttler != null)
                 throttler.checkThrottleInterval();
@@ -210,9 +215,14 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         return client;
     }
 
+    /**
+     * called whenever there is a change to the modification iterator
+     */
     @Override
     public void onChange() {
-        enableWrites();
+        // the write have to be enabled on the same thread as the selector
+        shouldEnableOpWrite = true;
+        selector.wakeup();
     }
 
     private void enableWrites() {
@@ -287,10 +297,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             return socketChannel.write(out);
 
         }
-
-        public void enableWrites() {
-
-        }
     }
 
     public static final int SIZE_OF_SHORT = 2;
@@ -359,7 +365,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         private final Details details;
 
         private ServerConnector(Details connectionDetails) {
-            super("UDP-Connector");
+            super("UDP-Connector", closeables);
             this.details = connectionDetails;
         }
 
