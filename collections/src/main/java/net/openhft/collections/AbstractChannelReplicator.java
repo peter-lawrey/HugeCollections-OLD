@@ -228,10 +228,8 @@ abstract class AbstractChannelReplicator implements Closeable {
         abstract SelectableChannel doConnect() throws IOException, InterruptedException;
 
         /**
-         * if its already connected then the existing connection is close and its reconnected
-         *
-         * @throws IOException
-         * @throws InterruptedException
+         * connects or reconnects, but first waits a period of time proportional to the {@code
+         * connectionAttempts}
          */
         public final void connectLater() {
             try {
@@ -258,8 +256,10 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
 
 
+        /**
+         * @param reconnectionInterval the period to wait before connecting
+         */
         private void doConnect(final long reconnectionInterval) {
-
 
             final Thread thread = new Thread(new Runnable() {
 
