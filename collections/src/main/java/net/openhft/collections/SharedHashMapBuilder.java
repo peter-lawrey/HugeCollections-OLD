@@ -256,7 +256,9 @@ public final class SharedHashMapBuilder implements Cloneable {
                 LOG.warn("MISSING TCP REPLICATION : The UdpReplicator only attempts to read data (" +
                         "it does not enforce or guarantee delivery), you should use the UdpReplicator if " +
                         "you have a large number of nodes, and you wish to receive the data before it " +
-                        "becomes available on TCP/IP. Hence, it is recommended that you only use the UDP " +
+                        "becomes available on TCP/IP. Since data delivery is not guaranteed, it is " +
+                        "recommended that you only use the UDP" +
+                        " " +
                         "Replicator " +
                         "in conjunction with a TCP Replicator");
             applyUdpReplication(result, udpReplicatorBuilder);
