@@ -18,6 +18,7 @@
 
 package net.openhft.collections;
 
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 
 
@@ -26,6 +27,8 @@ public class UdpReplicatorBuilder implements Cloneable {
     private String broadcastAddress;
     private int port;
     private long throttle;
+    private boolean isMultiCast;
+    private NetworkInterface interf;
 
     /**
      * @param port             udp port
@@ -105,4 +108,23 @@ public class UdpReplicatorBuilder implements Cloneable {
         }
     }
 
+    public boolean isMultiCast() {
+        return isMultiCast;
+    }
+
+    public UdpReplicatorBuilder isMultiCast(boolean isMultiCast) {
+        this.isMultiCast = isMultiCast;
+        return this;
+    }
+
+    public UdpReplicatorBuilder networkInterface(NetworkInterface interf) {
+        if (interf == null)
+            throw new IllegalArgumentException("networkInterface can not be set to null.");
+        this.interf = interf;
+        return this;
+    }
+
+    public NetworkInterface networkInterface() {
+        return interf;
+    }
 }

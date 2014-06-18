@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.NetworkInterface;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertTrue;
@@ -43,7 +44,12 @@ public class UDPSocketReplicationTest1 {
     @Before
     public void setup() throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8079, "192.168.0.255");
+
+        final NetworkInterface interf = NetworkInterface.getByName("eth0");
+
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078, "224.224.224.224");
+        udpReplicatorBuilder.isMultiCast(true);
+        udpReplicatorBuilder.networkInterface(NetworkInterface.getByName("wlan0"));
 
         assertTrue(identifier >= 1 && identifier <= Byte.MAX_VALUE);
 

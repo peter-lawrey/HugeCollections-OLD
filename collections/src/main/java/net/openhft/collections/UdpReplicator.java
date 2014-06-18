@@ -25,8 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.StandardSocketOptions;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Queue;
@@ -44,8 +43,8 @@ import static net.openhft.collections.TcpReplicator.EntryCallback;
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
  * @see SharedHashMapBuilder#udpReplicatorBuilder
- *
- *
+ * <p/>
+ * <p/>
  * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ), typically, you
  * should use the UdpReplicator if you have a large number of nodes, and you wish to receive the data before
  * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
@@ -107,7 +106,10 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(),
                 udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
-        final Details connectionDetails = new Details(address, map.identifier());
+
+        final UdpDetails connectionDetails = new UdpDetails(address, map.identifier(),
+                udpReplicatorBuilder.isMultiCast(), udpReplicatorBuilder.networkInterface());
+
         serverConnector = new ServerConnector(connectionDetails);
 
         this.executorService.execute(new Runnable() {
@@ -368,34 +370,65 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
     }
 
+    /**
+     * details about the socket connection
+     */
+    static class UdpDetails extends Details {
+        public boolean isMultiCast;
+        public NetworkInterface networkInterface;
+
+        UdpDetails(@NotNull InetSocketAddress address, byte localIdentifier, boolean isMultiCast,
+                   final NetworkInterface networkInterface) {
+            super(address, localIdentifier);
+            this.isMultiCast = isMultiCast;
+            this.networkInterface = networkInterface;
+
+        }
+    }
 
     private class ServerConnector extends TcpReplicator.AbstractConnector {
 
-        private final Details details;
+        private final UdpDetails details;
 
-        private ServerConnector(Details connectionDetails) {
+
+        private ServerConnector(UdpDetails connectionDetails) {
             super("UDP-Connector", closeables);
             this.details = connectionDetails;
+
         }
 
         SelectableChannel doConnect() throws
                 IOException, InterruptedException {
-            final DatagramChannel server = DatagramChannel.open();
 
-            // Create a non-blocking socket channel
-            server.socket().setBroadcast(true);
+            final DatagramChannel server = DatagramChannel.open();
             server.configureBlocking(false);
 
             // Kick off connection establishment
             try {
                 synchronized (UdpReplicator.this.closeables) {
-                    server.connect(details.address());
+
+                    if (details.isMultiCast) {
+                        final InetAddress group = InetAddress.getByName(details.address().getHostName());
+                        server.join(group, details.networkInterface);
+                    } else {
+                        // Create a non-blocking socket channel
+                        server.socket().setBroadcast(true);
+                        server.connect(details.address());
+                    }
+
+                    if (server == null)
+                        throw new NullPointerException("Server is null.");
+
                     UdpReplicator.this.closeables.add(server);
                 }
             } catch (IOException e) {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("details=" + details, e);
                 connectLater();
                 return null;
             }
+
+
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                     .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, false)
                     .setOption(StandardSocketOptions.SO_BROADCAST, true)

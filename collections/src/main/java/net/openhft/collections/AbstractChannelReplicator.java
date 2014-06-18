@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
@@ -183,15 +184,15 @@ abstract class AbstractChannelReplicator implements Closeable {
      */
     static class Details {
 
-        private final SocketAddress address;
+        private final InetSocketAddress address;
         private final byte localIdentifier;
 
-        Details(@NotNull final SocketAddress address, final byte localIdentifier) {
+        Details(@NotNull final InetSocketAddress address, final byte localIdentifier) {
             this.address = address;
             this.localIdentifier = localIdentifier;
         }
 
-        public SocketAddress address() {
+        public InetSocketAddress address() {
             return address;
         }
 
