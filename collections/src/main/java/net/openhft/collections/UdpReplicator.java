@@ -226,6 +226,10 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     }
 
     private void enableWrites() {
+
+        if (writeChannel == null)
+            return;
+
         try {
             final SelectionKey selectionKey = writeChannel.keyFor(this.selector);
             if (selectionKey != null)
@@ -236,6 +240,10 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     }
 
     private void disableWrites() {
+
+        if (writeChannel == null)
+            return;
+
         try {
             final SelectionKey selectionKey = writeChannel.keyFor(this.selector);
             selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
