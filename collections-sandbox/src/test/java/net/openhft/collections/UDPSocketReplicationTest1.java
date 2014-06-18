@@ -77,6 +77,10 @@ public class UDPSocketReplicationTest1 {
         for (; ; ) {
             for (int i = 0; i >= 0; i++) {
                 Thread.sleep(identifier <= 2 ? 20 : 10);
+                if (identifier <= 2) {
+                    map1.put(identifier, i);
+                    continue;
+                }
                 Integer val = map1.get(1);
                 if (val == null) continue;
                 if (first == 0) {
@@ -86,11 +90,10 @@ public class UDPSocketReplicationTest1 {
                 if (val.intValue() != last)
                     updates++;
                 int delta = val - first;
-                if (identifier <= 2)
-                    map1.put(identifier, i);
+
 
                 if (delta > 1 && val.intValue() != last)
-                    System.out.println("val: " + val+", ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
+                    System.out.println("val: " + val + ", ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
                 last = val;
             }
         }
