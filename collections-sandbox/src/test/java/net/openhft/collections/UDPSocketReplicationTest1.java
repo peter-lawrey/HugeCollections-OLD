@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 
 public class UDPSocketReplicationTest1 {
 
-    static final int identifier = Integer.getInteger("hostId", 1).byteValue();
+    static final int identifier = Integer.getInteger("hostId", 1);
     private SharedHashMap<Integer, Integer> map1;
 
     @Before
@@ -76,7 +76,7 @@ public class UDPSocketReplicationTest1 {
         int first = 0, updates = 0, last = 0;
         for (; ; ) {
             for (int i = 0; i >= 0; i++) {
-                Thread.sleep(10);
+                Thread.sleep(identifier <= 2 ? 20 : 10);
                 Integer val = map1.get(1);
                 if (val == null) continue;
                 if (first == 0) {
