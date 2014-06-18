@@ -90,7 +90,7 @@ public class UDPSocketReplicationTest1 {
                     map1.put(identifier, i);
 
                 if (delta > 1 && val.intValue() != last)
-                    System.out.println("ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
+                    System.out.println("val: " + val+", ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
                 last = val;
             }
         }
