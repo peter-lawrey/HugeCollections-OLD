@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier.NOP;
+
 /**
  * @author Rob Austin.
  */
@@ -55,7 +57,8 @@ public class Builder {
                 builder.canReplicate(true).create(getPersistenceFile(), Integer.class,
                         CharSequence.class);
 
-        final ReplicatedSharedHashMap.ModificationIterator modificationIterator = result.acquireModificationIterator(externalIdentifier);
+        final ReplicatedSharedHashMap.ModificationIterator modificationIterator = result
+                .acquireModificationIterator(externalIdentifier, NOP, true);
         new QueueReplicator(modificationIterator,
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
@@ -83,7 +86,7 @@ public class Builder {
                         Integer.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return new MapProvider<ReplicatedSharedHashMap<Integer, Integer>>() {
@@ -118,7 +121,7 @@ public class Builder {
                         IntValue.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return result;
@@ -141,7 +144,7 @@ public class Builder {
                         CharSequence.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return result;

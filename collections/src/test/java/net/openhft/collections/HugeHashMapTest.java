@@ -473,7 +473,7 @@ public class HugeHashMapTest {
     }
 
     @Test
-     public void clearMapViaEntryIteratorRemoves() {
+    public void clearMapViaEntryIteratorRemoves() {
         int noOfElements = 16 * 1024;
         HugeHashMap<Integer, String> map = getViewTestMap(noOfElements);
 
@@ -530,7 +530,7 @@ public class HugeHashMapTest {
         Set<Integer> keySet = map.keySet();
         Collection<String> values = map.values();
 
-        assertMap(map, new int[] {1}, new String[] {"A"});
+        assertMap(map, new int[]{1}, new String[]{"A"});
         assertEntrySet(entrySet, new int[]{1}, new String[]{"A"});
         assertKeySet(keySet, new int[]{1});
         assertValues(values, new String[]{"A"});

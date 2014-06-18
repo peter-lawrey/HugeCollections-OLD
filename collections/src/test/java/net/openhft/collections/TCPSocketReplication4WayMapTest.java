@@ -50,12 +50,12 @@ public class TCPSocketReplication4WayMapTest {
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(100);
+                InetSocketAddress).heartBeatIntervalMS(1000).deletedModIteratorFileOnExit(true);
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -66,12 +66,12 @@ public class TCPSocketReplication4WayMapTest {
             final InetSocketAddress... InetSocketAddress) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(100);
+                InetSocketAddress).heartBeatIntervalMS(100).deletedModIteratorFileOnExit(true);
 
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), IntValue.class, CharSequence.class);
     }
@@ -103,14 +103,14 @@ public class TCPSocketReplication4WayMapTest {
 
     @Test
     public void test() throws IOException, InterruptedException {
-
+        Thread.sleep(1000);
         map1.put(1, "EXAMPLE-1");
         map2.put(2, "EXAMPLE-1");
         map3.put(3, "EXAMPLE-1");
         map4.remove(3);
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1000);
+        waitTillEqual(1500);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
@@ -122,13 +122,13 @@ public class TCPSocketReplication4WayMapTest {
 
     @Test
     public void testBufferOverflow() throws IOException, InterruptedException {
-
-        for (int i = 0; i < 1024; i++) {
+        Thread.sleep(1000);
+        for (int i = 0; i < 50; i++) {
             map1.put(i, "EXAMPLE-1");
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000);
+        waitTillEqual(15000);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
@@ -140,6 +140,7 @@ public class TCPSocketReplication4WayMapTest {
 
     @Test
     public void testBufferOverflowPutIfAbsent() throws IOException, InterruptedException {
+        Thread.sleep(1000);
 
         for (int i = 0; i < 1024; i++) {
             map1.putIfAbsent(i, "EXAMPLE-1");
@@ -150,7 +151,7 @@ public class TCPSocketReplication4WayMapTest {
         }
 
         // allow time for the recompilation to resolve
-        waitTillEqual(5000);
+        waitTillEqual(10000);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);

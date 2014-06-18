@@ -42,12 +42,13 @@ public class TCPSocketReplicationTest2 {
     public void setup() throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079)
+                .deletedModIteratorFileOnExit(true)
                 .heartBeatIntervalMS(10000);
 
         map2 = new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) 2)
-                .tcpReplication(tcpReplicatorBuilder)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -70,7 +71,7 @@ public class TCPSocketReplicationTest2 {
     public void testContinueToPublish() throws IOException, InterruptedException {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
-                Thread.sleep(1000);
+            //    Thread.sleep(1000);
                 map2.put(1 + (i * 2), "E-1");
                 System.out.println(map2);
             }

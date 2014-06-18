@@ -37,7 +37,7 @@ public class OSResizesMain {
                 .entrySize(1024 * 1024)
                 .entries(1024 * 1024)
                 .create(file, String.class, String.class);
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 10000; i++) {
             char[] chars = new char[i];
             Arrays.fill(chars, '+');
             map.put("key-" + i, new String(chars));

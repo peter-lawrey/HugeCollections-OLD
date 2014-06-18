@@ -18,8 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.collections.SharedHashMap;
-import net.openhft.collections.SharedHashMapBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
@@ -268,7 +266,6 @@ public class ReplicationCheckingMap<K, V> implements SharedHashMap<K, V> {
     public File file() {
         throw new UnsupportedOperationException();
     }
-
 
 
     @Override

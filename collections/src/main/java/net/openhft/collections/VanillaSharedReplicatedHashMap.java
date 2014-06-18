@@ -34,13 +34,10 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import static net.openhft.collections.ReplicatedSharedHashMap.EventType.PUT;
-import static net.openhft.collections.ReplicatedSharedHashMap.EventType.REMOVE;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -263,7 +260,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public ModificationIterator acquireModificationIterator(byte remoteIdentifier) throws IOException {
+    public ModificationIterator acquireModificationIterator(byte remoteIdentifier,
+                                                            ModificationNotifier modificationNotifier,
+                                                            boolean deletedBackingFileOnExit)
+            throws IOException {
 
         final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
 
@@ -278,14 +278,17 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
 
+            if (deletedBackingFileOnExit) {
+                modificationIteratorFile.delete();
+                modificationIteratorFile.deleteOnExit();
+            }
+            //  if (ms.file().deleteOnExit();)
             // create a new modification iterator
             final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
                     modIterBitSetSizeInBytes());
 
             final ModificationIterator newEventListener = new ModificationIterator(
-                    null,
-                    EnumSet.allOf(EventType.class),
-                    mappedStore.bytes(), eventListener);
+                    mappedStore.bytes(), eventListener, modificationNotifier);
 
             modificationIterators.set(remoteIdentifier, newEventListener);
             eventListener = newEventListener;
@@ -1072,22 +1075,26 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     class ModificationIterator extends SharedMapEventListener<K, V, SharedHashMap<K, V>>
             implements ReplicatedSharedHashMap.ModificationIterator {
 
-        private final Object notifier;
+
+        private final ModificationNotifier modificationNotifier;
         private final ATSDirectBitSet changes;
         private final int segmentIndexShift;
         private final long posMask;
-        private final EnumSet<EventType> watchList;
         private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
         private final EntryModifiableCallback entryModifiableCallback = new EntryModifiableCallback();
 
         private volatile long position = -1;
 
-        public ModificationIterator(@Nullable final Object notifier,
-                                    @NotNull final Set<EventType> watchList,
-                                    @NotNull final Bytes bytes,
-                                    @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener) {
-            this.notifier = notifier;
-            this.watchList = EnumSet.copyOf(watchList);
+        /**
+         * @param bytes
+         * @param nextListener
+         * @param modificationNotifier called when ever there is a change applied
+         */
+        public ModificationIterator(@NotNull final Bytes bytes,
+                                    @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
+                                    @NotNull final ModificationNotifier modificationNotifier) {
+
+            this.modificationNotifier = modificationNotifier;
             this.nextListener = nextListener;
             long bitsPerSegment = bitsPerSegmentInModIterBitSet();
             segmentIndexShift = Long.numberOfTrailingZeros(bitsPerSegment);
@@ -1112,21 +1119,20 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         @Override
         public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                           boolean added, K key, V value, long pos, SharedSegment segment) {
+
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
-
-            nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
-
-            if (!watchList.contains(PUT))
-                return;
+            try {
+                nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
 
             changes.set(combine(segment.getIndex(), pos));
 
-            if (notifier != null) {
-                synchronized (notifier) {
-                    notifier.notifyAll();
-                }
-            }
+            modificationNotifier.onChange();
+
+
         }
 
         /**
@@ -1137,18 +1143,17 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                              K key, V value, int pos, SharedSegment segment) {
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onRemove() is called from outside of the parent map";
+            try {
+                nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
 
-            nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
-
-            if (!watchList.contains(REMOVE))
-                return;
             changes.set(combine(segment.getIndex(), pos));
 
-            if (notifier != null) {
-                synchronized (notifier) {
-                    notifier.notifyAll();
-                }
-            }
+            modificationNotifier.onChange();
+
+
         }
 
         /**

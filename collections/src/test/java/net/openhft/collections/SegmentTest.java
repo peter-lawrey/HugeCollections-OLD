@@ -23,8 +23,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Created with IntelliJ IDEA. User: peter Date: 09/12/13 Time: 15:56 To change this template use File | Settings | File
- * Templates.
+ * Created with IntelliJ IDEA. User: peter Date: 09/12/13 Time: 15:56 To change this template use File |
+ * Settings | File Templates.
  */
 public class SegmentTest {
     @Test

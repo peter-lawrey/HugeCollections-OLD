@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier.NOP;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -52,12 +53,12 @@ public class MultiMapTimeBaseReplicationTest {
 
         mapP1 = Builder.newShmIntInt(20000, map2ToMap1, map1ToMap2, (byte) 1, (byte) 2);
         map1 = mapP1.getMap();
-        segmentModificationIterator1 = map1.acquireModificationIterator((byte) 2);
+        segmentModificationIterator1 = map1.acquireModificationIterator((byte) 2, NOP, true);
 
         mapP2 = Builder.newShmIntInt(20000, map1ToMap2, map2ToMap1, (byte) 2, (byte) 1);
         map2 = mapP2.getMap();
 
-        segmentModificationIterator2 = map2.acquireModificationIterator((byte) 1);
+        segmentModificationIterator2 = map2.acquireModificationIterator((byte) 1, NOP, true);
 
         Mockito.when(timeProvider.currentTimeMillis()).thenReturn((long) 1);
     }
@@ -271,11 +272,6 @@ public class MultiMapTimeBaseReplicationTest {
             Thread.sleep(1);
         }
     }
-
-
-
-
-
 
 
 }

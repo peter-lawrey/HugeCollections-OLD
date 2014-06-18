@@ -26,7 +26,6 @@ import org.junit.Test;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.TreeMap;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -50,15 +49,15 @@ public class TCPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 hostId == 0 ? NO_SERVERS : hostId == 1 ? ONE_SERVER : TWO_SERVER)
-//                .throttle(1000)
+                .deletedModIteratorFileOnExit(true)
                 .throttleBucketIntervalMS(100)
                 .heartBeatIntervalMS(1000);
 
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) (1 + hostId))
-                .tcpReplication(tcpReplicatorBuilder)
+                .identifier((byte) 2)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
@@ -78,24 +77,18 @@ public class TCPSocketReplicationTest1 {
     @Test
     @Ignore
     public void testContinueToReceive() throws IOException, InterruptedException {
-
+        Thread.sleep(1000);
         long count = 0;
         long start = System.nanoTime();
         StringBuilder sb = new StringBuilder();
-        for (int j = 1; j <= 1000000; j++) {
-//            if (i )
-//            Thread.sleep(5);
-            for (int i = 0; i < 100; i += 10) {
-                sb.setLength(0);
-                sb.append('E').append(j);
-                map1.put(i * 10 + hostId, sb);
-                count++;
-            }
-            if (j % 10000 == 0)
-                System.out.println(new TreeMap(map1));
+        for (int j = 0; j < 1000000; j++) {
+            Thread.sleep(1000);
+            map1.put(j, "A");
+            System.out.println(map1);
         }
         long time = System.nanoTime() - start;
-        System.out.printf("Average write time was %.1f us%n", count * 1e3 / time);
+        System.out.printf("Throughput %.2f Mputs/s%n", count * 1e3 / time);
+        Thread.sleep(1000);
     }
 }
 
