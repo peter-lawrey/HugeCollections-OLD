@@ -27,6 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -36,20 +37,22 @@ import static net.openhft.collections.Builder.getPersistenceFile;
 
 public class UDPSocketReplicationTest1 {
 
-    private SharedHashMap<Integer, CharSequence> map1;
+    static final int identifier = Integer.getInteger("hostId", 1).byteValue();
+    private SharedHashMap<Integer, Integer> map1;
 
     @Before
     public void setup() throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8079, "192.168.0.254");
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8079, "192.168.0.255");
 
+        assertTrue(identifier >= 1 && identifier <= Byte.MAX_VALUE);
 
         map1 = new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) 1)
+                .identifier((byte) identifier)
                 .udpReplicatorBuilder(udpReplicatorBuilder)
                 .entries(20000)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                .create(getPersistenceFile(), Integer.class, Integer.class);
     }
 
     @After
@@ -68,11 +71,27 @@ public class UDPSocketReplicationTest1 {
     @Test
     @Ignore
     public void testContinueToReceive() throws IOException, InterruptedException {
+        if (identifier <= 2)
+            System.out.println("Publishing");
+        int first = 0, updates = 0, last = 0;
         for (; ; ) {
-            for (int i = 0; i < 1024; i++) {
-                Thread.sleep(1000);
-                map1.put(i * 2, "E1");
-                System.out.println(map1);
+            for (int i = 0; i >= 0; i++) {
+                Thread.sleep(10);
+                Integer val = map1.get(1);
+                if (val == null) continue;
+                if (first == 0) {
+                    first = last = val;
+                    continue;
+                }
+                if (val.intValue() != last)
+                    updates++;
+                int delta = val - first;
+                if (identifier <= 2)
+                    map1.put(identifier, i);
+
+                if (delta > 1 && val.intValue() != last)
+                    System.out.println("ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
+                last = val;
             }
         }
     }
