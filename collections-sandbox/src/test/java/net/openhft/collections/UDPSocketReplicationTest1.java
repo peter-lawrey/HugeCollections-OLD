@@ -73,7 +73,7 @@ public class UDPSocketReplicationTest1 {
     public void testContinueToReceive() throws IOException, InterruptedException {
         if (identifier <= 2)
             System.out.println("Publishing");
-        int first = 0, updates = 0, last = 0;
+        int first = 0, updates = 0, last = 0, dlast = 0;
         for (; ; ) {
             for (int i = 0; i >= 0; i++) {
                 Thread.sleep(identifier <= 2 ? 20 : 10);
@@ -85,6 +85,7 @@ public class UDPSocketReplicationTest1 {
                 if (val == null) continue;
                 if (first == 0) {
                     first = last = val;
+                    dlast = last / 100;
                     continue;
                 }
                 if (val.intValue() != last)
@@ -92,8 +93,10 @@ public class UDPSocketReplicationTest1 {
                 int delta = val - first;
 
 
-                if (delta > 1 && val.intValue() != last)
+                if (delta > 1 && val / 100 > dlast) {
                     System.out.println("val: " + val + ", ratio missed= " + 1000 * (delta - updates) / delta / 10.0 + " missed=" + (delta - updates));
+                    dlast = val / 100;
+                }
                 last = val;
             }
         }
