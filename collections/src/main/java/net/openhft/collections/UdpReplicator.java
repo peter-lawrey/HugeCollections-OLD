@@ -105,7 +105,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             throttler = new Throttler(selector, 100,
                     serializedEntrySize, udpReplicatorBuilder.throttle());
 
-
         final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(),
                 udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
@@ -215,6 +214,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             if (udpReplicatorBuilder.isMultiCast()) {
                 final InetAddress group = InetAddress.getByName(udpReplicatorBuilder.broadcastAddress());
                 client.setOption(StandardSocketOptions.IP_MULTICAST_IF, udpReplicatorBuilder.networkInterface());
+                client.bind(hostAddress);
                 client.join(group, udpReplicatorBuilder.networkInterface());
             } else {
                 client.bind(hostAddress);
