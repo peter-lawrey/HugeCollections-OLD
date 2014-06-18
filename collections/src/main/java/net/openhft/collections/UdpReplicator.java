@@ -409,7 +409,9 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
                     if (details.isMultiCast) {
                         final InetAddress group = InetAddress.getByName(details.address().getHostName());
+                        server.setOption(StandardSocketOptions.IP_MULTICAST_IF, details.networkInterface);
                         server.join(group, details.networkInterface);
+                        server.bind(new InetSocketAddress(details.address().getPort()));
                     } else {
                         // Create a non-blocking socket channel
                         server.socket().setBroadcast(true);
