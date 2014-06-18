@@ -45,16 +45,15 @@ public class UDPSocketReplicationTest1 {
     public void setup() throws IOException {
 
 
-        final NetworkInterface interf = NetworkInterface.getByName("eth0");
+        final NetworkInterface interf = NetworkInterface.getByName("eth1");
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078, "224.224.224.224");
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078, "225.0.0.100");
         udpReplicatorBuilder.isMultiCast(true);
-        udpReplicatorBuilder.networkInterface(NetworkInterface.getByName("wlan0"));
+        udpReplicatorBuilder.networkInterface(interf);
 
         assertTrue(identifier >= 1 && identifier <= Byte.MAX_VALUE);
 
         map1 = new SharedHashMapBuilder()
-                .entries(1000)
                 .identifier((byte) identifier)
                 .udpReplicatorBuilder(udpReplicatorBuilder)
                 .entries(20000)

@@ -25,7 +25,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Queue;
@@ -130,7 +133,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
      */
     private void process() throws Exception {
 
-        connectClient(udpReplicatorBuilder.port()).register(selector, OP_READ);
+        connectClient(udpReplicatorBuilder).register(selector, OP_READ);
         serverConnector.connectLater();
 
         while (selector.isOpen()) {
@@ -202,16 +205,23 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     }
 
 
-    private DatagramChannel connectClient(final int port) throws IOException {
+    private DatagramChannel connectClient(final UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
         final DatagramChannel client = DatagramChannel.open();
 
-        final InetSocketAddress hostAddress = new InetSocketAddress(port);
+        final InetSocketAddress hostAddress = new InetSocketAddress(udpReplicatorBuilder.port());
         client.configureBlocking(false);
         synchronized (closeables) {
-            client.bind(hostAddress);
+
+            if (udpReplicatorBuilder.isMultiCast()) {
+                final InetAddress group = InetAddress.getByName(udpReplicatorBuilder.broadcastAddress());
+                client.setOption(StandardSocketOptions.IP_MULTICAST_IF, udpReplicatorBuilder.networkInterface());
+                client.join(group, udpReplicatorBuilder.networkInterface());
+            } else {
+                client.bind(hostAddress);
+            }
 
             if (LOG.isDebugEnabled())
-                LOG.debug("Listening on port " + port);
+                LOG.debug("Listening on port " + udpReplicatorBuilder.port());
             closeables.add(client);
         }
         return client;
@@ -417,9 +427,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
                         server.connect(details.address());
                     }
 
-                    if (server == null)
-                        throw new NullPointerException("Server is null.");
-
                     UdpReplicator.this.closeables.add(server);
                 }
             } catch (IOException e) {
@@ -428,7 +435,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
                 connectLater();
                 return null;
             }
-
 
             server.setOption(StandardSocketOptions.SO_REUSEADDR, true)
                     .setOption(StandardSocketOptions.IP_MULTICAST_LOOP, false)
