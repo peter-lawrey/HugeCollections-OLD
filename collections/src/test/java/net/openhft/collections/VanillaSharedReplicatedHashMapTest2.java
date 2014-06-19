@@ -61,7 +61,6 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
     private static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-test" + System.nanoTime());
-        file.delete();
         file.deleteOnExit();
         return file;
     }

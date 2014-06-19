@@ -32,7 +32,6 @@ public class Builder {
     public static File getPersistenceFile() {
         String TMP = System.getProperty("java.io.tmpdir");
         File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
-        file.delete();
         file.deleteOnExit();
         return file;
     }
