@@ -88,10 +88,13 @@ public class CheckSharedHashMap<K, V> implements SharedHashMap<K, V> {
     }
 
     @Override
-    public int size() {
-
-        // if closed  then don't call size but throw a "runtime exception" !
-        return delegate.size();
+   public int size() throws RuntimeException {
+         if (delegate.equals("")){
+             throw new RuntimeException();
+            // if closed  then don't call size but throw a "runtime exception" !
+        }else{
+            return delegate.size();
+        }
     }
 
     @Override
