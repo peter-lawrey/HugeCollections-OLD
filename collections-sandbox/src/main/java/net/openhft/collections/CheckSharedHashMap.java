@@ -91,8 +91,8 @@ public class CheckSharedHashMap<K, V> implements SharedHashMap<K, V> {
    public int size() throws RuntimeException {
          if (delegate.equals("")){
              throw new RuntimeException();
-        }else{
             // if closed  then don't call size but throw a "runtime exception" !
+        }else{
             return delegate.size();
         }
     }
