@@ -21,6 +21,7 @@ import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
+import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
@@ -59,7 +60,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
-    final SharedHashMapBuilder builder;
+    private final BytesMarshallerFactory bytesMarshallerFactory;
+    private SharedHashMapBuilder builder;
 
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
         // if expected map size is about 1000, seems rather wasteful to allocate
@@ -109,6 +111,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     public AbstractVanillaSharedHashMap(SharedHashMapBuilder builder,
                                         Class<K> kClass, Class<V> vClass) throws IOException {
+        this.builder = builder.clone();
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
         this.kClass = kClass;
         this.vClass = vClass;
@@ -124,8 +127,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.generatedValueType = builder.generatedValueType();
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
+        this.bytesMarshallerFactory = builder.bytesMarshallerFactory();
 
-        this.builder = builder.clone();
         int segments = builder.actualSegments();
         int entriesPerSegment = builder.actualEntriesPerSegment();
         this.entriesPerSegment = entriesPerSegment;
@@ -140,13 +143,17 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.segments = ss;
     }
 
+    public SharedHashMapBuilder builder() {
+        return builder.clone();
+    }
+
     Class segmentType() {
         return Segment.class;
     }
 
     long createMappedStoreAndSegments(File file) throws IOException {
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes());
+                sizeInBytes(), bytesMarshallerFactory);
 
         onHeaderCreated(ms.bytes(0, getHeaderSize()));
 
@@ -180,12 +187,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     public File file() {
         return ms.file();
     }
-
-    @Override
-    public SharedHashMapBuilder builder() {
-        return builder.clone();
-    }
-
 
     /**
      * @param size positive number

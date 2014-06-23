@@ -18,6 +18,8 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +65,7 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
     private UdpReplicatorBuilder udpReplicatorBuilder;
+    private BytesMarshallerFactory bytesMarshallerFactory;
 
 
     @Override
@@ -449,6 +452,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", tcpReplicatorBuilder=" + tcpReplicatorBuilder() +
                 ", udpReplicatorBuilder=" + udpReplicatorBuilder() +
                 ", timeProvider=" + timeProvider() +
+                ", bytesMarshallerfactory=" + bytesMarshallerFactory() +
                 '}';
     }
 
@@ -607,6 +611,15 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     public SharedHashMapBuilder udpReplicatorBuilder(UdpReplicatorBuilder udpReplicatorBuilder) {
         this.udpReplicatorBuilder = udpReplicatorBuilder;
+        return this;
+    }
+
+    public BytesMarshallerFactory bytesMarshallerFactory() {
+        return bytesMarshallerFactory == null ? bytesMarshallerFactory = new VanillaBytesMarshallerFactory() : bytesMarshallerFactory;
+    }
+
+    public SharedHashMapBuilder bytesMarshallerFactory(BytesMarshallerFactory bytesMarshallerFactory) {
+        this.bytesMarshallerFactory = bytesMarshallerFactory;
         return this;
     }
 }
