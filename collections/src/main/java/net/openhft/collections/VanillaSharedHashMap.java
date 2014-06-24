@@ -22,6 +22,7 @@ import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
@@ -287,7 +288,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private DirectBytes acquireBufferForKey() {
         DirectBytes buffer = localBufferForKeys.get();
         if (buffer == null) {
-            buffer = new DirectStore(ms.bytesMarshallerFactory(),
+            buffer = new DirectStore(ms.objectSerializer(),
                     entrySize * bufferAllocationFactor, false).bytes();
             localBufferForKeys.set(buffer);
         } else {
@@ -299,7 +300,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private DirectBytes acquireBufferForValue() {
         DirectBytes buffer = localBufferForValues.get();
         if (buffer == null) {
-            buffer = new DirectStore(ms.bytesMarshallerFactory(),
+            buffer = new DirectStore(ms.objectSerializer(),
                     entrySize * bufferAllocationFactor, false).bytes();
             localBufferForValues.set(buffer);
         } else {
@@ -610,7 +611,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             createHashLookups(start);
             start += sizeOfMultiMap() * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
-                    tmpBytes.bytesMarshallerFactory(), start, start + sizeOfBitSets(), null);
+                    tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
             start += numberOfBitSets() * sizeOfBitSets();
             entriesOffset = start - bytes.startAddr();
@@ -623,7 +624,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         IntIntMultiMap createMultiMap(long start) {
             final NativeBytes multiMapBytes =
-                    new NativeBytes(null, start, start + sizeOfMultiMap(), null);
+                    new NativeBytes(new VanillaBytesMarshallerFactory(), start, start + sizeOfMultiMap(), null);
             multiMapBytes.load();
             return useSmallMultiMaps() ?
                     new VanillaShortShortMultiMap(multiMapBytes) :
