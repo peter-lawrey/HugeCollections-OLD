@@ -45,7 +45,9 @@ public class UDPSocketReplicationTest1 {
     public void setup() throws IOException {
 
 
-        final NetworkInterface interf = NetworkInterface.getByName("eth1");
+
+
+        final NetworkInterface interf = NetworkInterface.getByName("en0");
 
         final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078, "224.0.0.1");
         udpReplicatorBuilder.isMultiCast(true);

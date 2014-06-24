@@ -19,7 +19,9 @@
 package net.openhft.collections;
 
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Enumeration;
 
 
 public class UdpReplicatorBuilder implements Cloneable {
@@ -32,12 +34,8 @@ public class UdpReplicatorBuilder implements Cloneable {
 
     /**
      * @param port             udp port
-     * @param broadcastAddress the UDP broadcast address Directed broadcast,
-     *                         <p/>
-     *                         <p/>
-     *                         for example a broadcast address of 192.168.0.255  has an IP range of
-     *                         192.168.0.0 - 192.168.0.254
-     *                         <p/>
+     * @param broadcastAddress the UDP broadcast address Directed broadcast, <p/> <p/> for example a broadcast
+     *                         address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
      *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      * @throws UnknownHostException
      */
@@ -52,12 +50,8 @@ public class UdpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param broadcastAddress the UDP broadcast address Directed broadcast,
-     *                         <p/>
-     *                         <p/>
-     *                         for example a broadcast address of 192.168.0.255  has an IP range of
-     *                         192.168.0.0 - 192.168.0.254
-     *                         <p/>
+     * @param broadcastAddress the UDP broadcast address Directed broadcast, <p/> <p/> for example a broadcast
+     *                         address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
      *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      */
     public UdpReplicatorBuilder broadcastAddress(String broadcastAddress) {
@@ -117,9 +111,22 @@ public class UdpReplicatorBuilder implements Cloneable {
         return this;
     }
 
-    public UdpReplicatorBuilder networkInterface(NetworkInterface interf) {
-        if (interf == null)
-            throw new IllegalArgumentException("networkInterface can not be set to null.");
+    public UdpReplicatorBuilder networkInterface(NetworkInterface interf) throws SocketException {
+        if (interf == null) {
+            StringBuilder builder = new StringBuilder();
+
+            final Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                builder.append(networkInterfaces.nextElement().getName());
+
+                if (networkInterfaces.hasMoreElements())
+                    builder.append(", ");
+            }
+
+            throw new IllegalArgumentException("networkInterface can not be set to null. Please use one of " +
+                    "the following: " + builder + "");
+        }
+
         this.interf = interf;
         return this;
     }
