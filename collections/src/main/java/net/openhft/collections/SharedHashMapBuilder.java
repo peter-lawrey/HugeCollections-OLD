@@ -538,7 +538,7 @@ public final class SharedHashMapBuilder implements Cloneable {
 
 
         final UdpReplicator udpReplicator =
-                new UdpReplicator(result, result, udpReplicatorBuilder.clone(), entrySize());
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
 
         final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
                 result.new ModificationIterator(
