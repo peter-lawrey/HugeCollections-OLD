@@ -25,13 +25,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static java.net.StandardProtocolFamily.INET;
+import static java.net.StandardProtocolFamily.INET6;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
@@ -98,12 +103,13 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             throttler = new Throttler(selector, 100,
                     serializedEntrySize, udpReplicatorBuilder.throttle());
 
-        final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(),
+        final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.address(),
                 udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
 
         final UdpDetails connectionDetails = new UdpDetails(address, localIdentifier,
-                udpReplicatorBuilder.isMultiCast(), udpReplicatorBuilder.networkInterface());
+                udpReplicatorBuilder.address().isMulticastAddress(),
+                udpReplicatorBuilder.networkInterface());
 
         serverConnector = new ServerConnector(connectionDetails);
 
@@ -199,9 +205,10 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
     private DatagramChannel connectClient(final UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
         final DatagramChannel client;
+        final InetAddress address = udpReplicatorBuilder.address();
 
-        if (udpReplicatorBuilder.isMultiCast())
-            client = DatagramChannel.open(StandardProtocolFamily.INET);
+        if (udpReplicatorBuilder.address().isMulticastAddress())
+            client = DatagramChannel.open(address.getAddress().length == 4 ? INET : INET6);
         else
             client = DatagramChannel.open();
 
@@ -209,16 +216,16 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         client.configureBlocking(false);
         synchronized (closeables) {
 
-            if (udpReplicatorBuilder.isMultiCast()) {
-                final InetAddress group = InetAddress.getByName(udpReplicatorBuilder.broadcastAddress());
+            if (address.isMulticastAddress()) {
+                final InetAddress group = udpReplicatorBuilder.address();
                 client.setOption(StandardSocketOptions.IP_MULTICAST_IF, udpReplicatorBuilder.networkInterface());
                 client.setOption(StandardSocketOptions.SO_REUSEADDR, true);
                 client.bind(hostAddress);
                 client.join(group, udpReplicatorBuilder.networkInterface());
-
-            } else {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Connecting via multicast, group=" + group);
+            } else
                 client.bind(hostAddress);
-            }
 
             if (LOG.isDebugEnabled())
                 LOG.debug("Listening on port " + udpReplicatorBuilder.port());

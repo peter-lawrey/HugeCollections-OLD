@@ -18,6 +18,7 @@
 
 package net.openhft.collections;
 
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -26,36 +27,36 @@ import java.util.Enumeration;
 
 public class UdpReplicatorBuilder implements Cloneable {
 
-    private String broadcastAddress;
+    private InetAddress address;
     private int port;
     private long throttle;
     private boolean isMultiCast;
     private NetworkInterface interf;
 
     /**
-     * @param port             udp port
-     * @param broadcastAddress the UDP broadcast address Directed broadcast, <p/> <p/> for example a broadcast
-     *                         address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
-     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
+     * @param port    udp port
+     * @param address the UDP broadcast or multicast address Directed broadcast, <p/> <p/> for example a
+     *                broadcast address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
+     *                see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      * @throws UnknownHostException
      */
-    public UdpReplicatorBuilder(int port, String broadcastAddress) throws UnknownHostException {
+    public UdpReplicatorBuilder(int port, InetAddress address) throws UnknownHostException {
         this.port = port;
-        this.broadcastAddress = broadcastAddress;
+        this.address = address;
     }
 
 
-    public String broadcastAddress() {
-        return broadcastAddress;
+    public InetAddress address() {
+        return address;
     }
 
     /**
-     * @param broadcastAddress the UDP broadcast address Directed broadcast, <p/> <p/> for example a broadcast
-     *                         address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
-     *                         see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
+     * @param address the UDP broadcast or multicast address, <p/> <p/> for example for broadcast an address
+     *                of 192.168.0.255 has an IP range of 192.168.0.0 - 192.168.0.254 <p/> see
+     *                http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      */
-    public UdpReplicatorBuilder broadcastAddress(String broadcastAddress) {
-        this.broadcastAddress = broadcastAddress;
+    public UdpReplicatorBuilder address(InetAddress address) {
+        this.address = address;
         return this;
     }
 
@@ -71,7 +72,7 @@ public class UdpReplicatorBuilder implements Cloneable {
     @Override
     public String toString() {
         return "UdpReplication{" +
-                "broadcastAddress='" + broadcastAddress + '\'' +
+                "address='" + address + '\'' +
                 ", port=" + port + '}';
     }
 
@@ -102,14 +103,6 @@ public class UdpReplicatorBuilder implements Cloneable {
         }
     }
 
-    public boolean isMultiCast() {
-        return isMultiCast;
-    }
-
-    public UdpReplicatorBuilder isMultiCast(boolean isMultiCast) {
-        this.isMultiCast = isMultiCast;
-        return this;
-    }
 
     public UdpReplicatorBuilder networkInterface(NetworkInterface interf) throws SocketException {
         if (interf == null) {

@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
@@ -38,19 +39,17 @@ import static org.junit.Assert.assertTrue;
 
 public class UDPSocketReplicationTest1 {
 
-    static final int identifier = Integer.getInteger("hostId", 1);
+    static final int identifier = Integer.getInteger("hostId", 2);
     private SharedHashMap<Integer, Integer> map1;
 
     @Before
     public void setup() throws IOException {
 
-
-
-
         final NetworkInterface interf = NetworkInterface.getByName("en0");
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078, "224.0.0.1");
-        udpReplicatorBuilder.isMultiCast(true);
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078,
+                InetAddress.getByName("225.4.5.6"));
+
         udpReplicatorBuilder.networkInterface(interf);
 
         assertTrue(identifier >= 1 && identifier <= Byte.MAX_VALUE);
@@ -109,6 +108,17 @@ public class UDPSocketReplicationTest1 {
         }
     }
 
+    @Test
+    @Ignore
+    public void testContinueToReceive2() throws IOException, InterruptedException {
+        for (; ; ) {
+            for (int i = 0; i < 1024; i++) {
+                Thread.sleep(1000);
+              //  map1.put(i, 1);
+                System.out.println(map1);
+            }
+        }
+    }
 
 }
 
