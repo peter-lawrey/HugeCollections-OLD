@@ -159,12 +159,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
 
-    @Override
-    public SharedHashMapBuilder builder() {
-        return builder.clone();
-    }
-
-
     /**
      * {@inheritDoc}
      */
@@ -907,7 +901,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
-     *
+     * <p/>
      * This method does not set a segment lock, A segment lock should be obtained before calling this method,
      * especially when being used in a multi threaded context.
      */
@@ -985,7 +979,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
-     *
+     * <p/>
      * This method does not set a segment lock, A segment lock should be obtained before calling this method,
      * especially when being used in a multi threaded context.
      */
