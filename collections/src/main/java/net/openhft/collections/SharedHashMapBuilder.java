@@ -546,8 +546,9 @@ public final class SharedHashMapBuilder implements Cloneable {
         }
 
         if (address.isMulticastAddress() && udpReplicatorBuilder.networkInterface() == null) {
-            throw new IllegalArgumentException("MISSING: NetworkInterface, Multicast addresses require the" +
-                    "networkInterface to be set");
+            throw new IllegalArgumentException("MISSING: NetworkInterface, " +
+                    "When using a multicast addresses, please provided a " +
+                    "networkInterface");
         }
 
         // the udp modification modification iterator will not be stored in shared memory

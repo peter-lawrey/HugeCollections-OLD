@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
  * @author Rob Austin.
  */
 
-public class UDPSocketReplicationTest1 {
+public class UDPMultiCastSocketReplicationTest1 {
 
     static final int identifier = Integer.getInteger("hostId", 2);
     private SharedHashMap<Integer, Integer> map1;
@@ -48,7 +48,7 @@ public class UDPSocketReplicationTest1 {
         final NetworkInterface interf = NetworkInterface.getByName("en0");
 
         final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078,
-                InetAddress.getByName("225.4.5.6"));
+                InetAddress.getByName("224.0.0.1"));
 
         udpReplicatorBuilder.networkInterface(interf);
 
@@ -114,7 +114,7 @@ public class UDPSocketReplicationTest1 {
         for (; ; ) {
             for (int i = 0; i < 1024; i++) {
                 Thread.sleep(1000);
-              //  map1.put(i, 1);
+                //  map1.put(i, 1);
                 System.out.println(map1);
             }
         }

@@ -30,7 +30,7 @@ public class UdpReplicatorBuilder implements Cloneable {
     private InetAddress address;
     private int port;
     private long throttle;
-    private boolean isMultiCast;
+
     private NetworkInterface interf;
 
     /**
@@ -51,7 +51,7 @@ public class UdpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param address the UDP broadcast or multicast address, <p/> <p/> for example for broadcast an address
+     * @param address the UDP broadcast or multicast address, for example, for broadcast an address
      *                of 192.168.0.255 has an IP range of 192.168.0.0 - 192.168.0.254 <p/> see
      *                http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      */
