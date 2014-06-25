@@ -247,14 +247,11 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         // If there are 64 sets in L1, it should be 8- or much less likely 4-way, and segments
         // collision by pairs is not so terrible.
-        int minTargetCacheSets = 128;
 
-        long segmentSizeInLines = ss / 64;
-        int segmentsAssociativityMultiple =
-                Math.max(1, minTargetCacheSets >> Long.numberOfTrailingZeros(segmentSizeInLines));
-        if (segmentsAssociativityMultiple < segments.length) {
-            ss |= 64;
-        }
+        // if the size is a multiple of 4096 or slightly more. Make sure it is at least 64 more than a multiple.
+        if ((ss & 4093) < 64)
+            ss = (ss & ~63) + 64;
+        ;
 
         return ss;
     }
