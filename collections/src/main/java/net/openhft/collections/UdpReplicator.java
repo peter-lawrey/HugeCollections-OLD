@@ -35,6 +35,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static java.net.StandardProtocolFamily.INET;
+import static java.net.StandardProtocolFamily.INET6;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
@@ -45,13 +47,10 @@ import static net.openhft.collections.TcpReplicator.EntryCallback;
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
- * @see SharedHashMapBuilder#udpReplicatorBuilder
- * <p/>
- * <p/>
- * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ), typically, you
- * should use the UdpReplicator if you have a large number of nodes, and you wish to receive the data before
- * it becomes available on TCP/IP. In order to not miss data. The UdpReplicator should be used in conjunction
- * with the TCP Replicator.
+ * @see SharedHashMapBuilder#udpReplicatorBuilder <p/> <p/> The UdpReplicator attempts to read the data ( but
+ * it does not enforce or grantee delivery ), typically, you should use the UdpReplicator if you have a large
+ * number of nodes, and you wish to receive the data before it becomes available on TCP/IP. In order to not
+ * miss data. The UdpReplicator should be used in conjunction with the TCP Replicator.
  */
 class UdpReplicator extends AbstractChannelReplicator implements ModificationNotifier, Closeable {
 
@@ -82,18 +81,17 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
     }
 
     /**
-     * @param map
      * @param externalizable
      * @param udpReplicatorBuilder
      * @param serializedEntrySize
+     * @param localIdentifier      the identifier of this replicated share hash map
      * @throws IOException
      */
-    UdpReplicator(@NotNull final ReplicatedSharedHashMap map,
-                  @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+    UdpReplicator(@NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
-                  int serializedEntrySize) throws
+                  final int serializedEntrySize, final byte localIdentifier) throws
             IOException {
-        super("UdpReplicator-" + map.identifier());
+        super("UdpReplicator-" + localIdentifier);
 
         this.udpReplicatorBuilder = udpReplicatorBuilder;
 
@@ -105,12 +103,13 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             throttler = new Throttler(selector, 100,
                     serializedEntrySize, udpReplicatorBuilder.throttle());
 
-        final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.broadcastAddress(),
+        final InetSocketAddress address = new InetSocketAddress(udpReplicatorBuilder.address(),
                 udpReplicatorBuilder.port());
         pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
 
-        final UdpDetails connectionDetails = new UdpDetails(address, map.identifier(),
-                udpReplicatorBuilder.isMultiCast(), udpReplicatorBuilder.networkInterface());
+        final UdpDetails connectionDetails = new UdpDetails(address, localIdentifier,
+                udpReplicatorBuilder.address().isMulticastAddress(),
+                udpReplicatorBuilder.networkInterface());
 
         serverConnector = new ServerConnector(connectionDetails);
 
@@ -205,20 +204,28 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
 
     private DatagramChannel connectClient(final UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
-        final DatagramChannel client = DatagramChannel.open();
+        final DatagramChannel client;
+        final InetAddress address = udpReplicatorBuilder.address();
+
+        if (udpReplicatorBuilder.address().isMulticastAddress())
+            client = DatagramChannel.open(address.getAddress().length == 4 ? INET : INET6);
+        else
+            client = DatagramChannel.open();
 
         final InetSocketAddress hostAddress = new InetSocketAddress(udpReplicatorBuilder.port());
         client.configureBlocking(false);
         synchronized (closeables) {
 
-            if (udpReplicatorBuilder.isMultiCast()) {
-                final InetAddress group = InetAddress.getByName(udpReplicatorBuilder.broadcastAddress());
+            if (address.isMulticastAddress()) {
+                final InetAddress group = udpReplicatorBuilder.address();
                 client.setOption(StandardSocketOptions.IP_MULTICAST_IF, udpReplicatorBuilder.networkInterface());
+                client.setOption(StandardSocketOptions.SO_REUSEADDR, true);
                 client.bind(hostAddress);
                 client.join(group, udpReplicatorBuilder.networkInterface());
-            } else {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Connecting via multicast, group=" + group);
+            } else
                 client.bind(hostAddress);
-            }
 
             if (LOG.isDebugEnabled())
                 LOG.debug("Listening on port " + udpReplicatorBuilder.port());
@@ -417,15 +424,15 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             try {
                 synchronized (UdpReplicator.this.closeables) {
 
-                    if (details.isMultiCast) {
+                  /*  if (details.isMultiCast) {
                         final InetAddress group = InetAddress.getByName(details.address().getHostName());
                         server.setOption(StandardSocketOptions.IP_MULTICAST_IF, details.networkInterface);
                         server.join(group, details.networkInterface);
-                    } else {
-                        // Create a non-blocking socket channel
-                        server.socket().setBroadcast(true);
-                        server.connect(details.address());
-                    }
+                    } else {*/
+                    // Create a non-blocking socket channel
+                    server.socket().setBroadcast(true);
+                    server.connect(details.address());
+                    // }
 
                     UdpReplicator.this.closeables.add(server);
                 }

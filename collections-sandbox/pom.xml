@@ -37,7 +37,7 @@
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
                 <type>pom</type>
-                <version>3.4.0</version>
+                <version>3.4.1-SNAPSHOT</version>
                 <scope>import</scope>
             </dependency>
             <dependency>
@@ -61,10 +61,18 @@
                 <version>2.0.6</version>
             </dependency>
 
+
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
+
+
+        <dependency>
+            <groupId>org.apache.derby</groupId>
+            <artifactId>derby</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>affinity</artifactId>

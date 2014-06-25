@@ -23,10 +23,12 @@ import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
 import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -249,6 +251,7 @@ public final class SharedHashMapBuilder implements Cloneable {
 
         if (identifier <= 0)
             throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
+
 
         final VanillaSharedReplicatedHashMap<K, V> result =
                 new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
@@ -539,13 +542,25 @@ public final class SharedHashMapBuilder implements Cloneable {
                                             UdpReplicatorBuilder udpReplicatorBuilder)
             throws IOException {
 
+        final InetAddress address = udpReplicatorBuilder.address();
+
+        if (address == null) {
+            throw new IllegalArgumentException("address can not be null");
+        }
+
+        if (address.isMulticastAddress() && udpReplicatorBuilder.networkInterface() == null) {
+            throw new IllegalArgumentException("MISSING: NetworkInterface, " +
+                    "When using a multicast addresses, please provided a " +
+                    "networkInterface");
+        }
+
         // the udp modification modification iterator will not be stored in shared memory
         final ByteBufferBytes updModIteratorBytes =
                 new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
 
 
         final UdpReplicator udpReplicator =
-                new UdpReplicator(result, result, udpReplicatorBuilder.clone(), entrySize());
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
 
         final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
                 result.new ModificationIterator(
@@ -562,8 +577,9 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
 
-    private <K, V> void applyTcpReplication(VanillaSharedReplicatedHashMap<K, V> result,
-                                            TcpReplicatorBuilder tcpReplicatorBuilder) throws IOException {
+    private <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
+                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder) throws
+            IOException {
 
         result.addCloseable(new TcpReplicator(result,
                 result,

@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.Inet4Address;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -40,7 +41,8 @@ public class UDPSocketReplicationTest {
             final int identifier,
             final int udpPort) throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort, "255.255.255.255");
+        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort,
+                Inet4Address.getByName("255.255.255.255"));
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)
