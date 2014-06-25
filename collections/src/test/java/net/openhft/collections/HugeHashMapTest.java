@@ -135,6 +135,7 @@ public class HugeHashMapTest {
     }
 
     @Test
+    @Ignore
     public void testPutPerf() throws ExecutionException, InterruptedException { //todo: not deterministic, sometimes it fails
         ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         // use a simple pseudo-random distribution over 64-bits
