@@ -18,7 +18,10 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.io.serialization.BytesMarshallableSerializer;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.JDKObjectSerializer;
+import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +69,7 @@ public final class SharedHashMapBuilder implements Cloneable {
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
     private UdpReplicatorBuilder udpReplicatorBuilder;
     private BytesMarshallerFactory bytesMarshallerFactory;
-
+    private ObjectSerializer objectSerializer;
 
     @Override
     public SharedHashMapBuilder clone() {
@@ -620,6 +623,15 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     public SharedHashMapBuilder bytesMarshallerFactory(BytesMarshallerFactory bytesMarshallerFactory) {
         this.bytesMarshallerFactory = bytesMarshallerFactory;
+        return this;
+    }
+
+    public ObjectSerializer objectSerializer() {
+        return objectSerializer == null ? objectSerializer = BytesMarshallableSerializer.create(bytesMarshallerFactory(), JDKObjectSerializer.INSTANCE) : objectSerializer;
+    }
+
+    public SharedHashMapBuilder objectSerializer(ObjectSerializer objectSerializer) {
+        this.objectSerializer = objectSerializer;
         return this;
     }
 }
