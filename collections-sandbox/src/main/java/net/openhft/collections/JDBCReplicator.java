@@ -27,19 +27,16 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.sql.*;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.*;
-import java.util.Date;
 
 /**
  * @author Rob Austin.
  */
 public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedMapEventListener<K, V, M> {
 
-
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
-
-
     private static DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss");
 
     private final FieldMapper<V> fieldMapper;
@@ -78,6 +75,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
         for (final Field f : vClass.getDeclaredFields()) {
 
             f.setAccessible(true);
+
             for (final Annotation annotation : f.getAnnotations()) {
 
                 try {
@@ -85,7 +83,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
                     if (annotation.annotationType().equals(Key.class)) {
                         if (keyFieldName0 != null)
                             throw new IllegalArgumentException("@Key is already set : Only one field can be " +
-                                    "annotated with @DBKey, " +
+                                    "annotated with @Key, " +
                                     "The field '" + keyFieldName0 + "' already has this annotation, so '" +
                                     f.getName() + "' can not be set well.");
 
@@ -134,36 +132,48 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
 
                 for (Map.Entry<java.lang.reflect.Field, String> entry : columnsByField.entrySet()) {
 
-                    String v = null;
-                    final java.lang.reflect.Field field = entry.getKey();
-                    try {
-                        if (field.getType().equals(String.class) || field.getType().equals(java.sql.Date.class))
-                            v = "'" + field.get(value).toString() + "'";
-                        else if (field.getType().equals(Date.class)) {
-                            final Date date = (Date) field.get(value);
-                            //v = "'" + dateTimeFormatter.print(new DateTime(date.getTime())) + "'";
-                            final java.sql.Date date1 = new java.sql.Date(date.getTime());
-
-                            v = "'" + new java.sql.Date(date.getTime()) + "'";
-
-                        } else if (field.getType().equals(DateTime.class)) {
-                            v = "'" + dateTimeFormatter.print((DateTime) field.get(value)) + "'";
-                        } else
-                            v = field.get(value).toString();
-
-                        field.get(value).toString();
-
-
-                        // YYYY-MM-DD HH:MM:SS
-
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
 
                     final String columnName = entry.getValue();
 
-                    result.add(new Field(columnName, v));
+                    final java.lang.reflect.Field field = entry.getKey();
+                    try {
+
+                        final Class<?> type = field.getType();
+
+                        if (type == null)
+                            continue;
+
+                        if (Number.class.isAssignableFrom(type) ||
+                                (field.getType().isPrimitive() && field.getType() != char.class)) {
+                            result.add(new Field(columnName, field.get(value).toString()));
+                            continue;
+                        }
+
+                        Object v = null;
+
+                        if (field.getType().equals(String.class) || field.getType().equals(java.sql.Date.class))
+                            v = field.get(value);
+
+                        else if (field.getType().equals(Date.class))
+                            v = new java.sql.Date(((Date) field.get(value)).getTime());
+
+                        else if (field.getType().equals(DateTime.class))
+                            v = dateTimeFormatter.print((DateTime) field.get(value));
+
+                        if (v == null)
+                            v = field.get(value);
+
+                        if (v == null) {
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("unable to map field=" + field);
+                            continue;
+                        }
+
+                        result.add(new Field(columnName, new StringBuilder("'").append(v.toString()).append("'")));
+
+                    } catch (Exception e) {
+                        LOG.error("", e);
+                    }
 
                 }
 
@@ -303,7 +313,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             CharSequence name;
             CharSequence value;
 
-            public Field(String name, String value) {
+            public Field(CharSequence name, CharSequence value) {
                 this.name = name;
                 this.value = value;
             }
