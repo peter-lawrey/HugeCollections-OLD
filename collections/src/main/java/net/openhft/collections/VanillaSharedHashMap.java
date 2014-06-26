@@ -22,6 +22,7 @@ import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
+import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
@@ -61,7 +62,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
-    private final BytesMarshallerFactory bytesMarshallerFactory;
+    private final ObjectSerializer objectSerializer;
     private SharedHashMapBuilder builder;
 
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
@@ -128,7 +129,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.generatedValueType = builder.generatedValueType();
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
-        this.bytesMarshallerFactory = builder.bytesMarshallerFactory();
+        this.objectSerializer = builder.objectSerializer();
 
         int segments = builder.actualSegments();
         int entriesPerSegment = builder.actualEntriesPerSegment();
@@ -154,7 +155,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     long createMappedStoreAndSegments(File file) throws IOException {
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes(), bytesMarshallerFactory);
+                sizeInBytes(), objectSerializer);
 
         onHeaderCreated(ms.bytes(0, getHeaderSize()));
 
@@ -246,14 +247,11 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         // If there are 64 sets in L1, it should be 8- or much less likely 4-way, and segments
         // collision by pairs is not so terrible.
-        int minTargetCacheSets = 128;
 
-        long segmentSizeInLines = ss / 64;
-        int segmentsAssociativityMultiple =
-                Math.max(1, minTargetCacheSets >> Long.numberOfTrailingZeros(segmentSizeInLines));
-        if (segmentsAssociativityMultiple < segments.length) {
-            ss |= 64;
-        }
+        // if the size is a multiple of 4096 or slightly more. Make sure it is at least 64 more than a multiple.
+        if ((ss & 4093) < 64)
+            ss = (ss & ~63) + 64;
+        ;
 
         return ss;
     }
