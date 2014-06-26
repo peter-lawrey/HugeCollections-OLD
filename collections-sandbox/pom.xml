@@ -67,10 +67,16 @@
 
     <dependencies>
 
+        <dependency>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
+            <version>2.3</version>
+        </dependency>
 
         <dependency>
             <groupId>org.apache.derby</groupId>
             <artifactId>derby</artifactId>
+            <version>10.10.2.0</version>
         </dependency>
 
         <dependency>
