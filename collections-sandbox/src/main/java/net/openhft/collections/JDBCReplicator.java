@@ -39,15 +39,15 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss");
 
-    private final FieldMapper<V> fieldMapper;
+    private final Fields<V> fields;
     private Statement stmt;
     private final String table;
 
 
-    public JDBCReplicator(@NotNull final FieldMapper<V> fieldMapper,
+    public JDBCReplicator(@NotNull final Fields<V> fields,
                           @NotNull final Statement stmt,
                           @NotNull final String table) {
-        this.fieldMapper = fieldMapper;
+        this.fields = fields;
         this.stmt = stmt;
         this.table = table;
     }
@@ -55,7 +55,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
     public JDBCReplicator(@NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String tableName) {
-        fieldMapper = createAnnotationBasedFieldMapper(vClass);
+        fields = createAnnotationBasedFieldMapper(vClass);
         this.stmt = stmt;
         this.table = tableName;
     }
@@ -66,9 +66,9 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
      * @param vClass
      * @return
      */
-    private FieldMapper createAnnotationBasedFieldMapper(final Class<V> vClass) {
+    private Fields createAnnotationBasedFieldMapper(final Class<V> vClass) {
 
-        String keyFieldName0 = null;
+        CharSequence keyFieldName0 = null;
 
         final Map<Field, String> columnsByField = new HashMap<Field, String>();
 
@@ -113,9 +113,9 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
 
         }
 
-        final String keyFieldName = keyFieldName0;
+        final CharSequence keyFieldName = keyFieldName0;
 
-        return new FieldMapper<V>() {
+        return new Fields<V>() {
 
             @Override
             public CharSequence getKeyName() {
@@ -151,7 +151,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
 
                         Object v = null;
 
-                        if (field.getType().equals(String.class) || field.getType().equals(java.sql.Date.class))
+                        if (CharSequence.class.isAssignableFrom(type) || field.getType().equals(java.sql.Date.class))
                             v = field.get(value);
 
                         else if (field.getType().equals(Date.class))
@@ -241,7 +241,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             final StringBuilder values = new StringBuilder();
             final StringBuilder fields = new StringBuilder();
 
-            for (final FieldMapper.Field field : fieldMapper.getFields(value)) {
+            for (final Fields.Field field : this.fields.getFields(value)) {
                 values.append(field.value).append(",");
                 fields.append(field.name).append(",");
             }
@@ -249,21 +249,21 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             fields.deleteCharAt(fields.length() - 1);
             values.deleteCharAt(values.length() - 1);
 
-            final StringBuilder sql = new StringBuilder();
-
-            sql.append("insert into ").
-                    append(table).
-                    append(" (").
-                    append(fieldMapper.getKeyName()).
-                    append(",").
-                    append(fields).
-                    append(") values (").
-                    append(key).append(",").
-                    append(values).
-                    append(")");
+            final StringBuilder sql = new StringBuilder("INSERT INTO ")
+                    .append(table).
+                            append(" (").
+                            append(this.fields.getKeyName()).
+                            append(",").
+                            append(fields).
+                            append(") VALUES (").
+                            append(key).append(",").
+                            append(values).
+                            append(")");
 
             stmt.execute(sql.toString());
+
         } catch (SQLException e) {
+            // 23505 is the error code for duplicate
             if ("23505".equals(e.getSQLState()) || "duplicate".equalsIgnoreCase(e.getMessage())) {
                 onUpdate(key, value);
             }
@@ -281,19 +281,19 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
         final StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(this.table).append(" SET ");
 
-        final Set<FieldMapper.Field> fields1 = fieldMapper.getFields(value);
+        final Set<Fields.Field> fields1 = fields.getFields(value);
 
         if (fields1.isEmpty())
             return;
 
-        for (final FieldMapper.Field field : fields1) {
+        for (final Fields.Field field : fields1) {
             sql.append(field.name).append("=");
             sql.append(field.value).append(",");
         }
 
         sql.deleteCharAt(sql.length() - 1);
 
-        sql.append(" WHERE ").append(fieldMapper.getKeyName()).append("=").append(key);
+        sql.append(" WHERE ").append(fields.getKeyName()).append("=").append(key);
         final int rowCount = stmt.executeUpdate(sql.toString());
 
         if (rowCount == 0) {
@@ -304,7 +304,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
     }
 
 
-    public interface FieldMapper<V> {
+    public interface Fields<V> {
 
         CharSequence getKeyName();
 

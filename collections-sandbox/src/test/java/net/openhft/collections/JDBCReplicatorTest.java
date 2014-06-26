@@ -95,7 +95,7 @@ public class JDBCReplicatorTest {
 
         stmt.executeUpdate(createString);
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(new JDBCReplicator.FieldMapper() {
+        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(new JDBCReplicator.Fields() {
 
             @Override
             public CharSequence getKeyName() {
@@ -137,11 +137,24 @@ public class JDBCReplicatorTest {
             @Column(name = "DATE_VAL")
             Date dateValue;
 
-            BeanClass(int id, String name, double doubleValue, Date dateValue) {
+            @Column(name = "CHAR_VAL")
+            char c;
+
+            @Column(name = "BOOL_VAL")
+            boolean bool;
+
+            @Column(name = "SHORT_VAL")
+            short shortVal;
+
+
+            BeanClass(int id, String name, double doubleValue, Date dateValue, char c, boolean bool, short shortVal) {
                 this.id = id;
                 this.name = name;
                 this.doubleValue = doubleValue;
                 this.dateValue = dateValue;
+                this.c = c;
+                this.bool = bool;
+                this.shortVal = shortVal;
             }
         }
 
@@ -150,13 +163,16 @@ public class JDBCReplicatorTest {
         stmt.executeUpdate("create table " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
+                "CHAR_VAL char(1) NOT NULL, " +
                 "DOUBLE_VAL REAL," +
+                "SHORT_VAL SMALLINT," +
                 "DATE_VAL DATE," +
+                "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
 
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
         final Date expectedDate = new Date(0);
-        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate);
+        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1);
 
         jdbcCReplicator.onUpdate(bean.id, bean);
 
@@ -166,6 +182,9 @@ public class JDBCReplicatorTest {
 
         Assert.assertEquals("Rob", resultSets.getString("NAME"));
         Assert.assertEquals(1.234, resultSets.getDouble("DOUBLE_VAL"), 0.001);
+        Assert.assertEquals("c", resultSets.getString("CHAR_VAL"));
+        Assert.assertEquals(false, resultSets.getBoolean("BOOL_VAL"));
+        Assert.assertEquals(1, resultSets.getShort("SHORT_VAL"));
         final java.sql.Date expected = new java.sql.Date(expectedDate.getTime());
 
         Assert.assertEquals(expected.toLocalDate(), resultSets.getDate("DATE_VAL").toLocalDate());
