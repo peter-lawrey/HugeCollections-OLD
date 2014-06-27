@@ -25,7 +25,7 @@ import org.junit.Test;
 
 import java.sql.*;
 import java.util.Collections;
-import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -72,13 +72,11 @@ public class JDBCReplicatorTest {
 
         stmt.execute("insert into " + tableName + " (ID,NAME) values (1,'rob')");
 
-        ResultSet resultSets = stmt.executeQuery("select * from " + tableName);
-
+        final ResultSet resultSets = stmt.executeQuery("select * from " + tableName);
         resultSets.next();
 
         Assert.assertEquals(1, resultSets.getInt("ID"));
         Assert.assertEquals("rob", resultSets.getString("NAME"));
-
 
     }
 
@@ -95,15 +93,20 @@ public class JDBCReplicatorTest {
 
         stmt.executeUpdate(createString);
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(new JDBCReplicator.Fields() {
+        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, new JDBCReplicator.Fields() {
 
             @Override
-            public CharSequence getKeyName() {
+            public CharSequence keyName() {
                 return "ID";
             }
 
             @Override
-            public Set<Field> getFields(Object value) {
+            public Map<java.lang.reflect.Field, String> columnsNamesByField() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Set<Field> getFields(Object value, boolean skipKey) {
                 return Collections.singleton(new Field("F1", "'Rob'"));
             }
         }, stmt, tableName);
@@ -196,6 +199,197 @@ public class JDBCReplicatorTest {
     private static String createUniqueTableName() {
         return "dbo.Test" + (sequenceNumber++);
     }
+
+
+    /**
+     * get back a Map of all the rows in the table, the map is keyed on the tables key
+     *
+     * @throws ClassNotFoundException
+     * @throws SQLException
+     * @throws InstantiationException
+     */
+    @Test
+    public void testJDBCBulkLoading() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+
+        class BeanClass {
+
+            @Key(name = "ID")
+            int id;
+
+            @Column(name = "NAME")
+            String name;
+
+            BeanClass(int id, String name) {
+                this.id = id;
+                this.name = name;
+            }
+
+            @Override
+            public String toString() {
+                return "BeanClass{" +
+                        "id=" + id +
+                        ", name='" + name + '\'' +
+                        '}';
+            }
+        }
+
+        final String tableName = createUniqueTableName();
+
+        stmt.executeUpdate("create table " + tableName + " (" +
+                "ID integer NOT NULL, " +
+                "NAME varchar(40) NOT NULL, " +
+                "PRIMARY KEY (ID))");
+
+        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
+                new JDBCReplicator<Object, BeanClass,
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+
+        for (BeanClass bean : new BeanClass[]{
+                new BeanClass(1, "Rob"),
+                new BeanClass(2, "Peter"),
+                new BeanClass(3, "Daniel"),
+                new BeanClass(4, "Vicky")}) {
+
+            jdbcCReplicator.onInsert(bean.id, bean);
+        }
+
+        final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
+        Assert.assertEquals(4, result.size());
+
+    }
+
+
+    @Test
+    public void testJDBCLoadingASingleField() throws ClassNotFoundException, SQLException,
+            InstantiationException, IllegalAccessException {
+
+        class BeanClass {
+
+            @Key(name = "ID")
+            int id;
+
+            @Column(name = "NAME")
+            String name;
+
+            BeanClass(int id, String name) {
+                this.id = id;
+                this.name = name;
+            }
+
+            @Override
+            public String toString() {
+                return "BeanClass{" +
+                        "id=" + id +
+                        ", name='" + name + '\'' +
+                        '}';
+            }
+        }
+
+        final String tableName = createUniqueTableName();
+
+        stmt.executeUpdate("create table " + tableName + " (" +
+                "ID integer NOT NULL, " +
+                "NAME varchar(40) NOT NULL, " +
+                "PRIMARY KEY (ID))");
+
+        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
+                new JDBCReplicator<Object, BeanClass,
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+
+        for (BeanClass bean : new BeanClass[]{
+                new BeanClass(1, "Rob"),
+                new BeanClass(2, "Peter"),
+                new BeanClass(3, "Daniel"),
+                new BeanClass(4, "Vicky")}) {
+
+            jdbcCReplicator.onInsert(bean.id, bean);
+        }
+
+        final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
+        Assert.assertEquals(4, result.size());
+
+        final BeanClass beanClass = jdbcCReplicator.get(1);
+        Assert.assertEquals("Rob", beanClass.name);
+
+    }
+
+
+    @Test
+    public void testJDBCLoadingAListOfFields() throws ClassNotFoundException, SQLException,
+            InstantiationException, IllegalAccessException {
+
+        class BeanClass {
+
+            @Key(name = "ID")
+            int id;
+
+            @Column(name = "NAME")
+            String name;
+
+            BeanClass(int id, String name) {
+                this.id = id;
+                this.name = name;
+            }
+
+            @Override
+            public String toString() {
+                return "BeanClass{" +
+                        "id=" + id +
+                        ", name='" + name + '\'' +
+                        '}';
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+
+                BeanClass beanClass = (BeanClass) o;
+
+                if (id != beanClass.id) return false;
+                if (name != null ? !name.equals(beanClass.name) : beanClass.name != null) return false;
+
+                return true;
+            }
+
+            @Override
+            public int hashCode() {
+                int result = id;
+                result = 31 * result + (name != null ? name.hashCode() : 0);
+                return result;
+            }
+        }
+
+        final String tableName = createUniqueTableName();
+
+        stmt.executeUpdate("create table " + tableName + " (" +
+                "ID integer NOT NULL, " +
+                "NAME varchar(40) NOT NULL, " +
+                "PRIMARY KEY (ID))");
+
+        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
+                new JDBCReplicator<Object, BeanClass,
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+
+        final BeanClass rob = new BeanClass(1, "Rob");
+        final BeanClass peter = new BeanClass(2, "Peter");
+        for (BeanClass bean : new BeanClass[]{
+                rob,
+                peter,
+                new BeanClass(3, "Daniel"),
+                new BeanClass(4, "Vicky")}) {
+
+            jdbcCReplicator.onInsert(bean.id, bean);
+        }
+
+        final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
+        Assert.assertEquals(4, result.size());
+
+        final Set<BeanClass> beanClass = jdbcCReplicator.get(1, 2, 3);
+        Assert.assertTrue(beanClass.contains(rob));
+
+    }
+
 }
 
 
