@@ -42,158 +42,35 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss");
 
-    private final Fields<V> fields;
+    private final DBValueMapper<V> dbValueMapper;
     private final Class<V> vClass;
     private Statement stmt;
     private final String table;
 
-    public JDBCReplicator(@NotNull final Class<V> vClass,
-                          @NotNull final Fields<V> fields,
-                          @NotNull final Statement stmt,
-                          @NotNull final String table) {
-        this.fields = fields;
-        this.stmt = stmt;
-        this.table = table;
-        this.vClass = vClass;
-    }
 
     public JDBCReplicator(@NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String tableName) {
-        fields = createAnnotationBasedFieldMapper(vClass);
         this.stmt = stmt;
         this.table = tableName;
         this.vClass = vClass;
+        this.dbValueMapper = createAnnotationBasedFieldMapper();
     }
 
     /**
-     * Annotations
-     *
-     * @param vClass
-     * @return
+     * @param vClass        the class of <V>
+     * @param stmt
+     * @param table
+     * @param dbValueMapper
      */
-    private Fields createAnnotationBasedFieldMapper(final Class<V> vClass) {
-
-        String keyFieldName0 = null;
-
-        final Map<Field, String> columnsNamesByField = new HashMap<Field, String>();
-
-        for (final Field f : vClass.getDeclaredFields()) {
-
-            f.setAccessible(true);
-
-            for (final Annotation annotation : f.getAnnotations()) {
-
-                try {
-
-                    if (annotation.annotationType().equals(Key.class)) {
-                        if (keyFieldName0 != null)
-                            throw new IllegalArgumentException("@Key is already set : Only one field can be " +
-                                    "annotated with @Key, " +
-                                    "The field '" + keyFieldName0 + "' already has this annotation, so '" +
-                                    f.getName() + "' can not be set well.");
-
-                        keyFieldName0 = f.getName();
-
-                        final String fieldName = ((Key) annotation).name();
-                        keyFieldName0 = fieldName.isEmpty() ? f.getName() : fieldName;
-                        columnsNamesByField.put(f, keyFieldName0);
-                    }
-
-                    if (annotation.annotationType().equals(Column.class)) {
-
-                        final String fieldName = ((Column) annotation).name();
-                        final String columnName = fieldName.isEmpty() ? f.getName() : fieldName;
-
-                        columnsNamesByField.put(f, columnName);
-
-                    }
-
-                } catch (Exception exception) {
-                    LOG.error("", exception);
-                }
-
-
-            }
-
-        }
-
-        final CharSequence keyFieldName = keyFieldName0;
-
-        return new Fields<V>() {
-
-            @Override
-            public CharSequence keyName() {
-                if (keyFieldName == null) {
-                    throw new IllegalStateException("@DBKey is not set on any of the fields in " + vClass.getName());
-                }
-                return keyFieldName;
-            }
-
-            @Override
-            public Map<java.lang.reflect.Field, String> columnsNamesByField() {
-                return Collections.unmodifiableMap(columnsNamesByField);
-            }
-
-            @Override
-            public Set<Field> getFields(V value, boolean skipKey) {
-
-                final Set<Field> result = new HashSet<Field>();
-
-                for (Map.Entry<java.lang.reflect.Field, String> entry : columnsNamesByField.entrySet()) {
-
-                    final CharSequence columnName = entry.getValue();
-
-                    if (skipKey && columnName.equals(keyFieldName))
-                        continue;
-
-                    final java.lang.reflect.Field field = entry.getKey();
-                    try {
-
-                        final Class<?> type = field.getType();
-
-                        if (type == null)
-                            continue;
-
-                        if (Number.class.isAssignableFrom(type) ||
-                                (field.getType().isPrimitive() && field.getType() != char.class)) {
-                            result.add(new Field(columnName, field.get(value).toString()));
-                            continue;
-                        }
-
-                        Object v = null;
-
-                        if (CharSequence.class.isAssignableFrom(type) || field.getType().equals(java.sql.Date.class))
-                            v = field.get(value);
-
-                        else if (field.getType().equals(Date.class))
-                            v = new java.sql.Date(((Date) field.get(value)).getTime());
-
-                        else if (field.getType().equals(DateTime.class))
-                            v = dateTimeFormatter.print((DateTime) field.get(value));
-
-                        if (v == null)
-                            v = field.get(value);
-
-                        if (v == null) {
-                            if (LOG.isDebugEnabled())
-                                LOG.debug("unable to map field=" + field);
-                            continue;
-                        }
-
-                        result.add(new Field(columnName, new StringBuilder("'").append(v.toString()).append("'")));
-
-                    } catch (Exception e) {
-                        LOG.error("", e);
-                    }
-
-                }
-
-                return result;
-            }
-        };
-
-
+    public JDBCReplicator(@NotNull final Class<V> vClass,
+                          @NotNull final Statement stmt,
+                          @NotNull final String table,
+                          @NotNull final DBValueMapper<V> dbValueMapper) {
+        this.dbValueMapper = dbValueMapper;
+        this.stmt = stmt;
+        this.table = table;
+        this.vClass = vClass;
     }
 
 
@@ -253,9 +130,9 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             final StringBuilder values = new StringBuilder();
             final StringBuilder fields = new StringBuilder();
 
-            for (final Fields.Field field : this.fields.getFields(value, true)) {
-                values.append(field.value).append(",");
-                fields.append(field.name).append(",");
+            for (final JDBCReplicator.DBValueMapper.ValueWithFieldName valueWithFieldName : this.dbValueMapper.getFields(value, true)) {
+                values.append(valueWithFieldName.value).append(",");
+                fields.append(valueWithFieldName.name).append(",");
             }
 
             fields.deleteCharAt(fields.length() - 1);
@@ -264,7 +141,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             final StringBuilder sql = new StringBuilder("INSERT INTO ")
                     .append(table).
                             append(" (").
-                            append(this.fields.keyName()).
+                            append(this.dbValueMapper.keyName()).
                             append(",").
                             append(fields).
                             append(") VALUES (").
@@ -293,19 +170,19 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
         final StringBuilder sql = new StringBuilder("UPDATE ");
         sql.append(this.table).append(" SET ");
 
-        final Set<Fields.Field> fields1 = fields.getFields(value, true);
+        final Set<JDBCReplicator.DBValueMapper.ValueWithFieldName> fields1 = dbValueMapper.getFields(value, true);
 
         if (fields1.isEmpty())
             return;
 
-        for (final Fields.Field field : fields1) {
-            sql.append(field.name).append("=");
-            sql.append(field.value).append(",");
+        for (final JDBCReplicator.DBValueMapper.ValueWithFieldName valueWithFieldName : fields1) {
+            sql.append(valueWithFieldName.name).append("=");
+            sql.append(valueWithFieldName.value).append(",");
         }
 
         sql.deleteCharAt(sql.length() - 1);
 
-        sql.append(" WHERE ").append(fields.keyName()).append("=").append(key);
+        sql.append(" WHERE ").append(dbValueMapper.keyName()).append("=").append(key);
         final int rowCount = stmt.executeUpdate(sql.toString());
 
         if (rowCount == 0) {
@@ -316,28 +193,45 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
     }
 
 
-    public interface Fields<V> {
+    /**
+     * used to map the value object <V>, to a database table by using the annotations @Key and @Column
+     *
+     * @param <V>
+     */
+    public interface DBValueMapper<V> {
 
+        /**
+         * @return the database row name of the field which is annotated with @Key
+         */
         CharSequence keyName();
 
         /**
-         * @return all the field names including the name of the key and there assassinated type
+         * @return all the field names including the name of the key and their assassinated java type
          */
         Map<java.lang.reflect.Field, String> columnsNamesByField();
 
-
-        static class Field {
+        /**
+         * The Field and it's associated value
+         */
+        static class ValueWithFieldName {
 
             CharSequence name;
             CharSequence value;
 
-            public Field(CharSequence name, CharSequence value) {
+            public ValueWithFieldName(CharSequence name, CharSequence value) {
                 this.name = name;
                 this.value = value;
             }
         }
 
-        Set<Field> getFields(V value, boolean skipKey);
+        /**
+         * get all fields what re mapping to a database table
+         *
+         * @param value   a list of all the fields that have the
+         * @param skipKey if set to true include the @Key field
+         * @return
+         */
+        Set<ValueWithFieldName> getFields(V value, boolean skipKey);
 
     }
 
@@ -349,7 +243,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
      * @throws InstantiationException
      */
     public V get(K key) throws SQLException, InstantiationException, IllegalAccessException {
-        final String sql = "SELECT * FROM " + this.table + " WHERE " + fields.keyName() + "=" + key.toString();
+        final String sql = "SELECT * FROM " + this.table + " WHERE " + dbValueMapper.keyName() + "=" + key.toString();
         final ResultSet resultSet = stmt.executeQuery(sql);
         return toResult(resultSet, vClass);
     }
@@ -370,7 +264,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
         keys.deleteCharAt(keys.length() - 1);
         keys.deleteCharAt(0);
 
-        final String sql = "SELECT * FROM " + this.table + " WHERE " + fields.keyName() +
+        final String sql = "SELECT * FROM " + this.table + " WHERE " + dbValueMapper.keyName() +
                 " in (" + keys.toString() + ")";
 
         final ResultSet resultSet = stmt.executeQuery(sql);
@@ -407,14 +301,14 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
             result = rClass.newInstance();
 
 
-        final CharSequence keyName = fields.keyName();
+        final CharSequence keyName = dbValueMapper.keyName();
         while (resultSet.next()) {
 
             K key = null;
 
             final V o = (V) NativeBytes.UNSAFE.allocateInstance(this.vClass);
 
-            for (Map.Entry<Field, String> fieldNameByType : fields.columnsNamesByField().entrySet()) {
+            for (Map.Entry<Field, String> fieldNameByType : dbValueMapper.columnsNamesByField().entrySet()) {
 
 
                 final Field field = fieldNameByType.getKey();
@@ -489,6 +383,134 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends SharedM
 
         }
         return result;
+    }
+
+    /**
+     * @return an annotation based Object Relational Mapper (ORM) - Uses reflection and the annotations
+     * provided in the value object ( of type <V> ) to define the relationship between the database table and
+     * the value object
+     */
+    private DBValueMapper createAnnotationBasedFieldMapper() {
+
+        String keyFieldName0 = null;
+
+        final Map<Field, String> columnsNamesByField = new HashMap<Field, String>();
+
+        for (final Field f : vClass.getDeclaredFields()) {
+
+            f.setAccessible(true);
+
+            for (final Annotation annotation : f.getAnnotations()) {
+
+                try {
+
+                    if (annotation.annotationType().equals(Key.class)) {
+                        if (keyFieldName0 != null)
+                            throw new IllegalArgumentException("@Key is already set : Only one field can be " +
+                                    "annotated with @Key, " +
+                                    "The field '" + keyFieldName0 + "' already has this annotation, so '" +
+                                    f.getName() + "' can not be set well.");
+
+                        keyFieldName0 = f.getName();
+
+                        final String fieldName = ((Key) annotation).name();
+                        keyFieldName0 = fieldName.isEmpty() ? f.getName() : fieldName;
+                        columnsNamesByField.put(f, keyFieldName0);
+                    }
+
+                    if (annotation.annotationType().equals(Column.class)) {
+
+                        final String fieldName = ((Column) annotation).name();
+                        final String columnName = fieldName.isEmpty() ? f.getName() : fieldName;
+
+                        columnsNamesByField.put(f, columnName);
+
+                    }
+
+                } catch (Exception exception) {
+                    LOG.error("", exception);
+                }
+
+            }
+
+        }
+
+        final CharSequence keyFieldName = keyFieldName0;
+
+        return new DBValueMapper<V>() {
+
+            @Override
+            public CharSequence keyName() {
+                if (keyFieldName == null) {
+                    throw new IllegalStateException("@DBKey is not set on any of the fields in " + vClass.getName());
+                }
+                return keyFieldName;
+            }
+
+            @Override
+            public Map<java.lang.reflect.Field, String> columnsNamesByField() {
+                return Collections.unmodifiableMap(columnsNamesByField);
+            }
+
+            @Override
+            public Set<ValueWithFieldName> getFields(V value, boolean skipKey) {
+
+                final Set<ValueWithFieldName> result = new HashSet<ValueWithFieldName>();
+
+                for (Map.Entry<java.lang.reflect.Field, String> entry : columnsNamesByField.entrySet()) {
+
+                    final CharSequence columnName = entry.getValue();
+
+                    if (skipKey && columnName.equals(keyFieldName))
+                        continue;
+
+                    final java.lang.reflect.Field field = entry.getKey();
+                    try {
+
+                        final Class<?> type = field.getType();
+
+                        if (type == null)
+                            continue;
+
+                        if (Number.class.isAssignableFrom(type) ||
+                                (field.getType().isPrimitive() && field.getType() != char.class)) {
+                            result.add(new ValueWithFieldName(columnName, field.get(value).toString()));
+                            continue;
+                        }
+
+                        Object v = null;
+
+                        if (CharSequence.class.isAssignableFrom(type) || field.getType().equals(java.sql.Date.class))
+                            v = field.get(value);
+
+                        else if (field.getType().equals(Date.class))
+                            v = new java.sql.Date(((Date) field.get(value)).getTime());
+
+                        else if (field.getType().equals(DateTime.class))
+                            v = dateTimeFormatter.print((DateTime) field.get(value));
+
+                        if (v == null)
+                            v = field.get(value);
+
+                        if (v == null) {
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("unable to map field=" + field);
+                            continue;
+                        }
+
+                        result.add(new ValueWithFieldName(columnName, new StringBuilder("'").append(v.toString()).append("'")));
+
+                    } catch (Exception e) {
+                        LOG.error("", e);
+                    }
+
+                }
+
+                return result;
+            }
+        };
+
+
     }
 }
 

@@ -93,7 +93,7 @@ public class JDBCReplicatorTest {
 
         stmt.executeUpdate(createString);
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, new JDBCReplicator.Fields() {
+        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, stmt, tableName, new JDBCReplicator.DBValueMapper() {
 
             @Override
             public CharSequence keyName() {
@@ -106,10 +106,10 @@ public class JDBCReplicatorTest {
             }
 
             @Override
-            public Set<Field> getFields(Object value, boolean skipKey) {
-                return Collections.singleton(new Field("F1", "'Rob'"));
+            public Set<ValueWithFieldName> getFields(Object value, boolean skipKey) {
+                return Collections.singleton(new ValueWithFieldName("F1", "'Rob'"));
             }
-        }, stmt, tableName);
+        });
 
 
         jdbcCReplicator.onUpdate("1", "F1");
