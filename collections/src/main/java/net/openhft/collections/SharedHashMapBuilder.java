@@ -30,14 +30,13 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
+
+import static net.openhft.collections.Objects.equal;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
+    static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
 
-    static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
 
@@ -55,21 +54,18 @@ public final class SharedHashMapBuilder implements Cloneable {
     private boolean transactional = false;
     private long lockTimeOutMS = 1000;
     private int metaDataBytes = 0;
-    private SharedMapEventListener eventListener = SharedMapEventListeners.nop();
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.logging();
     private boolean putReturnsNull = false;
     private boolean removeReturnsNull = false;
-    private boolean generatedKeyType = false;
-    private boolean generatedValueType = false;
     private boolean largeSegments = false;
 
     // replication
     private boolean canReplicate;
     private byte identifier = Byte.MIN_VALUE;
-    private TcpReplicatorBuilder tcpReplicatorBuilder;
+    TcpReplicatorBuilder tcpReplicatorBuilder;
 
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
-    private UdpReplicatorBuilder udpReplicatorBuilder;
+    UdpReplicatorBuilder udpReplicatorBuilder;
     private BytesMarshallerFactory bytesMarshallerFactory;
     private ObjectSerializer objectSerializer;
 
@@ -225,93 +221,15 @@ public final class SharedHashMapBuilder implements Cloneable {
         return transactional;
     }
 
-    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
-        SharedHashMapBuilder builder = clone();
-
-        for (int i = 0; i < 10; i++) {
-            if (file.exists() && file.length() > 0) {
-                readFile(file, builder);
-                break;
-            }
-            if (file.createNewFile() || file.length() == 0) {
-                newFile(file);
-                break;
-            }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new IOException(e);
-            }
-        }
-        if (builder == null || !file.exists())
-            throw new FileNotFoundException("Unable to create " + file);
-
-        if (!canReplicate())
-            return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
-
-        if (identifier <= 0)
-            throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
-
-
-        final VanillaSharedReplicatedHashMap<K, V> result =
-                new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
-
-        if (tcpReplicatorBuilder != null)
-            applyTcpReplication(result, tcpReplicatorBuilder);
-
-
-        if (udpReplicatorBuilder != null) {
-            if (tcpReplicatorBuilder == null)
-                LOG.warn("MISSING TCP REPLICATION : The UdpReplicator only attempts to read data (" +
-                        "it does not enforce or guarantee delivery), you should use the UdpReplicator if " +
-                        "you have a large number of nodes, and you wish to receive the data before it " +
-                        "becomes available on TCP/IP. Since data delivery is not guaranteed, it is " +
-                        "recommended that you only use the UDP" +
-                        " " +
-                        "Replicator " +
-                        "in conjunction with a TCP Replicator");
-            applyUdpReplication(result, udpReplicatorBuilder);
-        }
-        return result;
-
+    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass)
+            throws IOException {
+        return new SharedHashMapKeyValueSpecificBuilder<K, V>(this.clone(), kClass, vClass)
+                .create(file);
     }
 
-    static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
-        ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
-        FileInputStream fis = new FileInputStream(file);
-        fis.getChannel().read(bb);
-        fis.close();
-        bb.flip();
-        if (bb.remaining() < 22) throw new IOException("File too small, corrupted? " + file);
-        byte[] bytes = new byte[8];
-        bb.get(bytes);
-        if (!Arrays.equals(bytes, MAGIC))
-            throw new IOException("Unknown magic number, was " + new String(bytes, "ISO-8859-1"));
-        builder.actualSegments(bb.getInt());
-        builder.actualEntriesPerSegment(bb.getInt());
-        builder.entrySize(bb.getInt());
-        builder.entryAndValueAlignment(Alignment.fromOrdinal(bb.get()));
-        builder.replicas(bb.getInt());
-        builder.transactional(bb.get() == 'Y');
-        builder.metaDataBytes(bb.get() & 0xFF);
-        if (builder.actualSegments() <= 0 || builder.actualEntriesPerSegment() <= 0 || builder.entrySize() <= 0)
-            throw new IOException("Corrupt header for " + file);
-    }
-
-    void newFile(File file) throws IOException {
-        ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_SIZE).order(ByteOrder.nativeOrder());
-        bb.put(MAGIC);
-        bb.putInt(actualSegments());
-        bb.putInt(actualEntriesPerSegment());
-        bb.putInt(entrySize());
-        bb.put((byte) entryAndValueAlignment().ordinal());
-        bb.putInt(replicas());
-        bb.put((byte) (transactional ? 'Y' : 'N'));
-        bb.put((byte) metaDataBytes);
-        bb.flip();
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.getChannel().write(bb);
-        fos.close();
+    public <K, V> SharedHashMapKeyValueSpecificBuilder<K, V> toKeyValueSpecificBuilder(
+            Class<K> kClass, Class<V> vClass) {
+        return new SharedHashMapKeyValueSpecificBuilder<K, V>(this.clone(), kClass, vClass);
     }
 
     public SharedHashMapBuilder lockTimeOutMS(long lockTimeOutMS) {
@@ -385,24 +303,6 @@ public final class SharedHashMapBuilder implements Cloneable {
         return removeReturnsNull;
     }
 
-    public boolean generatedKeyType() {
-        return generatedKeyType;
-    }
-
-    public SharedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
-        this.generatedKeyType = generatedKeyType;
-        return this;
-    }
-
-    public boolean generatedValueType() {
-        return generatedValueType;
-    }
-
-    public SharedHashMapBuilder generatedValueType(boolean generatedValueType) {
-        this.generatedValueType = generatedValueType;
-        return this;
-    }
-
     public boolean largeSegments() {
         return entries > 1L << (20 + 15) || largeSegments;
     }
@@ -424,15 +324,6 @@ public final class SharedHashMapBuilder implements Cloneable {
         return metaDataBytes;
     }
 
-    public SharedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
-        this.eventListener = eventListener;
-        return this;
-    }
-
-    public SharedMapEventListener eventListener() {
-        return eventListener;
-    }
-
     @Override
     public String toString() {
         return "SharedHashMapBuilder{" +
@@ -446,12 +337,9 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", transactional=" + transactional() +
                 ", lockTimeOutMS=" + lockTimeOutMS() +
                 ", metaDataBytes=" + metaDataBytes() +
-                ", eventListener=" + eventListener() +
                 ", errorListener=" + errorListener() +
                 ", putReturnsNull=" + putReturnsNull() +
                 ", removeReturnsNull=" + removeReturnsNull() +
-                ", generatedKeyType=" + generatedKeyType() +
-                ", generatedValueType=" + generatedValueType() +
                 ", largeSegments=" + largeSegments() +
                 ", canReplicate=" + canReplicate() +
                 ", identifier=" + identifierToString() +
@@ -474,8 +362,6 @@ public final class SharedHashMapBuilder implements Cloneable {
         if (canReplicate != that.canReplicate) return false;
         if (entries != that.entries) return false;
         if (entrySize != that.entrySize) return false;
-        if (generatedKeyType != that.generatedKeyType) return false;
-        if (generatedValueType != that.generatedValueType) return false;
         if (identifier != that.identifier) return false;
         if (largeSegments != that.largeSegments) return false;
         if (lockTimeOutMS != that.lockTimeOutMS) return false;
@@ -487,45 +373,26 @@ public final class SharedHashMapBuilder implements Cloneable {
         if (transactional != that.transactional) return false;
 
         if (alignment != that.alignment) return false;
-        if (errorListener != null ? !errorListener.equals(that.errorListener) : that.errorListener != null)
+        if (!equal(errorListener, that.errorListener))
             return false;
-        if (eventListener != null ? !eventListener.equals(that.eventListener) : that.eventListener != null)
+        if (!equal(tcpReplicatorBuilder, that.tcpReplicatorBuilder))
             return false;
-        if (tcpReplicatorBuilder != null ? !tcpReplicatorBuilder.equals(that.tcpReplicatorBuilder) : that.tcpReplicatorBuilder != null)
+        if (!equal(timeProvider, that.timeProvider))
             return false;
-        if (timeProvider != null ? !timeProvider.equals(that.timeProvider) : that.timeProvider != null)
+        if (!equal(udpReplicatorBuilder, that.udpReplicatorBuilder))
             return false;
-        if (udpReplicatorBuilder != null ? !udpReplicatorBuilder.equals(that.udpReplicatorBuilder) : that.udpReplicatorBuilder != null)
+        if (!equal(bytesMarshallerFactory, that.bytesMarshallerFactory))
             return false;
-
-        return true;
+        return equal(objectSerializer, that.objectSerializer);
     }
 
     @Override
     public int hashCode() {
-        int result = minSegments;
-        result = 31 * result + actualSegments;
-        result = 31 * result + actualEntriesPerSegment;
-        result = 31 * result + entrySize;
-        result = 31 * result + (alignment != null ? alignment.hashCode() : 0);
-        result = 31 * result + (int) (entries ^ (entries >>> 32));
-        result = 31 * result + replicas;
-        result = 31 * result + (transactional ? 1 : 0);
-        result = 31 * result + (int) (lockTimeOutMS ^ (lockTimeOutMS >>> 32));
-        result = 31 * result + metaDataBytes;
-        result = 31 * result + (eventListener != null ? eventListener.hashCode() : 0);
-        result = 31 * result + (errorListener != null ? errorListener.hashCode() : 0);
-        result = 31 * result + (putReturnsNull ? 1 : 0);
-        result = 31 * result + (removeReturnsNull ? 1 : 0);
-        result = 31 * result + (generatedKeyType ? 1 : 0);
-        result = 31 * result + (generatedValueType ? 1 : 0);
-        result = 31 * result + (largeSegments ? 1 : 0);
-        result = 31 * result + (canReplicate ? 1 : 0);
-        result = 31 * result + (int) identifier;
-        result = 31 * result + (tcpReplicatorBuilder != null ? tcpReplicatorBuilder.hashCode() : 0);
-        result = 31 * result + (timeProvider != null ? timeProvider.hashCode() : 0);
-        result = 31 * result + (udpReplicatorBuilder != null ? udpReplicatorBuilder.hashCode() : 0);
-        return result;
+        return Objects.hash(minSegments, actualSegments, actualEntriesPerSegment, entrySize,
+                alignment, entries, replicas, transactional, lockTimeOutMS, metaDataBytes,
+                errorListener, putReturnsNull, removeReturnsNull, largeSegments, canReplicate,
+                identifier, tcpReplicatorBuilder, timeProvider, udpReplicatorBuilder,
+                bytesMarshallerFactory, objectSerializer);
     }
 
     public boolean canReplicate() {
@@ -538,9 +405,8 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
 
-    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
-                                            UdpReplicatorBuilder udpReplicatorBuilder)
-            throws IOException {
+    <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
+                                    UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
 
         final InetAddress address = udpReplicatorBuilder.address();
 
@@ -577,10 +443,9 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
 
-    private <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
-                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder) throws
-            IOException {
-
+    <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
+                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder)
+            throws IOException {
         result.addCloseable(new TcpReplicator(result,
                 result,
                 tcpReplicatorBuilder.clone(),
@@ -643,7 +508,10 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     public ObjectSerializer objectSerializer() {
-        return objectSerializer == null ? objectSerializer = BytesMarshallableSerializer.create(bytesMarshallerFactory(), JDKObjectSerializer.INSTANCE) : objectSerializer;
+        return objectSerializer == null ?
+                objectSerializer = BytesMarshallableSerializer.create(
+                        bytesMarshallerFactory(), JDKObjectSerializer.INSTANCE) :
+                objectSerializer;
     }
 
     public SharedHashMapBuilder objectSerializer(ObjectSerializer objectSerializer) {

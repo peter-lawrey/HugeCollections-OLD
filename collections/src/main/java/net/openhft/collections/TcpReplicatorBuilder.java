@@ -81,6 +81,10 @@ public class TcpReplicatorBuilder implements Cloneable {
         return packetSize() == that.packetSize();
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(serverPort, endpoints, packetSize);
+    }
 
     @Override
     public String toString() {

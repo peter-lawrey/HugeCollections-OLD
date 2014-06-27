@@ -24,8 +24,9 @@ import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
+import net.openhft.lang.io.serialization.BytesMarshaller;
+import net.openhft.lang.io.serialization.ObjectFactory;
 import net.openhft.lang.model.Byteable;
-import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
@@ -33,28 +34,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
 import static java.lang.Thread.currentThread;
 
-
-class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
-
-    public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
-                                Class<K> kClass, Class<V> vClass) throws IOException {
-        super(builder, kClass, vClass);
-        createMappedStoreAndSegments(file);
-    }
-
-
-}
-
-abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
-        implements SharedHashMap<K, V> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractVanillaSharedHashMap.class);
+class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
+        implements SharedHashMap<K, V>, Serializable {
+    private static final long serialVersionUID = 0L;
+    private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedHashMap.class);
 
     /**
      * Because DirectBitSet implementations couldn't find more than 64 continuous clear or set
@@ -63,7 +54,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
     private final ObjectSerializer objectSerializer;
-    private SharedHashMapBuilder builder;
 
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
         // if expected map size is about 1000, seems rather wasteful to allocate
@@ -74,23 +64,25 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     private final int bufferAllocationFactor;
 
-    private final ThreadLocal<DirectBytes> localBufferForKeys =
-            new ThreadLocal<DirectBytes>();
-    private final ThreadLocal<DirectBytes> localBufferForValues =
-            new ThreadLocal<DirectBytes>();
+    private transient ThreadLocal<DirectBytes> localBufferForKeys;
+    private transient ThreadLocal<DirectBytes> localBufferForValues;
 
     final Class<K> kClass;
+    final BytesMarshaller<K> keyMarshaller;
     private final Class<V> vClass;
+    private final BytesMarshaller<V> valueMarshaller;
+    private final ObjectFactory<V> valueFactory;
     private final long lockTimeOutNS;
     final int metaDataBytes;
-    Segment[] segments; // non-final for close()
+    transient Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    MappedStore ms;
+    transient MappedStore ms;
     final Hasher hasher;
 
     private final int replicas;
     final int entrySize;
     final Alignment alignment;
+    final int actualSegments;
     final int entriesPerSegment;
 
     private final SharedMapErrorListener errorListener;
@@ -100,23 +92,24 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      */
     volatile SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
 
-    private final boolean generatedKeyType;
-    private final boolean generatedValueType;
-
     // if set the ReturnsNull fields will cause some functions to return NULL
     // rather than as returning the Object can be expensive for something you probably don't use.
     final boolean putReturnsNull;
     final boolean removeReturnsNull;
 
+    transient long headerSize;
     transient Set<Map.Entry<K, V>> entrySet;
 
 
-    public AbstractVanillaSharedHashMap(SharedHashMapBuilder builder,
-                                        Class<K> kClass, Class<V> vClass) throws IOException {
-        this.builder = builder.clone();
+    public VanillaSharedHashMap(SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder)
+            throws IOException {
+        SharedHashMapBuilder builder = kvBuilder.builder;
         bufferAllocationFactor = figureBufferAllocationFactor(builder);
-        this.kClass = kClass;
-        this.vClass = vClass;
+        this.kClass = kvBuilder.keyClass;
+        this.keyMarshaller = kvBuilder.keyMarshaller();
+        this.vClass = kvBuilder.valueClass;
+        this.valueMarshaller = kvBuilder.valueMarshaller();
+        this.valueFactory = kvBuilder.valueFactory();
 
         lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
 
@@ -125,32 +118,36 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.alignment = builder.entryAndValueAlignment();
 
         this.errorListener = builder.errorListener();
-        this.generatedKeyType = builder.generatedKeyType();
-        this.generatedValueType = builder.generatedValueType();
         this.putReturnsNull = builder.putReturnsNull();
         this.removeReturnsNull = builder.removeReturnsNull();
         this.objectSerializer = builder.objectSerializer();
 
-        int segments = builder.actualSegments();
-        int entriesPerSegment = builder.actualEntriesPerSegment();
-        this.entriesPerSegment = entriesPerSegment;
+        this.actualSegments = builder.actualSegments();
+        this.entriesPerSegment = builder.actualEntriesPerSegment();
         this.metaDataBytes = builder.metaDataBytes();
-        this.eventListener = builder.eventListener();
+        this.eventListener = kvBuilder.eventListener();
 
         int hashMask = useSmallMultiMaps() ? 0xFFFF : ~0;
-        this.hasher = new Hasher(segments, hashMask);
+        this.hasher = new Hasher(actualSegments, hashMask);
 
-        @SuppressWarnings("unchecked")
-        Segment[] ss = (Segment[]) Array.newInstance(segmentType(), segments);
-        this.segments = ss;
+        initTransients();
     }
 
-    public SharedHashMapBuilder builder() {
-        return builder.clone();
+    void initTransients() {
+        @SuppressWarnings("unchecked")
+        Segment[] ss = (Segment[]) Array.newInstance(segmentType(), actualSegments);
+        this.segments = ss;
+        localBufferForKeys = new ThreadLocal<DirectBytes>();
+        localBufferForValues = new ThreadLocal<DirectBytes>();
     }
 
     Class segmentType() {
         return Segment.class;
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        initTransients();
     }
 
     long createMappedStoreAndSegments(File file) throws IOException {
@@ -177,8 +174,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     }
 
-    int getHeaderSize() {
-        return SharedHashMapBuilder.HEADER_SIZE;
+    long getHeaderSize() {
+        return headerSize;
     }
 
     Segment createSegment(NativeBytes bytes, int index) {
@@ -350,10 +347,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     DirectBytes getKeyAsBytes(K key) {
         DirectBytes buffer = acquireBufferForKey();
-        if (generatedKeyType)
-            ((BytesMarshallable) key).writeMarshallable(buffer);
-        else
-            buffer.writeInstance(kClass, key);
+        keyMarshaller.write(buffer, key);
         buffer.flip();
         return buffer;
     }
@@ -361,10 +355,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     DirectBytes getValueAsBytes(V value) {
         DirectBytes buffer = acquireBufferForValue();
         buffer.clear();
-        if (generatedValueType)
-            ((BytesMarshallable) value).writeMarshallable(buffer);
-        else
-            buffer.writeInstance(vClass, value);
+        valueMarshaller.write(buffer, value);
         buffer.flip();
         return buffer;
     }
@@ -537,7 +528,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
 
-    static final class Hasher {
+    static final class Hasher implements Serializable {
+        private static final long serialVersionUID = 0L;
 
         static long hash(Bytes bytes) {
             long h = 0;
@@ -798,14 +790,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 if (usingValue != null) {
                     return usingValue;
                 } else {
-                    if (generatedValueType)
-                        return DataValueClasses.newDirectReference(vClass);
-                    else {
-                        try {
-                            return vClass.newInstance();
-                        } catch (Exception e) {
-                            throw new AssertionError(e);
-                        }
+                    try {
+                        return valueFactory.create();
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
                     }
                 }
             } else {
@@ -977,17 +965,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
          * @param value the object to reuse (if possible), if {@code null} a new object is created
          */
         V readValue(NativeBytes entry, V value, long valueLen) {
-            if (generatedValueType)
-                if (value == null)
-                    value = DataValueClasses.newDirectReference(vClass);
-                else
-                    assert value instanceof Byteable;
-            if (value instanceof Byteable) {
-                long valueOffset = entry.positionAddr() - bytes.address();
-                ((Byteable) value).bytes(bytes, valueOffset);
-                return value;
-            }
-            return entry.readInstance(vClass, value);
+            bytes.positionAddr(entry.positionAddr());
+            return valueMarshaller.read(bytes, value);
         }
 
         boolean keyEquals(Bytes keyBytes, long keyLen, Bytes entry) {
@@ -1109,7 +1088,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         void notifyPut(long offset, boolean added, K key, V value, final long pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onPut(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener.onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         added, key, value, pos, this);
             }
         }
@@ -1117,14 +1096,14 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         void notifyGet(long offset, K key, V value) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onGetFound(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener.onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value);
             }
         }
 
         V notifyMissed(Bytes keyBytes, K key, V usingValue) {
             if (eventListener != SharedMapEventListeners.NOP) {
-                return eventListener.onGetMissing(AbstractVanillaSharedHashMap.this, keyBytes,
+                return eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes,
                         key, usingValue);
             }
             return null;
@@ -1133,7 +1112,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         void notifyRemoved(long offset, K key, V value, final int pos) {
             if (eventListener != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onRemove(AbstractVanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value, pos, this);
             }
         }
@@ -1283,15 +1262,12 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         public Entry<K, V> getEntry(long pos) {
-            long offset = offsetFromPos(pos);
-            NativeBytes entry = entry(offset);
-            entry.readStopBit();
-            K key = entry.readInstance(kClass, null); //todo: readUsing?
-
-            V value = readValue(entry, null); //todo: reusable container
-
-            //notifyGet(offset - metaDataBytes, key, value); //todo: should we call this?
-
+            bytes.position(offsetFromPos(pos));
+            bytes.readStopBit();
+            K key = keyMarshaller.read(bytes);
+            bytes.readStopBit();
+            alignment.alignPositionAddr(bytes);
+            V value = valueMarshaller.read(bytes);
             return new WriteThroughEntry(key, value);
         }
 
@@ -1352,7 +1328,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         Entry<K, V> nextEntry, lastReturned;
 
-        Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
+        //todo: replace with a more efficient, auto resizing int[]
+        Deque<Integer> segmentPositions = new ArrayDeque<Integer>();
 
         EntryIterator() {
             nextEntry = nextSegmentEntry();
@@ -1364,7 +1341,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         public void remove() {
             if (lastReturned == null) throw new IllegalStateException();
-            AbstractVanillaSharedHashMap.this.remove(lastReturned.getKey());
+            VanillaSharedHashMap.this.remove(lastReturned.getKey());
             lastReturned = null;
         }
 
@@ -1429,7 +1406,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                 return false;
             Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
             try {
-                V v = AbstractVanillaSharedHashMap.this.get(e.getKey());
+                V v = VanillaSharedHashMap.this.get(e.getKey());
                 return v != null && v.equals(e.getValue());
             } catch (ClassCastException ex) {
                 return false;
@@ -1445,7 +1422,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             try {
                 Object key = e.getKey();
                 Object value = e.getValue();
-                return AbstractVanillaSharedHashMap.this.remove(key, value);
+                return VanillaSharedHashMap.this.remove(key, value);
             } catch (ClassCastException ex) {
                 return false;
             } catch (NullPointerException ex) {
@@ -1454,15 +1431,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         public int size() {
-            return AbstractVanillaSharedHashMap.this.size();
+            return VanillaSharedHashMap.this.size();
         }
 
         public boolean isEmpty() {
-            return AbstractVanillaSharedHashMap.this.isEmpty();
+            return VanillaSharedHashMap.this.isEmpty();
         }
 
         public void clear() {
-            AbstractVanillaSharedHashMap.this.clear();
+            VanillaSharedHashMap.this.clear();
         }
     }
 

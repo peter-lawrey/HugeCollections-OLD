@@ -31,34 +31,13 @@ public class SHMMetaDataTest {
     @Test
     public void testAccessTimes() throws IOException {
         File file = new File(TMP, "testAccessTimes");
-        final AtomicLong timeStamps = new AtomicLong(1);
         SharedMapEventListener<String, String, SharedHashMap<String, String>> listener =
-                new SharedMapEventListener<String, String, SharedHashMap<String, String>>() {
-
-                    @Override
-                    public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value) {
-                        assertEquals(8, metaDataBytes);
-                        entry.writeLong(0, timeStamps.incrementAndGet());
-                    }
-
-                    @Override
-                    public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, boolean added, String key, String value, long pos, SharedSegment segment) {
-                        assertEquals(8, metaDataBytes);
-                        if (added)
-                            assertEquals(0, entry.readLong());
-                        entry.writeLong(0, timeStamps.incrementAndGet());
-                    }
-
-                    @Override
-                    public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes, String key, String value, int pos, SharedSegment segment) {
-                        assertEquals(8, metaDataBytes);
-                        System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
-                    }
-                };
+                new StringStringSharedHashMapSharedMapEventListener(new AtomicLong(1));
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
                 .metaDataBytes(8)
+                .toKeyValueSpecificBuilder(String.class, String.class)
                 .eventListener(listener)
-                .create(file, String.class, String.class);
+                .create(file);
 
         try {
             map.put("a", "aye");
@@ -81,5 +60,40 @@ public class SHMMetaDataTest {
             file.delete();
         }
 
+    }
+
+    private static class StringStringSharedHashMapSharedMapEventListener
+            extends SharedMapEventListener<String, String, SharedHashMap<String, String>> {
+        private static final long serialVersionUID = 0L;
+
+        private final AtomicLong timeStamps;
+
+        public StringStringSharedHashMapSharedMapEventListener(AtomicLong timeStamps) {
+            this.timeStamps = timeStamps;
+        }
+
+        @Override
+        public void onGetFound(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes,
+                               String key, String value) {
+            assertEquals(8, metaDataBytes);
+            entry.writeLong(0, timeStamps.incrementAndGet());
+        }
+
+        @Override
+        public void onPut(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes,
+                          boolean added, String key, String value, long pos,
+                          SharedSegment segment) {
+            assertEquals(8, metaDataBytes);
+            if (added)
+                assertEquals(0, entry.readLong());
+            entry.writeLong(0, timeStamps.incrementAndGet());
+        }
+
+        @Override
+        public void onRemove(SharedHashMap<String, String> map, Bytes entry, int metaDataBytes,
+                             String key, String value, int pos, SharedSegment segment) {
+            assertEquals(8, metaDataBytes);
+            System.out.println("Removed " + key + "/" + value + " with ts of " + entry.readLong(0));
+        }
     }
 }

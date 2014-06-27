@@ -53,11 +53,6 @@ public class CheckSharedHashMap<K, V> implements SharedHashMap<K, V> {
     }
 
     @Override
-    public SharedHashMapBuilder builder() {
-        return delegate.builder();
-    }
-
-    @Override
     public File file() {
         return delegate.file();
     }

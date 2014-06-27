@@ -53,7 +53,6 @@ public class OpenJDKAndHashMapExamplesTest {
 
 
         SharedHashMap<String, BondVOInterface> shm = new SharedHashMapBuilder()
-                .generatedValueType(true)
                 .entrySize(512)
                 .create(
                         new File(TMP + "/shm-myBondPortfolioSHM"),
@@ -78,7 +77,6 @@ public class OpenJDKAndHashMapExamplesTest {
 
 
         SharedHashMap<String, BondVOInterface> shmB = new SharedHashMapBuilder()
-                .generatedValueType(true)
                 .entrySize(320)
                 .create(
                         new File(TMP + "/shm-myBondPortfolioSHM"),

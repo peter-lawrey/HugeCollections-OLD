@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Peter Lawrey
+ * Copyright 2014 Higher Frequency Trading
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,19 @@
 
 package net.openhft.collections;
 
-import java.io.Serializable;
+import net.openhft.lang.model.constraints.Nullable;
 
-public interface SharedMapErrorListener extends Serializable {
-    void onLockTimeout(long threadId) throws IllegalStateException;
+import java.util.Arrays;
 
-    void errorOnUnlock(IllegalMonitorStateException e);
+/**
+ * java.util.Objects since Java 7
+ */
+final class Objects {
+    static int hash(Object... values) {
+        return Arrays.hashCode(values);
+    }
+
+    static boolean equal(@Nullable Object a, @Nullable Object b) {
+        return a != null ? a.equals(b) : b == null;
+    }
 }

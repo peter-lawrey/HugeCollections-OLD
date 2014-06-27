@@ -75,7 +75,6 @@ public class PingPongCASLeft {
 
         String TMP = System.getProperty("java.io.tmpdir");
         return new SharedHashMapBuilder()
-                .generatedValueType(true)
                 .entries(16)
                 .entrySize(64)
                 .create(

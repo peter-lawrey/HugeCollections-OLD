@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.nio.channels.FileChannel;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -83,31 +84,27 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <K> the entries key type
  * @param <V> the entries value type
  */
-class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
+class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
+    private static final long serialVersionUID = 0L;
 
     private static final int MAX_UNSIGNED_SHORT = 1 << 16;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
+    private static final int LAST_UPDATED_HEADER_SIZE = (128 * 8);
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
-    private final AtomicReferenceArray<ModificationIterator> modificationIterators =
-            new AtomicReferenceArray<ModificationIterator>(127);
-    private Bytes identifierUpdatedBytes;
+    private transient Set<Closeable> closeables;
+    private transient AtomicReferenceArray<ModificationIterator> modificationIterators;
+    private transient Bytes identifierUpdatedBytes;
 
-    public VanillaSharedReplicatedHashMap(@NotNull SharedHashMapBuilder builder,
-                                          @NotNull File file,
-                                          @NotNull Class<K> kClass,
-                                          @NotNull Class<V> vClass) throws IOException {
-        super(builder, kClass, vClass);
-
-        this.timeProvider = builder.timeProvider();
-        this.localIdentifier = builder.identifier();
-
-        createMappedStoreAndSegments(file);
+    public VanillaSharedReplicatedHashMap(
+            @NotNull SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder, @NotNull File file)
+            throws IOException {
+        super(kvBuilder);
+        this.timeProvider = kvBuilder.builder.timeProvider();
+        this.localIdentifier = kvBuilder.builder.identifier();
     }
 
     @Override
@@ -117,6 +114,13 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     Class segmentType() {
         return Segment.class;
+    }
+
+    @Override
+    void initTransients() {
+        super.initTransients();
+        closeables = new CopyOnWriteArraySet<Closeable>();
+        modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
     }
 
     long modIterBitSetSizeInBytes() {
@@ -133,9 +137,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return 2;
     }
 
-    int getHeaderSize() {
-        final int headerSize = super.getHeaderSize();
-        return headerSize + LAST_UPDATED_HEADER_SIZE;
+    long getHeaderSize() {
+        return super.getHeaderSize() + LAST_UPDATED_HEADER_SIZE;
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
@@ -158,13 +161,12 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return identifierUpdatedBytes.readLong(offset);
     }
 
-
     /**
      * {@inheritDoc}
      */
     @Override
     void onHeaderCreated(Bytes headerBytes) {
-        final int len = getHeaderSize() - super.getHeaderSize();
+        final long len = getHeaderSize() - super.getHeaderSize();
         if (len == 0)
             return;
         this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
@@ -888,7 +890,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             long offset = offsetFromPos(pos);
             NativeBytes entry = entry(offset);
             entry.readStopBit();
-            K key = entry.readInstance(kClass, null); //todo: readUsing?
+            K key = keyMarshaller.read(entry);
 
             // skip timestamp and id
             entry.skip(10);

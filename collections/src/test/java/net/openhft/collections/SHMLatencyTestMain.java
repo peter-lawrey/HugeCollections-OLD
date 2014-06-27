@@ -76,8 +76,6 @@ public class SHMLatencyTestMain {
         SharedHashMap<LongValue, LongValue> countersMap = new SharedHashMapBuilder()
                 .entries(KEYS)
                 .entrySize(24)
-                .generatedKeyType(true)
-                .generatedValueType(true)
                 .create(file, LongValue.class, LongValue.class);
 
         // add keys

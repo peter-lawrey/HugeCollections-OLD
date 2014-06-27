@@ -44,36 +44,37 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
-    public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
+    public static SharedHashMapBuilder newTcpSocketShmBuilder(
             final byte identifier,
             final int serverPort,
-            final InetSocketAddress... InetSocketAddress) throws IOException {
+            final InetSocketAddress... endpoints) throws IOException {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(1000).deletedModIteratorFileOnExit(true);
+                endpoints).heartBeatIntervalMS(1000).deletedModIteratorFileOnExit(true);
 
-        return (T) new SharedHashMapBuilder()
+        return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier(identifier)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000)
+                .entries(20000);
+    }
+
+    public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
+            final byte identifier,
+            final int serverPort,
+            final InetSocketAddress... endpoints) throws IOException {
+        return (T) newTcpSocketShmBuilder(identifier, serverPort, endpoints)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
     static SharedHashMap<IntValue, CharSequence> newTcpSocketShmIntValueString(
             final byte identifier,
             final int serverPort,
-            final InetSocketAddress... InetSocketAddress) throws IOException {
-
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(100).deletedModIteratorFileOnExit(true);
-
-        return new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000)
-                .create(getPersistenceFile(), IntValue.class, CharSequence.class);
+            final InetSocketAddress... endpoints) throws IOException {
+        return newTcpSocketShmBuilder(identifier, serverPort, endpoints)
+                .toKeyValueSpecificBuilder(IntValue.class, CharSequence.class)
+                .keyMarshaller(ByteableIntValueMarshaller.INSTANCE)
+                .create(getPersistenceFile());
     }
 
 

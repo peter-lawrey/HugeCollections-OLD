@@ -32,6 +32,8 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmBuilder;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntValueString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -45,6 +47,7 @@ import static org.junit.Assert.assertTrue;
 public class TCPSocketReplicationIntValueTest {
 
 
+    private SharedHashMapBuilder map1Builder;
     private SharedHashMap<IntValue, CharSequence> map1;
     private SharedHashMap<IntValue, CharSequence> map2;
     private IntValue$$Native value;
@@ -53,7 +56,10 @@ public class TCPSocketReplicationIntValueTest {
     public void setup() throws IOException {
         value = new IntValue$$Native();
         value.bytes(new ByteBufferBytes(ByteBuffer.allocateDirect(4)), 0);
-        map1 = newTcpSocketShmIntValueString((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
+        map1Builder = newTcpSocketShmBuilder((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
+        map1 = map1Builder.toKeyValueSpecificBuilder(IntValue.class, CharSequence.class)
+                .keyMarshaller(ByteableIntValueMarshaller.INSTANCE)
+                .create(getPersistenceFile());
         map2 = newTcpSocketShmIntValueString((byte) 2, 8077);
     }
 
@@ -120,7 +126,7 @@ public class TCPSocketReplicationIntValueTest {
     @Ignore
     public void testBufferOverflow() throws IOException, InterruptedException {
 
-        for (int i = 0; i < map1.builder().entries(); i++) {
+        for (int i = 0; i < map1Builder.entries(); i++) {
             map1.put(set(i), "EXAMPLE-1");
         }
 
