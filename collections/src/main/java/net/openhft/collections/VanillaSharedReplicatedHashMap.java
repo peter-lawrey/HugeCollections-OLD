@@ -401,7 +401,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
 
-                    // skip the is deleted flag
+                    // skip the timestamp, identifier and is deleted flag
                     entry.skip(10);
 
                     return onKeyPresentOnAcquire(key, usingValue, offset, entry);
@@ -410,7 +410,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     if (usingValue != null) {
                         // see VanillaSharedHashMap.Segment.acquire() for explanation
                         // why `usingValue` is `create`.
-                        offset = putEntryOnAcquire(keyBytes, hash2, usingValue, create);
+                        offset = putEntryOnAcquire(keyBytes, hash2, usingValue, create, timestamp);
                         incrementSize();
                         notifyPut(offset, true, key, usingValue, posFromOffset(offset));
                         return usingValue;
@@ -423,9 +423,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             }
         }
 
-        private long putEntryOnAcquire(Bytes keyBytes, int hash2, V value, boolean usingValue) {
+        private long putEntryOnAcquire(Bytes keyBytes, int hash2, V value, boolean usingValue,
+                                       long timestamp) {
             return putEntry(keyBytes, hash2, value, usingValue, localIdentifier,
-                    timeProvider.currentTimeMillis(), hashLookupLiveOnly);
+                    timestamp, hashLookupLiveOnly);
         }
 
 
