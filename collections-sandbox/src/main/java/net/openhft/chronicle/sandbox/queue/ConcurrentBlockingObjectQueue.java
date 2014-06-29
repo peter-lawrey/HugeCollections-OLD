@@ -20,7 +20,7 @@ package net.openhft.chronicle.sandbox.queue;
 
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.RingIndex;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.util.Arrays;
 import java.util.Collection;

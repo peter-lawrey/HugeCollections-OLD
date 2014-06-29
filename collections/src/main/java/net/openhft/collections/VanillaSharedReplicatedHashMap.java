@@ -25,8 +25,8 @@ import net.openhft.lang.io.MappedStore;
 import net.openhft.lang.io.MultiStoreBytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -191,7 +191,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public V putIfAbsent(K key, V value) {
+    public V putIfAbsent(@NotNull K key, V value) {
         return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
@@ -324,7 +324,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public boolean remove(final Object key, final Object value) {
+    public boolean remove(@NotNull final Object key, final Object value) {
         if (value == null)
             return false; // CHM compatibility; I would throw NPE
         return removeIfValueIs(key, (V) value,
@@ -346,7 +346,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    V replaceIfValueIs(final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
