@@ -29,6 +29,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
+import static org.joda.time.DateTimeZone.UTC;
+
 /**
  * @author Rob Austin.
  */
@@ -177,7 +179,7 @@ public class JDBCReplicatorTest {
                 "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
 
-        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
         final Date expectedDate = new Date(0);
         final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1,
                 new DateTime(0));
@@ -247,7 +249,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
@@ -299,7 +301,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
@@ -374,7 +376,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
+                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
 
         final BeanClass rob = new BeanClass(1, "Rob");
         final BeanClass peter = new BeanClass(2, "Peter");

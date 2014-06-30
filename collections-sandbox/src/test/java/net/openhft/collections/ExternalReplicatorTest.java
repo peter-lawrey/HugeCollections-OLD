@@ -114,19 +114,30 @@ public class ExternalReplicatorTest {
         return Arrays.asList(new Object[][]{
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                BeanClass.class, System.getProperty("java.io.tmpdir")), DateTimeZone.UTC
+                                BeanClass.class,
+                                System.getProperty("java.io.tmpdir"),
+                                DateTimeZone.UTC)
                 },
                 {
                         new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
-                                BeanClass.class, stmt, tableName), DateTimeZone.UTC
+                                BeanClass.class,
+                                stmt, tableName, DateTimeZone.UTC)
+                },
+                {
+                        new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                                BeanClass.class, System.getProperty("java.io.tmpdir"), DateTimeZone.getDefault())
+
+                },
+                {
+                        new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
+                                BeanClass.class, stmt, tableName, DateTimeZone.getDefault())
                 }
         });
     }
 
 
-    public ExternalReplicatorTest(ExternalReplicator externalReplicator, DateTimeZone dateTimeZone) {
+    public ExternalReplicatorTest(ExternalReplicator externalReplicator) {
         this.externalReplicator = externalReplicator;
-        externalReplicator.withZone(dateTimeZone);
 
     }
 
@@ -151,7 +162,7 @@ public class ExternalReplicatorTest {
         Assert.assertEquals(1, result.shortVal);
 
 
-        Assert.assertEquals(expectedDateTime, result.dateTimeValue);
+        Assert.assertEquals(expectedDateTime.toDate().getTime(), result.dateTimeValue.toDate().getTime());
         Assert.assertEquals(expectedDate, result.timeStamp);
 
 

@@ -19,8 +19,6 @@
 package net.openhft.collections;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +66,6 @@ public interface FieldMapper<V> {
 
     class ReflectionBasedFieldMapperBuilder<V> {
 
-        private static DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
-                .withZoneUTC();
 
         static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
 
@@ -86,17 +82,12 @@ public interface FieldMapper<V> {
         }
 
 
-        public ReflectionBasedFieldMapperBuilder timeZone(DateTimeZone timeZone) {
-            dateTimeFormatter.withZone(timeZone);
-            return this;
-        }
-
         /**
          * @return an annotation based Object Relational Mapper (ORM) - Uses reflection and the annotations
          * provided in the value object ( of type <V> ) to define the relationship between the database table
          * and the value object
          */
-        public <V> FieldMapper create(final Class<V> vClass) {
+        public <V> FieldMapper create(final Class<V> vClass, final DateTimeFormatter dateTimeFormatter) {
 
             String keyFieldName0 = null;
 

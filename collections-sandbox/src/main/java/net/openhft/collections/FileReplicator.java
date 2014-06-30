@@ -22,6 +22,8 @@ import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.NotNull;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
@@ -32,15 +34,13 @@ import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.util.*;
 
-import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 import static net.openhft.collections.FieldMapper.ValueWithFieldName;
 
 /**
  * @author Rob Austin.
  */
-public class FileReplicator<K, V, M extends SharedHashMap<K, V>>
-        extends AbstractExternalReplicator<K, V, M> {
+public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final String SEPARATOR = System.getProperty("line.separator");
@@ -50,15 +50,20 @@ public class FileReplicator<K, V, M extends SharedHashMap<K, V>>
     private final String directory;
     private final String fileExt = ".value";
     private final Map<String, Field> fieldsByColumnsName;
+    private final DateTimeFormatter dateTimeFormatter;
+    private final DateTimeZone dateTimeZone;
 
 
     public FileReplicator(@NotNull final Class<V> vClass,
-                          @NotNull final String directory) {
+                          @NotNull final String directory,
+                          final DateTimeZone dateTimeZone) {
         this.vClass = vClass;
         this.directory = directory;
+        this.dateTimeZone = dateTimeZone;
+        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
 
         final ReflectionBasedFieldMapperBuilder builder = new ReflectionBasedFieldMapperBuilder();
-        fieldMapper = builder.create(vClass);
+        fieldMapper = builder.create(vClass, dateTimeFormatter);
 
         final Map<Field, String> fieldStringMap = fieldMapper.columnsNamesByField();
         fieldsByColumnsName = new HashMap<String, Field>(fieldStringMap.size());
@@ -147,8 +152,8 @@ public class FileReplicator<K, V, M extends SharedHashMap<K, V>>
             // remove the trailing new line
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
 
-            FileWriter fw = new FileWriter(file);
-            BufferedWriter bw = new BufferedWriter(fw);
+            final FileWriter fw = new FileWriter(file);
+            final BufferedWriter bw = new BufferedWriter(fw);
             bw.write(stringBuilder.toString());
             bw.close();
         } catch (Exception e) {
@@ -226,7 +231,8 @@ public class FileReplicator<K, V, M extends SharedHashMap<K, V>>
                             field.set(o, fieldValue);
 
                         else if (field.getType().equals(DateTime.class)) {
-                            final DateTime dateTime = dateTimeFormatter.parseDateTime(fieldValue);
+                            final DateTime dateTime = FileReplicator.this.dateTimeFormatter.parseDateTime
+                                    (fieldValue);
 
                             if (dateTime != null)
                                 field.set(o, dateTime);
@@ -251,6 +257,11 @@ public class FileReplicator<K, V, M extends SharedHashMap<K, V>>
             LOG.error("", e);
             return null;
         }
+    }
+
+    @Override
+    public DateTimeZone getZone() {
+        return this.dateTimeZone;
     }
 
     /**

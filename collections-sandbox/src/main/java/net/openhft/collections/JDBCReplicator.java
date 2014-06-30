@@ -34,47 +34,43 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
-import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
+import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 
 /**
  * @author Rob Austin.
  */
-public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
-        extends AbstractExternalReplicator<K, V, M> {
+public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements ExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JDBCReplicator.class.getName());
     public static final String YYYY_MM_DD = "YYYY-MM-dd";
 
     private final FieldMapper<V> fieldMapper;
     private final Class<V> vClass;
+    private final DateTimeFormatter dateTimeFormatter;
+    private final DateTimeFormatter shortDateTimeFormatter;
     private Statement stmt;
     private final String table;
-
-
-    final DateTimeFormatter shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD)
-            .withZoneUTC();
-
+    private final DateTimeZone dateTimeZone;
 
     public JDBCReplicator(@NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
-                          @NotNull final String tableName) {
+                          @NotNull final String tableName,
+                          @NotNull final DateTimeZone dateTimeZone) {
         this.stmt = stmt;
         this.table = tableName;
         this.vClass = vClass;
+        this.dateTimeZone = dateTimeZone;
+        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
+        shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
 
-        final FieldMapper.ReflectionBasedFieldMapperBuilder builder = new FieldMapper.ReflectionBasedFieldMapperBuilder();
+        final ReflectionBasedFieldMapperBuilder builder = new ReflectionBasedFieldMapperBuilder();
         builder.wrapTextAndDateFieldsInQuotes(true);
 
-        fieldMapper = builder.create(vClass);
-    }
+        fieldMapper = builder.create(vClass, dateTimeFormatter);
 
 
-    @Override
-    public AbstractExternalReplicator withZone(DateTimeZone timeZone) {
-        super.withZone(timeZone);
-        shortDateTimeFormatter.withZone(timeZone);
-        return this;
     }
+
 
     /**
      * @param vClass      the class of <V>
@@ -90,6 +86,9 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
         this.stmt = stmt;
         this.table = table;
         this.vClass = vClass;
+        this.dateTimeZone = DEFAULT_DATE_TIME_FORMATTER.getZone();
+        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER;
+        shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
     }
 
 
@@ -233,6 +232,11 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
             LOG.error("", e);
             return null;
         }
+    }
+
+    @Override
+    public DateTimeZone getZone() {
+        return this.dateTimeZone;
     }
 
 

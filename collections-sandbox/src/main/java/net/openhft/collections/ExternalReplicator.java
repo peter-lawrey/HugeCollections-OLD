@@ -29,6 +29,9 @@ import org.joda.time.format.DateTimeFormatter;
  */
 public interface ExternalReplicator<K, V> {
 
+    final DateTimeFormatter DEFAULT_DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
+            .withZoneUTC();
+
     /**
      * write the entry to an external source, be it a database or file
      *
@@ -48,20 +51,11 @@ public interface ExternalReplicator<K, V> {
     V get(K k);
 
 
-    ExternalReplicator withZone(DateTimeZone timeZone);
+    /**
+     * @return the timezone used to read and write the data from the external source
+     */
+    DateTimeZone getZone();
 
-    abstract class AbstractExternalReplicator<K, V, M extends SharedHashMap<K, V>>
-            extends SharedMapEventListener<K, V, M> implements ExternalReplicator<K, V> {
-
-        final DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
-                .withZoneUTC();
-
-        public AbstractExternalReplicator withZone(DateTimeZone timeZone) {
-            dateTimeFormatter.withZone(timeZone);
-            return this;
-        }
-
-    }
 }
 
 
