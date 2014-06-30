@@ -41,6 +41,7 @@ public interface FieldMapper<V> {
      */
     Map<Field, String> columnsNamesByField();
 
+
     /**
      * The Field and it's associated value
      */
@@ -89,6 +90,7 @@ public interface FieldMapper<V> {
          */
         public <V> FieldMapper create(final Class<V> vClass, final DateTimeFormatter dateTimeFormatter) {
 
+
             String keyFieldName0 = null;
 
             final Map<Field, String> columnsNamesByField = new HashMap<Field, String>();
@@ -118,7 +120,9 @@ public interface FieldMapper<V> {
                         if (annotation.annotationType().equals(Column.class)) {
 
                             final String fieldName = ((Column) annotation).name();
-                            final String columnName = fieldName.isEmpty() ? f.getName() : fieldName;
+                            final String columnName = fieldName.isEmpty() ?
+                                    toUpperCase(f.getName()) :
+                                    fieldName;
 
                             columnsNamesByField.put(f, columnName);
 
@@ -214,6 +218,17 @@ public interface FieldMapper<V> {
 
 
         }
+
+        /**
+         * converts from camelCase to UPPER_CASE  ( like this )
+         *
+         * @param fromCamelCase from this format, camelCase
+         * @return to this format, UPPER_CASE
+         */
+        private String toUpperCase(String fromCamelCase) {
+            return fromCamelCase.replaceAll("(.)(\\p{Upper})", "$1_$2").toUpperCase();
+        }
+
     }
 
 }

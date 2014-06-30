@@ -179,9 +179,7 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
 
             final V o = (V) NativeBytes.UNSAFE.allocateInstance(this.vClass);
 
-            //  StringBuilder fileContents = new StringBuilder((int) file.length());
-            Scanner scanner = new Scanner(file);
-            //   String lineSeparator = System.getProperty("line.separator");
+            final Scanner scanner = new Scanner(file);
 
             try {
 

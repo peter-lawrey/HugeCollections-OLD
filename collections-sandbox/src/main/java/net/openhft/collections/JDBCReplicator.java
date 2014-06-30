@@ -52,6 +52,13 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
     private final String table;
     private final DateTimeZone dateTimeZone;
 
+
+    /**
+     * @param vClass       the type of class to persist
+     * @param stmt         the database statement
+     * @param tableName    the name of the table that we are writing to
+     * @param dateTimeZone the timezone of the database we are replicating into
+     */
     public JDBCReplicator(@NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String tableName,
@@ -73,9 +80,8 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
 
     /**
-     * @param vClass      the class of <V>
-     * @param stmt
-     * @param table
+     * @param vClass      the type of class to persist
+     * @param stmt        the database statement
      * @param fieldMapper used to identifier the fields when serializing to the database
      */
     public JDBCReplicator(@NotNull final Class<V> vClass,
@@ -277,14 +283,15 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
 
     /**
-     * converts from a result set to Map
+     * converts from a result set to an Object of type <R>
      *
-     * @param resultSet
-     * @return
+     * @param resultSet the result set to adapt
+     * @return the object that represents the result set
      * @throws SQLException
      * @throws InstantiationException
      */
-    private <R> R toResult(ResultSet resultSet, Class<R> rClass) throws SQLException,
+    private <R> R toResult(@NotNull final ResultSet resultSet,
+                           @NotNull final Class<R> rClass) throws SQLException,
             InstantiationException, IllegalAccessException {
 
         R result = null;
@@ -347,8 +354,6 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
                         field.set(o, dateTime);
                     } else if (field.getType().equals(Date.class)) {
                         String date = resultSet.getString(fieldNameByType.getValue());
-
-                        ;
 
                         final DateTime dateTime = dateFormat(date).parseDateTime(date);
 

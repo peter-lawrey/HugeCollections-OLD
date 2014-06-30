@@ -49,8 +49,16 @@ public class ExternalReplicatorTest {
         @Key(name = "ID")
         int id;
 
-        @Column(name = "NAME")
+
+        // testing without the name annotation , the field will be used instead
+        @Column
         String name;
+
+
+        // testing without the name annotation , the field will be used instead
+        @Column
+        String fullCamelCaseFieldName;
+
 
         @Column(name = "DOUBLE_VAL")
         double doubleValue;
@@ -74,9 +82,18 @@ public class ExternalReplicatorTest {
         @Column(name = "DATETIME_VAL")
         DateTime dateTimeValue;
 
-        BeanClass(int id, String name, double doubleValue, Date timeStamp, Date dateValue, char charValue, boolean booleanValue, short shortVal, DateTime dateTimeValue) {
+        BeanClass(int id, String name,
+                  String fullCamelCaseFieldName,
+                  double doubleValue,
+                  Date timeStamp,
+                  Date dateValue,
+                  char charValue,
+                  boolean booleanValue,
+                  short shortVal,
+                  DateTime dateTimeValue) {
             this.id = id;
             this.name = name;
+            this.fullCamelCaseFieldName = fullCamelCaseFieldName;
             this.doubleValue = doubleValue;
             this.timeStamp = timeStamp;
             this.dateValue = dateValue;
@@ -101,6 +118,7 @@ public class ExternalReplicatorTest {
         stmt.executeUpdate("create table " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
+                "FULL_CAMEL_CASE_FIELD_NAME varchar(40) NOT NULL, " +
                 "CHAR_VAL char(1) NOT NULL, " +
                 "DOUBLE_VAL REAL," +
                 "SHORT_VAL SMALLINT," +
@@ -147,7 +165,8 @@ public class ExternalReplicatorTest {
 
         final Date expectedDate = new Date(0);
         final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
-        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, expectedDate, 'c', false,
+        final BeanClass bean = new BeanClass(1, "Rob", "camelCase", 1.234, expectedDate, expectedDate, 'c',
+                false,
                 (short) 1, expectedDateTime);
 
 
@@ -156,12 +175,11 @@ public class ExternalReplicatorTest {
         final BeanClass result = externalReplicator.get(bean.id);
 
         Assert.assertEquals("Rob", result.name);
+        Assert.assertEquals("camelCase", result.fullCamelCaseFieldName);
         Assert.assertEquals(1.234, result.doubleValue, 0.001);
         Assert.assertEquals('c', result.charValue);
         Assert.assertEquals(false, result.booleanValue);
         Assert.assertEquals(1, result.shortVal);
-
-
         Assert.assertEquals(expectedDateTime.toDate().getTime(), result.dateTimeValue.toDate().getTime());
         Assert.assertEquals(expectedDate, result.timeStamp);
 
