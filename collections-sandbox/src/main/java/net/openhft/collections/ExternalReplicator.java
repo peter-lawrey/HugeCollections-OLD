@@ -48,7 +48,7 @@ public interface ExternalReplicator<K, V> {
     V get(K k);
 
 
-    AbstractExternalReplicator timeZone(DateTimeZone timeZone);
+    ExternalReplicator withZone(DateTimeZone timeZone);
 
     abstract class AbstractExternalReplicator<K, V, M extends SharedHashMap<K, V>>
             extends SharedMapEventListener<K, V, M> implements ExternalReplicator<K, V> {
@@ -56,7 +56,7 @@ public interface ExternalReplicator<K, V> {
         final DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
                 .withZoneUTC();
 
-        public AbstractExternalReplicator timeZone(DateTimeZone timeZone) {
+        public AbstractExternalReplicator withZone(DateTimeZone timeZone) {
             dateTimeFormatter.withZone(timeZone);
             return this;
         }

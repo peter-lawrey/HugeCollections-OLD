@@ -55,8 +55,12 @@ public class ExternalReplicatorTest {
         @Column(name = "DOUBLE_VAL")
         double doubleValue;
 
+        @Column(name = "TIMESTAMP_VAL")
+        Date timeStamp;
+
         @Column(name = "DATE_VAL")
         Date dateValue;
+
 
         @Column(name = "CHAR_VAL")
         char charValue;
@@ -66,13 +70,15 @@ public class ExternalReplicatorTest {
 
         @Column(name = "SHORT_VAL")
         short shortVal;
+
         @Column(name = "DATETIME_VAL")
         DateTime dateTimeValue;
 
-        BeanClass(int id, String name, double doubleValue, Date dateValue, char charValue, boolean booleanValue, short shortVal, DateTime dateTimeValue) {
+        BeanClass(int id, String name, double doubleValue, Date timeStamp, Date dateValue, char charValue, boolean booleanValue, short shortVal, DateTime dateTimeValue) {
             this.id = id;
             this.name = name;
             this.doubleValue = doubleValue;
+            this.timeStamp = timeStamp;
             this.dateValue = dateValue;
             this.charValue = charValue;
             this.booleanValue = booleanValue;
@@ -98,7 +104,8 @@ public class ExternalReplicatorTest {
                 "CHAR_VAL char(1) NOT NULL, " +
                 "DOUBLE_VAL REAL," +
                 "SHORT_VAL SMALLINT," +
-                "DATE_VAL TIMESTAMP," +
+                "DATE_VAL DATE," +
+                "TIMESTAMP_VAL TIMESTAMP," +
                 "DATETIME_VAL TIMESTAMP," +
                 "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
@@ -119,7 +126,7 @@ public class ExternalReplicatorTest {
 
     public ExternalReplicatorTest(ExternalReplicator externalReplicator, DateTimeZone dateTimeZone) {
         this.externalReplicator = externalReplicator;
-        externalReplicator.timeZone(dateTimeZone);
+        externalReplicator.withZone(dateTimeZone);
 
     }
 
@@ -129,7 +136,8 @@ public class ExternalReplicatorTest {
 
         final Date expectedDate = new Date(0);
         final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
-        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1, expectedDateTime);
+        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, expectedDate, 'c', false,
+                (short) 1, expectedDateTime);
 
 
         externalReplicator.put(bean.id, bean, true);
@@ -144,7 +152,7 @@ public class ExternalReplicatorTest {
 
 
         Assert.assertEquals(expectedDateTime, result.dateTimeValue);
-        Assert.assertEquals(expectedDate, result.dateValue);
+        Assert.assertEquals(expectedDate, result.timeStamp);
 
 
     }

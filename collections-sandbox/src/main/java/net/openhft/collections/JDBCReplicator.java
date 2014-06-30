@@ -22,6 +22,9 @@ import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.NotNull;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
@@ -40,11 +43,16 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
         extends AbstractExternalReplicator<K, V, M> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JDBCReplicator.class.getName());
+    public static final String YYYY_MM_DD = "YYYY-MM-dd";
 
     private final FieldMapper<V> fieldMapper;
     private final Class<V> vClass;
     private Statement stmt;
     private final String table;
+
+
+    final DateTimeFormatter shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD)
+            .withZoneUTC();
 
 
     public JDBCReplicator(@NotNull final Class<V> vClass,
@@ -58,6 +66,14 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
         builder.wrapTextAndDateFieldsInQuotes(true);
 
         fieldMapper = builder.create(vClass);
+    }
+
+
+    @Override
+    public AbstractExternalReplicator withZone(DateTimeZone timeZone) {
+        super.withZone(timeZone);
+        shortDateTimeFormatter.withZone(timeZone);
+        return this;
     }
 
     /**
@@ -322,12 +338,15 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
 
                     else if (field.getType().equals(DateTime.class)) {
                         String date = resultSet.getString(fieldNameByType.getValue());
-                        final DateTime dateTime = dateTimeFormatter.parseDateTime(date).toDateTime();
+                        final DateTime dateTime = dateFormat(date).parseDateTime(date).toDateTime();
 
                         field.set(o, dateTime);
                     } else if (field.getType().equals(Date.class)) {
                         String date = resultSet.getString(fieldNameByType.getValue());
-                        final DateTime dateTime = dateTimeFormatter.parseDateTime(date);
+
+                        ;
+
+                        final DateTime dateTime = dateFormat(date).parseDateTime(date);
 
                         field.set(o, dateTime.toDate());
                     } else
@@ -362,6 +381,10 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>>
 
         }
         return result;
+    }
+
+    private DateTimeFormatter dateFormat(String date) {
+        return (date.length() == YYYY_MM_DD.length()) ? shortDateTimeFormatter : dateTimeFormatter;
     }
 
 
