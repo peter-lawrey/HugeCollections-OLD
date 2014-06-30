@@ -18,6 +18,7 @@
 
 package net.openhft.collections;
 
+import org.joda.time.DateTime;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -93,7 +94,7 @@ public class JDBCReplicatorTest {
 
         stmt.executeUpdate(createString);
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, stmt, tableName, new JDBCReplicator.DBValueMapper() {
+        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, stmt, tableName, new FieldMapper() {
 
             @Override
             public CharSequence keyName() {
@@ -112,7 +113,7 @@ public class JDBCReplicatorTest {
         });
 
 
-        jdbcCReplicator.onUpdate("1", "F1");
+        jdbcCReplicator.onPut(null, null, 0, true, "1", "F1");
         ResultSet resultSets = stmt.executeQuery("select * from " + tableName);
 
         resultSets.next();
@@ -138,26 +139,28 @@ public class JDBCReplicatorTest {
             double doubleValue;
 
             @Column(name = "DATE_VAL")
-            Date dateValue;
+            java.util.Date dateValue;
 
             @Column(name = "CHAR_VAL")
-            char c;
+            char charValue;
 
             @Column(name = "BOOL_VAL")
-            boolean bool;
+            boolean booleanValue;
 
             @Column(name = "SHORT_VAL")
             short shortVal;
+            @Column(name = "DATETIME_VAL")
+            DateTime dateTimeValue;
 
-
-            BeanClass(int id, String name, double doubleValue, Date dateValue, char c, boolean bool, short shortVal) {
+            BeanClass(int id, String name, double doubleValue, java.util.Date dateValue, char charValue, boolean booleanValue, short shortVal, DateTime dateTimeValue) {
                 this.id = id;
                 this.name = name;
                 this.doubleValue = doubleValue;
                 this.dateValue = dateValue;
-                this.c = c;
-                this.bool = bool;
+                this.charValue = charValue;
+                this.booleanValue = booleanValue;
                 this.shortVal = shortVal;
+                this.dateTimeValue = dateTimeValue;
             }
         }
 
@@ -169,15 +172,17 @@ public class JDBCReplicatorTest {
                 "CHAR_VAL char(1) NOT NULL, " +
                 "DOUBLE_VAL REAL," +
                 "SHORT_VAL SMALLINT," +
-                "DATE_VAL DATE," +
+                "DATE_VAL TIMESTAMP," +
+                "DATETIME_VAL TIMESTAMP," +
                 "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
 
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName);
         final Date expectedDate = new Date(0);
-        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1);
+        final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1,
+                new DateTime(0));
 
-        jdbcCReplicator.onUpdate(bean.id, bean);
+        jdbcCReplicator.onPut(null, null, 0, true, bean.id, bean);
 
         final ResultSet resultSets = stmt.executeQuery("select * from " + tableName);
 
@@ -197,7 +202,7 @@ public class JDBCReplicatorTest {
     private static int sequenceNumber;
 
     private static String createUniqueTableName() {
-        return "dbo.Test" + (sequenceNumber++);
+        return "dbo.Test" + (sequenceNumber++) + "_" + System.nanoTime();
     }
 
 
@@ -250,7 +255,7 @@ public class JDBCReplicatorTest {
                 new BeanClass(3, "Daniel"),
                 new BeanClass(4, "Vicky")}) {
 
-            jdbcCReplicator.onInsert(bean.id, bean);
+            jdbcCReplicator.onPut(null, null, 0, true, bean.id, bean);
         }
 
         final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
@@ -302,7 +307,7 @@ public class JDBCReplicatorTest {
                 new BeanClass(3, "Daniel"),
                 new BeanClass(4, "Vicky")}) {
 
-            jdbcCReplicator.onInsert(bean.id, bean);
+            jdbcCReplicator.onPut(null, null, 0, true, bean.id, bean);
         }
 
         final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
@@ -379,7 +384,7 @@ public class JDBCReplicatorTest {
                 new BeanClass(3, "Daniel"),
                 new BeanClass(4, "Vicky")}) {
 
-            jdbcCReplicator.onInsert(bean.id, bean);
+            jdbcCReplicator.onPut(null, null, 0, true, bean.id, bean);
         }
 
         final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
