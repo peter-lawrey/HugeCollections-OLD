@@ -254,7 +254,7 @@ public class JSR166TestCase {
     // Some convenient Integer constants
 
     /**
-     * Extra checks that get done for all test cases.
+     * Extra checks that getExternal done for all test cases.
      * <p/>
      * Triggers test case Assert.failure if any thread assertions have Assert.failed,
      * by rethrowing, in the test harness thread, any exception recorded
@@ -500,7 +500,7 @@ public class JSR166TestCase {
     }
 
     /**
-     * Checks that future.get times out, with the default timeout of
+     * Checks that future.getExternal times out, with the default timeout of
      * {@code timeoutMillis()}.
      */
     void assertFutureTimesOut(Future future) {
@@ -508,7 +508,7 @@ public class JSR166TestCase {
     }
 
     /**
-     * Checks that future.get times out, with the given millisecond timeout.
+     * Checks that future.getExternal times out, with the given millisecond timeout.
      */
     void assertFutureTimesOut(Future future, long timeoutMillis) {
         long startTime = System.nanoTime();
@@ -851,7 +851,7 @@ public class JSR166TestCase {
 //      */
 //     public void await(AtomicBoolean flag, long timeoutMillis) {
 //         long startTime = System.nanoTime();
-//         while (!flag.get()) {
+//         while (!flag.getExternal()) {
 //             if (millisElapsedSince(startTime) > timeoutMillis)
 //                 throw new AssertionFailedError("timed out");
 //             Thread.yield();

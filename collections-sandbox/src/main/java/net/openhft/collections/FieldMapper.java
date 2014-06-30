@@ -32,17 +32,6 @@ import java.util.*;
 public interface FieldMapper<V> {
 
     /**
-     * @return the database row name of the field which is annotated with @Key
-     */
-    CharSequence keyName();
-
-    /**
-     * @return all the field names including the name of the key and their assassinated java type
-     */
-    Map<Field, String> columnsNamesByField();
-
-
-    /**
      * The Field and it's associated value
      */
     static class ValueWithFieldName {
@@ -56,8 +45,25 @@ public interface FieldMapper<V> {
         }
     }
 
+
     /**
-     * get all fields what re mapping to a database table based on annotations
+     * @return the database row name of the field which is annotated with @Key
+     */
+    CharSequence keyName();
+
+    /**
+     * @return the database row name of the field which is annotated with @Key
+     */
+    Field keyField();
+
+    /**
+     * @return all the field names including the name of the key and their assassinated java type
+     */
+    Map<Field, String> columnsNamesByField();
+
+
+    /**
+     * getExternal all fields what re mapping to a database table based on annotations
      *
      * @param value   a list of all the fields that have the
      * @param skipKey if set to true include the @Key field
@@ -92,7 +98,7 @@ public interface FieldMapper<V> {
 
 
             String keyFieldName0 = null;
-
+            Field keyField0 = null;
             final Map<Field, String> columnsNamesByField = new HashMap<Field, String>();
 
             for (final Field f : vClass.getDeclaredFields()) {
@@ -115,6 +121,7 @@ public interface FieldMapper<V> {
                             final String fieldName = ((Key) annotation).name();
                             keyFieldName0 = fieldName.isEmpty() ? f.getName() : fieldName;
                             columnsNamesByField.put(f, keyFieldName0);
+                            keyField0 = f;
                         }
 
                         if (annotation.annotationType().equals(Column.class)) {
@@ -136,6 +143,8 @@ public interface FieldMapper<V> {
 
             }
 
+
+            final Field keyField = keyField0;
             final CharSequence keyFieldName = keyFieldName0;
 
             return new FieldMapper<V>() {
@@ -146,6 +155,13 @@ public interface FieldMapper<V> {
                         throw new IllegalStateException("@DBKey is not set on any of the fields in " + vClass.getName());
                     }
                     return keyFieldName;
+                }
+
+                @Override
+                public Field keyField() {
+                    if (keyField == null)
+                        throw new IllegalStateException("Field named=" + keyFieldName + " can not be found.");
+                    return keyField;
                 }
 
                 @Override

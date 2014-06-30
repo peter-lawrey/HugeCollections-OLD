@@ -55,7 +55,7 @@ abstract class AbstractBlockingQueue<E> {
     private final DataLocator<E> dataLocator;
     // only set and read by the producer thread, ( that the thread that's calling put(), offer() or add() )
     int xproducerWriteLocation;
-    // only set and read by the consumer thread, ( that the thread that's calling get(), poll() or peek() )
+    // only set and read by the consumer thread, ( that the thread that's calling getExternal(), poll() or peek() )
     int consumerReadLocation;
 
 
@@ -267,7 +267,7 @@ abstract class AbstractBlockingQueue<E> {
      *                     <tt>unit</tt>
      * @param unit         a <tt>TimeUnit</tt> determining how to interpret the
      *                     <tt>timeout</tt> parameter
-     * @param readLocation we want to minimize the number of volatile reads, so we read the readLocation just once and get it passed in
+     * @param readLocation we want to minimize the number of volatile reads, so we read the readLocation just once and getExternal it passed in
      * @return
      * @throws java.util.concurrent.TimeoutException
      */

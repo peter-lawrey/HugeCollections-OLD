@@ -22,6 +22,8 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
+import java.util.Map;
+
 /**
  * Used for both file and and database replication
  *
@@ -33,13 +35,14 @@ public interface ExternalReplicator<K, V> {
             .withZoneUTC();
 
     /**
-     * write the entry to an external source, be it a database or file
+     * write the entry to an external source, be it a database or file, this is called indirectly when ever
+     * data is put() on a shared hash map
      *
      * @param key   the key of the entry
      * @param value the value of the entry
      * @param added true if the entry has just been added to the map rather than updated
      */
-    void put(K key, V value, boolean added);
+    void putExternal(K key, V value, boolean added);
 
 
     /**
@@ -48,13 +51,52 @@ public interface ExternalReplicator<K, V> {
      * @param k the key of the entry
      * @return the value of the entry
      */
-    V get(K k);
+    V getExternal(K k);
 
 
     /**
-     * @return the timezone used to read and write the data from the external source
+     * reads the entry from the external source and puts them in the map which is associated with this
+     * replication
+     *
+     * @param k the key relating to the entry that has change at the eternal source
+     */
+    void putEntry(K k);
+
+
+    /**
+     * removes all the files or database records associated with the map
+     */
+    void removeAllExternal();
+
+    /**
+     * reads all the entries from the external source and writes into the map which is associated with this
+     * replication
+     */
+    void putAllEntries();
+
+
+    /**
+     * @return the timezone of the external source, for example database
      */
     DateTimeZone getZone();
+
+
+    abstract class AbstractExternalReplicator<K, V> implements ExternalReplicator<K, V> {
+
+
+        final Map<K, V> map;
+
+        protected AbstractExternalReplicator(Map<K, V> map) {
+            this.map = map;
+        }
+
+        @Override
+        public void putEntry(K k) {
+            map.put(k, getExternal(k));
+        }
+
+
+    }
 
 }
 

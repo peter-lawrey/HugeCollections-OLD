@@ -24,8 +24,10 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -96,23 +98,31 @@ public class JDBCReplicatorTest {
 
         stmt.executeUpdate(createString);
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(Object.class, stmt, tableName, new FieldMapper() {
+        final Map map = new HashMap();
 
-            @Override
-            public CharSequence keyName() {
-                return "ID";
-            }
+        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(map, Object.class, stmt, tableName,
+                new FieldMapper() {
 
-            @Override
-            public Map<java.lang.reflect.Field, String> columnsNamesByField() {
-                throw new UnsupportedOperationException();
-            }
+                    @Override
+                    public CharSequence keyName() {
+                        return "ID";
+                    }
 
-            @Override
-            public Set<ValueWithFieldName> getFields(Object value, boolean skipKey) {
-                return Collections.singleton(new ValueWithFieldName("F1", "'Rob'"));
-            }
-        });
+                    @Override
+                    public Field keyField() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public Map<java.lang.reflect.Field, String> columnsNamesByField() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public Set<ValueWithFieldName> getFields(Object value, boolean skipKey) {
+                        return Collections.singleton(new ValueWithFieldName("F1", "'Rob'"));
+                    }
+                });
 
 
         jdbcCReplicator.onPut(null, null, 0, true, "1", "F1");
@@ -179,7 +189,10 @@ public class JDBCReplicatorTest {
                 "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
 
-        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
+        final HashMap hashMap = new HashMap();
+
+        final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator = new
+                JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(hashMap, BeanClass.class, stmt, tableName, UTC);
         final Date expectedDate = new Date(0);
         final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1,
                 new DateTime(0));
@@ -209,7 +222,7 @@ public class JDBCReplicatorTest {
 
 
     /**
-     * get back a Map of all the rows in the table, the map is keyed on the tables key
+     * getExternal back a Map of all the rows in the table, the map is keyed on the tables key
      *
      * @throws ClassNotFoundException
      * @throws SQLException
@@ -247,9 +260,12 @@ public class JDBCReplicatorTest {
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
+
+        final HashMap hashMap = new HashMap();
+
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
+                        SharedHashMap<Object, BeanClass>>(hashMap, BeanClass.class, stmt, tableName, UTC);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
@@ -299,9 +315,11 @@ public class JDBCReplicatorTest {
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
+        final HashMap hashMap = new HashMap();
+
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
+                        SharedHashMap<Object, BeanClass>>(hashMap, BeanClass.class, stmt, tableName, UTC);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
@@ -315,7 +333,7 @@ public class JDBCReplicatorTest {
         final Map<Object, BeanClass> result = jdbcCReplicator.getAll();
         Assert.assertEquals(4, result.size());
 
-        final BeanClass beanClass = jdbcCReplicator.get(1);
+        final BeanClass beanClass = jdbcCReplicator.getExternal(1);
         Assert.assertEquals("Rob", beanClass.name);
 
     }
@@ -374,9 +392,11 @@ public class JDBCReplicatorTest {
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
+        final HashMap hashMap = new HashMap();
+
         final JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Object, BeanClass,
-                        SharedHashMap<Object, BeanClass>>(BeanClass.class, stmt, tableName, UTC);
+                        SharedHashMap<Object, BeanClass>>(hashMap, BeanClass.class, stmt, tableName, UTC);
 
         final BeanClass rob = new BeanClass(1, "Rob");
         final BeanClass peter = new BeanClass(2, "Peter");

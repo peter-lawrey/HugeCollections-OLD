@@ -20,7 +20,9 @@ package net.openhft.collections;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -30,25 +32,20 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Date;
+import java.util.*;
 
 
 @RunWith(value = Parameterized.class)
 public class ExternalReplicatorTest {
 
     private final ExternalReplicator<Integer, BeanClass> externalReplicator;
+    private final Map map;
 
-
-    private Connection connection;
-    private Statement stmt;
 
     class BeanClass {
 
         @Key(name = "ID")
         int id;
-
 
         // testing without the name annotation , the field will be used instead
         @Column
@@ -129,34 +126,49 @@ public class ExternalReplicatorTest {
                 "PRIMARY KEY (ID))");
 
 
+        final HashMap<Object, BeanClass> map = new HashMap<Object, BeanClass>();
+
         return Arrays.asList(new Object[][]{
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                BeanClass.class,
+                                map, BeanClass.class,
                                 System.getProperty("java.io.tmpdir"),
-                                DateTimeZone.UTC)
+                                DateTimeZone.UTC), map
                 },
                 {
                         new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
+                                map,
                                 BeanClass.class,
-                                stmt, tableName, DateTimeZone.UTC)
+                                stmt, tableName, DateTimeZone.UTC), map
                 },
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                BeanClass.class, System.getProperty("java.io.tmpdir"), DateTimeZone.getDefault())
+                                map, BeanClass.class, System.getProperty("java.io.tmpdir"), DateTimeZone.getDefault()), map
 
                 },
                 {
                         new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
-                                BeanClass.class, stmt, tableName, DateTimeZone.getDefault())
+                                map,
+                                BeanClass.class, stmt, tableName, DateTimeZone.getDefault()), map
                 }
         });
     }
 
+    @Before
+    public void setup() {
+        map.clear();
+    }
 
-    public ExternalReplicatorTest(ExternalReplicator externalReplicator) {
+    @After
+    public void after() {
+        // cleans up the files or removes the items from the database
+        externalReplicator.removeAllExternal();
+    }
+
+    public ExternalReplicatorTest(ExternalReplicator externalReplicator, Map map) {
         this.externalReplicator = externalReplicator;
 
+        this.map = map;
     }
 
 
@@ -170,9 +182,9 @@ public class ExternalReplicatorTest {
                 (short) 1, expectedDateTime);
 
 
-        externalReplicator.put(bean.id, bean, true);
+        externalReplicator.putExternal(bean.id, bean, true);
 
-        final BeanClass result = externalReplicator.get(bean.id);
+        final BeanClass result = externalReplicator.getExternal(bean.id);
 
         Assert.assertEquals("Rob", result.name);
         Assert.assertEquals("camelCase", result.fullCamelCaseFieldName);
@@ -183,8 +195,111 @@ public class ExternalReplicatorTest {
         Assert.assertEquals(expectedDateTime.toDate().getTime(), result.dateTimeValue.toDate().getTime());
         Assert.assertEquals(expectedDate, result.timeStamp);
 
+    }
+
+
+    @Test
+    public void testPutAllEntries() {
+
+        final Date expectedDate = new Date(0);
+        final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
+        final BeanClass bean1 = new BeanClass(1,
+                "Rob",
+                "camelCase",
+                1.111,
+                expectedDate,
+                expectedDate,
+                'a',
+                false,
+                (short) 1, expectedDateTime);
+
+        final BeanClass bean2 = new BeanClass(2,
+                "Rob2",
+                "camelCase",
+                1.222,
+                expectedDate,
+                expectedDate,
+                'b',
+                false,
+                (short) 1, expectedDateTime);
+
+
+        final BeanClass bean3 = new BeanClass(3,
+                "Rob3",
+                "camelCase",
+                1.333,
+                expectedDate,
+                expectedDate,
+                'c',
+                false,
+                (short) 1, expectedDateTime);
+
+
+        final BeanClass[] beanClasses = {bean1, bean2, bean3};
+        for (BeanClass bean : beanClasses) {
+            externalReplicator.putExternal(bean.id, bean, true);
+        }
+
+        externalReplicator.putAllEntries();
+
+        for (BeanClass bean : beanClasses) {
+            final int key = bean.id;
+            Assert.assertEquals(bean.charValue, ((BeanClass) map.get(key)).charValue);
+        }
+
 
     }
+
+
+    @Test
+    public void testPutEntry() {
+
+        final Date expectedDate = new Date(0);
+        final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
+        final BeanClass bean1 = new BeanClass(1,
+                "Rob",
+                "camelCase",
+                1.111,
+                expectedDate,
+                expectedDate,
+                'a',
+                false,
+                (short) 1, expectedDateTime);
+
+        final BeanClass bean2 = new BeanClass(2,
+                "Rob2",
+                "camelCase",
+                1.222,
+                expectedDate,
+                expectedDate,
+                'b',
+                false,
+                (short) 1, expectedDateTime);
+
+
+        final BeanClass bean3 = new BeanClass(3,
+                "Rob3",
+                "camelCase",
+                1.333,
+                expectedDate,
+                expectedDate,
+                'c',
+                false,
+                (short) 1, expectedDateTime);
+
+
+        final BeanClass[] beanClasses = {bean1, bean2, bean3};
+        for (BeanClass bean : beanClasses) {
+            externalReplicator.putExternal(bean.id, bean, true);
+        }
+
+        externalReplicator.putEntry(3);
+
+        Assert.assertEquals(map.size(), 1);
+        Assert.assertEquals(bean3.charValue, ((BeanClass) map.get(bean3.id)).charValue);
+
+    }
+
 
     private static int sequenceNumber;
 
@@ -194,6 +309,7 @@ public class ExternalReplicatorTest {
 
 
 }
+
 
 
 

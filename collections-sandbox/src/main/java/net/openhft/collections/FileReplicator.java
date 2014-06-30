@@ -26,21 +26,23 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.util.*;
 
+import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 import static net.openhft.collections.FieldMapper.ValueWithFieldName;
 
 /**
+ * Replicates the contents of the map into a directory, each file in the directory represents an entry in the
+ * map
+ *
  * @author Rob Austin.
  */
-public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
+public class FileReplicator<K, V, M> extends
+        AbstractExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final String SEPARATOR = System.getProperty("line.separator");
@@ -54,11 +56,17 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
     private final DateTimeZone dateTimeZone;
 
 
-    public FileReplicator(@NotNull final Class<V> vClass,
+    public FileReplicator(final Map map,
+                          @NotNull final Class<V> vClass,
                           @NotNull final String directory,
                           final DateTimeZone dateTimeZone) {
+        super(map);
+
         this.vClass = vClass;
+
+
         this.directory = directory;
+
         this.dateTimeZone = dateTimeZone;
         this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
 
@@ -81,7 +89,7 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
     void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
                long pos, SharedSegment segment) {
 
-        put(key, value, true);
+        putExternal(key, value, true);
     }
 
     /**
@@ -124,9 +132,10 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
      * since we are on the only system read and writing this data to the database, we will know, if the record
      * has already been inserted or updated so can call the appropriate sql
      */
-    public void put(K key, V value, boolean added) {
+    public void putExternal(K key, V value, boolean added) {
         try {
-            final File file = new File(directory + key.toString() + fileExt);
+
+            final File file = toFile(key);
 
             if (!file.exists()) {
                 synchronized (this) {
@@ -145,6 +154,11 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
 
             final StringBuilder stringBuilder = new StringBuilder();
 
+
+            stringBuilder.append(fieldMapper.keyName()).append("=")
+                    .append(fieldMapper.keyField().get(value).toString())
+                    .append(SEPARATOR);
+
             for (final ValueWithFieldName field : fieldMapper.getFields(value, true)) {
                 stringBuilder.append(field.name).append("=").append(field.value).append(SEPARATOR);
             }
@@ -162,6 +176,10 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
 
     }
 
+    private File toFile(K key) {
+        return new File(directory + key.toString() + fileExt);
+    }
+
 
     /**
      * gets all the records from the database as a Map<K,V>
@@ -170,92 +188,122 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
      * @throws java.sql.SQLException
      * @throws InstantiationException
      */
-    public V get(K key) {
+    public V getExternal(K key) {
+
         try {
-            final File file = new File(directory + key.toString() + fileExt);
+            final File folder = new File(directory);
 
-            if (!file.exists())
-                return null;
-
-            final V o = (V) NativeBytes.UNSAFE.allocateInstance(this.vClass);
-
-            final Scanner scanner = new Scanner(file);
-
-            try {
-
-                while (scanner.hasNextLine()) {
-
-                    final String s = scanner.nextLine();
-                    final int i = s.indexOf("=");
-
-                    if (i == -1) {
-                        LOG.debug("Skipping line='" + s + "' from file='" + file.getAbsolutePath() +
-                                " as its missing a  '='");
-                        continue;
-                    }
-
-                    final String fieldKey = s.substring(0, i);
-                    final String fieldValue = (i == s.length()) ? "" : s.substring(i + 1, s.length());
-
-
-                    final Field field = fieldsByColumnsName.get(fieldKey);
-
-                    try {
-                        if (field.getType().equals(boolean.class))
-                            field.setBoolean(o, Boolean.parseBoolean(fieldValue));
-
-                        else if (field.getType().equals(byte.class))
-                            field.setByte(o, Byte.parseByte(fieldValue));
-
-                        if (field.getType().equals(char.class))
-                            field.setChar(o, fieldValue.length() > 0 ? fieldValue.charAt(0) : 0);
-
-                        else if (field.getType().equals(short.class))
-                            field.setShort(o, Short.parseShort(fieldValue));
-
-                        else if (field.getType().equals(Float.class))
-                            field.setFloat(o, Float.parseFloat(fieldValue));
-
-                        else if (field.getType().equals(int.class))
-                            field.setInt(o, Integer.parseInt(fieldValue));
-
-                        else if (field.getType().equals(Long.class))
-                            field.setLong(o, Long.parseLong(fieldValue));
-
-                        else if (field.getType().equals(double.class))
-                            field.setDouble(o, Double.parseDouble(fieldValue));
-
-                        else if (field.getType().equals(String.class))
-                            field.set(o, fieldValue);
-
-                        else if (field.getType().equals(DateTime.class)) {
-                            final DateTime dateTime = FileReplicator.this.dateTimeFormatter.parseDateTime
-                                    (fieldValue);
-
-                            if (dateTime != null)
-                                field.set(o, dateTime);
-                        } else if (field.getType().equals(Date.class)) {
-                            final DateTime dateTime = dateTimeFormatter.parseDateTime
-                                    (fieldValue);
-                            if (dateTime != null)
-                                field.set(o, dateTime.toDate());
-                        }
-
-
-                    } catch (Exception e) {
-                        continue;
-                    }
-                }
-            } finally {
-                scanner.close();
+            if (!folder.isDirectory()) {
+                throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
             }
 
-            return o;
+            return get(new File(directory + key.toString() + fileExt));
+
         } catch (Exception e) {
             LOG.error("", e);
             return null;
         }
     }
+
+    @Override
+    public void removeAllExternal() {
+
+        final File folder = new File(directory);
+
+        if (!folder.isDirectory()) {
+            throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
+        }
+
+        for (K key : map.keySet()) {
+            final File file = toFile(key);
+            file.delete();
+        }
+
+
+    }
+
+
+    private V get(final File file) throws InstantiationException, FileNotFoundException {
+
+        if (!file.exists())
+            return null;
+
+        final V o = (V) NativeBytes.UNSAFE.allocateInstance(this.vClass);
+
+        final Scanner scanner = new Scanner(file);
+
+        try {
+
+            while (scanner.hasNextLine()) {
+
+                final String s = scanner.nextLine();
+                final int i = s.indexOf("=");
+
+                if (i == -1) {
+                    LOG.debug("Skipping line='" + s + "' from file='" + file.getAbsolutePath() +
+                            " as its missing a  '='");
+                    continue;
+                }
+
+                final String fieldKey = s.substring(0, i);
+                final String fieldValue = (i == s.length()) ? "" : s.substring(i + 1, s.length());
+
+
+                final Field field = fieldsByColumnsName.get(fieldKey);
+
+                try {
+                    if (field.getType().equals(boolean.class))
+                        field.setBoolean(o, Boolean.parseBoolean(fieldValue));
+
+                    else if (field.getType().equals(byte.class))
+                        field.setByte(o, Byte.parseByte(fieldValue));
+
+                    if (field.getType().equals(char.class))
+                        field.setChar(o, fieldValue.length() > 0 ? fieldValue.charAt(0) : 0);
+
+                    else if (field.getType().equals(short.class))
+                        field.setShort(o, Short.parseShort(fieldValue));
+
+                    else if (field.getType().equals(Float.class))
+                        field.setFloat(o, Float.parseFloat(fieldValue));
+
+                    else if (field.getType().equals(int.class))
+                        field.setInt(o, Integer.parseInt(fieldValue));
+
+                    else if (field.getType().equals(Long.class))
+                        field.setLong(o, Long.parseLong(fieldValue));
+
+                    else if (field.getType().equals(double.class))
+                        field.setDouble(o, Double.parseDouble(fieldValue));
+
+                    else if (field.getType().equals(String.class))
+                        field.set(o, fieldValue);
+
+                    else if (field.getType().equals(DateTime.class)) {
+                        final DateTime dateTime = FileReplicator.this.dateTimeFormatter.parseDateTime
+                                (fieldValue);
+
+                        if (dateTime != null)
+                            field.set(o, dateTime);
+                    } else if (field.getType().equals(Date.class)) {
+                        final DateTime dateTime = dateTimeFormatter.parseDateTime
+                                (fieldValue);
+                        if (dateTime != null)
+                            field.set(o, dateTime.toDate());
+                    }
+
+
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+        } finally {
+            scanner.close();
+        }
+
+        return o;
+    }
+
 
     @Override
     public DateTimeZone getZone() {
@@ -274,7 +322,7 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
         final HashSet<V> result = new HashSet<V>(keys.length);
 
         for (K k : keys) {
-            result.add(get(k));
+            result.add(getExternal(k));
         }
         return result;
     }
@@ -287,9 +335,44 @@ public class FileReplicator<K, V, M> implements ExternalReplicator<K, V> {
      * @throws InstantiationException
      */
     public Map<K, V> getAll() throws SQLException, InstantiationException, IllegalAccessException {
-        throw new UnsupportedOperationException("");
+        return aquireAllUsing(new HashMap<K, V>());
     }
 
+    @Override
+    public void putAllEntries() {
+        aquireAllUsing(map);
+    }
+
+    class ExtFilter implements FilenameFilter {
+
+        @Override
+        public boolean accept(File dir, String name) {
+            return name.endsWith(fileExt);
+        }
+    }
+
+    private final ExtFilter filenameFilter = new ExtFilter();
+
+    private Map<K, V> aquireAllUsing(final Map<K, V> map) {
+
+        final File folder = new File(directory);
+        if (!folder.isDirectory()) {
+            throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
+        }
+
+        for (final File fileEntry : folder.listFiles(filenameFilter)) {
+            try {
+                final V v = get(fileEntry);
+                map.put((K) fieldMapper.keyField().get(v), v);
+            } catch (Exception e) {
+                LOG.error("fileEntry=" + fileEntry, e);
+                continue;
+            }
+        }
+
+        return map;
+
+    }
 
 }
 

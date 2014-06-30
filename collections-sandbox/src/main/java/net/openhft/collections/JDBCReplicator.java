@@ -34,12 +34,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
+import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 
 /**
  * @author Rob Austin.
  */
-public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements ExternalReplicator<K, V> {
+public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends
+        AbstractExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JDBCReplicator.class.getName());
     public static final String YYYY_MM_DD = "YYYY-MM-dd";
@@ -48,25 +50,30 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
     private final Class<V> vClass;
     private final DateTimeFormatter dateTimeFormatter;
     private final DateTimeFormatter shortDateTimeFormatter;
+    private final Map<K, V> map;
     private Statement stmt;
     private final String table;
     private final DateTimeZone dateTimeZone;
 
 
     /**
+     * @param map          the map which the data will be written to
      * @param vClass       the type of class to persist
      * @param stmt         the database statement
      * @param tableName    the name of the table that we are writing to
      * @param dateTimeZone the timezone of the database we are replicating into
      */
-    public JDBCReplicator(@NotNull final Class<V> vClass,
+    public JDBCReplicator(@NotNull final Map<K, V> map,
+                          @NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String tableName,
                           @NotNull final DateTimeZone dateTimeZone) {
+        super(map);
         this.stmt = stmt;
         this.table = tableName;
         this.vClass = vClass;
         this.dateTimeZone = dateTimeZone;
+        this.map = map;
         this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
         shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
 
@@ -80,18 +87,23 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
 
     /**
+     * @param map         the map which the data will be written to
      * @param vClass      the type of class to persist
      * @param stmt        the database statement
      * @param fieldMapper used to identifier the fields when serializing to the database
      */
-    public JDBCReplicator(@NotNull final Class<V> vClass,
+    public JDBCReplicator(@NotNull final Map<K, V> map,
+                          @NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String table,
                           @NotNull final FieldMapper<V> fieldMapper) {
+        super(map);
+
         this.fieldMapper = fieldMapper;
         this.stmt = stmt;
         this.table = table;
         this.vClass = vClass;
+        this.map = map;
         this.dateTimeZone = DEFAULT_DATE_TIME_FORMATTER.getZone();
         this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER;
         shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
@@ -100,7 +112,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
     void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
                long pos, SharedSegment segment) {
-        put(key, value, added);
+        putExternal(key, value, added);
     }
 
     /**
@@ -114,7 +126,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
      * @param value         set for key
      */
     public void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value) {
-        put(key, value, added);
+        putExternal(key, value, added);
     }
 
     void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value,
@@ -210,7 +222,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
 
     @Override
-    public void put(K key, V value, boolean added) {
+    public void putExternal(K key, V value, boolean added) {
         try {
             if (added)
                 insert(key, value);
@@ -229,16 +241,17 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
      * @throws SQLException
      * @throws InstantiationException
      */
-    public V get(K key) {
+    public V getExternal(K key) {
         try {
             final String sql = "SELECT * FROM " + this.table + " WHERE " + fieldMapper.keyName() + "=" + key.toString();
             final ResultSet resultSet = stmt.executeQuery(sql);
-            return toResult(resultSet, vClass);
+            return applyResultsSet(null, resultSet);
         } catch (Exception e) {
             LOG.error("", e);
             return null;
         }
     }
+
 
     @Override
     public DateTimeZone getZone() {
@@ -265,7 +278,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
                 " in (" + keys.toString() + ")";
 
         final ResultSet resultSet = stmt.executeQuery(sql);
-        return toResult(resultSet, HashSet.class);
+        return applyResultsSet(new HashSet(), resultSet);
     }
 
 
@@ -278,27 +291,34 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
      */
     public Map<K, V> getAll() throws SQLException, InstantiationException, IllegalAccessException {
         final String sql = "SELECT * FROM " + this.table;
-        return toResult(stmt.executeQuery(sql), HashMap.class);
+        return applyResultsSet(new HashMap(), stmt.executeQuery(sql));
+    }
+
+
+    @Override
+    public void putAllEntries() {
+        final String sql = "SELECT * FROM " + this.table;
+        try {
+            applyResultsSet(map, stmt.executeQuery(sql));
+        } catch (Exception e) {
+            LOG.error("", e);
+        }
     }
 
 
     /**
-     * converts from a result set to an Object of type <R>
+     * apply the result set to the object
      *
-     * @param resultSet the result set to adapt
+     * @param using the object to update  ( pass null if you want to return an object of type V )
      * @return the object that represents the result set
      * @throws SQLException
      * @throws InstantiationException
      */
-    private <R> R toResult(@NotNull final ResultSet resultSet,
-                           @NotNull final Class<R> rClass) throws SQLException,
+    private <R> R applyResultsSet(@NotNull R using,
+                                  @NotNull final ResultSet resultSet) throws SQLException,
             InstantiationException, IllegalAccessException {
 
-        R result = null;
-
-        if (Collection.class.isAssignableFrom(rClass) || Map.class.isAssignableFrom(rClass))
-            result = rClass.newInstance();
-
+        final Class<?> rClass = (using == null) ? vClass : using.getClass();
 
         final CharSequence keyName = fieldMapper.keyName();
         while (resultSet.next()) {
@@ -319,7 +339,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
                     else if (field.getType().equals(byte.class))
                         field.setByte(o, resultSet.getByte(fieldNameByType.getValue()));
 
-                    if (field.getType().equals(char.class)) {
+                    else if (field.getType().equals(char.class)) {
                         final String string = resultSet.getString(fieldNameByType.getValue());
                         if (string.length() > 0)
                             field.setChar(o, string.charAt(0));
@@ -359,7 +379,8 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
 
                         field.set(o, dateTime.toDate());
                     } else
-                        LOG.error("unsupported type " + field);
+                        LOG.error("",
+                                new UnsupportedOperationException("unsupported type " + field.getType()));
 
                     if (Map.class.isAssignableFrom(rClass) && fieldNameByType.getValue().equals(keyName))
                         key = (K) field.get(o);
@@ -374,7 +395,7 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
                 return (R) o;
 
             if (Collection.class.isAssignableFrom(rClass))
-                ((Collection) result).add(o);
+                ((Collection) using).add(o);
 
             else if (Map.class.isAssignableFrom(rClass)) {
 
@@ -383,17 +404,45 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> implements Exte
                     continue;
                 }
 
-                ((Map) result).put(key, o);
+                ((Map) using).put(key, o);
 
             } else
                 throw new IllegalStateException("Unexpected class type class=" + vClass);
 
         }
-        return result;
+        return using;
     }
 
     private DateTimeFormatter dateFormat(String date) {
         return (date.length() == YYYY_MM_DD.length()) ? shortDateTimeFormatter : dateTimeFormatter;
+    }
+
+
+    @Override
+    public void removeAllExternal() {
+
+        if (map.keySet().isEmpty())
+            return;
+
+        final StringBuilder sql = new StringBuilder("DELETE FROM ");
+        sql.append(table);
+
+        sql.append(" WHERE ");
+        sql.append(fieldMapper.keyName());
+        sql.append(" IN (");
+        for (K key : map.keySet()) {
+            sql.append(key.toString()).append(',');
+        }
+
+        sql.deleteCharAt(sql.length() - 1);
+
+        sql.append(")");
+
+        try {
+            stmt.execute(sql.toString());
+        } catch (SQLException e) {
+            LOG.error("", e);
+        }
     }
 
 

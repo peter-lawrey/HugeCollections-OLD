@@ -46,7 +46,7 @@ public class ConsumerConcurrentBlockingObjectQueue<E> extends BlockingQueueDeleg
 
         //todo change the way we default the max size, there is an unsafe method we can use
         builder.setMaxSize(10);
-
+        builder.setDeleteOnExit(true);
         delegate = builder.create();
     }
 
