@@ -64,15 +64,6 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
  * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
  * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
- * applied to the local node, otherwise the event will be ignored. <p> If two ( or more nodes ) were to
- * receive a change to their maps for the same key but different values, say by a user of the maps, calling
- * the put(<key>,<value>). Then, initially each node will update its local store and each local store will
- * hold a different value, but the aim of multi master replication is to provide eventual consistency across
- * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change.
- * We will refer to this notification as an event. The event will hold a timestamp indicating the time the
- * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
- * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
- * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
  * applied to the local node, otherwise the event will be ignored. <p> However there is an edge case that we
  * have to concern ourselves with, If two nodes update their map at the same time with different values, we
  * have to deterministically resolve which update wins, because of eventual consistency both nodes should end
@@ -87,7 +78,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, EntryExternalizable, EntryResolver<K,V>, Closeable {
+        implements ReplicatedSharedHashMap<K, V>, EntryExternalizable, EntryResolver<K, V>, Closeable {
 
     private static final int MAX_UNSIGNED_SHORT = 1 << 16;
 
@@ -1079,8 +1070,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         private volatile long position = -1;
 
         /**
-         * @param bytes
-         * @param nextListener
+         * @param bytes                the back the bitset, used to mark which entries have changed
+         * @param nextListener         a chain for  SharedMapEventListeners
          * @param modificationNotifier called when ever there is a change applied
          */
         public ModificationIterator(@NotNull final Bytes bytes,
@@ -1261,60 +1252,94 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
     }
 
-    public V key(@NotNull NativeBytes entry, V usingValue) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public K key(@NotNull NativeBytes entry, K usingKey) {
 
-        final long keyLen = entry.readStopBit();
+        final long start = entry.position();
+        try {
 
-        entry.skip(keyLen);
+            // keyLen
+            entry.readStopBit();
 
-        final long timeStamp = entry.readLong();
+            final long keyPosition = entry.position();
 
-        final byte identifier = entry.readByte();
-        if (identifier != localIdentifier) {
-            return null;
+            if (generatedValueType)
+                if (usingKey == null)
+                    usingKey = (K) DataValueClasses.newDirectReference(kClass);
+                else
+                    assert usingKey instanceof Byteable;
+            if (usingKey instanceof Byteable) {
+                ((Byteable) usingKey).bytes(entry, keyPosition);
+                return usingKey;
+            }
+
+            return entry.readInstance(kClass, usingKey);
+        } finally {
+            entry.position(start);
         }
 
-        final boolean isDeleted = entry.readBoolean();
-        long valueLen;
-        if (!isDeleted) {
-            valueLen = entry.readStopBit();
-            assert valueLen > 0;
-        } else {
-            return null;
-        }
-
-        final long valueOffset = entry.position();
-
-        if (generatedValueType)
-            if (usingValue == null)
-                usingValue = (V) DataValueClasses.newDirectReference(vClass);
-            else
-                assert usingValue instanceof Byteable;
-        if (usingValue instanceof Byteable) {
-            ((Byteable) usingValue).bytes(entry, valueOffset);
-            return usingValue;
-        }
-
-        return entry.readInstance(vClass, usingValue);
     }
 
-    public K value(@NotNull NativeBytes entry, K usingKey) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public V value(@NotNull NativeBytes entry, V usingValue) {
+        final long start = entry.position();
+        try {
 
-        final long keyLen = entry.readStopBit();
-        final long keyPosition = entry.position();
+            // keyLen
+            entry.skip(entry.readStopBit());
 
-        if (generatedValueType)
-            if (usingKey == null)
-                usingKey = (K) DataValueClasses.newDirectReference(kClass);
-            else
-                assert usingKey instanceof Byteable;
-        if (usingKey instanceof Byteable) {
-            ((Byteable) usingKey).bytes(entry, keyPosition);
-            return usingKey;
+            //timeStamp
+            entry.readLong();
+
+            final byte identifier = entry.readByte();
+            if (identifier != localIdentifier) {
+                return null;
+            }
+
+            final boolean isDeleted = entry.readBoolean();
+            long valueLen;
+            if (!isDeleted) {
+                valueLen = entry.readStopBit();
+                assert valueLen > 0;
+            } else {
+                return null;
+            }
+
+            final long valueOffset = entry.position();
+
+            if (generatedValueType)
+                if (usingValue == null)
+                    usingValue = (V) DataValueClasses.newDirectReference(vClass);
+                else
+                    assert usingValue instanceof Byteable;
+            if (usingValue instanceof Byteable) {
+                ((Byteable) usingValue).bytes(entry, valueOffset);
+                return usingValue;
+            }
+
+            return entry.readInstance(vClass, usingValue);
+        } finally {
+            entry.position(start);
         }
+    }
 
-        return entry.readInstance(kClass, usingKey);
-
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean wasRemoved(@NotNull NativeBytes entry) {
+        final long start = entry.position();
+        try {
+            return entry.readBoolean(entry.readStopBit() + 10);
+        } finally {
+            entry.position(start);
+        }
     }
 
 

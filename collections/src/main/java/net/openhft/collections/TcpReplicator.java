@@ -944,15 +944,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
             try {
-                SelectionKey selectionKey1 = socketChannel.keyFor(selector);
-                if (selectionKey1 != null) {
-
+                SelectionKey selectionKey = socketChannel.keyFor(selector);
+                if (selectionKey != null) {
 
                     if (attached.isHandShakingComplete() && selector.isOpen()) {
                         if (LOG.isDebugEnabled())
                             LOG.debug("Disabling OP_WRITE to remoteIdentifier=" + attached
                                     .remoteIdentifier + ", localIdentifier=" + attached.localIdentifier);
-                        selectionKey1.interestOps(selectionKey1.interestOps() & ~OP_WRITE);
+                        selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
                     }
                 }
 
@@ -979,6 +978,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             this.in = in;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean onEntry(final NativeBytes entry) {
 
@@ -1180,7 +1182,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
     }
-
 
 }
 

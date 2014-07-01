@@ -18,9 +18,8 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
-import net.openhft.lang.model.constraints.NotNull;
+import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
@@ -48,10 +47,7 @@ public class FileReplicator<K, V, M> extends
     private static final String SEPARATOR = System.getProperty("line.separator");
 
     private final FieldMapper<V> fieldMapper;
-
     private final Class<V> vClass;
-    private final Class<K> kClass;
-
     private final String directory;
     private final String fileExt = ".value";
     private final Map<String, Field> fieldsByColumnsName;
@@ -59,19 +55,16 @@ public class FileReplicator<K, V, M> extends
     private final DateTimeZone dateTimeZone;
 
 
-    public FileReplicator(final Map<K, V> map,
-                          @NotNull final Class<K> kClass,
+    public FileReplicator(@NotNull final Class<K> kClass,
                           @NotNull final Class<V> vClass,
                           @NotNull final String directory,
                           final DateTimeZone dateTimeZone,
                           final ReplicatedSharedHashMap.EntryResolver<K, V> entryResolver) throws InstantiationException {
-        super(map, kClass, vClass, entryResolver);
+
+        super(kClass, vClass, entryResolver);
 
         this.vClass = vClass;
-        this.kClass = kClass;
-
         this.directory = directory;
-
         this.dateTimeZone = dateTimeZone;
         this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
 
@@ -90,47 +83,6 @@ public class FileReplicator<K, V, M> extends
 
     public String getFileExt() {
         return fileExt;
-    }
-
-    void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
-               long pos, SharedSegment segment) {
-
-        putExternal(key, value, true);
-    }
-
-    /**
-     * This method is called if a key/value is put in the map.
-     *
-     * @param map           accessed
-     * @param entry         added/modified
-     * @param metaDataBytes length of the meta data
-     * @param added         if this is a new entry
-     * @param key           looked up
-     * @param value         set for key
-     */
-    public void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value) {
-        // do nothing
-    }
-
-    void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value,
-                  int pos, SharedSegment segment) {
-        final File file = new File(directory + File.pathSeparator + key.toString());
-        file.delete();
-    }
-
-    /**
-     * This is called when an entry is removed. Misses are not notified.
-     *
-     * @param map           accessed
-     * @param entry         removed
-     * @param metaDataBytes length of meta data
-     * @param key           removed
-     * @param value         removed
-     */
-    public void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value) {
-        final File file = new File(directory + File.pathSeparator + key.toString());
-        file.delete();
-
     }
 
 
@@ -212,7 +164,7 @@ public class FileReplicator<K, V, M> extends
     }
 
     @Override
-    public void removeAllExternal() {
+    public void removeAllExternal(final Set<K> keys) {
 
         final File folder = new File(directory);
 
@@ -220,12 +172,24 @@ public class FileReplicator<K, V, M> extends
             throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
         }
 
-        for (K key : map.keySet()) {
+
+        for (K key : keys) {
             final File file = toFile(key);
             file.delete();
         }
 
+    }
 
+    @Override
+    public void removeExternal(K key) {
+        final File folder = new File(directory);
+
+        if (!folder.isDirectory()) {
+            throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
+        }
+
+        final File file = toFile(key);
+        file.delete();
     }
 
 
@@ -345,20 +309,17 @@ public class FileReplicator<K, V, M> extends
     }
 
     @Override
-    public void putAllEntries() {
-        acquireAllUsing(map);
+    public Map<K, V> getAllExternal(@NotNull Map<K, V> usingMap) {
+        acquireAllUsing(usingMap);
+        return usingMap;
     }
 
-
-    class ExtFilter implements FilenameFilter {
-
+    private final FilenameFilter filenameFilter = new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
             return name.endsWith(fileExt);
         }
-    }
-
-    private final ExtFilter filenameFilter = new ExtFilter();
+    };
 
     private Map<K, V> acquireAllUsing(final Map<K, V> map) {
 

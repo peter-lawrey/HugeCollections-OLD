@@ -46,8 +46,6 @@ class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
         super(builder, kClass, vClass);
         createMappedStoreAndSegments(file);
     }
-
-
 }
 
 abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>

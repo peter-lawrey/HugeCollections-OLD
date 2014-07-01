@@ -73,10 +73,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     byte identifier();
 
     /**
-     * Gets (if it does not exist, creates) an instance of ModificationIterator dedicated for the remote node
-     * with the given identifier. It doesn't mean the returned ModificationIterator iterates though entries
-     * originating from that remote node, on the contrary, the iterator should be used to send the updates
-     * originating from this map to that remote node.
+     * Gets (if it does not exist, creates) an instance of ModificationIterator associated with a remote
+     * node, this weak associated is bound using the {@code identifier}.
      *
      * @param remoteIdentifier         the identifier of the remote node
      * @param modificationNotifier     called when ever there is a change applied to the modification
@@ -88,7 +86,6 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     ModificationIterator acquireModificationIterator(byte remoteIdentifier,
                                                      ModificationNotifier modificationNotifier, boolean deletedBackingFileOnExit) throws IOException;
 
-
     /**
      * Used in conjunction with replication, to back filling data from a remote node that this node may have
      * missed updates while it has not been running.
@@ -99,6 +96,9 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     long lastModificationTime(byte identifier);
 
 
+    /**
+     * notifies when there is a changed to the modification iterator
+     */
     interface ModificationNotifier {
         public static ModificationNotifier NOP = new ModificationNotifier() {
             @Override
@@ -215,20 +215,23 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     interface EntryResolver<K, V> {
 
         /**
-         * gets the value from the entry
-         *
-         * @param entry the bytes which reference to the entry
-         * @return the value which is in the entry
-         */
-        K value(@NotNull NativeBytes entry, K usingKey);
-
-        /**
          * gets the key from the entry
          *
          * @param entry the bytes which the bytes which point to the entry
          * @return the key which is in the entry
          */
-        V key(@NotNull NativeBytes entry, V usingValue);
+        K key(@NotNull NativeBytes entry, K usingKey);
+
+
+        /**
+         * gets the value from the entry
+         *
+         * @param entry the bytes which reference to the entry
+         * @return the value which is in the entry or null if the value has been remove from the map
+         */
+        V value(@NotNull NativeBytes entry, V usingValue);
+
+        boolean wasRemoved(@NotNull NativeBytes entry);
 
     }
 

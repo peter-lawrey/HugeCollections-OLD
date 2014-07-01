@@ -18,8 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.NativeBytes;
-import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.After;
@@ -29,43 +27,31 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
 
+import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static org.joda.time.DateTimeZone.UTC;
 
-
+/**
+ * This test uses the modification iterator to update the map
+ */
 @RunWith(value = Parameterized.class)
-public class ExternalReplicatorTest {
+public class SHMExternalReplicatorWithModIterTest {
 
-    private final ExternalReplicator.AbstractExternalReplicator<Integer, BeanClass> externalReplicator;
-    private final Map map;
+    private final AbstractExternalReplicator<Integer, BeanClass> externalReplicator;
+    private final VanillaSharedReplicatedHashMap map;
 
 
-    static final ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new
-            ReplicatedSharedHashMap.EntryResolver() {
-
-                @Override
-                public Object key(@NotNull NativeBytes entry, Object usingKey) {
-                    return null;
-                }
-
-                @Override
-                public Object value(@NotNull NativeBytes entry, Object usingValue) {
-                    return null;
-                }
-
-                @Override
-                public boolean wasRemoved(@NotNull NativeBytes entry) {
-                    return false;
-                }
-            };
-
-    class BeanClass {
+    static class BeanClass implements Serializable {
 
         @Key(name = "ID")
         int id;
@@ -73,7 +59,6 @@ public class ExternalReplicatorTest {
         // testing without the name annotation , the field will be used instead
         @Column
         String name;
-
 
         // testing without the name annotation , the field will be used instead
         @Column
@@ -102,6 +87,7 @@ public class ExternalReplicatorTest {
         @Column(name = "DATETIME_VAL")
         DateTime dateTimeValue;
 
+
         BeanClass(int id, String name,
                   String fullCamelCaseFieldName,
                   double doubleValue,
@@ -122,10 +108,55 @@ public class ExternalReplicatorTest {
             this.shortVal = shortVal;
             this.dateTimeValue = dateTimeValue;
         }
+
+
+
+        @Override
+        public String toString() {
+            return "BeanClass{" +
+                    "id=" + id +
+                    ", name='" + name + '\'' +
+                    ", fullCamelCaseFieldName='" + fullCamelCaseFieldName + '\'' +
+                    ", doubleValue=" + doubleValue +
+                    ", timeStamp=" + timeStamp +
+                    ", dateValue=" + dateValue +
+                    ", charValue=" + charValue +
+                    ", booleanValue=" + booleanValue +
+                    ", shortVal=" + shortVal +
+                    '}';
+        }
     }
 
+
+    static int count;
+
+    public static File getPersistenceFile() {
+        String TMP = System.getProperty("java.io.tmpdir");
+        File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
+        file.deleteOnExit();
+        return file;
+    }
+
+
+    public static <T extends VanillaSharedReplicatedHashMap<Integer, ExternalReplicatorTest.BeanClass>>
+
+    VanillaSharedReplicatedHashMap<Integer, BeanClass> newIntBeanSHM(
+            final byte identifier) throws IOException {
+
+
+        SharedHashMapBuilder b = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier(identifier)
+                .canReplicate(true)
+                .entries(20000);
+
+        return (VanillaSharedReplicatedHashMap) b.create(getPersistenceFile(), Integer.class,
+                BeanClass.class);
+    }
+
+
     @Parameterized.Parameters
-    public static Collection<Object[]> data() throws SQLException, InstantiationException {
+    public static Collection<Object[]> data() throws SQLException, InstantiationException, IOException {
 
         final String dbURL = "jdbc:derby:memory:openhft;create=true";
 
@@ -133,7 +164,7 @@ public class ExternalReplicatorTest {
         connection.setAutoCommit(true);
         Statement stmt = connection.createStatement();
 
-        String tableName = createUniqueTableName();
+        final String tableName = createUniqueTableName();
 
         stmt.executeUpdate("create table " + tableName + " (" +
                 "ID integer NOT NULL, " +
@@ -149,46 +180,30 @@ public class ExternalReplicatorTest {
                 "PRIMARY KEY (ID))");
 
 
-        final HashMap<Integer, BeanClass> map = new HashMap<Integer, BeanClass>();
-        ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new ReplicatedSharedHashMap.EntryResolver() {
-
-            @Override
-            public Object key(@NotNull NativeBytes entry, Object usingKey) {
-                return null;
-            }
-
-            @Override
-            public Object value(@NotNull NativeBytes entry, Object usingValue) {
-                return null;
-            }
-
-            @Override
-            public boolean wasRemoved(@NotNull NativeBytes entry) {
-                return false;
-            }
-        };
+        final VanillaSharedReplicatedHashMap<Integer, BeanClass> map = newIntBeanSHM((byte) 1);
 
         return Arrays.asList(new Object[][]{
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
                                 Integer.class, BeanClass.class,
                                 System.getProperty("java.io.tmpdir"),
-                                UTC, NOP_ENTRY_RESOLVER), map
+                                UTC, map), map
                 },
                 {
                         new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
                                 Integer.class, BeanClass.class,
-                                stmt, tableName, UTC, NOP_ENTRY_RESOLVER), map
+                                stmt, tableName, UTC, map), map
                 },
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
                                 Integer.class, BeanClass.class, System.getProperty("java.io.tmpdir"),
-                                DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
+                                DateTimeZone.getDefault(), map), map
 
                 },
                 {
                         new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                Integer.class, BeanClass.class, stmt, tableName, DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
+                                Integer.class, BeanClass.class, stmt, tableName,
+                                DateTimeZone.getDefault(), map), map
                 }
         });
     }
@@ -204,46 +219,21 @@ public class ExternalReplicatorTest {
         externalReplicator.removeAllExternal(map.keySet());
     }
 
-    public ExternalReplicatorTest(ExternalReplicator.AbstractExternalReplicator externalReplicator, Map map) {
+    public SHMExternalReplicatorWithModIterTest(AbstractExternalReplicator externalReplicator, VanillaSharedReplicatedHashMap map) throws
+            IOException {
         this.externalReplicator = externalReplicator;
         this.map = map;
     }
 
-
     @Test
-    public void test() throws ClassNotFoundException, SQLException, IOException, InstantiationException {
-
-        final Date expectedDate = new Date(0);
-        final DateTime expectedDateTime = new DateTime(0, UTC);
-        final BeanClass bean = new BeanClass(1, "Rob", "camelCase", 1.234, expectedDate, expectedDate, 'c',
-                false,
-                (short) 1, expectedDateTime);
-
-
-        externalReplicator.putExternal(bean.id, bean, true);
-
-        final BeanClass result = externalReplicator.getExternal(bean.id);
-
-        Assert.assertEquals("Rob", result.name);
-        Assert.assertEquals("camelCase", result.fullCamelCaseFieldName);
-        Assert.assertEquals(1.234, result.doubleValue, 0.001);
-        Assert.assertEquals('c', result.charValue);
-        Assert.assertEquals(false, result.booleanValue);
-        Assert.assertEquals(1, result.shortVal);
-        Assert.assertEquals(expectedDateTime.toDate().getTime(), result.dateTimeValue.toDate().getTime());
-        Assert.assertEquals(expectedDate, result.timeStamp);
-
-    }
-
-    @Test
-    public void testPutAllEntries() {
+    public void testModificationIterator() throws IOException {
 
         final Date expectedDate = new Date(0);
         final DateTime expectedDateTime = new DateTime(0, UTC);
         final BeanClass bean1 = new BeanClass(1,
                 "Rob",
                 "camelCase",
-                1.111,
+                1.5,
                 expectedDate,
                 expectedDate,
                 'a',
@@ -253,7 +243,7 @@ public class ExternalReplicatorTest {
         final BeanClass bean2 = new BeanClass(2,
                 "Rob2",
                 "camelCase",
-                1.222,
+                2.5,
                 expectedDate,
                 expectedDate,
                 'b',
@@ -264,7 +254,7 @@ public class ExternalReplicatorTest {
         final BeanClass bean3 = new BeanClass(3,
                 "Rob3",
                 "camelCase",
-                1.333,
+                3.5,
                 expectedDate,
                 expectedDate,
                 'c',
@@ -273,75 +263,41 @@ public class ExternalReplicatorTest {
 
 
         final BeanClass[] beanClasses = {bean1, bean2, bean3};
+
+
+        ReplicatedSharedHashMap.ModificationNotifier notifier = new ReplicatedSharedHashMap
+                .ModificationNotifier() {
+            @Override
+            public void onChange() {
+
+            }
+        };
+
+        final VanillaSharedReplicatedHashMap.ModificationIterator modificationIterator
+                = map.acquireModificationIterator((byte) 1, notifier, true);
+
         for (BeanClass bean : beanClasses) {
-            externalReplicator.putExternal(bean.id, bean, true);
+            map.put(bean.id, bean);
         }
 
-        externalReplicator.getAllExternal(map);
-
-        for (BeanClass bean : beanClasses) {
-            final int key = bean.id;
-            Assert.assertEquals(bean.charValue, ((BeanClass) map.get(key)).charValue);
+        // this will update the database with the new values added to the map
+        // ideally this will be run on its own thread
+        while (modificationIterator.hasNext()) {
+            modificationIterator.nextEntry(externalReplicator);
         }
 
+        // we will now check, that what as got saved to the database is all 3 beans
+        for (final BeanClass bean : beanClasses) {
+            final BeanClass external = externalReplicator.getExternal(bean.id);
+            Assert.assertEquals(bean.name, external.name);
+        }
 
     }
-
-
-    @Test
-    public void testPutEntry() {
-
-        final Date expectedDate = new Date(0);
-        final DateTime expectedDateTime = new DateTime(0, UTC);
-        final BeanClass bean1 = new BeanClass(1,
-                "Rob",
-                "camelCase",
-                1.111,
-                expectedDate,
-                expectedDate,
-                'a',
-                false,
-                (short) 1, expectedDateTime);
-
-        final BeanClass bean2 = new BeanClass(2,
-                "Rob2",
-                "camelCase",
-                1.222,
-                expectedDate,
-                expectedDate,
-                'b',
-                false,
-                (short) 1, expectedDateTime);
-
-
-        final BeanClass bean3 = new BeanClass(3,
-                "Rob3",
-                "camelCase",
-                1.333,
-                expectedDate,
-                expectedDate,
-                'c',
-                false,
-                (short) 1, expectedDateTime);
-
-
-        final BeanClass[] beanClasses = {bean1, bean2, bean3};
-        for (BeanClass bean : beanClasses) {
-            externalReplicator.putExternal(bean.id, bean, true);
-        }
-
-        final BeanClass external = externalReplicator.getExternal(3);
-        map.put(3, external);
-
-        Assert.assertEquals(bean3.charValue, external.charValue);
-
-    }
-
 
     private static int sequenceNumber;
 
     private static String createUniqueTableName() {
-        return "dbo.Test" + (sequenceNumber++);
+        return "dbo.Test" + System.nanoTime() + sequenceNumber++;
     }
 
 

@@ -195,7 +195,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>> jdbcCReplicator = new
                 JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>
-                (hashMap, Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
+                (Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
         final Date expectedDate = new Date(0);
         final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1,
                 new DateTime(0));
@@ -268,7 +268,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Integer, BeanClass,
-                        SharedHashMap<Integer, BeanClass>>(hashMap, Integer.class, BeanClass.class, stmt,
+                        SharedHashMap<Integer, BeanClass>>(Integer.class, BeanClass.class, stmt,
                         tableName, UTC, NOP_ENTRY_RESOLVER);
 
 
@@ -324,7 +324,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Integer, BeanClass,
-                        SharedHashMap<Integer, BeanClass>>(hashMap, Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
+                        SharedHashMap<Integer, BeanClass>>(Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
@@ -401,7 +401,7 @@ public class JDBCReplicatorTest {
 
         final JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>> jdbcCReplicator =
                 new JDBCReplicator<Integer, BeanClass,
-                        SharedHashMap<Integer, BeanClass>>(hashMap, Integer.class, BeanClass.class, stmt,
+                        SharedHashMap<Integer, BeanClass>>(Integer.class, BeanClass.class, stmt,
                         tableName,
                         UTC, NOP_ENTRY_RESOLVER);
 

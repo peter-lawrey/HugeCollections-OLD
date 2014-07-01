@@ -19,11 +19,13 @@
 package net.openhft.collections;
 
 import net.openhft.lang.io.NativeBytes;
+import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 import java.util.Map;
+import java.util.Set;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
@@ -33,20 +35,6 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
  * @author Rob Austin.
  */
 public interface ExternalReplicator<K, V> {
-
-    final DateTimeFormatter DEFAULT_DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
-            .withZoneUTC();
-
-    /**
-     * write the entry to an external source, be it a database or file, this is called indirectly when ever
-     * data is put() on a shared hash map
-     *
-     * @param key   the key of the entry
-     * @param value the value of the entry
-     * @param added true if the entry has just been added to the map rather than updated
-     */
-    void putExternal(K key, V value, boolean added);
-
 
     /**
      * gets the data <V> from an external source
@@ -58,24 +46,13 @@ public interface ExternalReplicator<K, V> {
 
 
     /**
-     * reads the entry from the external source and puts them in the map which is associated with this
-     * replication
+     * reads all the entries from the external source and writes into the {@code usingMap}. This method will
+     * alter the contents of {@code usingMap}
      *
-     * @param k the key relating to the entry that has change at the eternal source
+     * @param usingMap the map to which the data will be written
+     * @return the {@code usingMap}
      */
-    void putEntry(K k);
-
-
-    /**
-     * removes all the files or database records associated with the map
-     */
-    void removeAllExternal();
-
-    /**
-     * reads all the entries from the external source and writes into the map which is associated with this
-     * replication
-     */
-    void putAllEntries();
+    Map<K, V> getAllExternal(@NotNull final Map<K, V> usingMap);
 
 
     /**
@@ -83,49 +60,73 @@ public interface ExternalReplicator<K, V> {
      */
     DateTimeZone getZone();
 
-
-    abstract class AbstractExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryCallback
+    /**
+     * an abstract base implementation of an ExternalReplicator
+     *
+     * @param <K>
+     * @param <V>
+     */
+    abstract class AbstractExternalReplicator<K, V>
+            extends ReplicatedSharedHashMap.EntryCallback
             implements ExternalReplicator<K, V> {
-
-        final Map<K, V> map;
 
         private final V usingValue;
         private final K usingKey;
         private final EntryResolver<K, V> entryResolver;
 
-
-        protected AbstractExternalReplicator(final Map<K, V> map,
-                                             final Class<K> kClass,
+        protected AbstractExternalReplicator(final Class<K> kClass,
                                              final Class<V> vClass,
                                              final EntryResolver<K, V> entryResolver)
                 throws InstantiationException {
 
-            this.map = map;
             usingValue = (V) NativeBytes.UNSAFE.allocateInstance(vClass);
             usingKey = (K) NativeBytes.UNSAFE.allocateInstance(kClass);
             this.entryResolver = entryResolver;
         }
 
         @Override
-        public void putEntry(K k) {
-            map.put(k, getExternal(k));
-        }
-
-
-        @Override
         public boolean onEntry(NativeBytes entry) {
 
-            final V value = entryResolver.key(entry, usingValue);
+            final K key = entryResolver.key(entry, usingKey);
+
+            if (entryResolver.wasRemoved(entry))
+                removeExternal(key);
+
+            final V value = entryResolver.value(entry, usingValue);
             if (value == null)
                 return false;
-
-            final K key = entryResolver.value(entry, usingKey);
 
             putExternal(key, value, false);
             return true;
         }
 
+
+        /**
+         * write the entry to an external source, be it a database or file, this is called indirectly when
+         * ever data is put() on a shared hash map
+         *
+         * @param key   the key of the entry
+         * @param value the value of the entry
+         * @param added true if the entry has just been added to the map rather than updated
+         */
+        protected abstract void putExternal(K key, V value, boolean added);
+
+        /**
+         * removes a single entry from the external source which releates to key {@code k},
+         */
+        protected abstract void removeExternal(K k);
+
+
+        /**
+         * removes form the external source, all the entries who's keys are in {@code keys}
+         */
+        protected abstract void removeAllExternal(final Set<K> keys);
+
     }
+
+    final DateTimeFormatter DEFAULT_DATE_TIME_FORMATTER = DateTimeFormat.forPattern("YYYY-MM-dd HH:mm:ss.S")
+            .withZoneUTC();
+
 
 }
 
