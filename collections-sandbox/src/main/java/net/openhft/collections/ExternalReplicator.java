@@ -61,7 +61,7 @@ public interface ExternalReplicator<K, V> {
     DateTimeZone getZone();
 
     /**
-     * an abstract base implementation of an ExternalReplicator
+     * an base implementation of an ExternalReplicator
      *
      * @param <K>
      * @param <V>
@@ -109,18 +109,18 @@ public interface ExternalReplicator<K, V> {
          * @param value the value of the entry
          * @param added true if the entry has just been added to the map rather than updated
          */
-        protected abstract void putExternal(K key, V value, boolean added);
+        abstract void putExternal(K key, V value, boolean added);
 
         /**
          * removes a single entry from the external source which releates to key {@code k},
          */
-        protected abstract void removeExternal(K k);
+        abstract void removeExternal(K k);
 
 
         /**
          * removes form the external source, all the entries who's keys are in {@code keys}
          */
-        protected abstract void removeAllExternal(final Set<K> keys);
+        abstract void removeAllExternal(final Set<K> keys);
 
     }
 

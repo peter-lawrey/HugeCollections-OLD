@@ -18,7 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -42,7 +41,7 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 /**
  * @author Rob Austin.
  */
-public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends
+public class JDBCReplicator<K, V> extends
         AbstractExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JDBCReplicator.class.getName());
@@ -113,44 +112,6 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends
         this.dateTimeZone = DEFAULT_DATE_TIME_FORMATTER.getZone();
         this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER;
         shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
-    }
-
-
-    void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value,
-               long pos, SharedSegment segment) {
-        putExternal(key, value, added);
-    }
-
-    /**
-     * This method is called if a key/value is put in the map.
-     *
-     * @param map           accessed
-     * @param entry         added/modified
-     * @param metaDataBytes length of the meta data
-     * @param added         if this is a new entry
-     * @param key           looked up
-     * @param value         set for key
-     */
-    public void onPut(M map, Bytes entry, int metaDataBytes, boolean added, K key, V value) {
-        putExternal(key, value, added);
-    }
-
-    void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value,
-                  int pos, SharedSegment segment) {
-        //  onRemove(map, entry, metaDataBytes, key, value);
-    }
-
-    /**
-     * This is called when an entry is removed. Misses are not notified.
-     *
-     * @param map           accessed
-     * @param entry         removed
-     * @param metaDataBytes length of meta data
-     * @param key           removed
-     * @param value         removed
-     */
-    public void onRemove(M map, Bytes entry, int metaDataBytes, K key, V value) {
-        // do nothing
     }
 
 

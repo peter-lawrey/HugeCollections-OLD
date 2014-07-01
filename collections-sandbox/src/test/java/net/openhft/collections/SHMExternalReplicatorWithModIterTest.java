@@ -19,7 +19,6 @@
 package net.openhft.collections;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -40,6 +39,7 @@ import java.util.Date;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static org.joda.time.DateTimeZone.UTC;
+import static org.joda.time.DateTimeZone.getDefault;
 
 /**
  * This test uses the modification iterator to update the map
@@ -108,7 +108,6 @@ public class SHMExternalReplicatorWithModIterTest {
             this.shortVal = shortVal;
             this.dateTimeValue = dateTimeValue;
         }
-
 
 
         @Override
@@ -184,26 +183,27 @@ public class SHMExternalReplicatorWithModIterTest {
 
         return Arrays.asList(new Object[][]{
                 {
-                        new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new FileReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
                                 System.getProperty("java.io.tmpdir"),
                                 UTC, map), map
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
                                 stmt, tableName, UTC, map), map
                 },
                 {
-                        new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                Integer.class, BeanClass.class, System.getProperty("java.io.tmpdir"),
-                                DateTimeZone.getDefault(), map), map
+                        new FileReplicator<Integer, BeanClass>(
+                                Integer.class, BeanClass.class,
+                                System.getProperty("java.io.tmpdir"),
+                                getDefault(), map), map
 
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class, stmt, tableName,
-                                DateTimeZone.getDefault(), map), map
+                                getDefault(), map), map
                 }
         });
     }

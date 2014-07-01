@@ -33,6 +33,7 @@ import java.util.*;
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 import static net.openhft.collections.FieldMapper.ValueWithFieldName;
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
 /**
  * Replicates the contents of the map into a directory, each file in the directory represents an entry in the
@@ -40,7 +41,7 @@ import static net.openhft.collections.FieldMapper.ValueWithFieldName;
  *
  * @author Rob Austin.
  */
-public class FileReplicator<K, V, M> extends
+public class FileReplicator<K, V> extends
         AbstractExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
@@ -59,7 +60,7 @@ public class FileReplicator<K, V, M> extends
                           @NotNull final Class<V> vClass,
                           @NotNull final String directory,
                           final DateTimeZone dateTimeZone,
-                          final ReplicatedSharedHashMap.EntryResolver<K, V> entryResolver) throws InstantiationException {
+                          final EntryResolver<K, V> entryResolver) throws InstantiationException {
 
         super(kClass, vClass, entryResolver);
 

@@ -170,24 +170,24 @@ public class ExternalReplicatorTest {
 
         return Arrays.asList(new Object[][]{
                 {
-                        new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new FileReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
                                 System.getProperty("java.io.tmpdir"),
                                 UTC, NOP_ENTRY_RESOLVER), map
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
                                 stmt, tableName, UTC, NOP_ENTRY_RESOLVER), map
                 },
                 {
-                        new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new FileReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class, System.getProperty("java.io.tmpdir"),
                                 DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
 
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class, stmt, tableName, DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
                 }
         });
