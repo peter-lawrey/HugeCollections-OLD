@@ -25,6 +25,7 @@ import net.openhft.lang.io.MappedStore;
 import net.openhft.lang.io.MultiStoreBytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
+import net.openhft.lang.model.DataValueClasses;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -38,6 +39,8 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -84,7 +87,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
+        implements ReplicatedSharedHashMap<K, V>, EntryExternalizable, EntryResolver<K,V>, Closeable {
 
     private static final int MAX_UNSIGNED_SHORT = 1 << 16;
 
@@ -900,10 +903,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * {@inheritDoc} <p/> This method does not set a segment lock, A segment lock should be obtained before
+     * calling this method, especially when being used in a multi threaded context.
      */
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
@@ -978,10 +979,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * {@inheritDoc} <p/> This method does not set a segment lock, A segment lock should be obtained before
+     * calling this method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1260,6 +1259,62 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             }
 
         }
+    }
+
+    public V key(@NotNull NativeBytes entry, V usingValue) {
+
+        final long keyLen = entry.readStopBit();
+
+        entry.skip(keyLen);
+
+        final long timeStamp = entry.readLong();
+
+        final byte identifier = entry.readByte();
+        if (identifier != localIdentifier) {
+            return null;
+        }
+
+        final boolean isDeleted = entry.readBoolean();
+        long valueLen;
+        if (!isDeleted) {
+            valueLen = entry.readStopBit();
+            assert valueLen > 0;
+        } else {
+            return null;
+        }
+
+        final long valueOffset = entry.position();
+
+        if (generatedValueType)
+            if (usingValue == null)
+                usingValue = (V) DataValueClasses.newDirectReference(vClass);
+            else
+                assert usingValue instanceof Byteable;
+        if (usingValue instanceof Byteable) {
+            ((Byteable) usingValue).bytes(entry, valueOffset);
+            return usingValue;
+        }
+
+        return entry.readInstance(vClass, usingValue);
+    }
+
+    public K value(@NotNull NativeBytes entry, K usingKey) {
+
+        final long keyLen = entry.readStopBit();
+        final long keyPosition = entry.position();
+
+        if (generatedValueType)
+            if (usingKey == null)
+                usingKey = (K) DataValueClasses.newDirectReference(kClass);
+            else
+                assert usingKey instanceof Byteable;
+        if (usingKey instanceof Byteable) {
+            ((Byteable) usingKey).bytes(entry, keyPosition);
+            return usingKey;
+        }
+
+        return entry.readInstance(kClass, usingKey);
+
     }
 
 

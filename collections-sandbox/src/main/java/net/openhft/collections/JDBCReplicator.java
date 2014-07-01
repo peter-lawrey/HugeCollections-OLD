@@ -36,6 +36,7 @@ import java.util.*;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
 /**
  * @author Rob Austin.
@@ -57,18 +58,23 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends
 
 
     /**
-     * @param map          the map which the data will be written to
-     * @param vClass       the type of class to persist
-     * @param stmt         the database statement
-     * @param tableName    the name of the table that we are writing to
-     * @param dateTimeZone the timezone of the database we are replicating into
+     * @param map                 the map which the data will be written to
+     * @param kClass              the type of key to persist
+     * @param vClass              the type of value to persist
+     * @param stmt                the database statement
+     * @param tableName           the name of the table that we are writing to
+     * @param dateTimeZone        the timezone of the database we are replicating into
+     * @param entryResolver
      */
     public JDBCReplicator(@NotNull final Map<K, V> map,
+                          @NotNull final Class<K> kClass,
                           @NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String tableName,
-                          @NotNull final DateTimeZone dateTimeZone) {
-        super(map);
+                          @NotNull final DateTimeZone dateTimeZone,
+                          @NotNull final EntryResolver<K, V> entryResolver)
+            throws InstantiationException {
+        super(map, kClass, vClass, entryResolver);
         this.stmt = stmt;
         this.table = tableName;
         this.vClass = vClass;
@@ -87,17 +93,21 @@ public class JDBCReplicator<K, V, M extends SharedHashMap<K, V>> extends
 
 
     /**
-     * @param map         the map which the data will be written to
-     * @param vClass      the type of class to persist
-     * @param stmt        the database statement
-     * @param fieldMapper used to identifier the fields when serializing to the database
+     * @param map                 the map which the data will be written to
+     * @param kClass
+     * @param vClass              the type of class to persist
+     * @param stmt                the database statement
+     * @param fieldMapper         used to identifier the fields when serializing to the database
+     * @param entryResolver
      */
     public JDBCReplicator(@NotNull final Map<K, V> map,
+                          @NotNull final Class<K> kClass,
                           @NotNull final Class<V> vClass,
                           @NotNull final Statement stmt,
                           @NotNull final String table,
-                          @NotNull final FieldMapper<V> fieldMapper) {
-        super(map);
+                          @NotNull final FieldMapper<V> fieldMapper,
+                          @NotNull final ReplicatedSharedHashMap.EntryResolver entryResolver) throws InstantiationException {
+        super(map, kClass, vClass, entryResolver);
 
         this.fieldMapper = fieldMapper;
         this.stmt = stmt;

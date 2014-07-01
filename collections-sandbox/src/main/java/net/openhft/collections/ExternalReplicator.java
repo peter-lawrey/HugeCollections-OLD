@@ -18,11 +18,14 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.NativeBytes;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 import java.util.Map;
+
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
 /**
  * Used for both file and and database replication
@@ -81,13 +84,26 @@ public interface ExternalReplicator<K, V> {
     DateTimeZone getZone();
 
 
-    abstract class AbstractExternalReplicator<K, V> implements ExternalReplicator<K, V> {
-
+    abstract class AbstractExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryCallback
+            implements ExternalReplicator<K, V> {
 
         final Map<K, V> map;
 
-        protected AbstractExternalReplicator(Map<K, V> map) {
+        private final V usingValue;
+        private final K usingKey;
+        private final EntryResolver<K, V> entryResolver;
+
+
+        protected AbstractExternalReplicator(final Map<K, V> map,
+                                             final Class<K> kClass,
+                                             final Class<V> vClass,
+                                             final EntryResolver<K, V> entryResolver)
+                throws InstantiationException {
+
             this.map = map;
+            usingValue = (V) NativeBytes.UNSAFE.allocateInstance(vClass);
+            usingKey = (K) NativeBytes.UNSAFE.allocateInstance(kClass);
+            this.entryResolver = entryResolver;
         }
 
         @Override
@@ -95,6 +111,19 @@ public interface ExternalReplicator<K, V> {
             map.put(k, getExternal(k));
         }
 
+
+        @Override
+        public boolean onEntry(NativeBytes entry) {
+
+            final V value = entryResolver.key(entry, usingValue);
+            if (value == null)
+                return false;
+
+            final K key = entryResolver.value(entry, usingKey);
+
+            putExternal(key, value, false);
+            return true;
+        }
 
     }
 

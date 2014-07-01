@@ -18,6 +18,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.NativeBytes;
+import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.After;
@@ -34,6 +36,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
+import static org.joda.time.DateTimeZone.UTC;
+
 
 @RunWith(value = Parameterized.class)
 public class ExternalReplicatorTest {
@@ -41,6 +45,20 @@ public class ExternalReplicatorTest {
     private final ExternalReplicator<Integer, BeanClass> externalReplicator;
     private final Map map;
 
+
+    static final ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new
+            ReplicatedSharedHashMap.EntryResolver() {
+
+                @Override
+                public Object value(@NotNull NativeBytes entry, Object usingKey) {
+                    return null;
+                }
+
+                @Override
+                public Object key(@NotNull NativeBytes entry, Object usingValue) {
+                    return null;
+                }
+            };
 
     class BeanClass {
 
@@ -102,7 +120,7 @@ public class ExternalReplicatorTest {
     }
 
     @Parameterized.Parameters
-    public static Collection<Object[]> data() throws SQLException {
+    public static Collection<Object[]> data() throws SQLException, InstantiationException {
 
         final String dbURL = "jdbc:derby:memory:openhft;create=true";
 
@@ -126,30 +144,43 @@ public class ExternalReplicatorTest {
                 "PRIMARY KEY (ID))");
 
 
-        final HashMap<Object, BeanClass> map = new HashMap<Object, BeanClass>();
+        final HashMap<Integer, BeanClass> map = new HashMap<Integer, BeanClass>();
+        ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new ReplicatedSharedHashMap.EntryResolver() {
+
+            @Override
+            public Object value(@NotNull NativeBytes entry, Object usingKey) {
+                return null;
+            }
+
+            @Override
+            public Object key(@NotNull NativeBytes entry, Object usingValue) {
+                return null;
+            }
+        };
 
         return Arrays.asList(new Object[][]{
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                map, BeanClass.class,
+                                map, Integer.class, BeanClass.class,
                                 System.getProperty("java.io.tmpdir"),
-                                DateTimeZone.UTC), map
+                                UTC, NOP_ENTRY_RESOLVER), map
                 },
                 {
-                        new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
                                 map,
-                                BeanClass.class,
-                                stmt, tableName, DateTimeZone.UTC), map
+                                Integer.class, BeanClass.class,
+                                stmt, tableName, UTC, NOP_ENTRY_RESOLVER), map
                 },
                 {
                         new FileReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
-                                map, BeanClass.class, System.getProperty("java.io.tmpdir"), DateTimeZone.getDefault()), map
+                                map, Integer.class, BeanClass.class, System.getProperty("java.io.tmpdir"),
+                                DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
 
                 },
                 {
-                        new JDBCReplicator<Object, BeanClass, SharedHashMap<Object, BeanClass>>(
+                        new JDBCReplicator<Integer, BeanClass, SharedHashMap<Integer, BeanClass>>(
                                 map,
-                                BeanClass.class, stmt, tableName, DateTimeZone.getDefault()), map
+                                Integer.class, BeanClass.class, stmt, tableName, DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
                 }
         });
     }
@@ -176,7 +207,7 @@ public class ExternalReplicatorTest {
     public void test() throws ClassNotFoundException, SQLException, IOException, InstantiationException {
 
         final Date expectedDate = new Date(0);
-        final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
+        final DateTime expectedDateTime = new DateTime(0, UTC);
         final BeanClass bean = new BeanClass(1, "Rob", "camelCase", 1.234, expectedDate, expectedDate, 'c',
                 false,
                 (short) 1, expectedDateTime);
@@ -202,7 +233,7 @@ public class ExternalReplicatorTest {
     public void testPutAllEntries() {
 
         final Date expectedDate = new Date(0);
-        final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
+        final DateTime expectedDateTime = new DateTime(0, UTC);
         final BeanClass bean1 = new BeanClass(1,
                 "Rob",
                 "camelCase",
@@ -255,7 +286,7 @@ public class ExternalReplicatorTest {
     public void testPutEntry() {
 
         final Date expectedDate = new Date(0);
-        final DateTime expectedDateTime = new DateTime(0, DateTimeZone.UTC);
+        final DateTime expectedDateTime = new DateTime(0, UTC);
         final BeanClass bean1 = new BeanClass(1,
                 "Rob",
                 "camelCase",

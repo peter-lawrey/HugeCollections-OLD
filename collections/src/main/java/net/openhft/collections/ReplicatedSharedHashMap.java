@@ -205,6 +205,32 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          */
         void readExternalEntry(@NotNull Bytes source);
 
+
     }
+
+    /**
+     * provides a key and value from NativeBytes, this can be used in conjunction with the modification
+     * iterator to get the key and value out of the NativeBytes
+     */
+    interface EntryResolver<K, V> {
+
+        /**
+         * gets the value from the entry
+         *
+         * @param entry the bytes which reference to the entry
+         * @return the value which is in the entry
+         */
+        K value(@NotNull NativeBytes entry, K usingKey);
+
+        /**
+         * gets the key from the entry
+         *
+         * @param entry the bytes which the bytes which point to the entry
+         * @return the key which is in the entry
+         */
+        V key(@NotNull NativeBytes entry, V usingValue);
+
+    }
+
 
 }

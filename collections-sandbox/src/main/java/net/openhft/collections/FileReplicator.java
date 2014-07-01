@@ -48,7 +48,10 @@ public class FileReplicator<K, V, M> extends
     private static final String SEPARATOR = System.getProperty("line.separator");
 
     private final FieldMapper<V> fieldMapper;
+
     private final Class<V> vClass;
+    private final Class<K> kClass;
+
     private final String directory;
     private final String fileExt = ".value";
     private final Map<String, Field> fieldsByColumnsName;
@@ -56,14 +59,16 @@ public class FileReplicator<K, V, M> extends
     private final DateTimeZone dateTimeZone;
 
 
-    public FileReplicator(final Map map,
+    public FileReplicator(final Map<K, V> map,
+                          @NotNull final Class<K> kClass,
                           @NotNull final Class<V> vClass,
                           @NotNull final String directory,
-                          final DateTimeZone dateTimeZone) {
-        super(map);
+                          final DateTimeZone dateTimeZone,
+                          final ReplicatedSharedHashMap.EntryResolver<K, V> entryResolver) throws InstantiationException {
+        super(map, kClass, vClass, entryResolver);
 
         this.vClass = vClass;
-
+        this.kClass = kClass;
 
         this.directory = directory;
 
@@ -79,6 +84,7 @@ public class FileReplicator<K, V, M> extends
         for (Map.Entry<Field, String> entry : fieldStringMap.entrySet()) {
             fieldsByColumnsName.put(entry.getValue().toUpperCase().trim(), entry.getKey());
         }
+
 
     }
 
@@ -335,13 +341,14 @@ public class FileReplicator<K, V, M> extends
      * @throws InstantiationException
      */
     public Map<K, V> getAll() throws SQLException, InstantiationException, IllegalAccessException {
-        return aquireAllUsing(new HashMap<K, V>());
+        return acquireAllUsing(new HashMap<K, V>());
     }
 
     @Override
     public void putAllEntries() {
-        aquireAllUsing(map);
+        acquireAllUsing(map);
     }
+
 
     class ExtFilter implements FilenameFilter {
 
@@ -353,7 +360,7 @@ public class FileReplicator<K, V, M> extends
 
     private final ExtFilter filenameFilter = new ExtFilter();
 
-    private Map<K, V> aquireAllUsing(final Map<K, V> map) {
+    private Map<K, V> acquireAllUsing(final Map<K, V> map) {
 
         final File folder = new File(directory);
         if (!folder.isDirectory()) {
