@@ -112,7 +112,7 @@ public interface ExternalReplicator<K, V> {
         abstract void putExternal(K key, V value, boolean added);
 
         /**
-         * removes a single entry from the external source which releates to key {@code k},
+         * removes a single entry from the external source which relates to key {@code k},
          */
         abstract void removeExternal(K k);
 
