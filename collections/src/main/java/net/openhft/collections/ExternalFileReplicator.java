@@ -22,7 +22,6 @@ import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
@@ -31,8 +30,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
-import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
-import static net.openhft.collections.FieldMapper.ValueWithFieldName;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.ValueWithFieldName;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
 /**
@@ -41,51 +39,39 @@ import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
  *
  * @author Rob Austin.
  */
-public class FileReplicator<K, V> extends
+public class ExternalFileReplicator<K, V> extends
         AbstractExternalReplicator<K, V> {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final String SEPARATOR = System.getProperty("line.separator");
 
-    private final FieldMapper<V> fieldMapper;
     private final Class<V> vClass;
-    private final String directory;
     private final String fileExt = ".value";
     private final Map<String, Field> fieldsByColumnsName;
-    private final DateTimeFormatter dateTimeFormatter;
-    private final DateTimeZone dateTimeZone;
+    private final ExternalFileReplicatorBuilder builder;
 
-
-    public FileReplicator(@NotNull final Class<K> kClass,
-                          @NotNull final Class<V> vClass,
-                          @NotNull final String directory,
-                          final DateTimeZone dateTimeZone,
-                          final EntryResolver<K, V> entryResolver) throws InstantiationException {
+    public ExternalFileReplicator(@NotNull final Class<K> kClass,
+                                  @NotNull final Class<V> vClass,
+                                  @NotNull final ExternalFileReplicatorBuilder builder,
+                                  @NotNull final EntryResolver<K, V> entryResolver) throws InstantiationException {
 
         super(kClass, vClass, entryResolver);
 
+        this.builder = builder;
         this.vClass = vClass;
-        this.directory = directory;
-        this.dateTimeZone = dateTimeZone;
-        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
 
-        final ReflectionBasedFieldMapperBuilder builder = new ReflectionBasedFieldMapperBuilder();
-        fieldMapper = builder.create(vClass, dateTimeFormatter);
-
-        final Map<Field, String> fieldStringMap = fieldMapper.columnsNamesByField();
+        final Map<Field, String> fieldStringMap = builder.fieldMapper().columnsNamesByField();
         fieldsByColumnsName = new HashMap<String, Field>(fieldStringMap.size());
 
         for (Map.Entry<Field, String> entry : fieldStringMap.entrySet()) {
             fieldsByColumnsName.put(entry.getValue().toUpperCase().trim(), entry.getKey());
         }
 
-
     }
 
     public String getFileExt() {
         return fileExt;
     }
-
 
     /**
      * since we are on the only system read and writing this data to the database, we will know, if the record
@@ -112,7 +98,7 @@ public class FileReplicator<K, V> extends
             }
 
             final StringBuilder stringBuilder = new StringBuilder();
-
+            final FieldMapper<V> fieldMapper = builder.fieldMapper();
 
             stringBuilder.append(fieldMapper.keyName()).append("=")
                     .append(fieldMapper.keyField().get(value).toString())
@@ -136,7 +122,7 @@ public class FileReplicator<K, V> extends
     }
 
     private File toFile(K key) {
-        return new File(directory + key.toString() + fileExt);
+        return new File(this.builder.directory() + key.toString() + fileExt);
     }
 
 
@@ -150,6 +136,7 @@ public class FileReplicator<K, V> extends
     public V getExternal(K key) {
 
         try {
+            final String directory = builder.directory();
             final File folder = new File(directory);
 
             if (!folder.isDirectory()) {
@@ -167,12 +154,11 @@ public class FileReplicator<K, V> extends
     @Override
     public void removeAllExternal(final Set<K> keys) {
 
+        final String directory = builder.directory();
         final File folder = new File(directory);
 
-        if (!folder.isDirectory()) {
+        if (!folder.isDirectory())
             throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
-        }
-
 
         for (K key : keys) {
             final File file = toFile(key);
@@ -183,6 +169,8 @@ public class FileReplicator<K, V> extends
 
     @Override
     public void removeExternal(K key) {
+
+        final String directory = builder.directory();
         final File folder = new File(directory);
 
         if (!folder.isDirectory()) {
@@ -251,13 +239,12 @@ public class FileReplicator<K, V> extends
                         field.set(o, fieldValue);
 
                     else if (field.getType().equals(DateTime.class)) {
-                        final DateTime dateTime = FileReplicator.this.dateTimeFormatter.parseDateTime
-                                (fieldValue);
-
+                        final DateTime dateTime = builder.dateTimeFormatter()
+                                .parseDateTime(fieldValue);
                         if (dateTime != null)
                             field.set(o, dateTime);
                     } else if (field.getType().equals(Date.class)) {
-                        final DateTime dateTime = dateTimeFormatter.parseDateTime
+                        final DateTime dateTime = builder.dateTimeFormatter().parseDateTime
                                 (fieldValue);
                         if (dateTime != null)
                             field.set(o, dateTime.toDate());
@@ -278,7 +265,7 @@ public class FileReplicator<K, V> extends
 
     @Override
     public DateTimeZone getZone() {
-        return this.dateTimeZone;
+        return builder.dateTimeZone();
     }
 
     /**
@@ -324,6 +311,8 @@ public class FileReplicator<K, V> extends
 
     private Map<K, V> acquireAllUsing(final Map<K, V> map) {
 
+        final String directory = builder.directory();
+
         final File folder = new File(directory);
         if (!folder.isDirectory()) {
             throw new IllegalArgumentException("NOT A VALID DIRECTORY : directory=" + directory);
@@ -332,7 +321,7 @@ public class FileReplicator<K, V> extends
         for (final File fileEntry : folder.listFiles(filenameFilter)) {
             try {
                 final V v = get(fileEntry);
-                map.put((K) fieldMapper.keyField().get(v), v);
+                map.put((K) builder.fieldMapper().keyField().get(v), v);
             } catch (Exception e) {
                 LOG.error("fileEntry=" + fileEntry, e);
                 continue;
@@ -342,6 +331,12 @@ public class FileReplicator<K, V> extends
         return map;
 
     }
+
+    @Override
+    public void close() throws IOException {
+        // do nothing
+    }
+
 
 }
 

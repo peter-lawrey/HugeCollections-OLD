@@ -966,7 +966,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     /**
      * {@inheritDoc}
      */
-    static class EntryCallback extends VanillaSharedReplicatedHashMap.EntryCallback {
+    static class EntryCallback extends ReplicatedSharedHashMap.AbstractEntryCallback {
 
         private final EntryExternalizable externalizable;
         private final ByteBufferBytes in;

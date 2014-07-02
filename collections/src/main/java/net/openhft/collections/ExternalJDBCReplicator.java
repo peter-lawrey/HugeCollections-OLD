@@ -23,95 +23,56 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
-import static net.openhft.collections.FieldMapper.ReflectionBasedFieldMapperBuilder;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 
 /**
  * @author Rob Austin.
  */
-public class JDBCReplicator<K, V> extends
-        AbstractExternalReplicator<K, V> {
+public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, V> {
 
-    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(JDBCReplicator.class.getName());
-    public static final String YYYY_MM_DD = "YYYY-MM-dd";
+    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(ExternalJDBCReplicator.class.getName());
 
     private final FieldMapper<V> fieldMapper;
     private final Class<V> vClass;
-    private final DateTimeFormatter dateTimeFormatter;
-    private final DateTimeFormatter shortDateTimeFormatter;
 
-    private final Statement stmt;
-    private final String table;
-    private final DateTimeZone dateTimeZone;
-
-    /**
-     * @param kClass        the type of key to persist
-     * @param vClass        the type of value to persist
-     * @param stmt          the database statement
-     * @param tableName     the name of the table that we are writing to
-     * @param dateTimeZone  the timezone of the database we are replicating into
-     * @param entryResolver
-     */
-    public JDBCReplicator(@NotNull final Class<K> kClass,
-                          @NotNull final Class<V> vClass,
-                          @NotNull final Statement stmt,
-                          @NotNull final String tableName,
-                          @NotNull final DateTimeZone dateTimeZone,
-                          @NotNull final EntryResolver<K, V> entryResolver)
-            throws InstantiationException {
-        super(kClass, vClass, entryResolver);
-        this.stmt = stmt;
-        this.table = tableName;
-        this.vClass = vClass;
-        this.dateTimeZone = dateTimeZone;
-
-        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER.withZone(dateTimeZone);
-        shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
-
-        final ReflectionBasedFieldMapperBuilder builder = new ReflectionBasedFieldMapperBuilder();
-        builder.wrapTextAndDateFieldsInQuotes(true);
-
-        fieldMapper = builder.create(vClass, dateTimeFormatter);
-    }
+    /*private final Statement builder.stmt;
+    private final String tableName;
+*/
+    /*    private final DateTimeZone dateTimeZone;
+        private final String shortDateTimeFormatterStr;
+        private final DateTimeFormatter dateTimeFormatter;
+        private final DateTimeFormatter shortDateTimeFormatter;*/
+    private final ExternalJDBCReplicatorBuilder builder;
 
 
     /**
-     * @param map           the map which the data will be written to
      * @param kClass
      * @param vClass        the type of class to persist
-     * @param stmt          the database statement
-     * @param fieldMapper   used to identifier the fields when serializing to the database
+     * @param builder
      * @param entryResolver
      */
-    public JDBCReplicator(@NotNull final Map<K, V> map,
-                          @NotNull final Class<K> kClass,
-                          @NotNull final Class<V> vClass,
-                          @NotNull final Statement stmt,
-                          @NotNull final String table,
-                          @NotNull final FieldMapper<V> fieldMapper,
-                          @NotNull final ReplicatedSharedHashMap.EntryResolver entryResolver) throws InstantiationException {
+    public ExternalJDBCReplicator(@NotNull final Class<K> kClass,
+                                  @NotNull final Class<V> vClass,
+                                  @NotNull final ExternalJDBCReplicatorBuilder builder,
+                                  @NotNull final EntryResolver entryResolver) throws InstantiationException {
         super(kClass, vClass, entryResolver);
 
-        this.fieldMapper = fieldMapper;
-        this.stmt = stmt;
-        this.table = table;
-        this.vClass = vClass;
+        this.fieldMapper = builder.fieldMapper();
 
-        this.dateTimeZone = DEFAULT_DATE_TIME_FORMATTER.getZone();
-        this.dateTimeFormatter = DEFAULT_DATE_TIME_FORMATTER;
-        shortDateTimeFormatter = DateTimeFormat.forPattern(YYYY_MM_DD).withZone(dateTimeFormatter.getZone());
+        this.vClass = vClass;
+        this.builder = builder;
+
     }
 
 
@@ -125,7 +86,13 @@ public class JDBCReplicator<K, V> extends
             final StringBuilder values = new StringBuilder();
             final StringBuilder fields = new StringBuilder();
 
-            for (final FieldMapper.ValueWithFieldName valueWithFieldName : this.fieldMapper.getFields(value, true)) {
+            final Set<FieldMapper.ValueWithFieldName> valueWithFieldNames = this.fieldMapper.getFields(value, true);
+            if (valueWithFieldNames.isEmpty()) {
+                LOG.warn("class " + value.getClass() + " has no associated columns");
+                return;
+            }
+
+            for (final FieldMapper.ValueWithFieldName valueWithFieldName : valueWithFieldNames) {
                 values.append(valueWithFieldName.value).append(",");
                 fields.append(valueWithFieldName.name).append(",");
             }
@@ -134,7 +101,7 @@ public class JDBCReplicator<K, V> extends
             values.deleteCharAt(values.length() - 1);
 
             final StringBuilder sql = new StringBuilder("INSERT INTO ")
-                    .append(table).
+                    .append(builder.tableName()).
                             append(" (").
                             append(this.fieldMapper.keyName()).
                             append(",").
@@ -147,7 +114,8 @@ public class JDBCReplicator<K, V> extends
             if (LOG.isDebugEnabled()) {
                 LOG.debug("insert-sql=" + sql.toString());
             }
-            stmt.execute(sql.toString());
+            builder.stmt().execute(sql.toString());
+
 
         } catch (SQLException e) {
             // 23505 is the error code for duplicate
@@ -167,7 +135,7 @@ public class JDBCReplicator<K, V> extends
     private void update(K key, V value) throws SQLException {
 
         final StringBuilder sql = new StringBuilder("UPDATE ");
-        sql.append(this.table).append(" SET ");
+        sql.append(this.builder.tableName()).append(" SET ");
 
         final Set<FieldMapper.ValueWithFieldName> fields = fieldMapper.getFields(value, true);
 
@@ -187,7 +155,7 @@ public class JDBCReplicator<K, V> extends
             LOG.debug("update-sql=" + sql.toString());
         }
 
-        final int rowCount = stmt.executeUpdate(sql.toString());
+        final int rowCount = builder.stmt().executeUpdate(sql.toString());
 
 
         if (rowCount == 0) {
@@ -219,8 +187,11 @@ public class JDBCReplicator<K, V> extends
      */
     public V getExternal(K key) {
         try {
-            final String sql = "SELECT * FROM " + this.table + " WHERE " + fieldMapper.keyName() + "=" + key.toString();
-            final ResultSet resultSet = stmt.executeQuery(sql);
+            final String sql = "SELECT * FROM " + this.builder.tableName() + " WHERE " + fieldMapper.keyName() +
+                    "=" + key.toString();
+            final ResultSet resultSet = builder.stmt().executeQuery(sql);
+            if (resultSet == null || resultSet.wasNull())
+                return null;
             return applyResultsSet(null, resultSet);
         } catch (Exception e) {
             LOG.error("", e);
@@ -231,7 +202,7 @@ public class JDBCReplicator<K, V> extends
 
     @Override
     public DateTimeZone getZone() {
-        return this.dateTimeZone;
+        return this.builder.dateTimeZone();
     }
 
 
@@ -250,10 +221,10 @@ public class JDBCReplicator<K, V> extends
         keys.deleteCharAt(keys.length() - 1);
         keys.deleteCharAt(0);
 
-        final String sql = "SELECT * FROM " + this.table + " WHERE " + fieldMapper.keyName() +
+        final String sql = "SELECT * FROM " + this.builder.tableName() + " WHERE " + fieldMapper.keyName() +
                 " in (" + keys.toString() + ")";
 
-        final ResultSet resultSet = stmt.executeQuery(sql);
+        final ResultSet resultSet = builder.stmt().executeQuery(sql);
         return applyResultsSet(new HashSet(), resultSet);
     }
 
@@ -266,17 +237,17 @@ public class JDBCReplicator<K, V> extends
      * @throws InstantiationException
      */
     public Map<K, V> getAll() throws SQLException, InstantiationException, IllegalAccessException {
-        final String sql = "SELECT * FROM " + this.table;
-        return applyResultsSet(new HashMap(), stmt.executeQuery(sql));
+        final String sql = "SELECT * FROM " + this.builder.tableName();
+        return applyResultsSet(new HashMap(), builder.stmt().executeQuery(sql));
     }
 
 
     @Override
     public Map<K, V> getAllExternal(@NotNull Map<K, V> usingMap) {
 
-        final String sql = "SELECT * FROM " + this.table;
+        final String sql = "SELECT * FROM " + this.builder.tableName();
         try {
-            applyResultsSet(usingMap, stmt.executeQuery(sql));
+            applyResultsSet(usingMap, builder.stmt().executeQuery(sql));
 
         } catch (Exception e) {
             LOG.error("", e);
@@ -300,7 +271,16 @@ public class JDBCReplicator<K, V> extends
         final Class<?> rClass = (using == null) ? vClass : using.getClass();
 
         final CharSequence keyName = fieldMapper.keyName();
-        while (resultSet.next()) {
+
+        for (; ; ) {
+
+            try {
+                if (!resultSet.next())
+                    break;
+            } catch (SQLException e) {
+                LOG.debug("", e);
+                return null;
+            }
 
             K key = null;
 
@@ -365,7 +345,7 @@ public class JDBCReplicator<K, V> extends
                         key = (K) field.get(o);
 
                 } catch (Exception e) {
-                    LOG.error("", e);
+                    LOG.debug("", e);
                 }
 
             }
@@ -393,7 +373,9 @@ public class JDBCReplicator<K, V> extends
     }
 
     private DateTimeFormatter dateFormat(String date) {
-        return (date.length() == YYYY_MM_DD.length()) ? shortDateTimeFormatter : dateTimeFormatter;
+        return (date.length() == builder.shortDateTimeFormatterStr().length()) ?
+                builder.shortDateTimeFormatter() :
+                builder.dateTimeFormatter();
     }
 
 
@@ -404,7 +386,7 @@ public class JDBCReplicator<K, V> extends
             return;
 
         final StringBuilder sql = new StringBuilder("DELETE FROM ");
-        sql.append(table);
+        sql.append(builder.tableName());
 
         sql.append(" WHERE ");
         sql.append(fieldMapper.keyName());
@@ -418,31 +400,39 @@ public class JDBCReplicator<K, V> extends
         sql.append(")");
 
         try {
-            stmt.execute(sql.toString());
+            builder.stmt().execute(sql.toString());
         } catch (SQLException e) {
             LOG.error("", e);
         }
-
     }
-
 
     @Override
     public void removeExternal(K k) {
 
         final StringBuilder sql = new StringBuilder("DELETE FROM ");
-        sql.append(table);
+        sql.append(builder.tableName());
         sql.append(" WHERE ");
         sql.append(fieldMapper.keyName());
         sql.append(" = ");
         sql.append(k.toString());
 
         try {
-            stmt.execute(sql.toString());
+            builder.stmt().execute(sql.toString());
         } catch (SQLException e) {
             LOG.error("", e);
         }
 
     }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            builder.stmt().close();
+        } catch (SQLException e) {
+            LOG.error("", e);
+        }
+    }
+
 
 }
 

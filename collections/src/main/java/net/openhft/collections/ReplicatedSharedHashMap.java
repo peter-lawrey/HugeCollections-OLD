@@ -73,8 +73,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     byte identifier();
 
     /**
-     * Gets (if it does not exist, creates) an instance of ModificationIterator associated with a remote
-     * node, this weak associated is bound using the {@code identifier}.
+     * Gets (if it does not exist, creates) an instance of ModificationIterator associated with a remote node,
+     * this weak associated is bound using the {@code identifier}.
      *
      * @param remoteIdentifier         the identifier of the remote node
      * @param modificationNotifier     called when ever there is a change applied to the modification
@@ -120,8 +120,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     interface ModificationIterator {
 
         /**
-         * @return {@code true} if the is another entry to be received via {@link #nextEntry(EntryCallback
-         * callback)}
+         * @return {@code true} if the is another entry to be received via {@link
+         * #nextEntry(net.openhft.collections.ReplicatedSharedHashMap.AbstractEntryCallback callback)}
          */
         boolean hasNext();
 
@@ -132,7 +132,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method, {@code
          * false} if the entry was not accepted or was not available
          */
-        boolean nextEntry(@NotNull final EntryCallback callback);
+        boolean nextEntry(@NotNull final AbstractEntryCallback callback);
 
         /**
          * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer. It means all
@@ -147,11 +147,38 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         void dirtyEntries(long fromTimeStamp);
     }
 
+
+    interface EntryCallback {
+        /**
+         * Called whenever a put() or remove() has occurred to a replicating map.
+         *
+         * @param entry the entry you will receive, this does not have to be locked, as locking is already
+         *              provided from the caller.
+         * @return {@code false} if this entry should be ignored because the identifier of the source node is
+         * not from one of our changes, WARNING even though we check the identifier in the
+         * ModificationIterator the entry may have been updated.
+         */
+        public abstract boolean onEntry(final NativeBytes entry);
+
+        /**
+         * Called just after {@see #onEntry(NativeBytes entry)}
+         *
+         * @see #onEntry(NativeBytes entry);
+         */
+        public void onAfterEntry();
+
+        /**
+         * Called just before {@see #onEntry(NativeBytes entry)}
+         */
+        public void onBeforeEntry();
+
+    }
+
     /**
      * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes
      *entry)} which will get called whenever a put() or remove() has occurred to the map
      */
-    abstract class EntryCallback {
+    abstract class AbstractEntryCallback implements EntryCallback {
 
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.

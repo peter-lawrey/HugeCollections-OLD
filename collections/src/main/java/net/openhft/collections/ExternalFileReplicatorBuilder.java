@@ -18,17 +18,23 @@
 
 package net.openhft.collections;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
 /**
  * @author Rob Austin.
  */
-@Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
-@Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
-public @interface Column {
+public class ExternalFileReplicatorBuilder<K, V> extends ExternalReplicatorBuilder<V, ExternalFileReplicatorBuilder> {
 
-    String name() default "";
+    public String directory = System.getProperty("java.io.tmpdir");
+
+    public ExternalFileReplicatorBuilder(Class<V> vClass) {
+        super(vClass, false);
+    }
+
+    public String directory() {
+        return directory;
+    }
+
+    public ExternalFileReplicatorBuilder directory(String directory) {
+        this.directory = directory;
+        return this;
+    }
 }

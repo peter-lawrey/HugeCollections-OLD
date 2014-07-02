@@ -1181,7 +1181,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
          * @param entryCallback call this to get an entry, this class will take care of the locking
          * @return true if an entry was processed
          */
-        public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
+        public boolean nextEntry(@NotNull final AbstractEntryCallback entryCallback) {
             long position = this.position;
             while (true) {
                 long oldPosition = position;

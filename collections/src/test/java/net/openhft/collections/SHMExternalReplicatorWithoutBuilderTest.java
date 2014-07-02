@@ -36,11 +36,13 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Column;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Key;
 import static org.joda.time.DateTimeZone.UTC;
 
 
 @RunWith(value = Parameterized.class)
-public class ExternalReplicatorTest {
+public class SHMExternalReplicatorWithoutBuilderTest {
 
     private final ExternalReplicator.AbstractExternalReplicator<Integer, BeanClass> externalReplicator;
     private final Map map;
@@ -135,7 +137,7 @@ public class ExternalReplicatorTest {
 
         String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "FULL_CAMEL_CASE_FIELD_NAME varchar(40) NOT NULL, " +
@@ -168,27 +170,27 @@ public class ExternalReplicatorTest {
             }
         };
 
+
+        final ExternalFileReplicatorBuilder<Integer, BeanClass> fileReplicatorBuilder = new ExternalFileReplicatorBuilder
+                (BeanClass.class);
+        final ExternalJDBCReplicatorBuilder<BeanClass> jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+
         return Arrays.asList(new Object[][]{
                 {
-                        new FileReplicator<Integer, BeanClass>(
+                        new ExternalFileReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
-                                System.getProperty("java.io.tmpdir"),
-                                UTC, NOP_ENTRY_RESOLVER), map
+                                fileReplicatorBuilder, NOP_ENTRY_RESOLVER), map
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass>(
+                        new ExternalJDBCReplicator<Integer, BeanClass>(
                                 Integer.class, BeanClass.class,
-                                stmt, tableName, UTC, NOP_ENTRY_RESOLVER), map
+                                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER), map
                 },
                 {
-                        new FileReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class, System.getProperty("java.io.tmpdir"),
-                                DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
-
-                },
-                {
-                        new JDBCReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class, stmt, tableName, DateTimeZone.getDefault(), NOP_ENTRY_RESOLVER), map
+                        new ExternalJDBCReplicator<Integer, BeanClass>(
+                                Integer.class, BeanClass.class,
+                                jdbcReplicatorBuilder.dateTimeZone(DateTimeZone.getDefault()),
+                                NOP_ENTRY_RESOLVER), map
                 }
         });
     }
@@ -204,7 +206,7 @@ public class ExternalReplicatorTest {
         externalReplicator.removeAllExternal(map.keySet());
     }
 
-    public ExternalReplicatorTest(ExternalReplicator.AbstractExternalReplicator externalReplicator, Map map) {
+    public SHMExternalReplicatorWithoutBuilderTest(ExternalReplicator.AbstractExternalReplicator externalReplicator, Map map) {
         this.externalReplicator = externalReplicator;
         this.map = map;
     }
@@ -345,6 +347,16 @@ public class ExternalReplicatorTest {
     }
 
 
+    public static boolean waitTimeEqual(long timeMs, Object expected,
+                                        Object actual) throws InterruptedException {
+        long endTime = System.currentTimeMillis() + timeMs;
+        while (System.currentTimeMillis() < endTime) {
+            if (expected.equals(actual))
+                return true;
+            Thread.sleep(1);
+        }
+        return false;
+    }
 }
 
 

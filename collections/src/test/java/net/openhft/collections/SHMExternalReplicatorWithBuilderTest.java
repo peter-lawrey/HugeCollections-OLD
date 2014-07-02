@@ -36,20 +36,22 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
-import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Column;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Key;
+import static net.openhft.collections.SHMExternalReplicatorWithoutBuilderTest.waitTimeEqual;
 import static org.joda.time.DateTimeZone.UTC;
-import static org.joda.time.DateTimeZone.getDefault;
 
 /**
  * This test uses the modification iterator to update the map
  */
 @RunWith(value = Parameterized.class)
-public class SHMExternalReplicatorWithModIterTest {
+public class SHMExternalReplicatorWithBuilderTest {
 
-    private final AbstractExternalReplicator<Integer, BeanClass> externalReplicator;
-    private final VanillaSharedReplicatedHashMap map;
 
+    private static Connection connection;
 
     static class BeanClass implements Serializable {
 
@@ -127,6 +129,10 @@ public class SHMExternalReplicatorWithModIterTest {
     }
 
 
+    private final ExternalReplicator<Integer, BeanClass> externalReplicator;
+
+    private final Map<Integer, BeanClass> map;
+
     static int count;
 
     public static File getPersistenceFile() {
@@ -137,35 +143,19 @@ public class SHMExternalReplicatorWithModIterTest {
     }
 
 
-    public static <T extends VanillaSharedReplicatedHashMap<Integer, ExternalReplicatorTest.BeanClass>>
-
-    VanillaSharedReplicatedHashMap<Integer, BeanClass> newIntBeanSHM(
-            final byte identifier) throws IOException {
-
-
-        SharedHashMapBuilder b = new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier(identifier)
-                .canReplicate(true)
-                .entries(20000);
-
-        return (VanillaSharedReplicatedHashMap) b.create(getPersistenceFile(), Integer.class,
-                BeanClass.class);
-    }
-
-
     @Parameterized.Parameters
     public static Collection<Object[]> data() throws SQLException, InstantiationException, IOException {
 
         final String dbURL = "jdbc:derby:memory:openhft;create=true";
 
-        Connection connection = DriverManager.getConnection(dbURL);
+        connection = DriverManager.getConnection(dbURL);
         connection.setAutoCommit(true);
+
         Statement stmt = connection.createStatement();
 
         final String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "FULL_CAMEL_CASE_FIELD_NAME varchar(40) NOT NULL, " +
@@ -179,31 +169,12 @@ public class SHMExternalReplicatorWithModIterTest {
                 "PRIMARY KEY (ID))");
 
 
-        final VanillaSharedReplicatedHashMap<Integer, BeanClass> map = newIntBeanSHM((byte) 1);
-
         return Arrays.asList(new Object[][]{
                 {
-                        new FileReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class,
-                                System.getProperty("java.io.tmpdir"),
-                                UTC, map), map
+                        new ExternalFileReplicatorBuilder(BeanClass.class)
                 },
                 {
-                        new JDBCReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class,
-                                stmt, tableName, UTC, map), map
-                },
-                {
-                        new FileReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class,
-                                System.getProperty("java.io.tmpdir"),
-                                getDefault(), map), map
-
-                },
-                {
-                        new JDBCReplicator<Integer, BeanClass>(
-                                Integer.class, BeanClass.class, stmt, tableName,
-                                getDefault(), map), map
+                        new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName)
                 }
         });
     }
@@ -215,18 +186,29 @@ public class SHMExternalReplicatorWithModIterTest {
 
     @After
     public void after() {
+
         // cleans up the files or removes the items from the database
-        externalReplicator.removeAllExternal(map.keySet());
+        map.clear();
+
     }
 
-    public SHMExternalReplicatorWithModIterTest(AbstractExternalReplicator externalReplicator, VanillaSharedReplicatedHashMap map) throws
+    public SHMExternalReplicatorWithBuilderTest(ExternalReplicatorBuilder builder) throws
             IOException {
-        this.externalReplicator = externalReplicator;
-        this.map = map;
+
+
+        final SharedHashMapBuilder sharedHashMapBuilder = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 1)
+                .canReplicate(true)
+                .externalReplicatorBuilder(builder)
+                .entries(20000);
+
+        map = sharedHashMapBuilder.create(getPersistenceFile(), Integer.class, BeanClass.class);
+        externalReplicator = sharedHashMapBuilder.externalReplicator();
     }
 
     @Test
-    public void testModificationIterator() throws IOException {
+    public void testModificationIterator() throws IOException, InterruptedException, TimeoutException, SQLException {
 
         final Date expectedDate = new Date(0);
         final DateTime expectedDateTime = new DateTime(0, UTC);
@@ -265,34 +247,21 @@ public class SHMExternalReplicatorWithModIterTest {
         final BeanClass[] beanClasses = {bean1, bean2, bean3};
 
 
-        ReplicatedSharedHashMap.ModificationNotifier notifier = new ReplicatedSharedHashMap
-                .ModificationNotifier() {
-            @Override
-            public void onChange() {
-
-            }
-        };
-
-        final VanillaSharedReplicatedHashMap.ModificationIterator modificationIterator
-                = map.acquireModificationIterator((byte) 1, notifier, true);
-
         for (BeanClass bean : beanClasses) {
             map.put(bean.id, bean);
         }
 
-        // this will update the database with the new values added to the map
-        // ideally this will be run on its own thread
-        while (modificationIterator.hasNext()) {
-            modificationIterator.nextEntry(externalReplicator);
-        }
+        connection.commit();
+        Thread.sleep(100);
 
         // we will now check, that what as got saved to the database is all 3 beans
         for (final BeanClass bean : beanClasses) {
-            final BeanClass external = externalReplicator.getExternal(bean.id);
-            Assert.assertEquals(bean.name, external.name);
+            final BeanClass external = getExternal(bean.id, 1000);
+            Assert.assertTrue(waitTimeEqual(10, bean.name, external.name));
         }
 
     }
+
 
     private static int sequenceNumber;
 
@@ -300,9 +269,17 @@ public class SHMExternalReplicatorWithModIterTest {
         return "dbo.Test" + System.nanoTime() + sequenceNumber++;
     }
 
+    public BeanClass getExternal(Integer id, long timeout) throws TimeoutException, InterruptedException {
+        long endTime = System.currentTimeMillis() + timeout;
+        while (System.currentTimeMillis() < endTime) {
+            final BeanClass external = externalReplicator.getExternal(id);
+            if (external != null)
+                return external;
+            Thread.sleep(1);
+        }
+        throw new TimeoutException("unable to get id=" + id);
+    }
 
 }
-
-
 
 

@@ -27,17 +27,19 @@ import org.junit.Test;
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static net.openhft.collections.ExternalReplicatorTest.NOP_ENTRY_RESOLVER;
-import static org.joda.time.DateTimeZone.UTC;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Column;
+import static net.openhft.collections.ExternalReplicator.FieldMapper.Key;
+import static net.openhft.collections.SHMExternalReplicatorWithoutBuilderTest.NOP_ENTRY_RESOLVER;
+import static net.openhft.collections.SHMExternalReplicatorWithoutBuilderTest.waitTimeEqual;
 
 /**
  * @author Rob Austin.
  */
-public class JDBCReplicatorTest {
+public class SHMExternalJDBCReplicatorTest {
 
     private Connection connection;
     private Statement stmt;
@@ -71,7 +73,7 @@ public class JDBCReplicatorTest {
 
         String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName +
+        stmt.executeUpdate("CREATE TABLE " + tableName +
                 " (ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
@@ -88,22 +90,21 @@ public class JDBCReplicatorTest {
 
 
     @Test
-    public void testJDBCWithCustomFieldMapper() throws ClassNotFoundException, SQLException, InstantiationException {
+    public void testJDBCWithCustomFieldMapper() throws ClassNotFoundException, SQLException, InstantiationException, InterruptedException {
 
         String tableName = createUniqueTableName();
         String createString =
-                "create table " + tableName + " " +
+                "CREATE TABLE " + tableName + " " +
                         "(ID integer NOT NULL, " +
                         "F1 varchar(40) NOT NULL, " +
                         "PRIMARY KEY (ID))";
 
+
         stmt.executeUpdate(createString);
 
-        final Map map = new HashMap();
 
-        final JDBCReplicator jdbcCReplicator = new JDBCReplicator(map, Object.class, Object.class, stmt,
-                tableName,
-                new FieldMapper() {
+        final ExternalReplicator.FieldMapper fieldMapper =
+                new ExternalReplicator.FieldMapper() {
 
                     @Override
                     public CharSequence keyName() {
@@ -124,10 +125,17 @@ public class JDBCReplicatorTest {
                     public Set<ValueWithFieldName> getFields(Object value, boolean skipKey) {
                         return Collections.singleton(new ValueWithFieldName("F1", "'Rob'"));
                     }
-                }, NOP_ENTRY_RESOLVER);
+                };
+
+        final ExternalJDBCReplicatorBuilder jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(Object.class, stmt, tableName);
+        jdbcReplicatorBuilder.fieldMapper(fieldMapper);
+
+        final ExternalJDBCReplicator jdbcCReplicator = new ExternalJDBCReplicator(Object.class, Object.class,
+                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER);
 
 
         jdbcCReplicator.putExternal("1", "F1", true);
+
         ResultSet resultSets = stmt.executeQuery("select * from " + tableName);
 
         resultSets.next();
@@ -139,7 +147,7 @@ public class JDBCReplicatorTest {
 
 
     @Test
-    public void testJDBCWithAnnotationBasedFieldMapper() throws ClassNotFoundException, SQLException, InstantiationException {
+    public void testJDBCWithAnnotationBasedFieldMapper() throws ClassNotFoundException, SQLException, InstantiationException, InterruptedException {
 
         class BeanClass {
 
@@ -180,7 +188,7 @@ public class JDBCReplicatorTest {
 
         final String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "CHAR_VAL char(1) NOT NULL, " +
@@ -191,11 +199,11 @@ public class JDBCReplicatorTest {
                 "BOOL_VAL BOOLEAN," +
                 "PRIMARY KEY (ID))");
 
-        final HashMap hashMap = new HashMap();
 
-        final JDBCReplicator<Integer, BeanClass> jdbcCReplicator = new
-                JDBCReplicator<Integer, BeanClass>
-                (Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
+        final ExternalJDBCReplicatorBuilder jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+        final ExternalJDBCReplicator jdbcCReplicator = new ExternalJDBCReplicator(Integer.class, BeanClass.class,
+                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER);
+
         final Date expectedDate = new Date(0);
         final BeanClass bean = new BeanClass(1, "Rob", 1.234, expectedDate, 'c', false, (short) 1,
                 new DateTime(0));
@@ -206,33 +214,34 @@ public class JDBCReplicatorTest {
 
         resultSets.next();
 
-        Assert.assertEquals("Rob", resultSets.getString("NAME"));
-        Assert.assertEquals(1.234, resultSets.getDouble("DOUBLE_VAL"), 0.001);
-        Assert.assertEquals("c", resultSets.getString("CHAR_VAL"));
-        Assert.assertEquals(false, resultSets.getBoolean("BOOL_VAL"));
+        Assert.assertTrue(waitTimeEqual(10, "Rob", resultSets.getString("NAME")));
+        Assert.assertTrue(waitTimeEqual(10, "c", resultSets.getString("CHAR_VAL")));
+        Assert.assertTrue(waitTimeEqual(10, false, resultSets.getBoolean("BOOL_VAL")));
         Assert.assertEquals(1, resultSets.getShort("SHORT_VAL"));
         final java.sql.Date expected = new java.sql.Date(expectedDate.getTime());
+        Assert.assertEquals(1.234, resultSets.getDouble("DOUBLE_VAL"), 0.001);
 
-        Assert.assertEquals(expected.toLocalDate(), resultSets.getDate("DATE_VAL").toLocalDate());
+        Assert.assertTrue(waitTimeEqual(10, expected.toLocalDate(), resultSets.getDate("DATE_VAL")
+                .toLocalDate()));
 
     }
 
-    private static int sequenceNumber;
+    private static AtomicInteger sequenceNumber = new AtomicInteger();
 
     private static String createUniqueTableName() {
-        return "dbo.Test" + (sequenceNumber++) + "_" + System.nanoTime();
+        return "dbo.Test" + (sequenceNumber.incrementAndGet());
     }
 
 
     /**
-     * getExternal back a Map of all the rows in the table, the map is keyed on the tables value
+     * getExternal back a Map of all the rows in the tableName, the map is keyed on the tables value
      *
      * @throws ClassNotFoundException
      * @throws SQLException
      * @throws InstantiationException
      */
     @Test
-    public void testJDBCBulkLoading() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException {
+    public void testJDBCBulkLoading() throws ClassNotFoundException, SQLException, InstantiationException, IllegalAccessException, InterruptedException {
 
         class BeanClass {
 
@@ -258,38 +267,35 @@ public class JDBCReplicatorTest {
 
         final String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
 
-        final HashMap hashMap = new HashMap();
-
-        final JDBCReplicator<Integer, BeanClass> jdbcCReplicator =
-                new JDBCReplicator<Integer, BeanClass
-                        >(Integer.class, BeanClass.class, stmt,
-                        tableName, UTC, NOP_ENTRY_RESOLVER);
+        final ExternalJDBCReplicatorBuilder jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+        final ExternalJDBCReplicator jdbcCReplicator = new ExternalJDBCReplicator(Integer.class, BeanClass.class,
+                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER);
 
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
                 new BeanClass(2, "Peter"),
                 new BeanClass(3, "Daniel"),
-                new BeanClass(4, "Vicky")}) {
+                new BeanClass(4, "Roman")}) {
 
             jdbcCReplicator.putExternal(bean.id, bean, true);
         }
 
         final Map<Integer, BeanClass> result = jdbcCReplicator.getAll();
-        Assert.assertEquals(4, result.size());
+        Assert.assertTrue(waitTimeEqual(10, 4, result.size()));
 
     }
 
 
     @Test
     public void testJDBCLoadingASingleField() throws ClassNotFoundException, SQLException,
-            InstantiationException, IllegalAccessException {
+            InstantiationException, IllegalAccessException, InterruptedException {
 
         class BeanClass {
 
@@ -315,38 +321,37 @@ public class JDBCReplicatorTest {
 
         final String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
-        final HashMap hashMap = new HashMap();
+        final ExternalJDBCReplicatorBuilder jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+        final ExternalJDBCReplicator<Integer, BeanClass> jdbcCReplicator = new ExternalJDBCReplicator(Integer.class, BeanClass.class,
+                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER);
 
-        final JDBCReplicator<Integer, BeanClass> jdbcCReplicator =
-                new JDBCReplicator<Integer, BeanClass
-                        >(Integer.class, BeanClass.class, stmt, tableName, UTC, NOP_ENTRY_RESOLVER);
 
         for (BeanClass bean : new BeanClass[]{
                 new BeanClass(1, "Rob"),
                 new BeanClass(2, "Peter"),
                 new BeanClass(3, "Daniel"),
-                new BeanClass(4, "Vicky")}) {
+                new BeanClass(4, "Roman")}) {
 
             jdbcCReplicator.putExternal(bean.id, bean, true);
         }
 
         final Map<Integer, BeanClass> result = jdbcCReplicator.getAll();
-        Assert.assertEquals(4, result.size());
+        Assert.assertTrue(waitTimeEqual(10, 4, result.size()));
 
         final BeanClass beanClass = jdbcCReplicator.getExternal(1);
-        Assert.assertEquals("Rob", beanClass.name);
+        Assert.assertTrue(waitTimeEqual(10, "Rob", beanClass.name));
 
     }
 
 
     @Test
     public void testJDBCLoadingAListOfFields() throws ClassNotFoundException, SQLException,
-            InstantiationException, IllegalAccessException {
+            InstantiationException, IllegalAccessException, InterruptedException {
 
         class BeanClass {
 
@@ -392,18 +397,16 @@ public class JDBCReplicatorTest {
 
         final String tableName = createUniqueTableName();
 
-        stmt.executeUpdate("create table " + tableName + " (" +
+        stmt.executeUpdate("CREATE TABLE " + tableName + " (" +
                 "ID integer NOT NULL, " +
                 "NAME varchar(40) NOT NULL, " +
                 "PRIMARY KEY (ID))");
 
-        final HashMap hashMap = new HashMap();
 
-        final JDBCReplicator<Integer, BeanClass> jdbcCReplicator =
-                new JDBCReplicator<Integer, BeanClass
-                        >(Integer.class, BeanClass.class, stmt,
-                        tableName,
-                        UTC, NOP_ENTRY_RESOLVER);
+        final ExternalJDBCReplicatorBuilder jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+        final ExternalJDBCReplicator jdbcCReplicator = new ExternalJDBCReplicator(Integer.class, BeanClass.class,
+                jdbcReplicatorBuilder, NOP_ENTRY_RESOLVER);
+
 
         final BeanClass rob = new BeanClass(1, "Rob");
         final BeanClass peter = new BeanClass(2, "Peter");
@@ -411,13 +414,13 @@ public class JDBCReplicatorTest {
                 rob,
                 peter,
                 new BeanClass(3, "Daniel"),
-                new BeanClass(4, "Vicky")}) {
+                new BeanClass(4, "Roman")}) {
 
             jdbcCReplicator.putExternal(bean.id, bean, true);
         }
 
         final Map<Integer, BeanClass> result = jdbcCReplicator.getAll();
-        Assert.assertEquals(4, result.size());
+        Assert.assertTrue(waitTimeEqual(10, 4, result.size()));
 
         final Set<BeanClass> beanClass = jdbcCReplicator.get(1, 2, 3);
         Assert.assertTrue(beanClass.contains(rob));

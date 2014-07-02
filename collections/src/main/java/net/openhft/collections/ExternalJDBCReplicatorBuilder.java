@@ -18,16 +18,29 @@
 
 package net.openhft.collections;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.sql.Statement;
 
 /**
  * @author Rob Austin.
  */
-@Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
-@Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
-public @interface Key {
-    String name() default "";
+public class ExternalJDBCReplicatorBuilder<V> extends ExternalReplicatorBuilder<V, ExternalJDBCReplicatorBuilder<V>> {
+
+    private final Statement stmt;
+    private final String table;
+
+    public ExternalJDBCReplicatorBuilder(final Class<V> vClass, Statement statement, String tableName) {
+        super(vClass, true);
+        stmt = statement;
+        table = tableName;
+    }
+
+    public Statement stmt() {
+        return stmt;
+    }
+
+    public String tableName() {
+        return table;
+    }
+
+
 }
