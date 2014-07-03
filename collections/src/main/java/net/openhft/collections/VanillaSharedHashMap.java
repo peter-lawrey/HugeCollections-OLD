@@ -157,7 +157,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
                 sizeInBytes(), objectSerializer);
 
-        onHeaderCreated(ms.bytes(0, getHeaderSize()));
+        onHeaderCreated();
 
         long offset = getHeaderSize();
         long segmentSize = segmentSize();
@@ -170,10 +170,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * called when the header is created
-     *
-     * @param headerBytes the bytes that make up the header
      */
-    void onHeaderCreated(Bytes headerBytes) {
+    void onHeaderCreated() {
 
     }
 

@@ -41,44 +41,46 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
- * A Replicating Multi Master HashMap <p> Each remote hash-map, mirrors its changes over to another remote
- * hash map, neither hash map is considered the master store of data, each hash map uses timestamps to
- * reconcile changes. We refer to in instance of a remote hash-map as a node. A node will be connected to any
- * number of other nodes, for the first implementation the maximum number of nodes will be fixed. The data
- * that is stored locally in each node will become eventually consistent. So changes made to one node, for
- * example by calling put() will be replicated over to the other node. To achieve a high level of performance
- * and throughput, the call to put() won’t block, with concurrentHashMap, It is typical to check the return
- * code of some methods to obtain the old value for example remove(). Due to the loose coupling and lock free
- * nature of this multi master implementation,  this return value will only be the old value on the nodes
- * local data store. In other words the nodes are only concurrent locally. Its worth realising that another
- * node performing exactly the same operation may return a different value. However reconciliation will ensure
- * the maps themselves become eventually consistent. <p> Reconciliation <p> If two ( or more nodes ) were to
- * receive a change to their maps for the same key but different values, say by a user of the maps, calling
- * the put(<key>,<value>). Then, initially each node will update its local store and each local store will
- * hold a different value, but the aim of multi master replication is to provide eventual consistency across
- * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change.
- * We will refer to this notification as an event. The event will hold a timestamp indicating the time the
- * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
- * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
- * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
- * applied to the local node, otherwise the event will be ignored. <p> If two ( or more nodes ) were to
- * receive a change to their maps for the same key but different values, say by a user of the maps, calling
- * the put(<key>,<value>). Then, initially each node will update its local store and each local store will
- * hold a different value, but the aim of multi master replication is to provide eventual consistency across
- * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change.
- * We will refer to this notification as an event. The event will hold a timestamp indicating the time the
- * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
- * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
- * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
- * applied to the local node, otherwise the event will be ignored. <p> However there is an edge case that we
- * have to concern ourselves with, If two nodes update their map at the same time with different values, we
- * have to deterministically resolve which update wins, because of eventual consistency both nodes should end
- * up locally holding the same data. Although it is rare two remote nodes could receive an update to their
- * maps at exactly the same time for the same key, we have to handle this edge case, its therefore important
- * not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp
- * should win, but in this example both timestamps are the same, and the decision made to one node should be
- * identical to the decision made to the other. We resolve this simple dilemma by using a node identifier,
- * each node will have a unique identifier, the update from the node with the smallest identifier wins.
+ * A Replicating Multi Master HashMap
+ *
+ * <p>Each remote hash map, mirrors its changes over to another remote hash map, neither hash map
+ * is considered the master store of data, each hash map uses timestamps to reconcile changes.
+ * We refer to an instance of a remote hash-map as a node. A node will be connected to any number
+ * of other nodes, for the first implementation the maximum number of nodes will be fixed.
+ * The data that is stored locally in each node will become eventually consistent. So changes made
+ * to one node, for example by calling put() will be replicated over to the other node.
+ * To achieve a high level of performance and throughput, the call to put() won’t block,
+ * with concurrentHashMap, It is typical to check the return code of some methods to obtain
+ * the old value for example remove(). Due to the loose coupling and lock free nature
+ * of this multi master implementation,  this return value will only be the old value on the nodes
+ * local data store. In other words the nodes are only concurrent locally. Its worth realising
+ * that another node performing exactly the same operation may return a different value.
+ * However reconciliation will ensure the maps themselves become eventually consistent.
+ *
+ * <p>Reconciliation
+ *
+ * <p>If two ( or more nodes ) were to receive a change to their maps for the same key but different
+ * values, say by a user of the maps, calling the put(key, value). Then, initially each node will
+ * update its local store and each local store will hold a different value, but the aim
+ * of multi master replication is to provide eventual consistency across the nodes.
+ * So, with multi master when ever a node is changed it will notify the other nodes of its change.
+ * We will refer to this notification as an event. The event will hold a timestamp indicating
+ * the time the change occurred, it will also hold the state transition, in this case it was a put
+ * with a key and value. Eventual consistency is achieved by looking at the timestamp
+ * from the remote node, if for a given key, the remote nodes timestamp is newer than the local
+ * nodes timestamp, then the event from the remote node will be applied to the local node,
+ * otherwise the event will be ignored.
+ *
+ * <p>However there is an edge case that we have to concern ourselves with, If two nodes update
+ * their map at the same time with different values, we have to deterministically resolve
+ * which update wins, because of eventual consistency both nodes should end up locally holding
+ * the same data. Although it is rare two remote nodes could receive an update to their maps
+ * at exactly the same time for the same key, we have to handle this edge case, its therefore
+ * important not to rely on timestamps alone to reconcile the updates. Typically the update
+ * with the newest timestamp should win, but in this example both timestamps are the same, and
+ * the decision made to one node should be identical to the decision made to the other. We resolve
+ * this simple dilemma by using a node identifier, each node will have a unique identifier,
+ * the update from the node with the smallest identifier wins.
  *
  * @param <K> the entries key type
  * @param <V> the entries value type
@@ -86,7 +88,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
         implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
 
-    private static final int MAX_UNSIGNED_SHORT = 1 << 16;
+    private static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
@@ -159,15 +161,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    void onHeaderCreated(Bytes headerBytes) {
-        final int len = getHeaderSize() - super.getHeaderSize();
-        if (len == 0)
-            return;
-        this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
+    void onHeaderCreated() {
+        identifierUpdatedBytes = ms.bytes(super.getHeaderSize(), LAST_UPDATED_HEADER_SIZE).zeroOut();
     }
 
     /**
@@ -223,6 +219,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return (Segment) segments[segmentNum];
     }
 
+    @Override
     V lookupUsing(K key, V value, boolean create) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -630,9 +627,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
 
         /**
-         * Used only with replication, its sometimes possible to receive an old ( or stale update ) from a
-         * remote map. This method is used to determine if we should ignore such updates. <p> We can reject
-         * put() and removes() when comparing times stamps with remote systems
+         * Used only with replication, its sometimes possible to receive an old ( or stale update )
+         * from a remote map. This method is used to determine if we should ignore such updates.
+         *
+         * <p>We can reject put() and removes() when comparing times stamps with remote systems
          *
          * @param entry      the maps entry
          * @param timestamp  the time the entry was created or updated
@@ -902,9 +900,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     *
+     * <p>This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
@@ -980,9 +978,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     /**
      * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     *
+     * <p>This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1056,14 +1054,17 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * Once a change occurs to a map, map replication requires that these changes are picked up by another
-     * thread, this class provides an iterator like interface to poll for such changes. <p> In most cases the
-     * thread that adds data to the node is unlikely to be the same thread that replicates the data over to
-     * the other nodes, so data will have to be marshaled between the main thread storing data to the map, and
-     * the thread running the replication. <p> One way to perform this marshalling, would be to pipe the data
-     * into a queue. However, This class takes another approach. It uses a bit set, and marks bits which
-     * correspond to the indexes of the entries that have changed. It then provides an iterator like interface
-     * to poll for such changes.
+     * Once a change occurs to a map, map replication requires that these changes are picked up
+     * by another thread, this class provides an iterator like interface to poll for such changes.
+     *
+     * <p>In most cases the thread that adds data to the node is unlikely to be the same thread
+     * that replicates the data over to the other nodes, so data will have to be marshaled between
+     * the main thread storing data to the map, and the thread running the replication.
+     *
+     * <p>One way to perform this marshalling, would be to pipe the data into a queue. However,
+     * This class takes another approach. It uses a bit set, and marks bits
+     * which correspond to the indexes of the entries that have changed.
+     * It then provides an iterator like interface to poll for such changes.
      *
      * @author Rob Austin.
      */

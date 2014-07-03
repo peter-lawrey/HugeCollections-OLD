@@ -409,7 +409,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
 
         private ServerConnector(UdpDetails connectionDetails) {
-            super("UDP-Connector", closeables);
+            super("UDP-Connector");
             this.details = connectionDetails;
 
         }

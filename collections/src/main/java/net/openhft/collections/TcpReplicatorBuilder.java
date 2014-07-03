@@ -19,28 +19,33 @@
 package net.openhft.collections;
 
 import java.net.InetSocketAddress;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableSet;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
  * @see SharedHashMapBuilder#tcpReplicatorBuilder(TcpReplicatorBuilder)
  */
-public class TcpReplicatorBuilder implements Cloneable {
+public final class TcpReplicatorBuilder implements Cloneable {
 
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
     private int packetSize = 1024 * 8;
-    private int throttleBucketIntervalMS = 100;
-
-    private int heartBeatIntervalMS = (int) TimeUnit.SECONDS.toMillis(20);
-    private long throttle;
-    private boolean deletedModIteratorFileOnExit;
+    private long throttleBucketInterval = 100;
+    private TimeUnit throttleBucketIntervalUnit = MILLISECONDS;
+    private long heartBeatInterval = 20;
+    private TimeUnit heartBeatIntervalUnit = SECONDS;
+    private long throttle = 0;
+    private TimeUnit throttlePerUnit = MILLISECONDS;
+    private boolean deletedModIteratorFileOnExit = false;
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
@@ -95,18 +100,26 @@ public class TcpReplicatorBuilder implements Cloneable {
         return new InetSocketAddress(serverPort());
     }
 
-    public int heartBeatInterval() {
-        return heartBeatIntervalMS;
+    public long heartBeatInterval(TimeUnit unit) {
+        return unit.convert(heartBeatInterval, heartBeatIntervalUnit);
     }
 
     /**
-     * @param heartBeatInterval in milliseconds, must be greater than ZERO
-     * @return
+     * @param heartBeatInterval heart beat interval
+     * @param unit the time unit of the interval
+     * @return this builder back
+     * @throws IllegalArgumentException if the given heart beat interval is unrecognisably small for
+     *         the current TCP replicator implementation or negative. Current minimum interval is
+     *         1 millisecond.
      */
-    public TcpReplicatorBuilder heartBeatIntervalMS(int heartBeatInterval) {
-        if (heartBeatInterval <= 0) throw new IllegalArgumentException("heartBeatInterval must be greater " +
-                "than zero");
-        this.heartBeatIntervalMS = heartBeatInterval;
+    public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval, TimeUnit unit) {
+        if (unit.toMillis(heartBeatInterval) < 1) {
+            throw new IllegalArgumentException(
+                    "Minimum heart beat interval is 1 millisecond, " +
+                            heartBeatInterval + " " + unit + " given");
+        }
+        this.heartBeatInterval = heartBeatInterval;
+        this.heartBeatIntervalUnit = unit;
         return this;
     }
 
@@ -114,16 +127,14 @@ public class TcpReplicatorBuilder implements Cloneable {
     @Override
     public TcpReplicatorBuilder clone() {
         try {
-            final TcpReplicatorBuilder result = (TcpReplicatorBuilder) super.clone();
-            result.endpoints(new HashSet<InetSocketAddress>(this.endpoints()));
-            return result;
+            return (TcpReplicatorBuilder) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new AssertionError(e);
         }
     }
 
-    private TcpReplicatorBuilder endpoints(Set<InetSocketAddress> endpoints) {
-        this.endpoints = endpoints;
+    private TcpReplicatorBuilder endpoints(Collection<InetSocketAddress> endpoints) {
+        this.endpoints = unmodifiableSet(new HashSet<InetSocketAddress>(endpoints));
         return this;
     }
 
@@ -133,40 +144,55 @@ public class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @return bits per seconds
+     * Default maximum bits is {@code 0}, i. e. there is no throttling.
+     *
+     * @param perUnit maximum bits is returned per this time unit
+     * @return maximum bits per the given time unit
      */
-    public long throttle() {
-        return this.throttle;
+    public long throttle(TimeUnit perUnit) {
+        return throttlePerUnit.convert(throttle, perUnit);
     }
 
     /**
-     * @param throttleInBitPerSecond the preferred maximum bit per seconds.
-     * @return this
+     * @param maxBits the preferred maximum bits.
+     *                Non-positive value designates TCP replicator shouldn't throttle.
+     * @param perUnit the time unit per which maximum bits specified
+     * @return this builder back
      */
-    public TcpReplicatorBuilder throttle(long throttleInBitPerSecond) {
-        this.throttle = throttleInBitPerSecond;
+    public TcpReplicatorBuilder throttle(long maxBits, TimeUnit perUnit) {
+        this.throttle = maxBits;
+        this.throttlePerUnit = perUnit;
         return this;
     }
 
 
     /**
-     * @return in milliseconds the size of the bucket for the token bucket algorithm
+     * Default throttle bucketing interval is 100 millis.
+     *
+     * @param unit the time unit of the interval
+     * @return the bucketing interval for throttling
      */
-    public int throttleBucketIntervalMS() {
-        return throttleBucketIntervalMS;
+    public long throttleBucketInterval(TimeUnit unit) {
+        return unit.convert(throttleBucketInterval, throttleBucketIntervalUnit);
     }
 
     /**
-     * @param throttleBucketInterval in milliseconds the size of the bucket for the token bucket algorithm
-     * @return this
+     * @param throttleBucketInterval the bucketing interval for throttling
+     * @param unit the time unit of the interval
+     * @return this builder back
+     * @throws IllegalArgumentException if the given bucketing interval is unrecognisably small for
+     *         the current TCP replicator implementation or negative. Current minimum interval is
+     *         1 millisecond.
      */
-    public TcpReplicatorBuilder throttleBucketIntervalMS(int throttleBucketInterval) {
-        this.throttleBucketIntervalMS = throttleBucketInterval;
+    public TcpReplicatorBuilder throttleBucketInterval(long throttleBucketInterval, TimeUnit unit) {
+        if (unit.toMillis(throttleBucketInterval) < 1) {
+            throw new IllegalArgumentException(
+                    "Minimum throttle bucketing interval is 1 millisecond, " +
+                            throttleBucketInterval + " " + unit + " given");
+        }
+        this.throttleBucketInterval = throttleBucketInterval;
+        this.throttleBucketIntervalUnit = unit;
         return this;
-    }
-
-    public int minIntervalMS() {
-        return Math.min(throttleBucketIntervalMS, heartBeatIntervalMS);
     }
 
     /**

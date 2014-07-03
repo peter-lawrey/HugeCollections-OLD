@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -38,16 +37,17 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
+import static java.lang.Math.round;
 import static java.nio.channels.SelectionKey.OP_WRITE;
+import static java.util.concurrent.TimeUnit.DAYS;
 
 /**
  * @author Rob Austin.
  */
 abstract class AbstractChannelReplicator implements Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractChannelReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractChannelReplicator.class);
     static final int BITS_IN_A_BYTE = 8;
 
     final ExecutorService executorService;
@@ -70,7 +70,8 @@ abstract class AbstractChannelReplicator implements Closeable {
      */
     void register(@NotNull final Queue<Runnable> selectableChannels) throws
             ClosedChannelException {
-        for (Runnable runnable = selectableChannels.poll(); runnable != null; runnable = selectableChannels.poll()) {
+        for (Runnable runnable = selectableChannels.poll(); runnable != null;
+             runnable = selectableChannels.poll()) {
             try {
                 runnable.run();
             } catch (Exception e) {
@@ -82,7 +83,6 @@ abstract class AbstractChannelReplicator implements Closeable {
 
     @Override
     public void close() {
-
         synchronized (this.closeables) {
             for (Closeable closeable : this.closeables) {
                 try {
@@ -91,8 +91,8 @@ abstract class AbstractChannelReplicator implements Closeable {
                     LOG.error("", e);
                 }
             }
+            closeables.clear();
         }
-        closeables.clear();
         executorService.shutdownNow();
     }
 
@@ -102,23 +102,23 @@ abstract class AbstractChannelReplicator implements Closeable {
      */
     static class Throttler {
 
-        private long lastTime = System.currentTimeMillis();
+        private final Selector selector;
         private final Set<SelectableChannel> channels = new CopyOnWriteArraySet<SelectableChannel>();
-        private long byteWritten;
-        private Selector selector;
-        private final int throttleInterval;
+        private final long throttleInterval;
         private final long maxBytesInInterval;
 
+        private long lastTime = System.currentTimeMillis();
+        private long bytesWritten;
+
         Throttler(@NotNull Selector selector,
-                  int throttleInterval,
+                  long throttleIntervalInMillis,
                   long serializedEntrySize,
-                  long bitsPerSecond) {
+                  long bitsPerDay) {
 
             this.selector = selector;
-            this.throttleInterval = throttleInterval;
-            this.maxBytesInInterval = (TimeUnit.SECONDS.toMillis(bitsPerSecond) /
-                    (throttleInterval * BITS_IN_A_BYTE))
-                    - serializedEntrySize;
+            this.throttleInterval = throttleIntervalInMillis;
+            double bytesPerMs = ((double) bitsPerDay) / DAYS.toMillis(1) / BITS_IN_A_BYTE;
+            this.maxBytesInInterval = round(bytesPerMs * throttleInterval) - serializedEntrySize;
         }
 
         public void add(SelectableChannel selectableChannel) {
@@ -141,11 +141,11 @@ abstract class AbstractChannelReplicator implements Closeable {
                 return;
 
             lastTime = time;
-            byteWritten = 0;
+            bytesWritten = 0;
 
 
             if (LOG.isDebugEnabled())
-                LOG.debug("Removing OP_WRITE on all channels");
+                LOG.debug("Restoring OP_WRITE on all channels");
 
             for (SelectableChannel selectableChannel : channels) {
 
@@ -165,12 +165,12 @@ abstract class AbstractChannelReplicator implements Closeable {
          * @throws ClosedChannelException
          */
         public void contemplateUnregisterWriteSocket(int len) throws ClosedChannelException {
-            byteWritten += len;
-            if (byteWritten > maxBytesInInterval) {
+            bytesWritten += len;
+            if (bytesWritten > maxBytesInInterval) {
                 for (SelectableChannel channel : channels) {
                     final SelectionKey selectionKey = channel.keyFor(selector);
-
-                    selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
+                    if (selectionKey != null)
+                        selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
 
                     if (LOG.isDebugEnabled())
                         LOG.debug("Throttling UDP writes");
@@ -209,18 +209,14 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-    abstract static class AbstractConnector {
-
-        int connectionAttempts;
+    abstract class AbstractConnector {
 
         private final String name;
-
+        private int connectionAttempts = 0;
         private volatile SelectableChannel socketChannel;
-        private Set<Closeable> closeables;
 
-        public AbstractConnector(String name, Set<Closeable> closeables) {
+        public AbstractConnector(String name) {
             this.name = name;
-            this.closeables = closeables;
         }
 
         abstract SelectableChannel doConnect() throws IOException, InterruptedException;
@@ -266,7 +262,6 @@ abstract class AbstractChannelReplicator implements Closeable {
                     try {
                         if (reconnectionInterval > 0)
                             Thread.sleep(reconnectionInterval);
-
 
                         synchronized (closeables) {
                             socketChannel = doConnect();
