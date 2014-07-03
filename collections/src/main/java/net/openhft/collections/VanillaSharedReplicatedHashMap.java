@@ -25,6 +25,7 @@ import net.openhft.lang.io.MappedStore;
 import net.openhft.lang.io.MultiStoreBytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.Byteable;
+import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
@@ -38,6 +39,8 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
+import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -86,7 +89,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
+        implements ReplicatedSharedHashMap<K, V>, EntryExternalizable, EntryResolver<K, V>, Closeable {
 
     private static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
@@ -899,10 +902,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
+<<<<<<< HEAD
      * {@inheritDoc}
      *
      * <p>This method does not set a segment lock, A segment lock should be obtained before calling
      * this method, especially when being used in a multi threaded context.
+=======
+     * {@inheritDoc} <p/> This method does not set a segment lock, A segment lock should be obtained before
+     * calling this method, especially when being used in a multi threaded context.
+>>>>>>> 955f195f709d270f36987e9a5d63c6d3cc22f8fa
      */
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
@@ -977,10 +985,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
+<<<<<<< HEAD
      * {@inheritDoc}
      *
      * <p>This method does not set a segment lock, A segment lock should be obtained before calling
      * this method, especially when being used in a multi threaded context.
+=======
+     * {@inheritDoc} <p/> This method does not set a segment lock, A segment lock should be obtained before
+     * calling this method, especially when being used in a multi threaded context.
+>>>>>>> 955f195f709d270f36987e9a5d63c6d3cc22f8fa
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1082,8 +1095,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         private volatile long position = -1;
 
         /**
-         * @param bytes
-         * @param nextListener
+         * @param bytes                the back the bitset, used to mark which entries have changed
+         * @param nextListener         a chain for  SharedMapEventListeners
          * @param modificationNotifier called when ever there is a change applied
          */
         public ModificationIterator(@NotNull final Bytes bytes,
@@ -1193,7 +1206,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
          * @param entryCallback call this to get an entry, this class will take care of the locking
          * @return true if an entry was processed
          */
-        public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
+        public boolean nextEntry(@NotNull final AbstractEntryCallback entryCallback) {
             long position = this.position;
             while (true) {
                 long oldPosition = position;
@@ -1261,6 +1274,96 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 segment.dirtyEntries(fromTimeStamp, entryModifiableCallback);
             }
 
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public K key(@NotNull NativeBytes entry, K usingKey) {
+
+        final long start = entry.position();
+        try {
+
+            // keyLen
+            entry.readStopBit();
+
+            final long keyPosition = entry.position();
+
+            if (generatedValueType)
+                if (usingKey == null)
+                    usingKey = (K) DataValueClasses.newDirectReference(kClass);
+                else
+                    assert usingKey instanceof Byteable;
+            if (usingKey instanceof Byteable) {
+                ((Byteable) usingKey).bytes(entry, keyPosition);
+                return usingKey;
+            }
+
+            return entry.readInstance(kClass, usingKey);
+        } finally {
+            entry.position(start);
+        }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public V value(@NotNull NativeBytes entry, V usingValue) {
+        final long start = entry.position();
+        try {
+
+            // keyLen
+            entry.skip(entry.readStopBit());
+
+            //timeStamp
+            entry.readLong();
+
+            final byte identifier = entry.readByte();
+            if (identifier != localIdentifier) {
+                return null;
+            }
+
+            final boolean isDeleted = entry.readBoolean();
+            long valueLen;
+            if (!isDeleted) {
+                valueLen = entry.readStopBit();
+                assert valueLen > 0;
+            } else {
+                return null;
+            }
+
+            final long valueOffset = entry.position();
+
+            if (generatedValueType)
+                if (usingValue == null)
+                    usingValue = (V) DataValueClasses.newDirectReference(vClass);
+                else
+                    assert usingValue instanceof Byteable;
+            if (usingValue instanceof Byteable) {
+                ((Byteable) usingValue).bytes(entry, valueOffset);
+                return usingValue;
+            }
+
+            return entry.readInstance(vClass, usingValue);
+        } finally {
+            entry.position(start);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean wasRemoved(@NotNull NativeBytes entry) {
+        final long start = entry.position();
+        try {
+            return entry.readBoolean(entry.readStopBit() + 10);
+        } finally {
+            entry.position(start);
         }
     }
 

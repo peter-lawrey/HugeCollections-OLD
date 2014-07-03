@@ -31,7 +31,7 @@ public interface Index {
     void setNextLocation(int index);
 
     /**
-     * get the index where the data is stored in the byte buffer
+     * getExternal the index where the data is stored in the byte buffer
      */
     int getWriterLocation();
 }

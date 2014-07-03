@@ -879,7 +879,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     private static final int SIZE_OF_UNSIGNED_SHORT = 2;
 
-    static class EntryCallback extends VanillaSharedReplicatedHashMap.EntryCallback {
+    static class EntryCallback extends ReplicatedSharedHashMap.AbstractEntryCallback {
 
         private final EntryExternalizable externalizable;
         private final ByteBufferBytes in;

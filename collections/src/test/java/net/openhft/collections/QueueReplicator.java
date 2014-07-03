@@ -141,8 +141,8 @@ public class QueueReplicator<K, V> {
                 buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
-                final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
-                        new VanillaSharedReplicatedHashMap.EntryCallback() {
+                final ReplicatedSharedHashMap.AbstractEntryCallback entryCallback =
+                        new ReplicatedSharedHashMap.AbstractEntryCallback() {
 
 
                             /**
