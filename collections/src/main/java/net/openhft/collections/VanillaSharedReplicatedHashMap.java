@@ -92,15 +92,17 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
     // for file, jdbc and UDP replication
-    public static final int RESERVED_MOD_ITER = 5;
+    public static final int RESERVED_MOD_ITER = 4;
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
-    private final AtomicReferenceArray<ModificationIterator> modificationIterators =
-            new AtomicReferenceArray<ModificationIterator>(127 + RESERVED_MOD_ITER);
+
     private Bytes identifierUpdatedBytes;
-    private long startOfModificationIterators;
+    private Bytes modDelBytes;
+
+    private final ModificationDelegator modificationDelegator;
+    private int startOfModificationIterators;
 
     public VanillaSharedReplicatedHashMap(@NotNull SharedHashMapBuilder builder,
                                           @NotNull File file,
@@ -112,6 +114,18 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         this.localIdentifier = builder.identifier();
 
         createMappedStoreAndSegments(file);
+
+        modificationDelegator = new ModificationDelegator(eventListener, modDelBytes, startOfModificationIterators);
+        this.eventListener = modificationDelegator;
+    }
+
+    /**
+     * this is used to iterate over all the modification iterators
+     *
+     * @return
+     */
+    int assignedModIterBitSetSizeInBytes() {
+        return (int) align64(127 + RESERVED_MOD_ITER / 8);
     }
 
     @Override
@@ -140,7 +154,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     int getHeaderSize() {
         final int headerSize = super.getHeaderSize();
 
-        return headerSize + LAST_UPDATED_HEADER_SIZE + modIterBitSetSizeInBytes() * (128 + RESERVED_MOD_ITER);
+        return headerSize + LAST_UPDATED_HEADER_SIZE + (modIterBitSetSizeInBytes() * (128 +
+                RESERVED_MOD_ITER)) + assignedModIterBitSetSizeInBytes();
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
@@ -166,8 +181,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     @Override
     void onHeaderCreated() {
-        identifierUpdatedBytes = ms.bytes(super.getHeaderSize(), LAST_UPDATED_HEADER_SIZE).zeroOut();
-        startOfModificationIterators = super.getHeaderSize() + LAST_UPDATED_HEADER_SIZE;
+
+        int offset = super.getHeaderSize();
+        identifierUpdatedBytes = ms.bytes(offset, offset += LAST_UPDATED_HEADER_SIZE).zeroOut();
+        modDelBytes = ms.bytes(offset, offset += assignedModIterBitSetSizeInBytes()).zeroOut();
+        startOfModificationIterators = offset;
     }
 
     /**
@@ -251,38 +269,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public ModificationIterator acquireModificationIterator(short remoteIdentifier,
-                                                            ModificationNotifier modificationNotifier)
-            throws IOException {
-
-        final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
-
-        if (modificationIterator != null)
-            return modificationIterator;
-
-        synchronized (modificationIterators) {
-            final ModificationIterator modificationIterator0 = modificationIterators.get(remoteIdentifier);
-
-            if (modificationIterator0 != null)
-                return modificationIterator0;
-
-            final DirectBytes bytes = ms.bytes(startOfModificationIterators + (modIterBitSetSizeInBytes()
-                            * remoteIdentifier),
-                    modIterBitSetSizeInBytes());
-
-            final ModificationIterator newEventListener = new ModificationIterator(
-                    bytes, eventListener, modificationNotifier);
-
-            modificationIterators.set(remoteIdentifier, newEventListener);
-            eventListener = newEventListener;
-            return newEventListener;
-        }
-    }
-
 
     void addCloseable(Closeable closeable) {
         closeables.add(closeable);
@@ -311,6 +297,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     @Override
     public byte identifier() {
         return localIdentifier;
+    }
+
+    @Override
+    public ReplicatedSharedHashMap.ModificationIterator acquireModificationIterator
+            (short remoteIdentifier,
+             @NotNull final ModificationNotifier modificationNotifier) throws IOException {
+
+        return modificationDelegator.acquireModificationIterator(remoteIdentifier, modificationNotifier);
     }
 
 
@@ -976,12 +970,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * <<<<<<< HEAD {@inheritDoc}
+     * {@inheritDoc}
      *
      * <p>This method does not set a segment lock, A segment lock should be obtained before calling this
-     * method, especially when being used in a multi threaded context. ======= {@inheritDoc} <p/> This method
-     * does not set a segment lock, A segment lock should be obtained before calling this method, especially
-     * when being used in a multi threaded context. >>>>>>> 955f195f709d270f36987e9a5d63c6d3cc22f8fa
+     * method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1055,6 +1047,129 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
+     * receive an update from the map, via the SharedMapEventListener and delegates the changes to the
+     * currently active modification iterators
+     */
+    class ModificationDelegator extends SharedMapEventListener<K, V, SharedHashMap<K, V>> {
+
+        // the assigned modification iterators
+        private final ATSDirectBitSet bitSet;
+
+        private final AtomicReferenceArray<ModificationIterator> modificationIterators =
+                new AtomicReferenceArray<ModificationIterator>(127 + RESERVED_MOD_ITER);
+
+        private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
+        private long startOfModificationIterators;
+
+        public ModificationDelegator(@NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
+                                     final Bytes bytes, long startOfModificationIterators) {
+            this.nextListener = nextListener;
+            this.startOfModificationIterators = startOfModificationIterators;
+            bitSet = new ATSDirectBitSet(bytes);
+
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public ModificationIterator acquireModificationIterator(short remoteIdentifier,
+                                                                ModificationNotifier modificationNotifier)
+                throws IOException {
+
+            final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
+
+            if (modificationIterator != null)
+                return modificationIterator;
+
+            synchronized (modificationIterators) {
+                final ModificationIterator modificationIterator0 = modificationIterators.get(remoteIdentifier);
+
+                if (modificationIterator0 != null)
+                    return modificationIterator0;
+
+                final DirectBytes bytes = ms.bytes(startOfModificationIterators + (modIterBitSetSizeInBytes()
+                                * remoteIdentifier),
+                        modIterBitSetSizeInBytes());
+
+                final ModificationIterator newModificationIterator = new ModificationIterator(
+                        bytes, modificationNotifier);
+
+
+                modificationIterators.set(remoteIdentifier, newModificationIterator);
+                bitSet.set(remoteIdentifier);
+                return newModificationIterator;
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                          boolean added, K key, V value, long pos, SharedSegment segment) {
+
+            assert VanillaSharedReplicatedHashMap.this == map :
+                    "ModificationIterator.onPut() is called from outside of the parent map";
+            try {
+                nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
+
+            for (long next = bitSet.nextSetBit(0); next > 0; next = bitSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onPut(map, entry, metaDataBytes,
+                            added, key, value, pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+
+
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                             K key, V value, int pos, SharedSegment segment) {
+            assert VanillaSharedReplicatedHashMap.this == map :
+                    "ModificationIterator.onRemove() is called from outside of the parent map";
+            try {
+                nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
+
+            for (long next = bitSet.nextSetBit(0); next > 0; next = bitSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+
+        }
+
+
+        @Override
+        public V onGetMissing(SharedHashMap<K, V> map, Bytes keyBytes, K key,
+                              V usingValue) {
+            return nextListener.onGetMissing(map, keyBytes, key, usingValue);
+        }
+
+        @Override
+        public void onGetFound(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                               K key, V value) {
+            nextListener.onGetFound(map, entry, metaDataBytes, key, value);
+        }
+
+    }
+
+    /**
      * Once a change occurs to a map, map replication requires that these changes are picked up by another
      * thread, this class provides an iterator like interface to poll for such changes.
      *
@@ -1076,22 +1191,19 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         private final ATSDirectBitSet changes;
         private final int segmentIndexShift;
         private final long posMask;
-        private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
+
         private final EntryModifiableCallback entryModifiableCallback = new EntryModifiableCallback();
 
         private volatile long position = -1;
 
         /**
          * @param bytes                the back the bitset, used to mark which entries have changed
-         * @param nextListener         a chain for  SharedMapEventListeners
          * @param modificationNotifier called when ever there is a change applied
          */
         public ModificationIterator(@NotNull final Bytes bytes,
-                                    @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
                                     @NotNull final ModificationNotifier modificationNotifier) {
 
             this.modificationNotifier = modificationNotifier;
-            this.nextListener = nextListener;
             long bitsPerSegment = bitsPerSegmentInModIterBitSet();
             segmentIndexShift = Long.numberOfTrailingZeros(bitsPerSegment);
             posMask = bitsPerSegment - 1;
@@ -1118,16 +1230,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
-            try {
-                nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
-            } catch (Exception e) {
-                LOG.error("", e);
-            }
+
 
             changes.set(combine(segment.getIndex(), pos));
 
             modificationNotifier.onChange();
-
 
         }
 
@@ -1139,16 +1246,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                              K key, V value, int pos, SharedSegment segment) {
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onRemove() is called from outside of the parent map";
-            try {
-                nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
-            } catch (Exception e) {
-                LOG.error("", e);
-            }
+
 
             changes.set(combine(segment.getIndex(), pos));
-
             modificationNotifier.onChange();
-
 
         }
 
@@ -1160,19 +1261,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             changes.clear(combine(segment.getIndex(), pos));
             // don't call nextListener.onRelocation(),
             // because no one event listener else overrides this method.
-        }
-
-
-        @Override
-        public V onGetMissing(SharedHashMap<K, V> map, Bytes keyBytes, K key,
-                              V usingValue) {
-            return nextListener.onGetMissing(map, keyBytes, key, usingValue);
-        }
-
-        @Override
-        public void onGetFound(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
-                               K key, V value) {
-            nextListener.onGetFound(map, entry, metaDataBytes, key, value);
         }
 
 

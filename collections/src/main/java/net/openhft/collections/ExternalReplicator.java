@@ -109,8 +109,7 @@ public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryC
             return true;
         }
 
-        public void setModificationIterator(final VanillaSharedReplicatedHashMap.ModificationIterator
-                                                    modIterator) {
+        public void setModificationIterator(final ReplicatedSharedHashMap.ModificationIterator modIterator) {
             final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
             executorService.execute(new Runnable() {
@@ -239,9 +238,9 @@ public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryC
 
 
             /**
-             * @return an annotation based Object Relational Mapper (ORM) - Uses reflection and the annotations
-             * provided in the value object ( of type <V> ) to define the relationship between the database tableName
-             * and the value object
+             * @return an annotation based Object Relational Mapper (ORM) - Uses reflection and the
+             * annotations provided in the value object ( of type <V> ) to define the relationship between the
+             * database tableName and the value object
              */
             public <V> FieldMapper<V> create(final Class<V> vClass, final DateTimeFormatter dateTimeFormatter) {
 
@@ -396,13 +395,15 @@ public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryC
 
 
         @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
-        @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
+        @Target({ElementType.FIELD})
+                // This annotation can only be applied to class methods.
         @interface Key {
             String name() default "";
         }
 
         @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
-        @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
+        @Target({ElementType.FIELD})
+                // This annotation can only be applied to class methods.
         @interface Column {
             String name() default "";
         }

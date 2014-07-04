@@ -17,7 +17,6 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.serialization.BytesMarshallableSerializer;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
@@ -566,21 +565,12 @@ public final class SharedHashMapBuilder implements Cloneable {
             } else
                 throw new IllegalStateException("builder of type " + builder.getClass() + " is not supported.");
 
-            map.acquireModificationIterator(id, externalReplicator);
 
-            // the  modification iterator will not be stored in shared memory
-            final ByteBufferBytes modIteratorBytes =
-                    new ByteBufferBytes(ByteBuffer.allocate(map.modIterBitSetSizeInBytes()));
-
-            final VanillaSharedReplicatedHashMap.ModificationIterator modIterator =
-                    map.new ModificationIterator(
-                            modIteratorBytes,
-                            map.eventListener,
-                            externalReplicator);
+            final ReplicatedSharedHashMap.ModificationIterator modIterator
+                    = map.acquireModificationIterator(id, externalReplicator);
 
             externalReplicator.setModificationIterator(modIterator);
 
-            map.eventListener = modIterator;
             map.addCloseable(externalReplicator);
             return externalReplicator;
         } catch (Exception e) {
@@ -610,12 +600,10 @@ public final class SharedHashMapBuilder implements Cloneable {
         final UdpReplicator udpReplicator =
                 new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
 
-        final VanillaSharedReplicatedHashMap<K, V>.ModificationIterator udpModIterator = result
-                .acquireModificationIterator(UDP_REPLICATION_MODIFICATION_ITERATOR_ID, udpReplicator);
+        final ReplicatedSharedHashMap.ModificationIterator udpModIterator
+                = result.acquireModificationIterator(UDP_REPLICATION_MODIFICATION_ITERATOR_ID, udpReplicator);
 
         udpReplicator.setModificationIterator(udpModIterator);
-        result.eventListener = udpModIterator;
-
 
         result.addCloseable(udpReplicator);
     }
