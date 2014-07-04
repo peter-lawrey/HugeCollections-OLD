@@ -92,7 +92,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
     // for file, jdbc and UDP replication
-    public static final int RESERVED_MOD_ITER = 4;
+    public static final int RESERVED_MOD_ITER = 8;
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
@@ -125,7 +125,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * @return
      */
     int assignedModIterBitSetSizeInBytes() {
-        return (int) align64(127 + RESERVED_MOD_ITER / 8);
+        return (int) align64((long) Math.ceil(127 + RESERVED_MOD_ITER / 8));
     }
 
     @Override
@@ -183,8 +183,13 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     void onHeaderCreated() {
 
         int offset = super.getHeaderSize();
-        identifierUpdatedBytes = ms.bytes(offset, offset += LAST_UPDATED_HEADER_SIZE).zeroOut();
-        modDelBytes = ms.bytes(offset, offset += assignedModIterBitSetSizeInBytes()).zeroOut();
+
+        identifierUpdatedBytes = ms.bytes(offset, LAST_UPDATED_HEADER_SIZE).zeroOut();
+        offset += LAST_UPDATED_HEADER_SIZE;
+
+        modDelBytes = ms.bytes(offset, assignedModIterBitSetSizeInBytes()).zeroOut();
+        offset += assignedModIterBitSetSizeInBytes();
+
         startOfModificationIterators = offset;
     }
 
@@ -890,12 +895,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * <<<<<<< HEAD {@inheritDoc}
+     * {@inheritDoc}
      *
      * <p>This method does not set a segment lock, A segment lock should be obtained before calling this
-     * method, especially when being used in a multi threaded context. ======= {@inheritDoc} <p/> This method
-     * does not set a segment lock, A segment lock should be obtained before calling this method, especially
-     * when being used in a multi threaded context. >>>>>>> 955f195f709d270f36987e9a5d63c6d3cc22f8fa
+     * method, especially when being used in a multi threaded context.
      */
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
