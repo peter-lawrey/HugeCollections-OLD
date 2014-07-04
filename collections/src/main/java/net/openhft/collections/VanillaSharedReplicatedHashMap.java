@@ -91,11 +91,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
 
+    // for file, jdbc and UDP replication
+    public static final int RESERVED_MOD_ITER = 5;
+
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
     private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
     private final AtomicReferenceArray<ModificationIterator> modificationIterators =
-            new AtomicReferenceArray<ModificationIterator>(127);
+            new AtomicReferenceArray<ModificationIterator>(127 + RESERVED_MOD_ITER);
     private Bytes identifierUpdatedBytes;
     private long startOfModificationIterators;
 
@@ -137,7 +140,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     int getHeaderSize() {
         final int headerSize = super.getHeaderSize();
 
-        return headerSize + LAST_UPDATED_HEADER_SIZE + modIterBitSetSizeInBytes() * 128;
+        return headerSize + LAST_UPDATED_HEADER_SIZE + modIterBitSetSizeInBytes() * (128 + RESERVED_MOD_ITER);
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
@@ -252,7 +255,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public ModificationIterator acquireModificationIterator(byte remoteIdentifier,
+    public ModificationIterator acquireModificationIterator(short remoteIdentifier,
                                                             ModificationNotifier modificationNotifier)
             throws IOException {
 
@@ -267,9 +270,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             if (modificationIterator0 != null)
                 return modificationIterator0;
 
-            final DirectBytes bytes = ms.bytes(startOfModificationIterators+(modIterBitSetSizeInBytes()
-                            *remoteIdentifier),
-            modIterBitSetSizeInBytes());
+            final DirectBytes bytes = ms.bytes(startOfModificationIterators + (modIterBitSetSizeInBytes()
+                            * remoteIdentifier),
+                    modIterBitSetSizeInBytes());
 
             final ModificationIterator newEventListener = new ModificationIterator(
                     bytes, eventListener, modificationNotifier);
@@ -309,6 +312,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     public byte identifier() {
         return localIdentifier;
     }
+
 
     /**
      * {@inheritDoc}

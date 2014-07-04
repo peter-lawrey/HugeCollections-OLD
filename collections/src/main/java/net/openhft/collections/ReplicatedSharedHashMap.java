@@ -82,7 +82,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
-    ModificationIterator acquireModificationIterator(byte remoteIdentifier,
+    ModificationIterator acquireModificationIterator(short remoteIdentifier,
                                                      ModificationNotifier modificationNotifier) throws IOException;
 
     /**

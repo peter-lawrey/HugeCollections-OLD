@@ -41,6 +41,10 @@ public final class SharedHashMapBuilder implements Cloneable {
     static final int SEGMENT_HEADER = 64;
     private static final byte[] MAGIC = "SharedHM".getBytes();
 
+    public static final short UDP_REPLICATION_MODIFICATION_ITERATOR_ID = 128;
+    public static final short JDBC_REPLICATION_MODIFICATION_ITERATOR_ID = 129;
+    public static final short FILE_REPLICATION_MODIFICATION_ITERATOR_ID = 130;
+
     // used when configuring the number of segments.
     private int minSegments = -1;
     private int actualSegments = -1;
@@ -258,7 +262,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
 
         if (externalReplicatorBuilder != null)
-            externalReplicator = applyExternalReplicator(result, externalReplicatorBuilder, kClass, vClass, identifier);
+            externalReplicator = applyExternalReplicator(result, externalReplicatorBuilder, kClass, vClass);
 
         if (tcpReplicatorBuilder != null)
             applyTcpReplication(result, tcpReplicatorBuilder);
@@ -544,25 +548,29 @@ public final class SharedHashMapBuilder implements Cloneable {
     private <K, V> ExternalReplicator.AbstractExternalReplicator applyExternalReplicator(VanillaSharedReplicatedHashMap<K, V> map,
                                                                                          ExternalReplicatorBuilder builder,
                                                                                          Class<K> kClass,
-                                                                                         Class<V> vClass,
-                                                                                         byte identifier) {
+                                                                                         Class<V> vClass) {
         try {
 
             final ExternalReplicator.AbstractExternalReplicator externalReplicator;
 
-            if (builder instanceof ExternalJDBCReplicatorBuilder)
-                externalReplicator = new ExternalJDBCReplicator<K, V>(kClass, vClass, (ExternalJDBCReplicatorBuilder) builder, map);
-            else if (builder instanceof ExternalFileReplicatorBuilder)
-                externalReplicator = new ExternalFileReplicator<K, V>(kClass, vClass, (ExternalFileReplicatorBuilder) builder,
-                        map);
-            else
+            final short id;
+
+            if (builder instanceof ExternalJDBCReplicatorBuilder) {
+                externalReplicator = new ExternalJDBCReplicator<K, V>(kClass, vClass,
+                        (ExternalJDBCReplicatorBuilder) builder, map);
+                id = JDBC_REPLICATION_MODIFICATION_ITERATOR_ID;
+            } else if (builder instanceof ExternalFileReplicatorBuilder) {
+                externalReplicator = new ExternalFileReplicator<K, V>(kClass, vClass,
+                        (ExternalFileReplicatorBuilder) builder, map);
+                id = FILE_REPLICATION_MODIFICATION_ITERATOR_ID;
+            } else
                 throw new IllegalStateException("builder of type " + builder.getClass() + " is not supported.");
 
-            map.acquireModificationIterator(identifier, externalReplicator);
+            map.acquireModificationIterator(id, externalReplicator);
 
             // the  modification iterator will not be stored in shared memory
             final ByteBufferBytes modIteratorBytes =
-                    new ByteBufferBytes(ByteBuffer.allocate((int) map.modIterBitSetSizeInBytes()));
+                    new ByteBufferBytes(ByteBuffer.allocate(map.modIterBitSetSizeInBytes()));
 
             final VanillaSharedReplicatedHashMap.ModificationIterator modIterator =
                     map.new ModificationIterator(
@@ -599,21 +607,13 @@ public final class SharedHashMapBuilder implements Cloneable {
                     "networkInterface");
         }
 
-        // the udp modification iterator will not be stored in shared memory
-        final ByteBufferBytes udpModIteratorBytes =
-                new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
-
         final UdpReplicator udpReplicator =
                 new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
 
-        final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
-                result.new ModificationIterator(
-                        udpModIteratorBytes,
-                        result.eventListener,
-                        udpReplicator);
+        final VanillaSharedReplicatedHashMap<K, V>.ModificationIterator udpModIterator = result
+                .acquireModificationIterator(UDP_REPLICATION_MODIFICATION_ITERATOR_ID, udpReplicator);
 
         udpReplicator.setModificationIterator(udpModIterator);
-
         result.eventListener = udpModIterator;
 
 
@@ -702,3 +702,4 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
 }
+
