@@ -305,20 +305,17 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
                     } else if (field.getType().equals(short.class))
                         field.setShort(o, resultSet.getShort(fieldNameByType.getValue()));
 
-                    else if (field.getType().equals(Float.class))
+                    else if (field.getType().equals(float.class))
                         field.setFloat(o, resultSet.getFloat(fieldNameByType.getValue()));
 
                     else if (field.getType().equals(int.class))
                         field.setInt(o, resultSet.getInt(fieldNameByType.getValue()));
 
-                    else if (field.getType().equals(Long.class))
+                    else if (field.getType().equals(long.class))
                         field.setLong(o, resultSet.getLong(fieldNameByType.getValue()));
 
                     else if (field.getType().equals(double.class))
                         field.setDouble(o, resultSet.getDouble(fieldNameByType.getValue()));
-
-                    else if (field.getType().equals(double.class))
-                        field.setDouble(o, resultSet.getBigDecimal(fieldNameByType.getValue()).doubleValue());
 
                     else if (field.getType().equals(BigDecimal.class))
                         field.set(o, resultSet.getBigDecimal(fieldNameByType.getValue()));
@@ -327,17 +324,42 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
                         field.set(o, resultSet.getString(fieldNameByType.getValue()));
 
                     else if (field.getType().equals(DateTime.class)) {
-                        String date = resultSet.getString(fieldNameByType.getValue());
+                        final String date = resultSet.getString(fieldNameByType.getValue());
                         final DateTime dateTime = dateFormat(date).parseDateTime(date).toDateTime();
 
                         field.set(o, dateTime);
                     } else if (field.getType().equals(Date.class)) {
-                        String date = resultSet.getString(fieldNameByType.getValue());
+                        final String date = resultSet.getString(fieldNameByType.getValue());
 
                         final DateTime dateTime = dateFormat(date).parseDateTime(date);
 
                         field.set(o, dateTime.toDate());
-                    } else
+                    } else if (field.getType().equals(Boolean.class))
+                        field.set(o, resultSet.getBoolean(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Byte.class))
+                        field.set(o, resultSet.getByte(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Character.class)) {
+                        final String string = resultSet.getString(fieldNameByType.getValue());
+                        if (string.length() > 0)
+                            field.setChar(o, string.charAt(0));
+                    } else if (field.getType().equals(Short.class))
+                        field.set(o, resultSet.getShort(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Float.class))
+                        field.set(o, resultSet.getFloat(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Integer.class))
+                        field.set(o, resultSet.getInt(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Long.class))
+                        field.set(o, resultSet.getLong(fieldNameByType.getValue()));
+
+                    else if (field.getType().equals(Double.class))
+                        field.set(o, resultSet.getDouble(fieldNameByType.getValue()));
+
+                    else
                         LOG.error("",
                                 new UnsupportedOperationException("unsupported type " + field.getType()));
 

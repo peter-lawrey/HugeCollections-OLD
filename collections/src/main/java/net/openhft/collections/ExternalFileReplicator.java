@@ -214,26 +214,50 @@ public class ExternalFileReplicator<K, V> extends
                     if (field.getType().equals(boolean.class))
                         field.setBoolean(o, Boolean.parseBoolean(fieldValue));
 
+                    else if (field.getType().equals(Boolean.class))
+                        field.set(o, Boolean.valueOf(fieldValue));
+
                     else if (field.getType().equals(byte.class))
                         field.setByte(o, Byte.parseByte(fieldValue));
 
-                    if (field.getType().equals(char.class))
+                    else if (field.getType().equals(Byte.class))
+                        field.set(o, Byte.valueOf(fieldValue));
+
+                    else if (field.getType().equals(char.class))
                         field.setChar(o, fieldValue.length() > 0 ? fieldValue.charAt(0) : 0);
+
+                    else if (field.getType().equals(Character.class))
+                        field.set(o, fieldValue.length() > 0 ? fieldValue.charAt(0) : 0);
 
                     else if (field.getType().equals(short.class))
                         field.setShort(o, Short.parseShort(fieldValue));
 
-                    else if (field.getType().equals(Float.class))
+                    else if (field.getType().equals(Short.class))
+                        field.set(o, Short.valueOf(fieldValue));
+
+                    else if (field.getType().equals(float.class))
                         field.setFloat(o, Float.parseFloat(fieldValue));
+
+                    else if (field.getType().equals(Float.class))
+                        field.set(o, Float.valueOf(fieldValue));
 
                     else if (field.getType().equals(int.class))
                         field.setInt(o, Integer.parseInt(fieldValue));
 
-                    else if (field.getType().equals(Long.class))
+                    else if (field.getType().equals(Integer.class))
+                        field.set(o, Integer.valueOf(fieldValue));
+
+                    else if (field.getType().equals(long.class))
                         field.setLong(o, Long.parseLong(fieldValue));
+
+                    else if (field.getType().equals(Long.class))
+                        field.set(o, Long.valueOf(fieldValue));
 
                     else if (field.getType().equals(double.class))
                         field.setDouble(o, Double.parseDouble(fieldValue));
+
+                    else if (field.getType().equals(Double.class))
+                        field.set(o, Double.valueOf(fieldValue));
 
                     else if (field.getType().equals(String.class))
                         field.set(o, fieldValue);
