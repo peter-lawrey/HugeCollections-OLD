@@ -57,7 +57,7 @@ public class Builder {
                         CharSequence.class);
 
         final ReplicatedSharedHashMap.ModificationIterator modificationIterator = result
-                .acquireModificationIterator(externalIdentifier, NOP, true);
+                .acquireModificationIterator(externalIdentifier, NOP);
         new QueueReplicator(modificationIterator,
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
@@ -85,7 +85,7 @@ public class Builder {
                         Integer.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return new MapProvider<ReplicatedSharedHashMap<Integer, Integer>>() {
@@ -120,7 +120,7 @@ public class Builder {
                         IntValue.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return result;
@@ -143,7 +143,7 @@ public class Builder {
                         CharSequence.class);
 
 
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP, true),
+        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
                 input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
 
         return result;

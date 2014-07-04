@@ -253,8 +253,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      */
     @Override
     public ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                            ModificationNotifier modificationNotifier,
-                                                            boolean deletedBackingFileOnExit)
+                                                            ModificationNotifier modificationNotifier)
             throws IOException {
 
         final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);

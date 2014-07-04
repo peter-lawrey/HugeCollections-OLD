@@ -546,9 +546,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                                                                                          Class<K> kClass,
                                                                                          Class<V> vClass,
                                                                                          byte identifier) {
-
         try {
-
 
             final ExternalReplicator.AbstractExternalReplicator externalReplicator;
 
@@ -560,7 +558,7 @@ public final class SharedHashMapBuilder implements Cloneable {
             else
                 throw new IllegalStateException("builder of type " + builder.getClass() + " is not supported.");
 
-            map.acquireModificationIterator(identifier, externalReplicator, true);
+            map.acquireModificationIterator(identifier, externalReplicator);
 
             // the  modification iterator will not be stored in shared memory
             final ByteBufferBytes modIteratorBytes =

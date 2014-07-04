@@ -18,8 +18,6 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.Nullable;
@@ -578,7 +576,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             }
 
             attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier,
-                    attached, deletedModIteratorFileOnExit);
+                    attached);
 
             writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
 

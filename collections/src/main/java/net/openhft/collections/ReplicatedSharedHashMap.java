@@ -79,12 +79,11 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * @param remoteIdentifier         the identifier of the remote node
      * @param modificationNotifier     called when ever there is a change applied to the modification
      *                                 iterator
-     * @param deletedBackingFileOnExit deleted the file the backs the modification iterator upon exit
      * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
     ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                     ModificationNotifier modificationNotifier, boolean deletedBackingFileOnExit) throws IOException;
+                                                     ModificationNotifier modificationNotifier) throws IOException;
 
     /**
      * Used in conjunction with replication, to back filling data from a remote node that this node may have
