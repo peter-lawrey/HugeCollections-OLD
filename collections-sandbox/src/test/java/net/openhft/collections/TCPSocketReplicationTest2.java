@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
 
@@ -43,7 +44,7 @@ public class TCPSocketReplicationTest2 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079)
                 .deletedModIteratorFileOnExit(true)
-                .heartBeatIntervalMS(10000);
+                .heartBeatInterval(10, TimeUnit.SECONDS);
 
         map2 = new SharedHashMapBuilder()
                 .entries(1000)

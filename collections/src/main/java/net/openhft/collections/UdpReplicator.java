@@ -19,7 +19,7 @@
 package net.openhft.collections;
 
 import net.openhft.lang.io.ByteBufferBytes;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -409,7 +409,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
 
         private ServerConnector(UdpDetails connectionDetails) {
-            super("UDP-Connector", closeables);
+            super("UDP-Connector");
             this.details = connectionDetails;
 
         }

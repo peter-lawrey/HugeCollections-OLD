@@ -27,6 +27,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
 
 /**
@@ -50,8 +52,8 @@ public class TCPSocketReplicationTest1 {
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 hostId == 0 ? NO_SERVERS : hostId == 1 ? ONE_SERVER : TWO_SERVER)
                 .deletedModIteratorFileOnExit(true)
-                .throttleBucketIntervalMS(100)
-                .heartBeatIntervalMS(1000);
+                .throttleBucketInterval(100, MILLISECONDS)
+                .heartBeatInterval(1, SECONDS);
 
 
         map1 = new SharedHashMapBuilder()

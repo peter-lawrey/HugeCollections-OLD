@@ -23,7 +23,7 @@ import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
 import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -627,10 +627,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                                             @NotNull TcpReplicatorBuilder tcpReplicatorBuilder) throws
             IOException {
 
-        result.addCloseable(new TcpReplicator(result,
-                result,
-                tcpReplicatorBuilder.clone(),
-                entrySize()));
+        result.addCloseable(new TcpReplicator(result, result, tcpReplicatorBuilder, entrySize()));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {

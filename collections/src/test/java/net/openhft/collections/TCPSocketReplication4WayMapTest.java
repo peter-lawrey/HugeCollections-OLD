@@ -28,6 +28,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -47,10 +49,12 @@ public class TCPSocketReplication4WayMapTest {
     public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
-            final InetSocketAddress... InetSocketAddress) throws IOException {
+            final InetSocketAddress... endpoints) throws IOException {
 
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(1000).deletedModIteratorFileOnExit(true);
+        final TcpReplicatorBuilder tcpReplicatorBuilder =
+                new TcpReplicatorBuilder(serverPort, endpoints)
+                .heartBeatInterval(1, SECONDS)
+                .deletedModIteratorFileOnExit(true);
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
@@ -63,10 +67,12 @@ public class TCPSocketReplication4WayMapTest {
     static SharedHashMap<IntValue, CharSequence> newTcpSocketShmIntValueString(
             final byte identifier,
             final int serverPort,
-            final InetSocketAddress... InetSocketAddress) throws IOException {
+            final InetSocketAddress... endpoints) throws IOException {
 
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress).heartBeatIntervalMS(100).deletedModIteratorFileOnExit(true);
+        final TcpReplicatorBuilder tcpReplicatorBuilder =
+                new TcpReplicatorBuilder(serverPort, endpoints)
+                .heartBeatInterval(100, MILLISECONDS)
+                .deletedModIteratorFileOnExit(true);
 
         return new SharedHashMapBuilder()
                 .entries(1000)

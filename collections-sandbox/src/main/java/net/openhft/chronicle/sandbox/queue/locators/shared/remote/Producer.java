@@ -26,7 +26,7 @@ import net.openhft.chronicle.sandbox.queue.locators.shared.OffsetProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.SliceProvider;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.channel.provider.SocketChannelProvider;
 import net.openhft.lang.io.ByteBufferBytes;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
