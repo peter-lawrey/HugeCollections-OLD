@@ -50,8 +50,8 @@ public class Builder {
     		raf.close();//allows closing the file access on windows. forcing to close access. Only works for admin-access. 
     	}
     	
-        //file.delete();
-        file.deleteOnExit();
+        //file.delete(); //isnt guaranteed on windows.
+        file.deleteOnExit();//isnt guaranteed on windows.
         
         return file;
     }
