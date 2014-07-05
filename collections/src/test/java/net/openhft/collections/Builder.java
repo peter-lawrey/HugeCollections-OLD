@@ -34,11 +34,25 @@ public class Builder {
 
     // added to ensure uniqueness
     static int count;
+    static String WIN_OS="WINDOWS";
 
-    public static File getPersistenceFile() {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
+    public static File getPersistenceFile() throws IOException {
+    	String TMP = System.getProperty("java.io.tmpdir");
+    	File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
+	     
+    	if (System.getProperty("os.name").indexOf(WIN_OS) > 0 ){
+    		/*Windows will lock a file that are currently in use. You cannot delete it, however, 
+    		  using setwritable() and then releasing RandomRW lock adds the file to JVM exit cleanup.
+    		  This will only work if the user is an admin on windows.
+    		*/
+    		file.setWritable(true);//just in case relative path was used.
+    		RandomAccessFile raf=new RandomAccessFile(file,"rw");
+    		raf.close();//allows closing the file access on windows. forcing to close access. Only works for admin-access. 
+    	}
+    	
+        //file.delete();
         file.deleteOnExit();
+        
         return file;
     }
 
