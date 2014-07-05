@@ -39,7 +39,8 @@ public class Builder {
     public static File getPersistenceFile() throws IOException {
     	String TMP = System.getProperty("java.io.tmpdir");
     	File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
-	     
+	
+	//Not Guaranteed to work on Windows, since OS file-lock takes precedence     
     	if (System.getProperty("os.name").indexOf(WIN_OS) > 0 ){
     		/*Windows will lock a file that are currently in use. You cannot delete it, however, 
     		  using setwritable() and then releasing RandomRW lock adds the file to JVM exit cleanup.
