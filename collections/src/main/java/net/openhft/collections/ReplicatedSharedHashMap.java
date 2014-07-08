@@ -231,7 +231,6 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          */
         void readExternalEntry(@NotNull Bytes source);
 
-
     }
 
     /**
@@ -246,6 +245,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * @param entry the bytes which the bytes which point to the entry
          * @return the key which is in the entry
          */
+
         K key(@NotNull NativeBytes entry, K usingKey);
 
 

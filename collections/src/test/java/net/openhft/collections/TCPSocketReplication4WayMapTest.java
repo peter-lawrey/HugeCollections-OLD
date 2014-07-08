@@ -53,8 +53,8 @@ public class TCPSocketReplication4WayMapTest {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder =
                 new TcpReplicatorBuilder(serverPort, endpoints)
-                .heartBeatInterval(1, SECONDS)
-                .deletedModIteratorFileOnExit(true);
+                .heartBeatInterval(1, SECONDS)      ;
+
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
@@ -71,8 +71,7 @@ public class TCPSocketReplication4WayMapTest {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder =
                 new TcpReplicatorBuilder(serverPort, endpoints)
-                .heartBeatInterval(100, MILLISECONDS)
-                .deletedModIteratorFileOnExit(true);
+                .heartBeatInterval(100, MILLISECONDS) ;
 
         return new SharedHashMapBuilder()
                 .entries(1000)

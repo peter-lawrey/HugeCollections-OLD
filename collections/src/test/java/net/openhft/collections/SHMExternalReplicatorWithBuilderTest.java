@@ -251,8 +251,10 @@ public class SHMExternalReplicatorWithBuilderTest {
             map.put(bean.id, bean);
         }
 
+
         connection.commit();
         Thread.sleep(100);
+
 
         // we will now check, that what as got saved to the database is all 3 beans
         for (final BeanClass bean : beanClasses) {

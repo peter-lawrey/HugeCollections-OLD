@@ -20,8 +20,8 @@ package net.openhft.collections;
 
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.NativeBytes;
-import net.openhft.lang.model.constraints.Nullable;
 import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +39,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.nio.channels.SelectionKey.*;
-import static java.util.concurrent.TimeUnit.*;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
 
@@ -75,8 +76,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final int packetSize;
     private final Iterable<InetSocketAddress> endpoints;
 
-    private final boolean deletedModIteratorFileOnExit;
-
     private final ReplicatedSharedHashMap map;
     private final byte localIdentifier;
     private final int serializedEntrySize;
@@ -103,8 +102,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         packetSize = tcpReplicatorBuilder.packetSize();
         endpoints = tcpReplicatorBuilder.endpoints();
-
-        deletedModIteratorFileOnExit = tcpReplicatorBuilder.deletedModIteratorFileOnExit();
 
         this.map = map;
         this.localIdentifier = map.identifier();
@@ -223,6 +220,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     /**
      * checks that we receive heartbeats and send out heart beats.
+     *
      * @param approxTime the approximate time in milliseconds
      */
     void heartBeatMonitor(long approxTime) {
@@ -539,7 +537,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     /**
      * used to exchange identifiers and timestamps and heartbeat intervals between the server and client
      *
-     * @param key                    the SelectionKey relating to the this cha
+     * @param key the SelectionKey relating to the this cha
      * @throws java.io.IOException
      * @throws InterruptedException
      */
@@ -1062,8 +1060,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         /**
-         * @param keyIndex the index of the key that has changed, the list of keys is provided by
-         *                 the constructor {@link KeyInterestUpdater(int, SelectionKey[])}
+         * @param keyIndex the index of the key that has changed, the list of keys is provided by the
+         *                 constructor {@link KeyInterestUpdater(int, SelectionKey[])}
          */
         public void set(int keyIndex) {
             changeOfOpWriteRequired.set(keyIndex);

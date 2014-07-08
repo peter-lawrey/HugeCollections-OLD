@@ -84,7 +84,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     MappedStore ms;
     final Hasher hasher;
 
-    private final int replicas;
+ //   private final int replicas;
     final int entrySize;
     final Alignment alignment;
     final int entriesPerSegment;
@@ -116,7 +116,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
 
-        this.replicas = builder.replicas();
+      //  this.replicas = builder.replicas();
         this.entrySize = builder.alignedEntrySize();
         this.alignment = builder.entryAndValueAlignment();
 
@@ -218,9 +218,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     int numberOfBitSets() {
-        return 1 // for free list
-                + (replicas > 0 ? 1 : 0) // deleted set
-                + replicas; // to notify each replica of a change.
+        return 1; // for free list
+              //  + (replicas > 0 ? 1 : 0) // deleted set
+             //   + replicas; // to notify each replica of a change.
     }
 
     long segmentSize() {
@@ -245,7 +245,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         // if the size is a multiple of 4096 or slightly more. Make sure it is at least 64 more than a multiple.
         if ((ss & 4093) < 64)
             ss = (ss & ~63) + 64;
-        ;
 
         return ss;
     }

@@ -114,7 +114,10 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("insert-sql=" + sql.toString());
             }
-            builder.stmt().execute(sql.toString());
+
+            synchronized (builder.stmt()) {
+                builder.stmt().execute(sql.toString());
+            }
 
 
         } catch (SQLException e) {
@@ -155,8 +158,10 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
             LOG.debug("update-sql=" + sql.toString());
         }
 
-        final int rowCount = builder.stmt().executeUpdate(sql.toString());
-
+        final int rowCount;
+        synchronized (builder.stmt()) {
+            rowCount = builder.stmt().executeUpdate(sql.toString());
+        }
 
         if (rowCount == 0) {
             insert(key, value);
@@ -189,7 +194,10 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
         try {
             final String sql = "SELECT * FROM " + this.builder.tableName() + " WHERE " + fieldMapper.keyName() +
                     "=" + key.toString();
-            final ResultSet resultSet = builder.stmt().executeQuery(sql);
+            final ResultSet resultSet;
+            synchronized (builder.stmt()) {
+                resultSet = builder.stmt().executeQuery(sql);
+            }
             if (resultSet == null || resultSet.wasNull())
                 return null;
             return applyResultsSet(null, resultSet);
@@ -224,7 +232,11 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
         final String sql = "SELECT * FROM " + this.builder.tableName() + " WHERE " + fieldMapper.keyName() +
                 " in (" + keys.toString() + ")";
 
-        final ResultSet resultSet = builder.stmt().executeQuery(sql);
+        final ResultSet resultSet;
+        synchronized (builder.stmt()) {
+            resultSet = builder.stmt().executeQuery(sql);
+        }
+
         return applyResultsSet(new HashSet(), resultSet);
     }
 
@@ -238,7 +250,14 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
      */
     public Map<K, V> getAll() throws SQLException, InstantiationException, IllegalAccessException {
         final String sql = "SELECT * FROM " + this.builder.tableName();
-        return applyResultsSet(new HashMap(), builder.stmt().executeQuery(sql));
+
+        final ResultSet resultSet;
+        synchronized (builder.stmt()) {
+            resultSet = builder.stmt().executeQuery(sql);
+        }
+
+
+        return applyResultsSet(new HashMap(), resultSet);
     }
 
 
@@ -247,7 +266,13 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
 
         final String sql = "SELECT * FROM " + this.builder.tableName();
         try {
-            applyResultsSet(usingMap, builder.stmt().executeQuery(sql));
+
+            final ResultSet resultSet;
+            synchronized (builder.stmt()) {
+                resultSet = builder.stmt().executeQuery(sql);
+            }
+
+            applyResultsSet(usingMap, resultSet);
 
         } catch (Exception e) {
             LOG.error("", e);
@@ -422,7 +447,9 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
         sql.append(")");
 
         try {
-            builder.stmt().execute(sql.toString());
+            synchronized (builder.stmt()) {
+                builder.stmt().execute(sql.toString());
+            }
         } catch (SQLException e) {
             LOG.error("", e);
         }
@@ -438,8 +465,11 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
         sql.append(" = ");
         sql.append(k.toString());
 
+
         try {
-            builder.stmt().execute(sql.toString());
+            synchronized (builder.stmt()) {
+                builder.stmt().execute(sql.toString());
+            }
         } catch (SQLException e) {
             LOG.error("", e);
         }
@@ -449,7 +479,9 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
     @Override
     public void close() throws IOException {
         try {
-            builder.stmt().close();
+            synchronized (builder.stmt()) {
+                builder.stmt().close();
+            }
         } catch (SQLException e) {
             LOG.error("", e);
         }

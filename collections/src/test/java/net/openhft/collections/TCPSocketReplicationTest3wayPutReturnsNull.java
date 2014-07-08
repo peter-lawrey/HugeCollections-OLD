@@ -51,7 +51,7 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
         TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
                 InetSocketAddress);
 
-        tcpReplicatorBuilder.deletedModIteratorFileOnExit(true);
+
 
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
