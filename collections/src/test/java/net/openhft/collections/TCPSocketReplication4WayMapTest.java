@@ -115,7 +115,7 @@ public class TCPSocketReplication4WayMapTest {
         map4.remove(3);
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1500);
+        waitTillEqual(2500);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
@@ -178,6 +178,8 @@ public class TCPSocketReplication4WayMapTest {
         for (; t < timeOutMs; t++) {
             if (map1.equals(map2) &&
                     map1.equals(map3) &&
+                    map2.equals(map3) &&
+                    map4.equals(map3) &&
                     map1.equals(map4))
                 break;
             Thread.sleep(1);

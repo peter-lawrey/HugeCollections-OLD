@@ -34,7 +34,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
+import static net.openhft.collections.Replica.EntryResolver;
 
 /**
  * @author Rob Austin.

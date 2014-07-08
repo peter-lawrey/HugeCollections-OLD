@@ -31,7 +31,7 @@ import java.util.*;
 
 import static net.openhft.collections.ExternalReplicator.AbstractExternalReplicator;
 import static net.openhft.collections.ExternalReplicator.FieldMapper.ValueWithFieldName;
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
+import static net.openhft.collections.Replica.EntryResolver;
 
 /**
  * Replicates the contents of the map into a directory, each file in the directory represents an entry in the

@@ -566,7 +566,7 @@ public final class SharedHashMapBuilder implements Cloneable {
                 throw new IllegalStateException("builder of type " + builder.getClass() + " is not supported.");
 
 
-            final ReplicatedSharedHashMap.ModificationIterator modIterator
+            final Replica.ModificationIterator modIterator
                     = map.acquireModificationIterator(id, externalReplicator);
 
             externalReplicator.setModificationIterator(modIterator);
@@ -600,7 +600,7 @@ public final class SharedHashMapBuilder implements Cloneable {
         final UdpReplicator udpReplicator =
                 new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
 
-        final ReplicatedSharedHashMap.ModificationIterator udpModIterator
+        final Replica.ModificationIterator udpModIterator
                 = result.acquireModificationIterator(UDP_REPLICATION_MODIFICATION_ITERATOR_ID, udpReplicator);
 
         udpReplicator.setModificationIterator(udpModIterator);

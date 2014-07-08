@@ -70,9 +70,9 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final SharedHashMap<Integer, CharSequence> map1 =
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map1 =
                 Builder.newShmIntString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
-        final SharedHashMap<Integer, CharSequence> map2 =
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2 =
                 Builder.newShmIntString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
 
         return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);

@@ -231,7 +231,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
     public void testIgnoreWithRemoteRemove() throws IOException {
 
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
-        ReplicatedSharedHashMap map = (ReplicatedSharedHashMap) new SharedHashMapBuilder()
+        VanillaSharedReplicatedHashMap map = (VanillaSharedReplicatedHashMap) new SharedHashMapBuilder()
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
@@ -262,7 +262,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
 
 
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
-        ReplicatedSharedHashMap map = (ReplicatedSharedHashMap) new SharedHashMapBuilder()
+        VanillaSharedReplicatedHashMap map = (VanillaSharedReplicatedHashMap) new SharedHashMapBuilder()
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
@@ -293,7 +293,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
     public void testRemoveFollowedByLatePut() throws IOException {
 
         final TimeProvider timeProvider = Mockito.mock(TimeProvider.class);
-        ReplicatedSharedHashMap map = (ReplicatedSharedHashMap) new SharedHashMapBuilder().entries(10)
+        VanillaSharedReplicatedHashMap map = (VanillaSharedReplicatedHashMap) new SharedHashMapBuilder().entries(10)
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)

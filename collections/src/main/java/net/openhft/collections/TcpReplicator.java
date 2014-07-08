@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.nio.channels.SelectionKey.*;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.Replica.EntryExternalizable;
+import static net.openhft.collections.Replica.ModificationIterator;
 
 /**
  * Used with a {@see net.openhft.collections.ReplicatedSharedHashMap} to send data between the maps using a
@@ -76,17 +76,17 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final int packetSize;
     private final Iterable<InetSocketAddress> endpoints;
 
-    private final ReplicatedSharedHashMap map;
+    private final Replica replica;
     private final byte localIdentifier;
     private final int serializedEntrySize;
     private final EntryExternalizable externalizable;
 
-    TcpReplicator(@NotNull final ReplicatedSharedHashMap map,
+    TcpReplicator(@NotNull final Replica replica,
                   @NotNull final EntryExternalizable externalizable,
                   @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder,
                   final int serializedEntrySize) throws IOException {
 
-        super("TcpSocketReplicator-" + map.identifier());
+        super("TcpSocketReplicator-" + replica.identifier());
 
         serverInetSocketAddress = tcpReplicatorBuilder.serverInetSocketAddress();
 
@@ -103,8 +103,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         packetSize = tcpReplicatorBuilder.packetSize();
         endpoints = tcpReplicatorBuilder.endpoints();
 
-        this.map = map;
-        this.localIdentifier = map.identifier();
+        this.replica = replica;
+        this.localIdentifier = replica.identifier();
         this.serializedEntrySize = serializedEntrySize;
         this.externalizable = externalizable;
 
@@ -573,10 +573,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                         "please change either this maps identifier or the remote one");
             }
 
-            attached.remoteModificationIterator = map.acquireModificationIterator(remoteIdentifier,
+            attached.remoteModificationIterator = replica.acquireModificationIterator(remoteIdentifier,
                     attached);
 
-            writer.writeRemoteBootstrapTimestamp(map.lastModificationTime(remoteIdentifier));
+            writer.writeRemoteBootstrapTimestamp(replica.lastModificationTime(remoteIdentifier));
 
             // tell the remote node, what are heartbeat interval is
             writer.writeRemoteHeartbeatInterval(heartBeatInterval);
@@ -677,12 +677,12 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     /**
      * Attached to the NIO selection key via methods such as {@link SelectionKey#attach(Object)}
      */
-    class Attached implements ReplicatedSharedHashMap.ModificationNotifier {
+    class Attached implements Replica.ModificationNotifier {
 
         public TcpSocketChannelEntryReader entryReader;
         public TcpSocketChannelEntryWriter entryWriter;
 
-        public ReplicatedSharedHashMap.ModificationIterator remoteModificationIterator;
+        public Replica.ModificationIterator remoteModificationIterator;
         public AbstractConnector connector;
         public long remoteBootstrapTimestamp = Long.MIN_VALUE;
         private boolean handShakingComplete;
@@ -875,7 +875,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     private static final int SIZE_OF_UNSIGNED_SHORT = 2;
 
-    static class EntryCallback extends ReplicatedSharedHashMap.AbstractEntryCallback {
+    static class EntryCallback extends Replica.AbstractEntryCallback {
 
         private final EntryExternalizable externalizable;
         private final ByteBufferBytes in;

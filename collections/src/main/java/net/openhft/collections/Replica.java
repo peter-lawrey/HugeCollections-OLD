@@ -27,34 +27,7 @@ import java.io.IOException;
 /**
  * @author Rob Austin.
  */
-public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
-
-    /**
-     * Used in conjunction with map replication, all put events that originate from a remote node will be
-     * processed using this method.
-     *
-     * @param key        key with which the specified value is to be associated
-     * @param value      value to be associated with the specified key
-     * @param identifier a unique identifier for a replicating node
-     * @param timeStamp  timestamp in milliseconds, when the put event originally occurred
-     * @return the previous value
-     * @see #put(Object, Object)
-     */
-    V put(K key, V value, byte identifier, long timeStamp);
-
-    /**
-     * Used in conjunction with map replication, all remove events that originate from a remote node will be
-     * processed using this method.
-     *
-     * @param key        key with which the specified value is associated
-     * @param value      value expected to be associated with the specified key
-     * @param identifier a unique identifier for a replicating node
-     * @param timeStamp  timestamp in milliseconds, when the remove event originally occurred
-     * @return {@code true} if the entry was removed
-     * @see #remove(Object, Object)
-     */
-    V remove(K key, V value, byte identifier, long timeStamp);
-
+public interface Replica<K, V>  {
 
     /**
      * Provides the unique Identifier associated with this map instance. <p> An identifier is used to
@@ -76,9 +49,8 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
      * Gets (if it does not exist, creates) an instance of ModificationIterator associated with a remote node,
      * this weak associated is bound using the {@code identifier}.
      *
-     * @param remoteIdentifier         the identifier of the remote node
-     * @param modificationNotifier     called when ever there is a change applied to the modification
-     *                                 iterator
+     * @param remoteIdentifier     the identifier of the remote node
+     * @param modificationNotifier called when ever there is a change applied to the modification iterator
      * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
@@ -120,7 +92,7 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
 
         /**
          * @return {@code true} if the is another entry to be received via {@link
-         * #nextEntry(net.openhft.collections.ReplicatedSharedHashMap.AbstractEntryCallback callback)}
+         * #nextEntry(Replica.AbstractEntryCallback callback)}
          */
         boolean hasNext();
 

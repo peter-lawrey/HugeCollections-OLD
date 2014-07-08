@@ -36,15 +36,14 @@ import static org.junit.Assert.assertEquals;
 
 public class TCPSocketReplicationBootStrapTests {
 
-    private ReplicatedSharedHashMap<Integer, CharSequence> map1;
+    private VanillaSharedReplicatedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
-
 
     @Test
     public void testBootstrap() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079);
-        final ReplicatedSharedHashMap<Integer,
+        final VanillaSharedReplicatedHashMap<Integer,
                 CharSequence> map2a = TCPSocketReplication4WayMapTest
                 .newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8079));
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
@@ -59,7 +58,6 @@ public class TCPSocketReplicationBootStrapTests {
 
         final File map2File = map2a.file();
         map2a.close();
-
 
         {
             // restart map 2 but don't doConnect it to map one

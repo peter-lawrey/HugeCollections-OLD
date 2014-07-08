@@ -38,8 +38,8 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryExternalizable;
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
+import static net.openhft.collections.Replica.EntryExternalizable;
+import static net.openhft.collections.Replica.EntryResolver;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -84,7 +84,8 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, EntryExternalizable, EntryResolver<K, V>, Closeable {
+        implements SharedHashMap<K, V>, Replica<K, V>, EntryExternalizable, EntryResolver<K, V>,
+        Closeable {
 
     private static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
@@ -202,10 +203,18 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
     /**
-     * {@inheritDoc}
+     * Used in conjunction with map replication, all put events that originate from a remote node will be
+     * processed using this method.
+     *
+     * @param key        key with which the specified value is to be associated
+     * @param value      value to be associated with the specified key
+     * @param identifier a unique identifier for a replicating node
+     * @param timeStamp  timestamp in milliseconds, when the put event originally occurred
+     * @return the previous value
+     * @see #put(Object, Object)
      */
-    @Override
-    public V put(K key, V value, byte identifier, long timeStamp) {
+
+    V put(K key, V value, byte identifier, long timeStamp) {
         assert identifier > 0;
         return put0(key, value, true, identifier, timeStamp);
     }
@@ -266,10 +275,18 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
     /**
-     * {@inheritDoc}
+     * Used in conjunction with map replication, all remove events that originate from a remote node will be
+     * processed using this method.
+     *
+     * @param key        key with which the specified value is associated
+     * @param value      value expected to be associated with the specified key
+     * @param identifier a unique identifier for a replicating node
+     * @param timeStamp  timestamp in milliseconds, when the remove event originally occurred
+     * @return {@code true} if the entry was removed
+     * @see #remove(Object, Object)
      */
-    @Override
-    public V remove(K key, V value, byte identifier, long timeStamp) {
+
+    V remove(K key, V value, byte identifier, long timeStamp) {
         assert identifier > 0;
         return removeIfValueIs(key, null, identifier, timeStamp);
     }
@@ -305,7 +322,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
     @Override
-    public ReplicatedSharedHashMap.ModificationIterator acquireModificationIterator
+    public Replica.ModificationIterator acquireModificationIterator
             (short remoteIdentifier,
              @NotNull final ModificationNotifier modificationNotifier) throws IOException {
 
@@ -1187,7 +1204,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * @author Rob Austin.
      */
     class ModificationIterator extends SharedMapEventListener<K, V, SharedHashMap<K, V>>
-            implements ReplicatedSharedHashMap.ModificationIterator {
+            implements Replica.ModificationIterator {
 
 
         private final ModificationNotifier modificationNotifier;

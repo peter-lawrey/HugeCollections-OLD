@@ -27,6 +27,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -45,8 +46,8 @@ public class SHMExternalReplicatorWithoutBuilderTest {
     private final Map map;
 
 
-    static final ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new
-            ReplicatedSharedHashMap.EntryResolver() {
+    static final Replica.EntryResolver NOP_ENTRY_RESOLVER = new
+            Replica.EntryResolver() {
 
                 @Override
                 public Object key(@NotNull NativeBytes entry, Object usingKey) {
@@ -149,7 +150,7 @@ public class SHMExternalReplicatorWithoutBuilderTest {
 
 
         final HashMap<Integer, BeanClass> map = new HashMap<Integer, BeanClass>();
-        ReplicatedSharedHashMap.EntryResolver NOP_ENTRY_RESOLVER = new ReplicatedSharedHashMap.EntryResolver() {
+        Replica.EntryResolver NOP_ENTRY_RESOLVER = new Replica.EntryResolver() {
 
             @Override
             public Object key(@NotNull NativeBytes entry, Object usingKey) {
@@ -354,6 +355,14 @@ public class SHMExternalReplicatorWithoutBuilderTest {
             Thread.sleep(1);
         }
         return false;
+    }
+
+    public static void main(String... args) {
+        BigDecimal bd = BigDecimal.ONE;
+        bd = bd.divide(BigDecimal.valueOf(49));
+ /*       final BigDecimal a = BigDecimal.valueOf(49).multiply(BigDecimal.valueOf(2));
+        bd = bd.multiply(a);*/
+        System.out.println("bd=" + bd);
     }
 }
 

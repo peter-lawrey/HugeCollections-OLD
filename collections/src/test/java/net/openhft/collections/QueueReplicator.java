@@ -31,7 +31,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.lang.System.arraycopy;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.Replica.ModificationIterator;
 
 /**
  * This class replicates data from one ReplicatedShareHashMap to another using a queue it was originally
@@ -54,7 +54,7 @@ public class QueueReplicator<K, V> {
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            final int entrySize,
-                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                           @NotNull final Replica.EntryExternalizable externalizable) {
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
@@ -141,8 +141,8 @@ public class QueueReplicator<K, V> {
                 buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
-                final ReplicatedSharedHashMap.AbstractEntryCallback entryCallback =
-                        new ReplicatedSharedHashMap.AbstractEntryCallback() {
+                final Replica.AbstractEntryCallback entryCallback =
+                        new Replica.AbstractEntryCallback() {
 
 
                             /**

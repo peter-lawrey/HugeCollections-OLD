@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.ArrayBlockingQueue;
 
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier.NOP;
+import static net.openhft.collections.Replica.ModificationNotifier.NOP;
 
 /**
  * @author Rob Austin.
@@ -35,31 +35,31 @@ public class Builder {
 
     // added to ensure uniqueness
     static int count;
-    static String WIN_OS="WINDOWS";
+    static String WIN_OS = "WINDOWS";
 
     public static File getPersistenceFile() throws IOException {
-    	String TMP = System.getProperty("java.io.tmpdir");
-    	File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
-	
-	//Not Guaranteed to work on Windows, since OS file-lock takes precedence     
-    	if (System.getProperty("os.name").indexOf(WIN_OS) > 0 ){
-    		/*Windows will lock a file that are currently in use. You cannot delete it, however, 
-    		  using setwritable() and then releasing RandomRW lock adds the file to JVM exit cleanup.
+        String TMP = System.getProperty("java.io.tmpdir");
+        File file = new File(TMP + "/shm-test" + System.nanoTime() + (count++));
+
+        //Not Guaranteed to work on Windows, since OS file-lock takes precedence
+        if (System.getProperty("os.name").indexOf(WIN_OS) > 0) {
+            /*Windows will lock a file that are currently in use. You cannot delete it, however,
+              using setwritable() and then releasing RandomRW lock adds the file to JVM exit cleanup.
     		  This will only work if the user is an admin on windows.
     		*/
-    		file.setWritable(true);//just in case relative path was used.
-    		RandomAccessFile raf=new RandomAccessFile(file,"rw");
-    		raf.close();//allows closing the file access on windows. forcing to close access. Only works for admin-access. 
-    	}
-    	
+            file.setWritable(true);//just in case relative path was used.
+            RandomAccessFile raf = new RandomAccessFile(file, "rw");
+            raf.close();//allows closing the file access on windows. forcing to close access. Only works for admin-access.
+        }
+
         //file.delete(); //isnt guaranteed on windows.
         file.deleteOnExit();//isnt guaranteed on windows.
-        
+
         return file;
     }
 
 
-    static ReplicatedSharedHashMap<Integer, CharSequence> newShmIntString(
+    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newShmIntString(
             int size, final ArrayBlockingQueue<byte[]> input,
             final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
@@ -68,14 +68,14 @@ public class Builder {
                         .entries(size)
                         .identifier(localIdentifier);
 
-        final ReplicatedSharedHashMap<Integer, CharSequence> result = (ReplicatedSharedHashMap<Integer, CharSequence>)
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = (VanillaSharedReplicatedHashMap<Integer, CharSequence>)
                 builder.canReplicate(true).create(getPersistenceFile(), Integer.class,
                         CharSequence.class);
 
-        final ReplicatedSharedHashMap.ModificationIterator modificationIterator = result
+        final Replica.ModificationIterator modificationIterator = result
                 .acquireModificationIterator(externalIdentifier, NOP);
         new QueueReplicator(modificationIterator,
-                input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
+                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
 
         return result;
 
@@ -87,7 +87,7 @@ public class Builder {
         boolean isQueueEmpty();
     }
 
-    static MapProvider<ReplicatedSharedHashMap<Integer, Integer>> newShmIntInt(
+    static MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> newShmIntInt(
             int size, final ArrayBlockingQueue<byte[]> input,
             final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
@@ -96,18 +96,18 @@ public class Builder {
                         .entries(size)
                         .identifier(localIdentifier);
 
-        final ReplicatedSharedHashMap<Integer, Integer> result = (ReplicatedSharedHashMap<Integer, Integer>)
+        final VanillaSharedReplicatedHashMap<Integer, Integer> result = (VanillaSharedReplicatedHashMap<Integer, Integer>)
                 builder.canReplicate(true).create(getPersistenceFile(), Integer.class,
                         Integer.class);
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
+                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
 
-        return new MapProvider<ReplicatedSharedHashMap<Integer, Integer>>() {
+        return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
 
             @Override
-            public ReplicatedSharedHashMap<Integer, Integer> getMap() {
+            public VanillaSharedReplicatedHashMap<Integer, Integer> getMap() {
                 return result;
             }
 
@@ -122,7 +122,7 @@ public class Builder {
     }
 
 
-    static ReplicatedSharedHashMap<IntValue, IntValue> newShmIntValueIntValue(
+    static Replica<IntValue, IntValue> newShmIntValueIntValue(
             int size, final ArrayBlockingQueue<byte[]> input,
             final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
 
@@ -131,13 +131,13 @@ public class Builder {
                         .entries(size)
                         .identifier(localIdentifier);
 
-        final ReplicatedSharedHashMap<IntValue, IntValue> result = (ReplicatedSharedHashMap<IntValue, IntValue>)
+        final Replica<IntValue, IntValue> result = (Replica<IntValue, IntValue>)
                 builder.canReplicate(true).create(getPersistenceFile(), IntValue.class,
                         IntValue.class);
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
+                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
 
         return result;
 
@@ -154,13 +154,13 @@ public class Builder {
                         .entries(size)
                         .identifier(localIdentifier);
 
-        final ReplicatedSharedHashMap<CharSequence, CharSequence> result = (ReplicatedSharedHashMap<CharSequence, CharSequence>)
+        final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result = (VanillaSharedReplicatedHashMap<CharSequence, CharSequence>)
                 builder.canReplicate(true).create(getPersistenceFile(), CharSequence.class,
                         CharSequence.class);
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (ReplicatedSharedHashMap.EntryExternalizable) result);
+                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
 
         return result;
 

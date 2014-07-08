@@ -39,8 +39,8 @@ import static java.net.StandardProtocolFamily.INET;
 import static java.net.StandardProtocolFamily.INET6;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier;
+import static net.openhft.collections.Replica.ModificationIterator;
+import static net.openhft.collections.Replica.ModificationNotifier;
 import static net.openhft.collections.TcpReplicator.EntryCallback;
 
 
@@ -87,7 +87,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
      * @param localIdentifier      the identifier of this replicated share hash map
      * @throws IOException
      */
-    UdpReplicator(@NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable,
+    UdpReplicator(@NotNull final Replica.EntryExternalizable externalizable,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
                   final int serializedEntrySize, final byte localIdentifier) throws
             IOException {
@@ -278,7 +278,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         private final EntryCallback entryCallback;
 
         UdpSocketChannelEntryWriter(final int serializedEntrySize,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                                    @NotNull final Replica.EntryExternalizable externalizable) {
 
             // we make the buffer twice as large just to give ourselves headroom
             out = ByteBuffer.allocateDirect(serializedEntrySize * 2);
@@ -332,7 +332,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
     private static class UdpSocketChannelEntryReader {
 
-        private final ReplicatedSharedHashMap.EntryExternalizable externalizable;
+        private final Replica.EntryExternalizable externalizable;
         private final ByteBuffer in;
         private final ByteBufferBytes out;
 
@@ -341,7 +341,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
          * @param externalizable      supports reading and writing serialize entries
          */
         UdpSocketChannelEntryReader(final int serializedEntrySize,
-                                    @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                                    @NotNull final Replica.EntryExternalizable externalizable) {
             // we make the buffer twice as large just to give ourselves headroom
             in = ByteBuffer.allocateDirect(serializedEntrySize * 2);
             this.externalizable = externalizable;

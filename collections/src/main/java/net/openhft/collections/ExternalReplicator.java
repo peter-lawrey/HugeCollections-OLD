@@ -33,15 +33,15 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static net.openhft.collections.ReplicatedSharedHashMap.EntryResolver;
+import static net.openhft.collections.Replica.EntryResolver;
 
 /**
  * Used for both file and and database replication
  *
  * @author Rob Austin.
  */
-public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryCallback,
-        ReplicatedSharedHashMap.ModificationNotifier, Closeable {
+public interface ExternalReplicator<K, V> extends Replica.EntryCallback,
+        Replica.ModificationNotifier, Closeable {
 
     /**
      * gets the data <V> from an external source
@@ -72,7 +72,7 @@ public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryC
      * @param <V>
      */
     abstract class AbstractExternalReplicator<K, V>
-            extends ReplicatedSharedHashMap.AbstractEntryCallback
+            extends Replica.AbstractEntryCallback
             implements ExternalReplicator<K, V> {
 
         private final V usingValue;
@@ -109,7 +109,7 @@ public interface ExternalReplicator<K, V> extends ReplicatedSharedHashMap.EntryC
             return true;
         }
 
-        public void setModificationIterator(final ReplicatedSharedHashMap.ModificationIterator modIterator) {
+        public void setModificationIterator(final Replica.ModificationIterator modIterator) {
             final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
             executorService.execute(new Runnable() {
