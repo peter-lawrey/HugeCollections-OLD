@@ -51,7 +51,6 @@ public class TCPSocketReplicationTest1 {
 
         final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
                 hostId == 0 ? NO_SERVERS : hostId == 1 ? ONE_SERVER : TWO_SERVER)
-                .deletedModIteratorFileOnExit(true)
                 .throttleBucketInterval(100, MILLISECONDS)
                 .heartBeatInterval(1, SECONDS);
 
