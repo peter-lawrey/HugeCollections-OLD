@@ -44,6 +44,7 @@ public class SHMExternalJDBCReplicatorTest {
     private Connection connection;
     private Statement stmt;
 
+
     @Before
     public void setup() throws SQLException {
         final String dbURL = "jdbc:derby:memory:openhft;create=true";
