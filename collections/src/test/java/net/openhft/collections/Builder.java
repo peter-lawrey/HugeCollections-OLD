@@ -23,6 +23,7 @@ import net.openhft.lang.values.IntValue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import static net.openhft.collections.ReplicatedSharedHashMap.ModificationNotifier.NOP;
