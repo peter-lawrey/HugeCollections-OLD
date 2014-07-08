@@ -27,7 +27,7 @@ import java.io.IOException;
 /**
  * @author Rob Austin.
  */
-public interface Replica<K, V>  {
+interface Replica<K, V> {
 
     /**
      * Provides the unique Identifier associated with this map instance. <p> An identifier is used to
