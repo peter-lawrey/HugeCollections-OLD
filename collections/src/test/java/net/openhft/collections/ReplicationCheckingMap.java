@@ -258,11 +258,6 @@ public class ReplicationCheckingMap<K, V> implements SharedHashMap<K, V> {
     }
 
     @Override
-    public SharedHashMapBuilder builder() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public File file() {
         throw new UnsupportedOperationException();
     }

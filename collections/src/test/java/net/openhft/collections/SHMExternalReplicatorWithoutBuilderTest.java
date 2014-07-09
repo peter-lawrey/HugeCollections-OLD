@@ -27,7 +27,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -354,13 +353,6 @@ public class SHMExternalReplicatorWithoutBuilderTest {
         return false;
     }
 
-    public static void main(String... args) {
-        BigDecimal bd = BigDecimal.ONE;
-        bd = bd.divide(BigDecimal.valueOf(49));
- /*       final BigDecimal a = BigDecimal.valueOf(49).multiply(BigDecimal.valueOf(2));
-        bd = bd.multiply(a);*/
-        System.out.println("bd=" + bd);
-    }
 }
 
 

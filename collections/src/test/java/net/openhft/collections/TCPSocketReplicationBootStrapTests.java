@@ -26,6 +26,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -43,9 +45,20 @@ public class TCPSocketReplicationBootStrapTests {
     public void testBootstrap() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079);
+
+        final TcpReplicatorBuilder tcpReplicatorBuilder =
+                new TcpReplicatorBuilder(8076, new InetSocketAddress("localhost", 8079))
+                        .heartBeatInterval(1, SECONDS);
+
+
+        final SharedHashMapBuilder builder = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 2)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
+                .entries(20000);
         final VanillaSharedReplicatedHashMap<Integer,
-                CharSequence> map2a = TCPSocketReplication4WayMapTest
-                .newTcpSocketShmIntString((byte) 2, 8076, new InetSocketAddress("localhost", 8079));
+                CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -72,7 +85,7 @@ public class TCPSocketReplicationBootStrapTests {
         }
 
         // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
-        map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
+        map2 = builder.create(map2File, Integer.class, CharSequence.class);
 
         // add data into it
         waitTillEqual(5000);
@@ -87,7 +100,19 @@ public class TCPSocketReplicationBootStrapTests {
     public void testBootstrapAndHeartbeat() throws IOException, InterruptedException {
 
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8079, new InetSocketAddress("localhost", 8076));
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8076);
+
+        final TcpReplicatorBuilder tcpReplicatorBuilder =
+                new TcpReplicatorBuilder(8076)
+                        .heartBeatInterval(1, SECONDS);
+
+
+        final SharedHashMapBuilder builder = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 2)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
+                .entries(20000);
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
@@ -115,7 +140,7 @@ public class TCPSocketReplicationBootStrapTests {
         }
 
         // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
-        map2 = map2a.builder().create(map2File, Integer.class, CharSequence.class);
+        map2 = builder.create(map2File, Integer.class, CharSequence.class);
 
         // add data into it
         waitTillEqual(20000);

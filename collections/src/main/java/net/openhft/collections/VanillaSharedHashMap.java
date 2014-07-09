@@ -141,10 +141,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         this.segments = ss;
     }
 
-    public SharedHashMapBuilder builder() {
-        return builder.clone();
-    }
-
     Class segmentType() {
         return Segment.class;
     }
