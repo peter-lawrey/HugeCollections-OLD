@@ -97,7 +97,8 @@ abstract class AbstractChannelReplicator implements Closeable {
     }
 
     /**
-     * forces the TCP and UDP replicators to rebootstrap
+     * forces the TCP and UDP replicators to re-bootstrap
+     * This is called whenever a new SHM is added to a custer
      */
     public abstract void forceBootstrap();
 

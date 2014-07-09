@@ -22,11 +22,10 @@ import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static net.openhft.collections.SharedHashMapBuilder.UDP_REPLICATION_MODIFICATION_ITERATOR_ID;
 
@@ -40,18 +39,22 @@ public class ClusterReplicatorBuilder<K, V> {
     private final byte identifier;
     private UdpReplicatorBuilder udpReplicatorBuilder = null;
     private TcpReplicatorBuilder tcpReplicatorBuilder = null;
-    private final List<SharedHashMapBuilder> sharedHashMapBuilders = new ArrayList<SharedHashMapBuilder>();
-    private int bufferSize = 1024;
 
-    private TcpReplicatorBuilder tcpClusterReplicator;
-    private ClusterReplicator<K, V> udpClusterReplicator;
+    private int maxEntrySize;
+    private int maxNumberOfChronicles = 128;
 
 
-    ClusterReplicatorBuilder(byte identifier) {
+    ClusterReplicatorBuilder(byte identifier, final int maxEntrySize1) {
         this.identifier = identifier;
+        this.maxEntrySize = maxEntrySize1;
+        if (!(identifier > 0 && identifier < 128))
+            throw new IllegalArgumentException("Identifier must be positive and <128, " +
+                    "identifier=" + identifier);
     }
 
-    List<ReplicaExternalizable<K, V>> replicas = new CopyOnWriteArrayList<ReplicaExternalizable<K, V>>();
+
+    private final Map<Short, ReplicaExternalizable> replicas
+            = new ConcurrentHashMap<Short, ReplicaExternalizable>();
 
     public ClusterReplicatorBuilder udpReplicator(UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
         this.udpReplicatorBuilder = udpReplicatorBuilder;
@@ -59,27 +62,25 @@ public class ClusterReplicatorBuilder<K, V> {
     }
 
     public ClusterReplicatorBuilder<K, V> tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
-        this.tcpClusterReplicator = tcpReplicatorBuilder;
+        this.tcpReplicatorBuilder = tcpReplicatorBuilder;
         return this;
     }
 
-    public SharedHashMap createSharedHashMap(SharedHashMapBuilder builder) throws IOException {
+    public <K, V> SharedHashMap<K, V> create(short canonicalId, SharedHashMapBuilder builder) throws
+            IOException {
 
-        if (builder == null || !builder.file().exists())
+        final SharedHashMapBuilder builder0 = builder.toBuilder();
+
+        builder0.identifier(identifier);
+
+        if (builder0 == null || !builder0.file().exists())
             throw new FileNotFoundException("Unable to create file");
 
-        if (!builder.canReplicate())
-            throw new IllegalArgumentException("Please set the 'identifier', " +
-                    "as this is required for clustering.");
-
-
-        if (builder.identifier() <= 0)
-            throw new IllegalArgumentException("Identifier must be positive, " + builder.identifier() + " given");
-
         final VanillaSharedReplicatedHashMap<K, V> result =
-                new VanillaSharedReplicatedHashMap<K, V>(builder, builder.file(), builder.<K>kClass(), builder.<V>kClass());
+                new VanillaSharedReplicatedHashMap<K, V>(builder0, builder0.file(), builder0.<K>kClass(),
+                        builder0.<V>vClass());
 
-        replicas.add(result);
+        replicas.put(canonicalId, (ReplicaExternalizable) result);
 
         return result;
     }
@@ -87,12 +88,17 @@ public class ClusterReplicatorBuilder<K, V> {
 
     public ClusterReplicator create() throws IOException {
 
-        final ClusterReplicator<K, V> clusterReplicator = new ClusterReplicator<K, V>(identifier);
-        clusterReplicator.addAll(replicas);
+        final ClusterReplicator<K, V> clusterReplicator = new ClusterReplicator<K, V>(identifier,
+                maxNumberOfChronicles);
+
+        for (final Map.Entry<Short, ReplicaExternalizable> entry : replicas.entrySet()) {
+            clusterReplicator.add(entry.getKey(), entry.getValue());
+        }
+
 
         if (tcpReplicatorBuilder != null) {
             final TcpReplicator tcpReplicator = new TcpReplicator(clusterReplicator, clusterReplicator, tcpReplicatorBuilder,
-                    bufferSize);
+                    maxEntrySize);
             closeables.add(tcpReplicator);
             clusterReplicator.add(tcpReplicator);
         }
@@ -111,7 +117,7 @@ public class ClusterReplicatorBuilder<K, V> {
             final UdpReplicator udpReplicator =
                     new UdpReplicator(clusterReplicator,
                             udpReplicatorBuilder.clone(),
-                            bufferSize,
+                            maxEntrySize,
                             identifier,
                             UDP_REPLICATION_MODIFICATION_ITERATOR_ID);
 
@@ -119,7 +125,7 @@ public class ClusterReplicatorBuilder<K, V> {
             clusterReplicator.add(udpReplicator);
         }
 
-        this.udpClusterReplicator = clusterReplicator;
+
         return clusterReplicator;
 
     }

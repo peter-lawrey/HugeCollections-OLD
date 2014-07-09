@@ -58,13 +58,13 @@ interface Replica<K, V> {
                                                      ModificationNotifier modificationNotifier);
 
     /**
-     * Used in conjunction with replication, to back filling data from a remote node that this node may have
-     * missed updates while it has not been running.
+     * Used in conjunction with replication, to back fill data from a remote node. This node  may have missed
+     * updates while it was not been running or connected via TCP.
      *
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      * @see #identifier()
      */
-    long lastModificationTime(byte identifier);
+    long lastModificationTime(byte remoteIdentifier);
 
 
     /**

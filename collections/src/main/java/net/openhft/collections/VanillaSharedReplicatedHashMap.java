@@ -169,10 +169,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     @Override
-    public long lastModificationTime(byte identifier) {
-        assert identifier != this.identifier();
+    public long lastModificationTime(byte remoteIdentifier) {
+        assert remoteIdentifier != this.identifier();
 
-        final int offset = identifier * 8;
+        final int offset = remoteIdentifier * 8;
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
         return identifierUpdatedBytes.readLong(offset);
@@ -1091,8 +1091,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         /**
          * {@inheritDoc}
          */
-        public ModificationIterator acquireModificationIterator(short remoteIdentifier,
-                                                                ModificationNotifier modificationNotifier) {
+        public ModificationIterator acquireModificationIterator(
+                final short remoteIdentifier,
+                @NotNull final ModificationNotifier modificationNotifier) {
 
             final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
 
@@ -1211,7 +1212,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         private final EntryModifiableCallback entryModifiableCallback = new EntryModifiableCallback();
 
-        private volatile long position = -1;
+        // records the current position of the cursor in the bitset
+        private long position = -1;
 
         /**
          * @param bytes                the back the bitset, used to mark which entries have changed
@@ -1386,7 +1388,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             if (generatedValueType)
                 if (usingKey == null)
-                    usingKey = (K) DataValueClasses.newDirectReference(kClass);
+                    usingKey = DataValueClasses.newDirectReference(kClass);
                 else
                     assert usingKey instanceof Byteable;
             if (usingKey instanceof Byteable) {
@@ -1433,7 +1435,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             if (generatedValueType)
                 if (usingValue == null)
-                    usingValue = (V) DataValueClasses.newDirectReference(vClass);
+                    usingValue = DataValueClasses.newDirectReference(vClass);
                 else
                     assert usingValue instanceof Byteable;
             if (usingValue instanceof Byteable) {
@@ -1459,7 +1461,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             entry.position(start);
         }
     }
-
 
 }
 

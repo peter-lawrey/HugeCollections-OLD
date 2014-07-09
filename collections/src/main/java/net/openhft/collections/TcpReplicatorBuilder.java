@@ -46,6 +46,7 @@ public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Clo
     private TimeUnit heartBeatIntervalUnit = SECONDS;
     private long throttle = 0;
     private TimeUnit throttlePerUnit = MILLISECONDS;
+    private int maxEntrySizeBytes;
 
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
@@ -195,6 +196,7 @@ public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Clo
         this.throttleBucketIntervalUnit = unit;
         return this;
     }
+
 
 
 }

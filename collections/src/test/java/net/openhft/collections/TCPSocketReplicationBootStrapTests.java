@@ -50,15 +50,16 @@ public class TCPSocketReplicationBootStrapTests {
                 new TcpReplicatorBuilder(8076, new InetSocketAddress("localhost", 8079))
                         .heartBeatInterval(1, SECONDS);
 
-
         final SharedHashMapBuilder builder = new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) 2)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000);
+
         final VanillaSharedReplicatedHashMap<Integer,
                 CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
+
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;

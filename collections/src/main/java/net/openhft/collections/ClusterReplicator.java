@@ -18,68 +18,74 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.collection.SingleThreadedDirectBitSet;
+import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
-import net.openhft.lang.model.constraints.NotNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static java.lang.Math.min;
+import static java.nio.ByteBuffer.wrap;
 
 /**
  * @author Rob Austin.
  */
-public class ClusterReplicator<K, V>
-        implements ReplicaExternalizable<K, V>, Closeable {
+public class ClusterReplicator<K, V> implements ReplicaExternalizable<K, V>, Closeable {
 
+    private final SingleThreadedDirectBitSet bitSet;
     private byte identifier;
 
 
-    private List<ReplicaExternalizable<K, V>> replicas = new CopyOnWriteArrayList<ReplicaExternalizable<K, V>>();
+    final ReplicaExternalizable replicaExternalizables[];
 
     private final AtomicReferenceArray<ModificationIterator> modificationIterator = new
             AtomicReferenceArray<ModificationIterator>(130);
 
     Set<AbstractChannelReplicator> replicators = new CopyOnWriteArraySet<AbstractChannelReplicator>();
 
-    public ClusterReplicator(final byte identifier) {
+    public ClusterReplicator(final byte identifier, int maxNumberOfChronicles) {
         this.identifier = identifier;
+        final int size = (int) Math.ceil(maxNumberOfChronicles / 8.0);
+        final ByteBufferBytes bytes = new ByteBufferBytes(wrap(new byte[size]));
+        bitSet = new SingleThreadedDirectBitSet(bytes);
+        replicaExternalizables = new ReplicaExternalizable[maxNumberOfChronicles];
+
     }
 
-    public void add(ReplicaExternalizable<K, V> replica) {
-        replicas.add(replica);
-        bootstrap();
+
+    public synchronized void add(short chronicleId, ReplicaExternalizable replica) {
+        replicaExternalizables[chronicleId] = replica;
+        forceBootstrap();
     }
 
-    private void bootstrap() {
+
+    /**
+     * forcing the bootstrap ensures that {@code net.openhft.collections.Replica.ModificationIterator#dirtyEntries(long)}
+     * is called and this taking into account all recently added replicas
+     */
+    private void forceBootstrap() {
         for (AbstractChannelReplicator replicator : replicators) {
             replicator.forceBootstrap();
         }
-
     }
 
-    public void addAll(Collection<ReplicaExternalizable<K, V>> replicas) {
-        this.replicas.addAll(replicas);
-        bootstrap();
-    }
 
     @Override
     public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination, int chronicleId) {
         destination.writeStopBit(chronicleId);
-        replicas.get(chronicleId).writeExternalEntry(entry, destination, chronicleId);
+        replicaExternalizables[chronicleId].writeExternalEntry(entry, destination, chronicleId);
     }
 
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
         final int chronicleId = (int) source.readStopBit();
-        replicas.get(chronicleId).readExternalEntry(source);
+        replicaExternalizables[chronicleId].readExternalEntry(source);
     }
 
     @Override
@@ -98,8 +104,8 @@ public class ClusterReplicator<K, V>
 
             @Override
             public boolean hasNext() {
-                for (int i = 0; i < replicas.size(); i++) {
-                    if (replicas.get(i).acquireModificationIterator(id, notifier).hasNext())
+                for (int i = (int) bitSet.nextSetBit(0); i > 0; i = (int) bitSet.nextSetBit(i + 1)) {
+                    if (replicaExternalizables[i].acquireModificationIterator(id, notifier).hasNext())
                         return true;
                 }
                 return false;
@@ -107,8 +113,9 @@ public class ClusterReplicator<K, V>
 
             @Override
             public boolean nextEntry(@NotNull AbstractEntryCallback callback, final int na) {
-                for (int chronicleId = 0; chronicleId < replicas.size(); chronicleId++) {
-                    if (replicas.get(chronicleId).acquireModificationIterator(id, notifier).nextEntry(callback, chronicleId))
+                for (int i = (int) bitSet.nextSetBit(0); i > 0; i = (int) bitSet.nextSetBit(i + 1)) {
+                    if (replicaExternalizables[i].acquireModificationIterator(id,
+                            notifier).nextEntry(callback, i))
                         return true;
                 }
                 return false;
@@ -116,8 +123,8 @@ public class ClusterReplicator<K, V>
 
             @Override
             public void dirtyEntries(long fromTimeStamp) {
-                for (int i = 0; i < replicas.size(); i++) {
-                    replicas.get(i).acquireModificationIterator(id, notifier).dirtyEntries(fromTimeStamp);
+                for (int i = (int) bitSet.nextSetBit(0); i > 0; i = (int) bitSet.nextSetBit(i + 1)) {
+                    replicaExternalizables[i].acquireModificationIterator(id, notifier).dirtyEntries(fromTimeStamp);
                 }
             }
         };
@@ -130,22 +137,22 @@ public class ClusterReplicator<K, V>
     /**
      * gets the earliest modification time for all of the chronicles
      *
-     * @param identifier
+     * @param remoteIdentifier the remote identifer
      * @return
      */
     @Override
-    public long lastModificationTime(byte identifier) {
+    public long lastModificationTime(byte remoteIdentifier) {
         long t = System.currentTimeMillis();
-        for (int i = 0; i < replicas.size(); i++) {
-            t = min(t, replicas.get(i).lastModificationTime(identifier));
+        for (int i = (int) bitSet.nextSetBit(0); i > 0; i = (int) bitSet.nextSetBit(i + 1)) {
+            t = min(t, replicaExternalizables[i].lastModificationTime(remoteIdentifier));
         }
         return t;
     }
 
     @Override
     public void close() throws IOException {
-        for (ReplicaExternalizable<K, V> closeable : replicas) {
-            closeable.close();
+        for (int i = (int) bitSet.nextSetBit(0); i > 0; i = (int) bitSet.nextSetBit(i + 1)) {
+            replicaExternalizables[i].close();
         }
     }
 

@@ -233,31 +233,6 @@ public final class SharedHashMapBuilder implements Cloneable {
         return transactional;
     }
 
-    public SharedHashMapBuilder file(File file) throws IOException {
-
-
-        for (int i = 0; i < 10; i++) {
-            if (file.exists() && file.length() > 0) {
-                readFile(file, this);
-                break;
-            }
-            if (file.createNewFile() || file.length() == 0) {
-                newFile(file);
-                break;
-            }
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new IOException(e);
-            }
-
-            this.file = file;
-        }
-
-        this.file = file;
-        return this;
-    }
 
     public SharedHashMapBuilder kClass(Class kClass) {
         this.kClass = kClass;
@@ -266,6 +241,11 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     public SharedHashMapBuilder vClass(Class vClass) {
         this.vClass = vClass;
+        return this;
+    }
+
+    public SharedHashMapBuilder file(File file) {
+        this.file = file;
         return this;
     }
 
@@ -292,35 +272,8 @@ public final class SharedHashMapBuilder implements Cloneable {
         if (file == null)
             throw new IllegalArgumentException("missing mandatory parameter file");
 
-        return create(file, kClass, vClass);
-    }
 
-
-    /**
-     * Its recommended use net.openhft.collections.SharedHashMapBuilder#create() instead as this method
-     * will bwe shortly removed
-     */
-    @Deprecated
-    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
-        SharedHashMapBuilder builder = clone();
-
-        for (int i = 0; i < 10; i++) {
-            if (file.exists() && file.length() > 0) {
-                readFile(file, builder);
-                break;
-            }
-            if (file.createNewFile() || file.length() == 0) {
-                newFile(file);
-                break;
-            }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new IOException(e);
-            }
-        }
-        if (builder == null || !file.exists())
-            throw new FileNotFoundException("Unable to create " + file);
+        SharedHashMapBuilder builder = toBuilder();
 
         if (!canReplicate())
             return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
@@ -350,7 +303,39 @@ public final class SharedHashMapBuilder implements Cloneable {
             applyUdpReplication(result, udpReplicatorBuilder);
         }
         return result;
+    }
 
+
+    /**
+     * Its recommended use net.openhft.collections.SharedHashMapBuilder#create() instead as this method will
+     * bwe shortly removed
+     */
+    @Deprecated
+    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
+        return file(file).kClass(kClass).vClass(vClass).create();
+    }
+
+      SharedHashMapBuilder toBuilder() throws IOException {
+        SharedHashMapBuilder builder = clone();
+
+        for (int i = 0; i < 10; i++) {
+            if (file.exists() && file.length() > 0) {
+                readFile(file, builder);
+                break;
+            }
+            if (file.createNewFile() || file.length() == 0) {
+                newFile(file);
+                break;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+        }
+        if (builder == null || !file.exists())
+            throw new FileNotFoundException("Unable to create " + file);
+        return builder;
     }
 
     static void readFile(File file, SharedHashMapBuilder builder) throws IOException {
@@ -669,8 +654,7 @@ public final class SharedHashMapBuilder implements Cloneable {
         }
 
         final UdpReplicator udpReplicator =
-                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier(),UDP_REPLICATION_MODIFICATION_ITERATOR_ID );
-
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier(), UDP_REPLICATION_MODIFICATION_ITERATOR_ID);
 
 
         result.addCloseable(udpReplicator);
@@ -678,8 +662,8 @@ public final class SharedHashMapBuilder implements Cloneable {
 
 
     private <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
-                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder) throws
-            IOException {
+                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder)
+            throws IOException {
 
         result.addCloseable(new TcpReplicator(result, result, tcpReplicatorBuilder, entrySize()));
     }
