@@ -77,6 +77,9 @@ public final class SharedHashMapBuilder implements Cloneable {
     private BytesMarshallerFactory bytesMarshallerFactory;
     private ObjectSerializer objectSerializer;
     private ExternalReplicator externalReplicator;
+    private File file;
+    private Class kClass;
+    private Class vClass;
 
     @Override
     public SharedHashMapBuilder clone() {
@@ -230,6 +233,74 @@ public final class SharedHashMapBuilder implements Cloneable {
         return transactional;
     }
 
+    public SharedHashMapBuilder file(File file) throws IOException {
+
+
+        for (int i = 0; i < 10; i++) {
+            if (file.exists() && file.length() > 0) {
+                readFile(file, this);
+                break;
+            }
+            if (file.createNewFile() || file.length() == 0) {
+                newFile(file);
+                break;
+            }
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
+
+            this.file = file;
+        }
+
+        this.file = file;
+        return this;
+    }
+
+    public SharedHashMapBuilder kClass(Class kClass) {
+        this.kClass = kClass;
+        return this;
+    }
+
+    public SharedHashMapBuilder vClass(Class vClass) {
+        this.vClass = vClass;
+        return this;
+    }
+
+    public File file() {
+        return this.file;
+    }
+
+    public <K> Class<K> kClass() {
+        return this.kClass;
+    }
+
+    public <V> Class<V> vClass() {
+        return this.vClass;
+    }
+
+
+    public <K, V> SharedHashMap<K, V> create() throws IOException {
+        if (kClass == null)
+            throw new IllegalArgumentException("missing mandatory parameter kClass");
+
+        if (vClass == null)
+            throw new IllegalArgumentException("missing mandatory parameter vClass");
+
+        if (file == null)
+            throw new IllegalArgumentException("missing mandatory parameter file");
+
+        return create(file, kClass, vClass);
+    }
+
+
+    /**
+     * Its recommended use net.openhft.collections.SharedHashMapBuilder#create() instead as this method
+     * will bwe shortly removed
+     */
+    @Deprecated
     public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         SharedHashMapBuilder builder = clone();
 
@@ -598,12 +669,9 @@ public final class SharedHashMapBuilder implements Cloneable {
         }
 
         final UdpReplicator udpReplicator =
-                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
+                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier(),UDP_REPLICATION_MODIFICATION_ITERATOR_ID );
 
-        final Replica.ModificationIterator udpModIterator
-                = result.acquireModificationIterator(UDP_REPLICATION_MODIFICATION_ITERATOR_ID, udpReplicator);
 
-        udpReplicator.setModificationIterator(udpModIterator);
 
         result.addCloseable(udpReplicator);
     }

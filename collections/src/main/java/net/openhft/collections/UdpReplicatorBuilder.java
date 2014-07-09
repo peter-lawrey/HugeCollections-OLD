@@ -24,8 +24,10 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Enumeration;
 
+import static net.openhft.collections.AbstractChannelReplicator.ChannelReplicatorBuilder;
 
-public class UdpReplicatorBuilder implements Cloneable {
+
+public class UdpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable {
 
     private InetAddress address;
     private int port;
@@ -51,8 +53,8 @@ public class UdpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param address the UDP broadcast or multicast address, for example, for broadcast an address
-     *                of 192.168.0.255 has an IP range of 192.168.0.0 - 192.168.0.254 <p/> see
+     * @param address the UDP broadcast or multicast address, for example, for broadcast an address of
+     *                192.168.0.255 has an IP range of 192.168.0.0 - 192.168.0.254 <p/> see
      *                http://www.subnet-calculator.com/subnet.php?net_class=C for more details
      */
     public UdpReplicatorBuilder address(InetAddress address) {

@@ -59,15 +59,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final Map<SocketAddress, AbstractConnector> connectorBySocket = new ConcurrentHashMap<SocketAddress, AbstractConnector>();
 
     @Nullable
-    private Throttler throttler;
+    private final Throttler throttler;
 
     private final SelectionKey[] selectionKeysStore = new SelectionKey[Byte.MAX_VALUE + 1];
-
     private final BitSet activeKeys = new BitSet(selectionKeysStore.length);
 
     // used to instruct the selector thread to set OP_WRITE on a key correlated by the bit index in the
     // bitset
-    private KeyInterestUpdater opWriteUpdater = new KeyInterestUpdater(OP_WRITE, selectionKeysStore);
+    private final KeyInterestUpdater opWriteUpdater = new KeyInterestUpdater(OP_WRITE, selectionKeysStore);
 
     private final long heartBeatInterval;
     private long selectorTimeout;
@@ -81,6 +80,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final int serializedEntrySize;
     private final EntryExternalizable externalizable;
 
+
+    /**
+     * @param replica
+     * @param externalizable
+     * @param tcpReplicatorBuilder
+     * @param serializedEntrySize  used to determine the size of the internal byteBuffer
+     * @throws IOException
+     */
     TcpReplicator(@NotNull final Replica replica,
                   @NotNull final EntryExternalizable externalizable,
                   @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder,
@@ -94,11 +101,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         long throttleBucketInterval = tcpReplicatorBuilder.throttleBucketInterval(MILLISECONDS);
         selectorTimeout = Math.min(heartBeatInterval, throttleBucketInterval);
 
-        if (tcpReplicatorBuilder.throttle(DAYS) > 0) {
-            throttler = new Throttler(selector,
-                    throttleBucketInterval,
-                    serializedEntrySize, tcpReplicatorBuilder.throttle(DAYS));
-        }
+        throttler = tcpReplicatorBuilder.throttle(DAYS) > 0 ?
+                new Throttler(selector,
+                        throttleBucketInterval,
+                        serializedEntrySize, tcpReplicatorBuilder.throttle(DAYS)) : null;
 
         packetSize = tcpReplicatorBuilder.packetSize();
         endpoints = tcpReplicatorBuilder.endpoints();
@@ -118,7 +124,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                             LOG.error("", e);
                         }
                     }
-                });
+                }
+        );
     }
 
     private void process() throws IOException {
@@ -160,6 +167,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 final Set<SelectionKey> selectionKeys = selector.selectedKeys();
                 for (final SelectionKey key : selectionKeys) {
                     try {
+
                         if (!key.isValid())
                             continue;
 
@@ -329,6 +337,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         } catch (IOException ex) {
             // do nothing
         }
+    }
+
+    @Override
+    public void forceBootstrap() {
+
     }
 
 
@@ -770,7 +783,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
             for (; ; ) {
 
-                final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+                final boolean wasDataRead = modificationIterator.nextEntry(entryCallback, 0);
 
                 if (!wasDataRead) {
 
@@ -887,10 +900,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         @Override
-        public boolean onEntry(final NativeBytes entry) {
+        public boolean onEntry(final NativeBytes entry, final int chronicleId) {
             in.skip(SIZE_OF_UNSIGNED_SHORT);
             final long start = in.position();
-            externalizable.writeExternalEntry(entry, in);
+            externalizable.writeExternalEntry(entry, in, chronicleId);
 
             if (in.position() == start) {
                 in.position(in.position() - SIZE_OF_UNSIGNED_SHORT);
@@ -1029,7 +1042,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
      * sets interestOps to "selector keys",The change to interestOps much be on the same thread as the
      * selector. This  class, allows via {@link net.openhft.collections.AbstractChannelReplicator
      * .KeyInterestUpdater#set(int)}  to holds a pending change  in interestOps ( via a bitset ), this change
-     * is  processed later on the same thread as the selector
+     * is processed later on the same thread as the selector
      */
     private static class KeyInterestUpdater {
 

@@ -22,7 +22,7 @@ import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.NotNull;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 /**
  * @author Rob Austin.
@@ -55,7 +55,7 @@ interface Replica<K, V> {
      * @see #identifier()
      */
     ModificationIterator acquireModificationIterator(short remoteIdentifier,
-                                                     ModificationNotifier modificationNotifier) throws IOException;
+                                                     ModificationNotifier modificationNotifier);
 
     /**
      * Used in conjunction with replication, to back filling data from a remote node that this node may have
@@ -92,18 +92,19 @@ interface Replica<K, V> {
 
         /**
          * @return {@code true} if the is another entry to be received via {@link
-         * #nextEntry(Replica.AbstractEntryCallback callback)}
+         * #nextEntry(net.openhft.collections.Replica.AbstractEntryCallback, int chronicleId)}
          */
         boolean hasNext();
 
         /**
          * A non-blocking call that provides the entry that has changed to {@code callback.onEntry()}.
          *
-         * @param callback a callback which will be called when a new entry becomes available.
+         * @param callback    a callback which will be called when a new entry becomes available.
+         * @param chronicleId only assigned when clustering
          * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method, {@code
          * false} if the entry was not accepted or was not available
          */
-        boolean nextEntry(@NotNull final AbstractEntryCallback callback);
+        boolean nextEntry(@NotNull final AbstractEntryCallback callback, final int chronicleId);
 
         /**
          * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer. It means all
@@ -123,18 +124,19 @@ interface Replica<K, V> {
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
          *
-         * @param entry the entry you will receive, this does not have to be locked, as locking is already
-         *              provided from the caller.
+         * @param entry       the entry you will receive, this does not have to be locked, as locking is
+         *                    already provided from the caller.
+         * @param chronicleId
          * @return {@code false} if this entry should be ignored because the identifier of the source node is
          * not from one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final NativeBytes entry);
+        public abstract boolean onEntry(final NativeBytes entry, final int chronicleId);
 
         /**
          * Called just after {@see #onEntry(NativeBytes entry)}
          *
-         * @see #onEntry(NativeBytes entry);
+         * @see #onEntry(net.openhft.lang.io.NativeBytes, int chronicleId) ;
          */
         public void onAfterEntry();
 
@@ -154,18 +156,19 @@ interface Replica<K, V> {
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
          *
-         * @param entry the entry you will receive, this does not have to be locked, as locking is already
-         *              provided from the caller.
+         * @param entry       the entry you will receive, this does not have to be locked, as locking is
+         *                    already provided from the caller.
+         * @param chronicleId
          * @return {@code false} if this entry should be ignored because the identifier of the source node is
          * not from one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final NativeBytes entry);
+        public abstract boolean onEntry(final NativeBytes entry, final int chronicleId);
 
         /**
          * Called just after {@see #onEntry(NativeBytes entry)}
          *
-         * @see #onEntry(NativeBytes entry);
+         * @see EntryCallback#onEntry(net.openhft.lang.io.NativeBytes, int chronicleId) ;
          */
         public void onAfterEntry() {
             // no-op by default
@@ -191,9 +194,9 @@ interface Replica<K, V> {
          * @param entry       the byte location of the entry to be stored
          * @param destination a buffer the entry will be written to, the segment may reject this operation and
          *                    add zeroBytes, if the identifier in the entry did not match the maps local
-         *                    identifier
+         * @param chronicleId used in cluster into identify the canonical map or queue
          */
-        void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
+        void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination, int chronicleId);
 
         /**
          * The map implements this method to restore its contents. This method must read the values in the
@@ -234,4 +237,7 @@ interface Replica<K, V> {
     }
 
 
+}
+
+interface ReplicaExternalizable<K, V> extends Replica.EntryExternalizable, Replica<K, V>, Closeable {
 }

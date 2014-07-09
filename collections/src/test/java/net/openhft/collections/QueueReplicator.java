@@ -149,10 +149,10 @@ public class QueueReplicator<K, V> {
                              * {@inheritDoc}
                              */
                             @Override
-                            public boolean onEntry(NativeBytes entry) {
+                            public boolean onEntry(NativeBytes entry, final int chronicleId) {
 
                                 entryBuffer.clear();
-                                externalizable.writeExternalEntry(entry, entryBuffer);
+                                externalizable.writeExternalEntry(entry, entryBuffer, chronicleId);
 
                                 if (entryBuffer.position() == 0)
                                     return false;
@@ -180,7 +180,7 @@ public class QueueReplicator<K, V> {
                 try {
                     for (; ; ) {
 
-                        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+                        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback, 0);
 
                         if (wasDataRead) {
                             isWritingEntry.set(false);

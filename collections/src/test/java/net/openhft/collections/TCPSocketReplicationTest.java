@@ -103,7 +103,7 @@ public class TCPSocketReplicationTest {
     @Test
     public void testBufferOverflow() throws IOException, InterruptedException {
 
-        for (int i = 0; i < map1.builder().entries(); i++) {
+        for (int i = 0; i < 1000; i++) {
             map1.put(i, "EXAMPLE-1");
         }
 

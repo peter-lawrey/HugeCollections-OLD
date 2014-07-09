@@ -94,7 +94,7 @@ public interface ExternalReplicator<K, V> extends Replica.EntryCallback,
         }
 
         @Override
-        public boolean onEntry(NativeBytes entry) {
+        public boolean onEntry(NativeBytes entry, final int chronicleId) {
 
             final K key = entryResolver.key(entry, usingKey);
 
@@ -122,7 +122,7 @@ public interface ExternalReplicator<K, V> extends Replica.EntryCallback,
                         // map
                         // ideally this will be run on its own thread
                         while (modIterator.hasNext()) {
-                            modIterator.nextEntry(AbstractExternalReplicator.this);
+                            modIterator.nextEntry(AbstractExternalReplicator.this, 0);
                         }
 
                         // waits here unit there are more events to process

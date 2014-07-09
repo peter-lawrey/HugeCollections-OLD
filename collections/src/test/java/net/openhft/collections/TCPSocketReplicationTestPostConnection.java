@@ -25,6 +25,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -76,7 +77,18 @@ public class TCPSocketReplicationTestPostConnection {
     @Test
     public void testBootStrapIntoNewMapWithNewFile() throws IOException, InterruptedException {
 
-        final SharedHashMap<Integer, CharSequence> map2a = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        final TcpReplicatorBuilder tcpReplicatorBuilder =
+                new TcpReplicatorBuilder(8077, new InetSocketAddress("localhost", 8076))
+                        .heartBeatInterval(1, SECONDS);
+
+
+        final SharedHashMapBuilder builder = new SharedHashMapBuilder()
+                .entries(1000)
+                .identifier((byte) 2)
+                .tcpReplicatorBuilder(tcpReplicatorBuilder)
+                .entries(20000);
+        final SharedHashMap<Integer, CharSequence> map2a = (SharedHashMap<Integer, CharSequence>) builder
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
 
         Thread.sleep(1);
@@ -89,7 +101,7 @@ public class TCPSocketReplicationTestPostConnection {
         map1.put(6, "EXAMPLE-1");
 
         // recreate map2 with new unique file
-        map2 = map2a.builder().create(getPersistenceFile(), Integer.class, CharSequence.class);
+        map2 = builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
 
         // allow time for the recompilation to resolve
@@ -107,7 +119,8 @@ public class TCPSocketReplicationTestPostConnection {
 
         for (final Closeable closeable : new Closeable[]{map1, map2}) {
             try {
-                closeable.close();
+                if (closeable != null)
+                    closeable.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }

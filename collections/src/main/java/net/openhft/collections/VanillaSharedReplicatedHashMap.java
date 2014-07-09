@@ -38,7 +38,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import static net.openhft.collections.Replica.EntryExternalizable;
 import static net.openhft.collections.Replica.EntryResolver;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
@@ -84,7 +83,7 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements SharedHashMap<K, V>, Replica<K, V>, EntryExternalizable, EntryResolver<K, V>,
+        implements SharedHashMap<K, V>, ReplicaExternalizable<K, V>, EntryResolver<K, V>,
         Closeable {
 
     private static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
@@ -324,7 +323,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     @Override
     public Replica.ModificationIterator acquireModificationIterator
             (short remoteIdentifier,
-             @NotNull final ModificationNotifier modificationNotifier) throws IOException {
+             @NotNull final ModificationNotifier modificationNotifier) {
 
         return modificationDelegator.acquireModificationIterator(remoteIdentifier, modificationNotifier);
     }
@@ -918,7 +917,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * method, especially when being used in a multi threaded context.
      */
     @Override
-    public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
+    public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination, int chronicleId) {
 
         final long initialLimit = entry.limit();
 
@@ -1093,8 +1092,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
          * {@inheritDoc}
          */
         public ModificationIterator acquireModificationIterator(short remoteIdentifier,
-                                                                ModificationNotifier modificationNotifier)
-                throws IOException {
+                                                                ModificationNotifier modificationNotifier) {
 
             final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
 
@@ -1113,7 +1111,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
                 final ModificationIterator newModificationIterator = new ModificationIterator(
                         bytes, modificationNotifier);
-
 
                 modificationIterators.set(remoteIdentifier, newModificationIterator);
                 bitSet.set(remoteIdentifier);
@@ -1299,9 +1296,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         /**
          * @param entryCallback call this to get an entry, this class will take care of the locking
+         * @param chronicleId
          * @return true if an entry was processed
          */
-        public boolean nextEntry(@NotNull final AbstractEntryCallback entryCallback) {
+        public boolean nextEntry(@NotNull final AbstractEntryCallback entryCallback, final int chronicleId) {
             long position = this.position;
             while (true) {
                 long oldPosition = position;
@@ -1327,7 +1325,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                         final NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
 
                         // if the entry should be ignored, we'll move the next entry
-                        final boolean success = entryCallback.onEntry(entry);
+                        final boolean success = entryCallback.onEntry(entry, chronicleId);
                         entryCallback.onAfterEntry();
                         if (success) {
                             return true;

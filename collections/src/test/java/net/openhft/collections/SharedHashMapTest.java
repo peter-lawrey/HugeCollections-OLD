@@ -553,7 +553,7 @@ public class SharedHashMapTest {
             int threads = procs * 2; // runs > 100 ? procs / 2 : procs;
             int count = runs > 500 ? runs > 1200 ? 1 : 3 : 5;
             final int independence = 8; // Math.min(procs, runs > 500 ? 8 : 4);
-            System.out.println("\nKey size: " + runs + " Million entries. " + map.builder());
+            System.out.println("\nKey size: " + runs + " Million entries. ");
             for (int j = 0; j < count; j++) {
                 long start = System.currentTimeMillis();
                 ExecutorService es = Executors.newFixedThreadPool(procs);

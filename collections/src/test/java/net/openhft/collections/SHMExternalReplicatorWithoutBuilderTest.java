@@ -74,11 +74,9 @@ public class SHMExternalReplicatorWithoutBuilderTest {
         @Column
         String name;
 
-
         // testing without the name annotation , the field will be used instead
         @Column
         String fullCamelCaseFieldName;
-
 
         @Column(name = "DOUBLE_VAL")
         double doubleValue;
@@ -88,7 +86,6 @@ public class SHMExternalReplicatorWithoutBuilderTest {
 
         @Column(name = "DATE_VAL")
         Date dateValue;
-
 
         @Column(name = "CHAR_VAL")
         char charValue;

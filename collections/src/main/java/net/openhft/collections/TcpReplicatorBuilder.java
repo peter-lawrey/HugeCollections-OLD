@@ -28,13 +28,14 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableSet;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static net.openhft.collections.AbstractChannelReplicator.ChannelReplicatorBuilder;
 
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
  *
  * @see SharedHashMapBuilder#tcpReplicatorBuilder(TcpReplicatorBuilder)
  */
-public final class TcpReplicatorBuilder implements Cloneable {
+public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable {
 
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
@@ -106,11 +107,11 @@ public final class TcpReplicatorBuilder implements Cloneable {
 
     /**
      * @param heartBeatInterval heart beat interval
-     * @param unit the time unit of the interval
+     * @param unit              the time unit of the interval
      * @return this builder back
-     * @throws IllegalArgumentException if the given heart beat interval is unrecognisably small for
-     *         the current TCP replicator implementation or negative. Current minimum interval is
-     *         1 millisecond.
+     * @throws IllegalArgumentException if the given heart beat interval is unrecognisably small for the
+     *                                  current TCP replicator implementation or negative. Current minimum
+     *                                  interval is 1 millisecond.
      */
     public TcpReplicatorBuilder heartBeatInterval(long heartBeatInterval, TimeUnit unit) {
         if (unit.toMillis(heartBeatInterval) < 1) {
@@ -154,8 +155,8 @@ public final class TcpReplicatorBuilder implements Cloneable {
     }
 
     /**
-     * @param maxBits the preferred maximum bits.
-     *                Non-positive value designates TCP replicator shouldn't throttle.
+     * @param maxBits the preferred maximum bits. Non-positive value designates TCP replicator shouldn't
+     *                throttle.
      * @param perUnit the time unit per which maximum bits specified
      * @return this builder back
      */
@@ -178,11 +179,11 @@ public final class TcpReplicatorBuilder implements Cloneable {
 
     /**
      * @param throttleBucketInterval the bucketing interval for throttling
-     * @param unit the time unit of the interval
+     * @param unit                   the time unit of the interval
      * @return this builder back
-     * @throws IllegalArgumentException if the given bucketing interval is unrecognisably small for
-     *         the current TCP replicator implementation or negative. Current minimum interval is
-     *         1 millisecond.
+     * @throws IllegalArgumentException if the given bucketing interval is unrecognisably small for the
+     *                                  current TCP replicator implementation or negative. Current minimum
+     *                                  interval is 1 millisecond.
      */
     public TcpReplicatorBuilder throttleBucketInterval(long throttleBucketInterval, TimeUnit unit) {
         if (unit.toMillis(throttleBucketInterval) < 1) {

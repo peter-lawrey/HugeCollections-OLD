@@ -50,12 +50,12 @@ public class UDPSocketReplicationTest {
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
-    //  private SharedHashMap<Integer, CharSequence> map1;
+
     private SharedHashMap<Integer, CharSequence> map2;
 
     @Before
     public void setup() throws IOException {
-        //      map1 = newUdpSocketShmIntString(1, 1234);
+
         map2 = newUdpSocketShmIntString(1, 1234);
         try {
             Thread.sleep(500);

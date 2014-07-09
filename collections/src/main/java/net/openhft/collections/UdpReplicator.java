@@ -59,6 +59,8 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
 
     private final UdpSocketChannelEntryWriter writer;
     private final UdpSocketChannelEntryReader reader;
+    private final ReplicaExternalizable replicaExternalizable;
+    private final short udpIdentifier;
 
     private ModificationIterator modificationIterator;
     private Throttler throttler;
@@ -80,23 +82,27 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         super.close();
     }
 
+
+
     /**
-     * @param externalizable
+     * @param replicaExternalizable
      * @param udpReplicatorBuilder
      * @param serializedEntrySize
-     * @param localIdentifier      the identifier of this replicated share hash map
+     * @param localIdentifier       the identifier of this replicated share hash map
+     * @param udpIdentifier
      * @throws IOException
      */
-    UdpReplicator(@NotNull final Replica.EntryExternalizable externalizable,
+    UdpReplicator(@NotNull final ReplicaExternalizable replicaExternalizable,
                   @NotNull final UdpReplicatorBuilder udpReplicatorBuilder,
-                  final int serializedEntrySize, final byte localIdentifier) throws
+                  final int serializedEntrySize, final byte localIdentifier, short udpIdentifier) throws
             IOException {
         super("UdpReplicator-" + localIdentifier);
 
+        this.replicaExternalizable = replicaExternalizable;
         this.udpReplicatorBuilder = udpReplicatorBuilder;
-
-        this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(serializedEntrySize, externalizable);
-        this.reader = new UdpReplicator.UdpSocketChannelEntryReader(serializedEntrySize, externalizable);
+        this.udpIdentifier = udpIdentifier;
+        this.writer = new UdpReplicator.UdpSocketChannelEntryWriter(serializedEntrySize, replicaExternalizable);
+        this.reader = new UdpReplicator.UdpSocketChannelEntryReader(serializedEntrySize, replicaExternalizable);
 
         // throttling is calculated at bytes in a period, minus the size of on entry
         if (udpReplicatorBuilder.throttle() > 0)
@@ -125,6 +131,11 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         });
     }
 
+
+    @Override
+    public void forceBootstrap() {
+        modificationIterator = replicaExternalizable.acquireModificationIterator(udpIdentifier, this);
+    }
 
     /**
      * binds to the server socket and process data This method will block until interrupted
@@ -311,7 +322,7 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
             in.clear();
             in.skip(2);
 
-            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+            final boolean wasDataRead = modificationIterator.nextEntry(entryCallback, 0);
 
             if (!wasDataRead) {
                 disableWrites();
@@ -469,10 +480,6 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         }
 
 
-    }
-
-    public void setModificationIterator(ModificationIterator modificationIterator) {
-        this.modificationIterator = modificationIterator;
     }
 
 

@@ -18,8 +18,8 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.thread.NamedThreadFactory;
 import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.thread.NamedThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,6 +95,11 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
         executorService.shutdownNow();
     }
+
+    /**
+     * forces the TCP and UDP replicators to rebootstrap
+     */
+    public abstract void forceBootstrap();
 
     /**
      * throttles 'writes' to ensure the network is not swamped, this is achieved by periodically
@@ -296,5 +301,7 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
+    interface ChannelReplicatorBuilder {
+    }
 
 }
