@@ -20,14 +20,11 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.DirectBytes;
-import net.openhft.lang.io.MultiStoreBytes;
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.*;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,7 +219,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public V putIfAbsent(@NotNull K key, V value) {
+    public V putIfAbsent(@net.openhft.lang.model.constraints.NotNull K key, V value) {
         return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
@@ -307,6 +304,13 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 LOG.error("", e);
             }
         }
+
+        try {
+            // give time for stuff to fully close
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         super.close();
 
     }
@@ -333,7 +337,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public boolean remove(@NotNull final Object key, final Object value) {
+    public boolean remove(@net.openhft.lang.model.constraints.NotNull final Object key, final Object value) {
         if (value == null)
             return false; // CHM compatibility; I would throw NPE
         return removeIfValueIs(key, (V) value,
@@ -355,7 +359,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@net.openhft.lang.model.constraints.NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -391,7 +395,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                     expectedStopBits(valueLen)) + valueLen;
             // replication enforces that the entry size will never be larger than an unsigned short
             if (result > MAX_UNSIGNED_SHORT)
-                throw new IllegalStateException("ENTRY SIZE TOO LARGE : Replicated " +
+                throw new IllegalStateException("ENTRY WRITE_BUFFER_SIZE TOO LARGE : Replicated " +
                         "SharedHashMap's" +
                         " are restricted to an " +
                         "entry size of " + MAX_UNSIGNED_SHORT + ", " +
@@ -917,7 +921,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * method, especially when being used in a multi threaded context.
      */
     @Override
-    public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination, int chronicleId) {
+    public void writeExternalEntry(@NotNull AbstractBytes entry, @NotNull Bytes destination, int chronicleId) {
 
         final long initialLimit = entry.limit();
 
@@ -1252,9 +1256,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
             changes.set(combine(segment.getIndex(), pos));
-
             modificationNotifier.onChange();
-
         }
 
         /**
@@ -1376,7 +1378,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public K key(@NotNull NativeBytes entry, K usingKey) {
+    public K key(@NotNull AbstractBytes entry, K usingKey) {
 
         final long start = entry.position();
         try {
@@ -1407,7 +1409,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public V value(@NotNull NativeBytes entry, V usingValue) {
+    public V value(@NotNull AbstractBytes entry, V usingValue) {
         final long start = entry.position();
         try {
 
@@ -1453,7 +1455,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * {@inheritDoc}
      */
     @Override
-    public boolean wasRemoved(@NotNull NativeBytes entry) {
+    public boolean wasRemoved(@NotNull AbstractBytes entry) {
         final long start = entry.position();
         try {
             return entry.readBoolean(entry.readStopBit() + 10);

@@ -18,9 +18,9 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.NativeBytes;
-import net.openhft.lang.model.constraints.NotNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.Closeable;
 
@@ -131,12 +131,12 @@ interface Replica<K, V> {
          * not from one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final NativeBytes entry, final int chronicleId);
+        public abstract boolean onEntry(final AbstractBytes entry, final int chronicleId);
 
         /**
          * Called just after {@see #onEntry(NativeBytes entry)}
          *
-         * @see #onEntry(net.openhft.lang.io.NativeBytes, int chronicleId) ;
+         * @see #onEntry(net.openhft.lang.io.AbstractBytes, int chronicleId) ;
          */
         public void onAfterEntry();
 
@@ -163,12 +163,12 @@ interface Replica<K, V> {
          * not from one of our changes, WARNING even though we check the identifier in the
          * ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final NativeBytes entry, final int chronicleId);
+        public abstract boolean onEntry(final AbstractBytes entry, final int chronicleId);
 
         /**
          * Called just after {@see #onEntry(NativeBytes entry)}
          *
-         * @see EntryCallback#onEntry(net.openhft.lang.io.NativeBytes, int chronicleId) ;
+         * @see EntryCallback#onEntry(net.openhft.lang.io.AbstractBytes, int chronicleId) ;
          */
         public void onAfterEntry() {
             // no-op by default
@@ -196,7 +196,7 @@ interface Replica<K, V> {
          *                    add zeroBytes, if the identifier in the entry did not match the maps local
          * @param chronicleId used in cluster into identify the canonical map or queue
          */
-        void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination, int chronicleId);
+        void writeExternalEntry(@NotNull AbstractBytes entry, @NotNull Bytes destination, int chronicleId);
 
         /**
          * The map implements this method to restore its contents. This method must read the values in the
@@ -221,7 +221,7 @@ interface Replica<K, V> {
          * @return the key which is in the entry
          */
 
-        K key(@NotNull NativeBytes entry, K usingKey);
+        K key(@NotNull AbstractBytes entry, K usingKey);
 
 
         /**
@@ -230,9 +230,9 @@ interface Replica<K, V> {
          * @param entry the bytes which reference to the entry
          * @return the value which is in the entry or null if the value has been remove from the map
          */
-        V value(@NotNull NativeBytes entry, V usingValue);
+        V value(@NotNull AbstractBytes entry, V usingValue);
 
-        boolean wasRemoved(@NotNull NativeBytes entry);
+        boolean wasRemoved(@NotNull AbstractBytes entry);
 
     }
 

@@ -18,7 +18,7 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.AbstractBytes;
 import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -49,17 +49,17 @@ public class SHMExternalReplicatorWithoutBuilderTest {
             Replica.EntryResolver() {
 
                 @Override
-                public Object key(@NotNull NativeBytes entry, Object usingKey) {
+                public Object key(@NotNull AbstractBytes entry, Object usingKey) {
                     return null;
                 }
 
                 @Override
-                public Object value(@NotNull NativeBytes entry, Object usingValue) {
+                public Object value(@NotNull AbstractBytes entry, Object usingValue) {
                     return null;
                 }
 
                 @Override
-                public boolean wasRemoved(@NotNull NativeBytes entry) {
+                public boolean wasRemoved(@NotNull AbstractBytes entry) {
                     return false;
                 }
             };
@@ -149,25 +149,27 @@ public class SHMExternalReplicatorWithoutBuilderTest {
         Replica.EntryResolver NOP_ENTRY_RESOLVER = new Replica.EntryResolver() {
 
             @Override
-            public Object key(@NotNull NativeBytes entry, Object usingKey) {
+            public Object key(@NotNull AbstractBytes entry, Object usingKey) {
                 return null;
             }
 
             @Override
-            public Object value(@NotNull NativeBytes entry, Object usingValue) {
+            public Object value(@NotNull AbstractBytes entry, Object usingValue) {
                 return null;
             }
 
             @Override
-            public boolean wasRemoved(@NotNull NativeBytes entry) {
+            public boolean wasRemoved(@NotNull AbstractBytes entry) {
                 return false;
             }
         };
 
 
-        final ExternalFileReplicatorBuilder<Integer, BeanClass> fileReplicatorBuilder = new ExternalFileReplicatorBuilder
-                (BeanClass.class);
-        final ExternalJDBCReplicatorBuilder<BeanClass> jdbcReplicatorBuilder = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
+        final ExternalFileReplicatorBuilder<Integer, BeanClass> fileReplicatorBuilder
+                = new ExternalFileReplicatorBuilder(BeanClass.class);
+
+        final ExternalJDBCReplicatorBuilder<BeanClass> jdbcReplicatorBuilder
+                = new ExternalJDBCReplicatorBuilder(BeanClass.class, stmt, tableName);
 
         return Arrays.asList(new Object[][]{
                 {

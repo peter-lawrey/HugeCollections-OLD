@@ -19,7 +19,10 @@
 package net.openhft.collections;
 
 
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -36,16 +39,17 @@ import static org.junit.Assert.assertTrue;
  */
 public class CusterReplicationTest {
 
-
     private SharedHashMap<Integer, CharSequence> map1a;
     private SharedHashMap<Integer, CharSequence> map2a;
 
     private SharedHashMap<Integer, CharSequence> map1b;
     private SharedHashMap<Integer, CharSequence> map2b;
 
-
     private ClusterReplicator clusterB;
     private ClusterReplicator clusterA;
+
+    private ClusterReplicatorBuilder clusterReplicatorBuilder;
+    private ClusterReplicatorBuilder clusterReplicatorBuilder1;
 
 
     @Before
@@ -56,9 +60,9 @@ public class CusterReplicationTest {
             final TcpReplicatorBuilder tcpReplicatorBuilder =
                     new TcpReplicatorBuilder(8086, new InetSocketAddress("localhost", 8087)).heartBeatInterval(1, SECONDS);
 
-            final ClusterReplicatorBuilder clusterReplicatorBuilder = new ClusterReplicatorBuilder((byte) 1, 1024);
+            clusterReplicatorBuilder = new ClusterReplicatorBuilder((byte) 1, 1024);
             clusterReplicatorBuilder.tcpReplicatorBuilder(tcpReplicatorBuilder);
-            clusterA = clusterReplicatorBuilder.create();
+
 
             // this is how you add maps after the custer is created
             map1a = clusterReplicatorBuilder.create((short) 1, new SharedHashMapBuilder()
@@ -67,12 +71,8 @@ public class CusterReplicationTest {
                     .kClass(Integer.class)
                     .vClass(CharSequence.class));
 
+            clusterA = clusterReplicatorBuilder.create();
 
-            map2a = clusterReplicatorBuilder.create((short) 2, new SharedHashMapBuilder()
-                    .entries(1000)
-                    .file(getPersistenceFile())
-                    .kClass(Integer.class)
-                    .vClass(CharSequence.class));
         }
 
 
@@ -81,25 +81,20 @@ public class CusterReplicationTest {
             final TcpReplicatorBuilder tcpReplicatorBuilder =
                     new TcpReplicatorBuilder(8087).heartBeatInterval(1, SECONDS);
 
-            final ClusterReplicatorBuilder clusterReplicatorBuilder = new ClusterReplicatorBuilder((byte)
+            clusterReplicatorBuilder1 = new ClusterReplicatorBuilder((byte)
                     2, 1024);
-            clusterReplicatorBuilder.tcpReplicatorBuilder(tcpReplicatorBuilder);
-            clusterB = clusterReplicatorBuilder.create();
+            clusterReplicatorBuilder1.tcpReplicatorBuilder(tcpReplicatorBuilder);
 
 
             // this is how you add maps after the custer is created
-            map1b = clusterReplicatorBuilder.create((short) 1, new SharedHashMapBuilder()
+            map1b = clusterReplicatorBuilder1.create((short) 1, new SharedHashMapBuilder()
                     .entries(1000)
                     .file(getPersistenceFile())
-                    .vClass(Integer.class)
-                    .kClass(CharSequence.class));
+                    .kClass(Integer.class)
+                    .vClass(CharSequence.class));
 
+            clusterB = clusterReplicatorBuilder1.create();
 
-            map2b = clusterReplicatorBuilder.create((short) 2, new SharedHashMapBuilder()
-                    .entries(1000)
-                    .file(getPersistenceFile())
-                    .vClass(Integer.class)
-                    .kClass(CharSequence.class));
         }
 
     }
@@ -118,11 +113,26 @@ public class CusterReplicationTest {
 
 
     @Test
-    @Ignore
+
     public void test() throws IOException, InterruptedException {
-        Thread.sleep(1000);
-        map1a.put(1, "EXAMPLE-1");
+
+        // todo remove this sleep
+        Thread.sleep(100);
+
+        map2b = clusterReplicatorBuilder1.create((short) 2, new SharedHashMapBuilder()
+                .entries(1000)
+                .file(getPersistenceFile())
+                .kClass(Integer.class)
+                .vClass(CharSequence.class));
+
+        map2a = clusterReplicatorBuilder.create((short) 2, new SharedHashMapBuilder()
+                .entries(1000)
+                .file(getPersistenceFile())
+                .kClass(Integer.class)
+                .vClass(CharSequence.class));
+
         map2a.put(2, "EXAMPLE-2");
+        map1a.put(1, "EXAMPLE-1");
 
         // allow time for the recompilation to resolve
         waitTillEqual(2500);
@@ -144,8 +154,7 @@ public class CusterReplicationTest {
      */
 
     private void waitTillEqual(final int timeOutMs) throws InterruptedException {
-        int t = 0;
-        for (; t < timeOutMs; t++) {
+        for (int t = 0; t < timeOutMs; t++) {
             if (map1a.equals(map1b) &&
                     map2a.equals(map2b))
                 break;

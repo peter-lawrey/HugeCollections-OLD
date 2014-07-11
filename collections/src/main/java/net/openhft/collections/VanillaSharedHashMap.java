@@ -506,7 +506,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * @param newValue      the new value you wish to store in the map
      * @return the value that was replaced
      */
-    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@net.openhft.lang.model.constraints.NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);

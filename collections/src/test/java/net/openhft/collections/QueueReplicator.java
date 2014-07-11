@@ -18,8 +18,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.ByteBufferBytes;
-import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,7 +149,7 @@ public class QueueReplicator<K, V> {
                              * {@inheritDoc}
                              */
                             @Override
-                            public boolean onEntry(NativeBytes entry, final int chronicleId) {
+                            public boolean onEntry(AbstractBytes entry, final int chronicleId) {
 
                                 entryBuffer.clear();
                                 externalizable.writeExternalEntry(entry, entryBuffer, chronicleId);

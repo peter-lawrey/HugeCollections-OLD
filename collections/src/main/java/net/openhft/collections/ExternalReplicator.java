@@ -18,6 +18,7 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 import org.joda.time.DateTime;
@@ -94,7 +95,7 @@ public interface ExternalReplicator<K, V> extends Replica.EntryCallback,
         }
 
         @Override
-        public boolean onEntry(NativeBytes entry, final int chronicleId) {
+        public boolean onEntry(AbstractBytes entry, final int chronicleId) {
 
             final K key = entryResolver.key(entry, usingKey);
 

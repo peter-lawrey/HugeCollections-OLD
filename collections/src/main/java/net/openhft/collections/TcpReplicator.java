@@ -18,8 +18,8 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.ByteBufferBytes;
-import net.openhft.lang.io.NativeBytes;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
@@ -69,7 +69,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final KeyInterestUpdater opWriteUpdater = new KeyInterestUpdater(OP_WRITE, selectionKeysStore);
 
     private final long heartBeatInterval;
-    private long selectorTimeout;
+    private long selectorTimeout = 100;
 
     private final InetSocketAddress serverInetSocketAddress;
     private final int packetSize;
@@ -101,8 +101,16 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         serverInetSocketAddress = tcpReplicatorBuilder.serverInetSocketAddress();
 
         heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval(MILLISECONDS);
+
+        if (heartBeatInterval < 0)
+            LOG.info("");
+
+
         long throttleBucketInterval = tcpReplicatorBuilder.throttleBucketInterval(MILLISECONDS);
         selectorTimeout = Math.min(heartBeatInterval, throttleBucketInterval);
+
+        if (selectorTimeout < 0)
+            LOG.info("");
 
         throttler = tcpReplicatorBuilder.throttle(DAYS) > 0 ?
                 new Throttler(selector,
@@ -242,9 +250,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                     activeKeys.clear(i);
                     continue;
                 }
-                final Attached attachment = (Attached) key.attachment();
                 try {
-                    heartbeatCheckShouldSend(approxTime, key, attachment);
+                    sendHeartbeatIfRequired(approxTime, key);
                 } catch (Exception e) {
                     if (LOG.isDebugEnabled())
                         LOG.debug("", e);
@@ -264,23 +271,37 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
     }
 
-    private void heartbeatCheckShouldSend(final long approxTime,
-                                          @NotNull final SelectionKey key,
-                                          @NotNull final Attached attachment) {
+
+    /**
+     * check to see if its time to send a heartbeat, and send one if required
+     *
+     * @param approxTime the current time ( approximately )
+     * @param key        nio selection key
+     */
+    private void sendHeartbeatIfRequired(final long approxTime,
+                                         @NotNull final SelectionKey key) {
+
+        final Attached attachment = (Attached) key.attachment();
+
         if (attachment.isHandShakingComplete() && attachment.entryWriter.lastSentTime +
                 heartBeatInterval < approxTime) {
 
             attachment.entryWriter.lastSentTime = approxTime;
             attachment.entryWriter.writeHeartbeatToBuffer();
 
-            int ops = key.interestOps();
-            if ((ops & (OP_CONNECT | OP_ACCEPT)) == 0)
-                key.interestOps(ops | OP_WRITE);
+            enableOpWrite(key);
 
             if (LOG.isDebugEnabled())
                 LOG.debug("sending heartbeat");
 
         }
+    }
+
+
+    private void enableOpWrite(SelectionKey key) {
+        int ops = key.interestOps();
+        if ((ops & (OP_CONNECT | OP_ACCEPT)) == 0)
+            key.interestOps(ops | OP_WRITE);
     }
 
     /**
@@ -342,11 +363,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
     }
 
+    final AtomicBoolean forceBootstrap = new AtomicBoolean();
+
     @Override
     public void forceBootstrap() {
-        for (int i = activeKeys.nextSetBit(0); i >= 0; i = activeKeys.nextSetBit(i + 1)) {
-            ((Attached) selectionKeysStore[i].attachment()).forceBootstrap();
-        }
+        forceBootstrap.lazySet(true);
     }
 
     private class ServerConnector extends AbstractConnector {
@@ -551,6 +572,20 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         attached.entryWriter.identifierToBuffer(localIdentifier);
     }
 
+
+    /**
+     * this can be called when a new SHM is added to a cluster, we have to rebootstrap so will clear all the
+     * old bootstrap information
+     *
+     * @param key the nio SelectionKey
+     */
+    private void clearHandsharking(SelectionKey key) {
+        final Attached attached = (Attached) key.attachment();
+        activeKeys.clear(attached.remoteIdentifier);
+        selectionKeysStore[attached.remoteIdentifier] = null;
+        attached.clearHandShaking();
+    }
+
     /**
      * used to exchange identifiers and timestamps and heartbeat intervals between the server and client
      *
@@ -624,12 +659,15 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             // we have to make our selector poll interval at least as short as the minimum selector timeout
             selectorTimeout = Math.min(selectorTimeout, value);
 
+            if (selectorTimeout < 0)
+                LOG.info("");
+
             attached.hasRemoteHeartbeatInterval = true;
 
             // now we're finished we can get on with reading the entries
             attached.setHandShakingComplete();
             attached.remoteModificationIterator.dirtyEntries(attached.remoteBootstrapTimestamp);
-            reader.entriesFromBuffer(key);
+            reader.entriesFromBuffer();
         }
     }
 
@@ -642,7 +680,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         final Attached attached = (Attached) key.attachment();
 
         if (attached.remoteModificationIterator != null)
-            attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator, socketChannel, attached);
+            attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator, key);
 
         try {
             int len = attached.entryWriter.writeBufferToSocket(socketChannel,
@@ -684,7 +722,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         attached.entryReader.lastHeartBeatReceived = approxTime;
 
         if (attached.isHandShakingComplete()) {
-            attached.entryReader.entriesFromBuffer(key);
+            attached.entryReader.entriesFromBuffer();
         } else {
             doHandShaking(key);
         }
@@ -714,8 +752,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         // true if its socket is a ServerSocket
         public boolean isServer;
 
-        private AtomicBoolean forceBootstrap = new AtomicBoolean();
-
         boolean isHandShakingComplete() {
             return handShakingComplete;
         }
@@ -732,6 +768,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             remoteHeartbeatInterval = heartBeatInterval;
             hasRemoteHeartbeatInterval = false;
             remoteModificationIterator = null;
+
+
         }
 
         /**
@@ -746,13 +784,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             selector.wakeup();
         }
 
-        public boolean isBootstrapRequired() {
-            return forceBootstrap.get();
-        }
-
-        public void forceBootstrap() {
-            forceBootstrap.lazySet(true);
-        }
     }
 
 
@@ -795,19 +826,17 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
          * writes all the entries that have changed, to the buffer which will later be written to TCP/IP
          *
          * @param modificationIterator a record of which entries have modification
-         * @param socketChannel        the socket we are connected to
-         * @param attached             data associated with the socketChannels key
+         * @param selectionKey
          */
         void entriesToBuffer(@NotNull final ModificationIterator modificationIterator,
-                             @NotNull final SocketChannel socketChannel,
-                             @NotNull final Attached attached)
-                throws InterruptedException {
+                             @NotNull final SelectionKey selectionKey)
+                throws InterruptedException, IOException {
+
+            final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+            final Attached attached = (Attached) selectionKey.attachment();
 
             // this can occur when new SHM's are added to a cluster
-            if (attached.isBootstrapRequired()) {
-                in.writeLong(-1);
-                return;
-            }
+            final boolean handShakingComplete = attached.isHandShakingComplete();
 
             for (; ; ) {
 
@@ -817,7 +846,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
                     // if we have no more data to write to the socket then we will
                     // un-register OP_WRITE on the selector, until more data becomes available
-                    if (in.position() == 0 && attached.isHandShakingComplete())
+                    if (in.position() == 0 && handShakingComplete)
                         disableWrite(socketChannel, attached);
 
                     return;
@@ -905,6 +934,8 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 LOG.error("", e);
             }
         }
+
+
     }
 
     private static final int SIZE_OF_UNSIGNED_SHORT = 2;
@@ -921,7 +952,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         }
 
         @Override
-        public boolean onEntry(final NativeBytes entry, final int chronicleId) {
+        public boolean onEntry(final AbstractBytes entry, final int chronicleId) {
             in.skip(SIZE_OF_UNSIGNED_SHORT);
             final long start = in.position();
             externalizable.writeExternalEntry(entry, in, chronicleId);
@@ -934,10 +965,16 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             // write the length of the entry, just before the start, so when we read it back
             // we read the length of the entry first and hence know how many preceding writer to read
             final int entrySize = (int) (in.position() - start);
+            if (entrySize >= 0xFFF) // 0xFFF is reserved see {@code net.openhft.collections.TcpReplicator.FORCE_BOOT_STRAP}
+                throw new IllegalStateException("entry too large, the entry size=" + entrySize + ", " +
+                        "entries are limited to a size of " + (0xFFFF - 1));
             in.writeUnsignedShort(start - SIZE_OF_UNSIGNED_SHORT, entrySize);
 
             return true;
         }
+
+
+
     }
 
     /**
@@ -977,10 +1014,9 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         /**
          * reads entries from the buffer till empty
          *
-         * @param key
          * @throws InterruptedException
          */
-        private void entriesFromBuffer(SelectionKey key) throws InterruptedException, IOException {
+        private void entriesFromBuffer() throws InterruptedException, IOException {
 
             for (; ; ) {
 
@@ -997,15 +1033,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                     // this is the heartbeat
                     if (value == 0)
                         continue;
-
-                    // this is the re-bootstrap message, this can occur when a
-                    // new map or new canonical is added to a cluster, we have to get the new
-                    // boot strap time stamps so we re-bootstrap
-                    if (value == -1) {
-                        clearHandsharking(key);
-                        doHandShaking(key);
-                        return;
-                    }
 
                     sizeOfNextEntry = value;
                 }
@@ -1030,18 +1057,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         }
 
-        /**
-         * this can be called when a new SHM is added to a cluster, we have to rebootstrap so will clear all
-         * the old bootstrap information
-         *
-         * @param key
-         */
-        private void clearHandsharking(SelectionKey key) {
-            final Attached attached = (Attached) key.attachment();
-            activeKeys.clear(attached.remoteIdentifier);
-            selectionKeysStore[attached.remoteIdentifier] = null;
-            attached.clearHandShaking();
-        }
 
         /**
          * compacts the buffer and updates the {@code in} and {@code out} accordingly

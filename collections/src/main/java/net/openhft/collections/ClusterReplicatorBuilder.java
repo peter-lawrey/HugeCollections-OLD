@@ -19,7 +19,6 @@
 package net.openhft.collections;
 
 import java.io.Closeable;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashSet;
@@ -42,6 +41,7 @@ public class ClusterReplicatorBuilder<K, V> {
 
     private int maxEntrySize;
     private int maxNumberOfChronicles = 128;
+    private ClusterReplicator<K, V> clusterReplicator;
 
 
     ClusterReplicatorBuilder(byte identifier, final int maxEntrySize1) {
@@ -51,7 +51,6 @@ public class ClusterReplicatorBuilder<K, V> {
             throw new IllegalArgumentException("Identifier must be positive and <128, " +
                     "identifier=" + identifier);
     }
-
 
     private final Map<Short, ReplicaExternalizable> replicas
             = new ConcurrentHashMap<Short, ReplicaExternalizable>();
@@ -66,22 +65,30 @@ public class ClusterReplicatorBuilder<K, V> {
         return this;
     }
 
-    public <K, V> SharedHashMap<K, V> create(short canonicalId, SharedHashMapBuilder builder) throws
+    /**
+     * @param chronicleChannel when clustering with a number of maps, each map will be called a chronicle
+     *                         channel
+     * @param builder
+     * @param <K>
+     * @param <V>
+     * @return
+     * @throws IOException
+     */
+    public <K, V> SharedHashMap<K, V> create(short chronicleChannel, SharedHashMapBuilder builder) throws
             IOException {
 
         final SharedHashMapBuilder builder0 = builder.toBuilder();
-
         builder0.identifier(identifier);
-
-        if (builder0 == null || !builder0.file().exists())
-            throw new FileNotFoundException("Unable to create file");
 
         final VanillaSharedReplicatedHashMap<K, V> result =
                 new VanillaSharedReplicatedHashMap<K, V>(builder0, builder0.file(), builder0.<K>kClass(),
                         builder0.<V>vClass());
 
-        replicas.put(canonicalId, (ReplicaExternalizable) result);
-
+        if (clusterReplicator == null)
+            replicas.put(chronicleChannel, (ReplicaExternalizable) result);
+        else {
+            clusterReplicator.add(chronicleChannel, result);
+        }
         return result;
     }
 
@@ -111,7 +118,7 @@ public class ClusterReplicatorBuilder<K, V> {
 
             if (address.isMulticastAddress() && udpReplicatorBuilder.networkInterface() == null) {
                 throw new IllegalArgumentException("MISSING: NetworkInterface, " +
-                        "When using a multicast addresses, please provided a  networkInterface");
+                        "When using a multicast addresses, please provided a networkInterface");
             }
 
             final UdpReplicator udpReplicator =
@@ -125,7 +132,7 @@ public class ClusterReplicatorBuilder<K, V> {
             clusterReplicator.add(udpReplicator);
         }
 
-
+        this.clusterReplicator = clusterReplicator;
         return clusterReplicator;
 
     }
