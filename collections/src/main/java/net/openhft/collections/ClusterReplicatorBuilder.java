@@ -31,7 +31,7 @@ import static net.openhft.collections.SharedHashMapBuilder.UDP_REPLICATION_MODIF
 /**
  * @author Rob Austin.
  */
-public class ClusterReplicatorBuilder<K, V> {
+public class ClusterReplicatorBuilder {
 
     Set<Closeable> closeables = new HashSet<Closeable>();
 
@@ -41,7 +41,7 @@ public class ClusterReplicatorBuilder<K, V> {
 
     private int maxEntrySize;
     private int maxNumberOfChronicles = 128;
-    private ClusterReplicator<K, V> clusterReplicator;
+    private ClusterReplicator clusterReplicator;
 
 
     ClusterReplicatorBuilder(byte identifier, final int maxEntrySize1) {
@@ -60,24 +60,18 @@ public class ClusterReplicatorBuilder<K, V> {
         return this;
     }
 
-    public ClusterReplicatorBuilder<K, V> tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
+    public ClusterReplicatorBuilder tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
         this.tcpReplicatorBuilder = tcpReplicatorBuilder;
         return this;
     }
 
     /**
-     * @param chronicleChannel when clustering with a number of maps, each map will be called a chronicle
-     *                         channel
-     * @param builder
-     * @param <K>
-     * @param <V>
-     * @return
-     * @throws IOException
+     * @param chronicleChannel when clustering with a number of maps, each map will be called a chronicle channel
      */
-    public <K, V> SharedHashMap<K, V> create(short chronicleChannel, SharedHashMapBuilder builder) throws
+    public <K, V> SharedHashMap<K, V> create(short chronicleChannel, SharedHashMapBuilder<K, V> builder) throws
             IOException {
 
-        final SharedHashMapBuilder builder0 = builder.toBuilder();
+        final SharedHashMapBuilder<K, V> builder0 = builder.toBuilder();
         builder0.identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<K, V> result =
@@ -95,8 +89,7 @@ public class ClusterReplicatorBuilder<K, V> {
 
     public ClusterReplicator create() throws IOException {
 
-        final ClusterReplicator<K, V> clusterReplicator = new ClusterReplicator<K, V>(identifier,
-                maxNumberOfChronicles);
+        final ClusterReplicator clusterReplicator = new ClusterReplicator(identifier, maxNumberOfChronicles);
 
         for (final Map.Entry<Short, ReplicaExternalizable> entry : replicas.entrySet()) {
             clusterReplicator.add(entry.getKey(), entry.getValue());

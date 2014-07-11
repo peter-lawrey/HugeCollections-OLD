@@ -65,11 +65,10 @@ public class ClusterReplicationTest {
 
 
             // this is how you add maps after the custer is created
-            map1a = clusterReplicatorBuilder.create((short) 1, new SharedHashMapBuilder()
-                    .entries(1000)
-                    .file(getPersistenceFile())
-                    .kClass(Integer.class)
-                    .vClass(CharSequence.class));
+            map1a = clusterReplicatorBuilder.create((short) 1,
+                    SharedHashMapBuilder.of(Integer.class, CharSequence.class)
+                            .entries(1000)
+                            .file(getPersistenceFile()));
 
             clusterA = clusterReplicatorBuilder.create();
 
@@ -87,11 +86,10 @@ public class ClusterReplicationTest {
 
 
             // this is how you add maps after the custer is created
-            map1b = clusterReplicatorBuilder1.create((short) 1, new SharedHashMapBuilder()
-                    .entries(1000)
-                    .file(getPersistenceFile())
-                    .kClass(Integer.class)
-                    .vClass(CharSequence.class));
+            map1b = clusterReplicatorBuilder1.create((short) 1,
+                    SharedHashMapBuilder.of(Integer.class, CharSequence.class)
+                            .entries(1000)
+                            .file(getPersistenceFile()));
 
             clusterB = clusterReplicatorBuilder1.create();
 
@@ -119,17 +117,16 @@ public class ClusterReplicationTest {
         // todo remove this sleep
         Thread.sleep(100);
 
-        map2b = clusterReplicatorBuilder1.create((short) 2, new SharedHashMapBuilder()
-                .entries(1000)
-                .file(getPersistenceFile())
-                .kClass(Integer.class)
-                .vClass(CharSequence.class));
+        map2b = clusterReplicatorBuilder1.create((short) 2,
+                SharedHashMapBuilder.of(Integer.class, CharSequence.class)
+                        .entries(1000)
+                        .file(getPersistenceFile()));
 
-        map2a = clusterReplicatorBuilder.create((short) 2, new SharedHashMapBuilder()
-                .entries(1000)
-                .file(getPersistenceFile())
-                .kClass(Integer.class)
-                .vClass(CharSequence.class));
+
+        map2a = clusterReplicatorBuilder.create((short) 2,
+                SharedHashMapBuilder.of(Integer.class, CharSequence.class)
+                        .entries(1000)
+                        .file(getPersistenceFile()));
 
         map2a.put(2, "EXAMPLE-2");
         map1a.put(1, "EXAMPLE-1");
