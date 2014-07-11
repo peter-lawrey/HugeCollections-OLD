@@ -32,7 +32,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-public final class SharedHashMapBuilder<K,V> implements Cloneable {
+public final class SharedHashMapBuilder<K, V> implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
 
@@ -83,22 +83,22 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
 
     public SharedHashMapBuilder() {
     }
-    
+
     public SharedHashMapBuilder(Class<K> kClass, Class<V> vClass) {
         this.kClass = kClass;
         this.vClass = vClass;
     }
-    
-    public static <K,V> SharedHashMapBuilder<K,V> of(Class<K> kClass, Class<V> vClass) {
+
+    public static <K, V> SharedHashMapBuilder<K, V> of(Class<K> kClass, Class<V> vClass) {
         return new SharedHashMapBuilder<K, V>(kClass, vClass);
     }
 
     @Override
-    public SharedHashMapBuilder<K,V> clone() {
+    public SharedHashMapBuilder<K, V> clone() {
 
         try {
             @SuppressWarnings("unchecked")
-            final SharedHashMapBuilder<K,V> result = (SharedHashMapBuilder) super.clone();
+            final SharedHashMapBuilder<K, V> result = (SharedHashMapBuilder) super.clone();
             if (tcpReplicatorBuilder() != null)
                 result.tcpReplicatorBuilder(tcpReplicatorBuilder().clone());
             if (udpReplicatorBuilder() != null)
@@ -168,7 +168,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment()
      */
-    public SharedHashMapBuilder<K,V> entryAndValueAlignment(Alignment alignment) {
+    public SharedHashMapBuilder<K, V> entryAndValueAlignment(Alignment alignment) {
         this.alignment = alignment;
         return this;
     }
@@ -183,7 +183,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
         return alignment;
     }
 
-    public SharedHashMapBuilder<K,V> entries(long entries) {
+    public SharedHashMapBuilder<K, V> entries(long entries) {
         this.entries = entries;
         return this;
     }
@@ -192,7 +192,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
         return entries;
     }
 
-    public SharedHashMapBuilder<K,V> replicas(int replicas) {
+    public SharedHashMapBuilder<K, V> replicas(int replicas) {
         this.replicas = replicas;
         return this;
     }
@@ -201,7 +201,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
         return replicas;
     }
 
-    public SharedHashMapBuilder<K,V> actualEntriesPerSegment(int actualEntriesPerSegment) {
+    public SharedHashMapBuilder<K, V> actualEntriesPerSegment(int actualEntriesPerSegment) {
         this.actualEntriesPerSegment = actualEntriesPerSegment;
         return this;
     }
@@ -214,7 +214,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
         return (int) (Math.max(1, entries * 2L / as) + 63) & ~63;
     }
 
-    public SharedHashMapBuilder<K,V> actualSegments(int actualSegments) {
+    public SharedHashMapBuilder<K, V> actualSegments(int actualSegments) {
         this.actualSegments = actualSegments;
         return this;
     }
@@ -237,7 +237,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
      * @param transactional if the built map should be transactional
      * @return this {@code SharedHashMapBuilder} back
      */
-    public SharedHashMapBuilder<K,V> transactional(boolean transactional) {
+    public SharedHashMapBuilder<K, V> transactional(boolean transactional) {
         this.transactional = transactional;
         return this;
     }
@@ -257,7 +257,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder<K,V> file(File file) {
+    public SharedHashMapBuilder<K, V> file(File file) {
         this.file = file;
         return this;
     }
@@ -286,7 +286,7 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
             throw new IllegalArgumentException("missing mandatory parameter file");
 
 
-        SharedHashMapBuilder<K,V> builder = toBuilder();
+        SharedHashMapBuilder<K, V> builder = toBuilder();
 
         if (!canReplicate())
             return new VanillaSharedHashMap<K, V>(builder, file, kClass, vClass);
@@ -320,15 +320,15 @@ public final class SharedHashMapBuilder<K,V> implements Cloneable {
 
 
     /**
-     * Its recommended use net.openhft.collections.SharedHashMapBuilder#create() instead as this method will
-     * bwe shortly removed
+     * Its recommended that you use net.openhft.collections.SharedHashMapBuilder#create() instead as this
+     * method will be shortly removed
      */
     @Deprecated
     public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         return file(file).kClass(kClass).vClass(vClass).create();
     }
 
-      SharedHashMapBuilder<K,V> toBuilder() throws IOException {
+    SharedHashMapBuilder<K, V> toBuilder() throws IOException {
         SharedHashMapBuilder builder = clone();
 
         for (int i = 0; i < 10; i++) {
