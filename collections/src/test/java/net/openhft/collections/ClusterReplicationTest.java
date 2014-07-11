@@ -111,7 +111,6 @@ public class ClusterReplicationTest {
 
 
     @Test
-
     public void test() throws IOException, InterruptedException {
 
         // todo remove this sleep
@@ -128,7 +127,7 @@ public class ClusterReplicationTest {
                         .entries(1000)
                         .file(getPersistenceFile()));
 
-        map2a.put(2, "EXAMPLE-2");
+        map2a.put(1, "EXAMPLE-2");
         map1a.put(1, "EXAMPLE-1");
 
         // allow time for the recompilation to resolve
