@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
  *
  * @author Rob Austin.
  */
-public class CusterReplicationTest {
+public class ClusterReplicationTest {
 
     private SharedHashMap<Integer, CharSequence> map1a;
     private SharedHashMap<Integer, CharSequence> map2a;
