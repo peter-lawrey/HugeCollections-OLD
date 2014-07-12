@@ -273,7 +273,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                             return;
                         break;
                     }
-                    if (ifAbsent)
+                    if (ifAbsent && !ifPresent)
                         return;
                     bytes.storePositionAndSize(store, 0, store.size());
                     foundLarge = true;
@@ -301,6 +301,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                 ((BytesMarshallable) value).writeMarshallable(tmpBytes);
             else
                 tmpBytes.writeObject(value);
+            boolean largeRemoved = false;
             long size = tmpBytes.position();
             if (size <= smallEntrySize) {
                 if (foundSmall) {
@@ -309,6 +310,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
                     return;
                 } else if (foundLarge) {
                     remove(hash, key);
+                    largeRemoved = true;
                 }
                 // look for a free spot.
                 int position = h & (entriesPerSegment - 1);
@@ -326,12 +328,7 @@ public class HugeHashMap<K, V> extends AbstractMap<K, V> implements HugeMap<K, V
             }
             if (foundSmall) {
                 remove(hash, key);
-            } else if (foundLarge) {
-                // can it be reused.
-                if (bytes.capacity() <= size || bytes.capacity() - size < (size >> 3)) {
-                    bytes.write(tmpBytes, startOfValuePos, size);
-                    return;
-                }
+            } else if (foundLarge && !largeRemoved) {
                 remove(hash, key);
             }
             size = size - startOfValuePos;
