@@ -18,10 +18,8 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,14 +30,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.BitSet;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.nio.channels.SelectionKey.*;
-import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static net.openhft.collections.Replica.EntryExternalizable;
 import static net.openhft.collections.Replica.ModificationIterator;
@@ -55,11 +50,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
     private static final int BUFFER_SIZE = 0x100000; // 1MB
 
-    private final Queue<Runnable> pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
+
     private final Map<SocketAddress, AbstractConnector> connectorBySocket = new ConcurrentHashMap<SocketAddress, AbstractConnector>();
 
-    @Nullable
-    private final Throttler throttler;
+
 
     private final SelectionKey[] selectionKeysStore = new SelectionKey[Byte.MAX_VALUE + 1];
     private final BitSet activeKeys = new BitSet(selectionKeysStore.length);
@@ -69,7 +63,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final KeyInterestUpdater opWriteUpdater = new KeyInterestUpdater(OP_WRITE, selectionKeysStore);
 
     private final long heartBeatInterval;
-    private long selectorTimeout = 100;
+    private long selectorTimeout;
 
     private final InetSocketAddress serverInetSocketAddress;
     private final int packetSize;
@@ -96,26 +90,15 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                   @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder,
                   final int maxEntrySizeBytes) throws IOException {
 
-        super("TcpSocketReplicator-" + replica.identifier());
+        super("TcpSocketReplicator-" + replica.identifier(), tcpReplicatorBuilder,
+                maxEntrySizeBytes);
 
         serverInetSocketAddress = tcpReplicatorBuilder.serverInetSocketAddress();
 
         heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval(MILLISECONDS);
 
-        if (heartBeatInterval < 0)
-            LOG.info("");
-
-
         long throttleBucketInterval = tcpReplicatorBuilder.throttleBucketInterval(MILLISECONDS);
         selectorTimeout = Math.min(heartBeatInterval, throttleBucketInterval);
-
-        if (selectorTimeout < 0)
-            LOG.info("");
-
-        throttler = tcpReplicatorBuilder.throttle(DAYS) > 0 ?
-                new Throttler(selector,
-                        throttleBucketInterval,
-                        maxEntrySizeBytes, tcpReplicatorBuilder.throttle(DAYS)) : null;
 
         packetSize = tcpReplicatorBuilder.packetSize();
         endpoints = tcpReplicatorBuilder.endpoints();
@@ -125,21 +108,11 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         this.maxEntrySizeBytes = maxEntrySizeBytes;
         this.externalizable = externalizable;
 
-        this.executorService.execute(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            process();
-                        } catch (Exception e) {
-                            LOG.error("", e);
-                        }
-                    }
-                }
-        );
+        start();
     }
 
-    private void process() throws IOException {
+    @Override
+    void process() throws IOException {
         try {
             final Details serverDetails = new Details(serverInetSocketAddress, localIdentifier);
             connectorBySocket.put(serverInetSocketAddress, new ServerConnector(serverDetails));
@@ -155,16 +128,14 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
             while (selector.isOpen()) {
 
-                if (!pendingRegistrations.isEmpty())
-                    register(pendingRegistrations);
+                registerPendingRegistrations();
 
                 final int nSelectedKeys = selector.select(selectorTimeout);
 
                 // its less resource intensive to set this less frequently and use an approximation
                 final long approxTime = System.currentTimeMillis();
 
-                if (throttler != null)
-                    throttler.checkThrottleInterval();
+                checkThrottleInterval();
 
                 // check that we have sent and received heartbeats
                 heartBeatMonitor(approxTime);
@@ -204,7 +175,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                         quietClose(key, e);
                     } catch (Exception e) {
                         LOG.info("", e);
-                        close(key);
+                        closeEarlyAndQuietly(key.channel());
                     }
                 }
                 selectionKeys.clear();
@@ -348,19 +319,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private void quietClose(@NotNull final SelectionKey key, @NotNull final Exception e) {
         if (LOG.isDebugEnabled())
             LOG.debug("", e);
-        close(key);
-    }
-
-    private void close(@NotNull final SelectionKey key) {
-        try {
-            SelectableChannel channel = key.channel();
-            if (throttler != null)
-                throttler.remove(channel);
-            channel.close();
-            closeables.remove(channel);
-        } catch (IOException ex) {
-            // do nothing
-        }
+        closeEarlyAndQuietly(key.channel());
     }
 
     final AtomicBoolean forceBootstrap = new AtomicBoolean();
@@ -399,7 +358,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             serverSocket.bind(details.address());
 
             // these can be run on this thread
-            pendingRegistrations.add(new Runnable() {
+            addPendingRegistration(new Runnable() {
                 @Override
                 public void run() {
                     final Attached attached = new Attached();
@@ -462,7 +421,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
                 Thread.sleep(10);
 
                 // the registration has be be run on the same thread as the selector
-                pendingRegistrations.add(new Runnable() {
+                addPendingRegistration(new Runnable() {
                     @Override
                     public void run() {
 
@@ -486,16 +445,12 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             } finally {
                 if (!success) {
                     try {
-
                         try {
                             socketChannel.socket().close();
                         } catch (Exception e) {
                             LOG.error("", e);
                         }
-
                         socketChannel.close();
-                        if (throttler != null)
-                            throttler.remove(socketChannel);
                     } catch (IOException e) {
                         LOG.error("", e);
                     }
@@ -539,8 +494,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
         key.interestOps(OP_WRITE | OP_READ);
 
-        if (throttler != null)
-            throttler.add(channel);
+        throttle(channel);
 
         // register it with the selector and store the ModificationIterator for this key
         attached.entryWriter.identifierToBuffer(localIdentifier);
@@ -562,8 +516,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
         final Attached attached = new Attached();
         channel.register(selector, OP_WRITE | OP_READ, attached);
 
-        if (throttler != null)
-            throttler.add(channel);
+        throttle(channel);
 
         attached.entryReader = new TcpSocketChannelEntryReader();
         attached.entryWriter = new TcpSocketChannelEntryWriter();
@@ -579,7 +532,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
      *
      * @param key the nio SelectionKey
      */
-    private void clearHandsharking(SelectionKey key) {
+    private void clearHandshaking(SelectionKey key) {
         final Attached attached = (Attached) key.attachment();
         activeKeys.clear(attached.remoteIdentifier);
         selectionKeysStore[attached.remoteIdentifier] = null;
@@ -683,11 +636,10 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             attached.entryWriter.entriesToBuffer(attached.remoteModificationIterator, key);
 
         try {
-            int len = attached.entryWriter.writeBufferToSocket(socketChannel,
+            int bytesJustWritten = attached.entryWriter.writeBufferToSocket(socketChannel,
                     approxTime);
 
-            if (this.throttler != null)
-                this.throttler.contemplateUnregisterWriteSocket(len);
+            contemplateThrottleWrites(bytesJustWritten);
 
         } catch (IOException e) {
             quietClose(key, e);
@@ -938,45 +890,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
     }
 
-    private static final int SIZE_OF_UNSIGNED_SHORT = 2;
-
-    static class EntryCallback extends Replica.AbstractEntryCallback {
-
-        private final EntryExternalizable externalizable;
-        private final ByteBufferBytes in;
-
-        EntryCallback(@NotNull final EntryExternalizable externalizable,
-                      @NotNull final ByteBufferBytes in) {
-            this.externalizable = externalizable;
-            this.in = in;
-        }
-
-        @Override
-        public boolean onEntry(final AbstractBytes entry, final int chronicleId) {
-            in.skip(SIZE_OF_UNSIGNED_SHORT);
-            final long start = in.position();
-            externalizable.writeExternalEntry(entry, in, chronicleId);
-
-            if (in.position() == start) {
-                in.position(in.position() - SIZE_OF_UNSIGNED_SHORT);
-                return false;
-            }
-
-            // write the length of the entry, just before the start, so when we read it back
-            // we read the length of the entry first and hence know how many preceding writer to read
-            final int entrySize = (int) (in.position() - start);
-            if (entrySize >= 0xFFF) // 0xFFF is reserved see {@code net.openhft.collections.TcpReplicator.FORCE_BOOT_STRAP}
-                throw new IllegalStateException("entry too large, the entry size=" + entrySize + ", " +
-                        "entries are limited to a size of " + (0xFFFF - 1));
-            in.writeUnsignedShort(start - SIZE_OF_UNSIGNED_SHORT, entrySize);
-
-            return true;
-        }
-
-
-
-    }
-
     /**
      * Reads map entries from a socket, this could be a client or server socket
      */
@@ -1024,7 +937,7 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
                 // its set to MIN_VALUE when it should be read again
                 if (sizeOfNextEntry == Integer.MIN_VALUE) {
-                    if (out.remaining() < SIZE_OF_UNSIGNED_SHORT) {
+                    if (out.remaining() < SIZE_OF_SHORT) {
                         return;
                     }
 

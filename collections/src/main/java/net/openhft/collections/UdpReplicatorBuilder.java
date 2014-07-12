@@ -27,12 +27,11 @@ import java.util.Enumeration;
 import static net.openhft.collections.AbstractChannelReplicator.ChannelReplicatorBuilder;
 
 
-public class UdpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable {
+public final class UdpReplicatorBuilder extends AbstractReplicationBuilder<UdpReplicatorBuilder>
+        implements ChannelReplicatorBuilder {
 
     private InetAddress address;
     private int port;
-    private long throttle;
-
     private NetworkInterface interf;
 
     /**
@@ -40,9 +39,8 @@ public class UdpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable
      * @param address the UDP broadcast or multicast address Directed broadcast, <p/> <p/> for example a
      *                broadcast address of 192.168.0.255  has an IP range of 192.168.0.0 - 192.168.0.254 <p/>
      *                see  http://www.subnet-calculator.com/subnet.php?net_class=C for more details
-     * @throws UnknownHostException
      */
-    public UdpReplicatorBuilder(int port, InetAddress address) throws UnknownHostException {
+    public UdpReplicatorBuilder(int port, InetAddress address) {
         this.port = port;
         this.address = address;
     }
@@ -78,34 +76,6 @@ public class UdpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable
                 ", port=" + port + '}';
     }
 
-    /**
-     * @return throttle bits per seconds
-     */
-    public long throttle() {
-        return this.throttle;
-    }
-
-
-    /**
-     * @param throttleInBitsPerSecond bits per seconds
-     * @return this
-     */
-    public UdpReplicatorBuilder throttle(long throttleInBitsPerSecond) {
-        this.throttle = throttleInBitsPerSecond;
-        return this;
-    }
-
-    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
-    @Override
-    public UdpReplicatorBuilder clone() {
-        try {
-            return (UdpReplicatorBuilder) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);
-        }
-    }
-
-
     public UdpReplicatorBuilder networkInterface(NetworkInterface interf) throws SocketException {
         if (interf == null) {
             StringBuilder builder = new StringBuilder();
@@ -128,5 +98,10 @@ public class UdpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable
 
     public NetworkInterface networkInterface() {
         return interf;
+    }
+
+    @Override
+    UdpReplicatorBuilder thisBuilder() {
+        return this;
     }
 }
