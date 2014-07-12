@@ -589,7 +589,8 @@ public class HugeHashMapTest {
 		        .setSmallEntrySize(32)
 		        .setCapacity(512);
 
-		final HugeHashMap<String, LongWrapper> map = new HugeHashMap<>(config, String.class, LongWrapper.class);
+		final HugeHashMap<String, LongWrapper> map =
+                new HugeHashMap<String, LongWrapper>(config, String.class, LongWrapper.class);
 		
 		LongWrapper value = new LongWrapper();
 		LongWrapper retrieveValue = new LongWrapper();
