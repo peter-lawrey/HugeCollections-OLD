@@ -16,6 +16,9 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.io.serialization.BytesMarshallable;
+
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -33,6 +36,20 @@ import static org.junit.Assert.assertNotNull;
  */
 @SuppressWarnings("unchecked")
 public class HugeHashMapTest {
+	private static class LongWrapper implements BytesMarshallable {
+		private long val;
+
+		@Override
+		public void readMarshallable(Bytes in) throws IllegalStateException {
+			val = in.readLong();
+		}
+
+		@Override
+		public void writeMarshallable(Bytes out) {
+			out.writeLong(val);
+		}
+	}
+	
     static final int N_THREADS = 32;
     // 32M needs 5 GB of memory
     // 64M needs 10 GB of memory
@@ -563,6 +580,31 @@ public class HugeHashMapTest {
         for (Map.Entry<CharSequence, CharSequence> entry : map.entrySet()) {
             org.junit.Assert.assertEquals(entry.getKey(), entry.getValue());
         }
+    }
+    
+    @Test
+	public void overridePutTest() {
+		HugeConfig config = HugeConfig.DEFAULT.clone()
+		        .setSegments(128)
+		        .setSmallEntrySize(32)
+		        .setCapacity(512);
+
+		final HugeHashMap<String, LongWrapper> map =
+                new HugeHashMap<String, LongWrapper>(config, String.class, LongWrapper.class);
+		
+		LongWrapper value = new LongWrapper();
+		LongWrapper retrieveValue = new LongWrapper();
+		
+		for (int i = 0; i < 1024 * 4; ++i) {
+			int id = i % 1024;
+			String key = String.valueOf(id);
+			value.val = i;
+			
+			map.put(key, value);
+			LongWrapper retr = map.get(key, retrieveValue);
+			
+			assertEquals((long)i, retr.val);
+		}
     }
 
     private HugeHashMap<Integer, String> getViewTestMap(int noOfElements) {

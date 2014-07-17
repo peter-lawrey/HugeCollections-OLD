@@ -35,19 +35,14 @@ import static net.openhft.collections.AbstractChannelReplicator.ChannelReplicato
  *
  * @see SharedHashMapBuilder#tcpReplicatorBuilder(TcpReplicatorBuilder)
  */
-public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Cloneable {
+public final class TcpReplicatorBuilder extends AbstractReplicationBuilder<TcpReplicatorBuilder>
+        implements ChannelReplicatorBuilder {
 
     private int serverPort;
     private Set<InetSocketAddress> endpoints;
     private int packetSize = 1024 * 8;
-    private long throttleBucketInterval = 100;
-    private TimeUnit throttleBucketIntervalUnit = MILLISECONDS;
     private long heartBeatInterval = 20;
     private TimeUnit heartBeatIntervalUnit = SECONDS;
-    private long throttle = 0;
-    private TimeUnit throttlePerUnit = MILLISECONDS;
-    private int maxEntrySizeBytes;
-
 
     public TcpReplicatorBuilder(int serverPort, InetSocketAddress... endpoints) {
         this.serverPort = serverPort;
@@ -125,16 +120,6 @@ public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Clo
         return this;
     }
 
-    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
-    @Override
-    public TcpReplicatorBuilder clone() {
-        try {
-            return (TcpReplicatorBuilder) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);
-        }
-    }
-
     private TcpReplicatorBuilder endpoints(Collection<InetSocketAddress> endpoints) {
         this.endpoints = unmodifiableSet(new HashSet<InetSocketAddress>(endpoints));
         return this;
@@ -145,58 +130,8 @@ public final class TcpReplicatorBuilder implements ChannelReplicatorBuilder, Clo
         return this;
     }
 
-    /**
-     * Default maximum bits is {@code 0}, i. e. there is no throttling.
-     *
-     * @param perUnit maximum bits is returned per this time unit
-     * @return maximum bits per the given time unit
-     */
-    public long throttle(TimeUnit perUnit) {
-        return throttlePerUnit.convert(throttle, perUnit);
-    }
-
-    /**
-     * @param maxBits the preferred maximum bits. Non-positive value designates TCP replicator shouldn't
-     *                throttle.
-     * @param perUnit the time unit per which maximum bits specified
-     * @return this builder back
-     */
-    public TcpReplicatorBuilder throttle(long maxBits, TimeUnit perUnit) {
-        this.throttle = maxBits;
-        this.throttlePerUnit = perUnit;
+    @Override
+    TcpReplicatorBuilder thisBuilder() {
         return this;
     }
-
-
-    /**
-     * Default throttle bucketing interval is 100 millis.
-     *
-     * @param unit the time unit of the interval
-     * @return the bucketing interval for throttling
-     */
-    public long throttleBucketInterval(TimeUnit unit) {
-        return unit.convert(throttleBucketInterval, throttleBucketIntervalUnit);
-    }
-
-    /**
-     * @param throttleBucketInterval the bucketing interval for throttling
-     * @param unit                   the time unit of the interval
-     * @return this builder back
-     * @throws IllegalArgumentException if the given bucketing interval is unrecognisably small for the
-     *                                  current TCP replicator implementation or negative. Current minimum
-     *                                  interval is 1 millisecond.
-     */
-    public TcpReplicatorBuilder throttleBucketInterval(long throttleBucketInterval, TimeUnit unit) {
-        if (unit.toMillis(throttleBucketInterval) < 1) {
-            throw new IllegalArgumentException(
-                    "Minimum throttle bucketing interval is 1 millisecond, " +
-                            throttleBucketInterval + " " + unit + " given");
-        }
-        this.throttleBucketInterval = throttleBucketInterval;
-        this.throttleBucketIntervalUnit = unit;
-        return this;
-    }
-
-
-
 }

@@ -83,7 +83,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         implements SharedHashMap<K, V>, ReplicaExternalizable<K, V>, EntryResolver<K, V>,
         Closeable {
 
-    private static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
+    static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
     private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
