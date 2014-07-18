@@ -59,7 +59,7 @@ public final class SharedHashMapBuilder<K, V> implements Cloneable {
     private long entries = 1 << 20;
     private int replicas = 0;
     private boolean transactional = false;
-    private long lockTimeOutMS = 1000;
+    private long lockTimeOutMS = 20000;
     private int metaDataBytes = 0;
     private SharedMapEventListener eventListener = SharedMapEventListeners.nop();
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.logging();
