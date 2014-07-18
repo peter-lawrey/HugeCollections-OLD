@@ -140,7 +140,7 @@ class ClusterReplicator<K, V> implements ReplicaExternalizable<K, V>, Closeable 
      * @return a new DirectBitSet backed by a byteBuffer
      */
     private static DirectBitSet newBitSet(int numberOfBits) {
-        final ByteBufferBytes bytes = new ByteBufferBytes(wrap(new byte[(int) ceil(numberOfBits / 8.0)]));
+        final ByteBufferBytes bytes = new ByteBufferBytes(wrap(new byte[(numberOfBits+7) / 8]));
         return new SingleThreadedDirectBitSet(bytes);
     }
 

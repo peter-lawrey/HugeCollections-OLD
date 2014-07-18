@@ -44,7 +44,11 @@ class VanillaSharedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V> {
     public VanillaSharedHashMap(SharedHashMapBuilder builder, File file,
                                 Class<K> kClass, Class<V> vClass) throws IOException {
         super(builder, kClass, vClass);
-        createMappedStoreAndSegments(file);
+        ObjectSerializer objectSerializer = builder.objectSerializer();
+        BytesStore bytesStore = file == null
+                ? DirectStore.allocateLazy(sizeInBytes(), objectSerializer)
+                : new MappedStore(file, FileChannel.MapMode.READ_WRITE, sizeInBytes(), objectSerializer);
+        createMappedStoreAndSegments(bytesStore);
     }
 }
 
@@ -81,7 +85,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final int metaDataBytes;
     Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    MappedStore ms;
+    BytesStore ms;
     final Hasher hasher;
 
  //   private final int replicas;
@@ -145,16 +149,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return Segment.class;
     }
 
-    long createMappedStoreAndSegments(File file) throws IOException {
-        this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes(), objectSerializer);
+    long createMappedStoreAndSegments(BytesStore bytesStore) throws IOException {
+        this.ms = bytesStore;
 
         onHeaderCreated();
 
         long offset = getHeaderSize();
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = createSegment(ms.bytes(offset, segmentSize), i);
+            this.segments[i] = createSegment((NativeBytes) ms.bytes(offset, segmentSize), i);
             offset += segmentSize;
         }
         return offset;
