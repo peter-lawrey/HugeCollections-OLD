@@ -1,16 +1,12 @@
 package eg;
 
-import java.io.Externalizable;
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
+import net.openhft.collections.SharedHashMapBuilder;
+import net.openhft.lang.io.Bytes;
+
+import java.io.*;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import net.openhft.collections.SharedHashMapBuilder;
-import net.openhft.lang.io.Bytes;
 
 /*
  tune the kernel to maximise the amount of cached write data.
@@ -32,7 +28,9 @@ public class BigData {
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
         builder.entries(MAXSIZE);
         builder.entrySize(32);
-        String shmPath = "./testmap-"+Long.toString(System.nanoTime(), 36);
+        String dir = System.getProperty("dir", "/ocz/tmp");
+        if (!new File("/ocz/tmp").exists()) dir = ".";
+        String shmPath = dir + "/testmap-" + Long.toString(System.nanoTime(), 36);
         System.out.println("SharedHashMap entries() = " + builder.entries());
         try {
             TheSharedMap = builder.create(new File(shmPath), Long.class, BigDataStuff.class);
