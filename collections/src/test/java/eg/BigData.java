@@ -26,8 +26,10 @@ public class BigData {
 
     static {
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
+        builder.largeSegments(true);
+        builder.actualSegments(64);
         builder.entries(MAXSIZE);
-        builder.entrySize(32);
+        builder.entrySize(216);  //  (128 GB - 20GB)/0.5 BN
         String dir = System.getProperty("dir", "/ocz/tmp");
         if (!new File("/ocz/tmp").exists()) dir = ".";
         String shmPath = dir + "/testmap-" + Long.toString(System.nanoTime(), 36);
