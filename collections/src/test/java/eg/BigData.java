@@ -12,10 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /*
  tune the kernel to maximise the amount of cached write data.
 
- vm.dirty_background_ratio = 80
- vm.dirty_expire_centisecs = 60000
- vm.dirty_ratio = 90
- vm.dirty_writeback_centisecs = 30000
+ vm.dirty_background_ratio = 30
+ vm.dirty_expire_centisecs = 30000
+ vm.dirty_ratio = 60
+ vm.dirty_writeback_centisecs = 3000
  */
 public class BigData {
     static Map<Long, BigDataStuff> TheSharedMap;
