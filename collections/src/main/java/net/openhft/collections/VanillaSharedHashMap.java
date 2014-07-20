@@ -84,7 +84,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     MappedStore ms;
     final Hasher hasher;
 
-    private final int replicas;
+ //   private final int replicas;
     final int entrySize;
     final Alignment alignment;
     final int entriesPerSegment;
@@ -116,7 +116,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
 
-        this.replicas = builder.replicas();
+      //  this.replicas = builder.replicas();
         this.entrySize = builder.alignedEntrySize();
         this.alignment = builder.entryAndValueAlignment();
 
@@ -139,10 +139,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         @SuppressWarnings("unchecked")
         Segment[] ss = (Segment[]) Array.newInstance(segmentType(), segments);
         this.segments = ss;
-    }
-
-    public SharedHashMapBuilder builder() {
-        return builder.clone();
     }
 
     Class segmentType() {
@@ -218,9 +214,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     int numberOfBitSets() {
-        return 1 // for free list
-                + (replicas > 0 ? 1 : 0) // deleted set
-                + replicas; // to notify each replica of a change.
+        return 1; // for free list
+              //  + (replicas > 0 ? 1 : 0) // deleted set
+             //   + replicas; // to notify each replica of a change.
     }
 
     long segmentSize() {
@@ -245,7 +241,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         // if the size is a multiple of 4096 or slightly more. Make sure it is at least 64 more than a multiple.
         if ((ss & 4093) < 64)
             ss = (ss & ~63) + 64;
-        ;
 
         return ss;
     }
@@ -511,7 +506,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * @param newValue      the new value you wish to store in the map
      * @return the value that was replaced
      */
-    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@net.openhft.lang.model.constraints.NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -1342,8 +1337,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         Entry<K, V> nextEntry, lastReturned;
 
-        Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
-
+        //Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
+        
+        int entryCounter=0;
+        
         EntryIterator() {
             nextEntry = nextSegmentEntry();
         }
@@ -1369,16 +1366,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
-                if (segmentPositions.isEmpty()) {
+                if (/*segmentPositions.isEmpty() ||*/ entryCounter==0) {
                     switchToNextSegment();
                 } else {
                     final Segment segment = segments[segmentIndex];
                     segment.lock();
                     try {
-                        while (!segmentPositions.isEmpty()) {
-                            Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
+                        while (/*!segmentPositions.isEmpty() ||*/ entryCounter==1) {
+                        	//int segPosition = segmentPositions.removeFirst();                        	
+                            Entry<K, V> entry = segment.getEntry(0);
                             if (entry != null) {
-                                return entry;
+                            	entryCounter=0;
+                            	return entry;
                             }
                         }
                     } finally {
@@ -1389,8 +1388,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             return null;
         }
 
-        private void switchToNextSegment() {
-            segmentPositions.clear();
+        private void switchToNextSegment() {        	
+            //segmentPositions.clear();
+            entryCounter=0;
             segmentIndex--;
             if (segmentIndex >= 0) {
                 final Segment segment = segments[segmentIndex];
@@ -1405,7 +1405,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         @Override
         public void accept(int key, int value) {
-            segmentPositions.add(value);
+            //segmentPositions.add(value);
+            entryCounter=1;           
         }
     }
 
