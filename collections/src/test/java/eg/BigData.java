@@ -1,5 +1,6 @@
 package eg;
 
+import net.openhft.affinity.AffinitySupport;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.lang.io.Bytes;
 
@@ -18,21 +19,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class BigData {
     static Map<Long, BigDataStuff> TheSharedMap;
-    final static long MAXSIZE = 500 * 1000 * 1000L;
+    final static long MAXSIZE = 1000 * 1000 * 1000L;
     //run 1st test with no map, and Highwatermark set to 0
     //then switch to Highwatermark set to MAXSIZE for subsequent test repeats
     static AtomicInteger Highwatermark = new AtomicInteger((int) MAXSIZE);
 //    static AtomicInteger Highwatermark = new AtomicInteger(0);
 
+    static final SharedHashMapBuilder builder = new SharedHashMapBuilder();
+
     static {
-        SharedHashMapBuilder builder = new SharedHashMapBuilder();
         builder.largeSegments(true);
-        builder.actualSegments(64);
+        builder.actualSegments(8 * 1024);
         builder.entries(MAXSIZE);
-        builder.entrySize(216);  //  (128 GB - 20GB)/0.5 BN
         String dir = System.getProperty("dir", "/ocz/tmp");
         if (!new File("/ocz/tmp").exists()) dir = ".";
         String shmPath = dir + "/testmap-" + Long.toString(System.nanoTime(), 36);
+        new File(shmPath).deleteOnExit();
         System.out.println("SharedHashMap entries() = " + builder.entries());
         try {
             TheSharedMap = builder.create(new File(shmPath), Long.class, BigDataStuff.class);
@@ -43,6 +45,7 @@ public class BigData {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
+        long start = System.currentTimeMillis();
         initialbuild();
         System.out.println("Start highwatermark " + Highwatermark.get());
         for (int i = 0; i < 10; i++) {
@@ -70,6 +73,8 @@ public class BigData {
             t3.join();
         }
         System.out.println("End highwatermark " + Highwatermark.get());
+        long time = System.currentTimeMillis() - start;
+        System.out.printf("End to end took %.1f%n", time / 1e3);
     }
 
     public static void initialbuild() throws IOException, InterruptedException {
@@ -98,10 +103,13 @@ public class BigData {
         t2.join();
         t3.join();
         long now = System.currentTimeMillis();
+        System.out.println(builder);
         System.out.println("Time taken to insert all entries " + ((now - start) / 1000.0) + " seconds");
     }
 
     public static void populate(int n) {
+        AffinitySupport.setThreadId();
+
         long start = System.currentTimeMillis();
         BigDataStuff value = new BigDataStuff(0);
         for (long i = n; i < MAXSIZE; i += 4) {
@@ -116,6 +124,8 @@ public class BigData {
     }
 
     public static void _test() {
+        // improves logging of these threads.
+        AffinitySupport.setThreadId();
         try {
             test();
         } catch (IOException e) {

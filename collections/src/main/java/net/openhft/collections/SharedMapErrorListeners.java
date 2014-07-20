@@ -32,7 +32,7 @@ public final class SharedMapErrorListeners {
         public void onLockTimeout(long threadId) throws IllegalStateException {
             if (threadId > 1L << 32) {
                 LOG.warn("Grabbing lock held by processId: {}, threadId: {}",
-                    (threadId >>> 33), (threadId & 0xFFFFFFFFL));
+                        (threadId >>> 33), (threadId & 0xFFFFFFL));
             } else {
                 LOG.warn("Grabbing lock held by threadId: {}",threadId);
             }
