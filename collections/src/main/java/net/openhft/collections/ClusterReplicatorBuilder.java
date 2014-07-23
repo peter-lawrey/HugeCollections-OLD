@@ -18,9 +18,13 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.DirectStore;
+import net.openhft.lang.io.MappedStore;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.channels.FileChannel;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -75,7 +79,7 @@ public class ClusterReplicatorBuilder {
         builder0.identifier(identifier);
 
         final VanillaSharedReplicatedHashMap<K, V> result =
-                new VanillaSharedReplicatedHashMap<K, V>(builder0, builder0.file(), builder0.<K>kClass(),
+                new VanillaSharedReplicatedHashMap<K, V>(builder0, builder0.<K>kClass(),
                         builder0.<V>vClass());
 
         if (clusterReplicator == null)

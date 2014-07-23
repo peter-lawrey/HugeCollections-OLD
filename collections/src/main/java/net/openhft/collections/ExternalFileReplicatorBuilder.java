@@ -23,10 +23,11 @@ package net.openhft.collections;
  */
 public class ExternalFileReplicatorBuilder<K, V> extends ExternalReplicatorBuilder<V, ExternalFileReplicatorBuilder> {
 
-    public String directory = System.getProperty("java.io.tmpdir");
+    public String directory;
 
     public ExternalFileReplicatorBuilder(Class<V> vClass) {
         super(vClass, false);
+        directory(System.getProperty("java.io.tmpdir"));
     }
 
     public String directory() {
@@ -34,6 +35,8 @@ public class ExternalFileReplicatorBuilder<K, V> extends ExternalReplicatorBuild
     }
 
     public ExternalFileReplicatorBuilder directory(String directory) {
+        if (!directory.endsWith("/"))
+            directory += '/';
         this.directory = directory;
         return this;
     }

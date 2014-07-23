@@ -317,78 +317,82 @@ public class ExternalJDBCReplicator<K, V> extends AbstractExternalReplicator<K, 
                 final Field field = fieldNameByType.getKey();
                 try {
 
-                    if (field.getType().equals(boolean.class))
-                        field.setBoolean(o, resultSet.getBoolean(fieldNameByType.getValue()));
+                    Class<?> type = field.getType();
+                    String value = fieldNameByType.getValue();
+                    if (type.equals(boolean.class))
+                        field.setBoolean(o, resultSet.getBoolean(value));
 
-                    else if (field.getType().equals(byte.class))
-                        field.setByte(o, resultSet.getByte(fieldNameByType.getValue()));
+                    else if (type.equals(byte.class))
+                        field.setByte(o, resultSet.getByte(value));
 
-                    else if (field.getType().equals(char.class)) {
-                        final String string = resultSet.getString(fieldNameByType.getValue());
+                    else if (type.equals(char.class)) {
+                        final String string = resultSet.getString(value);
                         if (string.length() > 0)
                             field.setChar(o, string.charAt(0));
-                    } else if (field.getType().equals(short.class))
-                        field.setShort(o, resultSet.getShort(fieldNameByType.getValue()));
+                    } else if (type.equals(short.class))
+                        field.setShort(o, resultSet.getShort(value));
 
-                    else if (field.getType().equals(float.class))
-                        field.setFloat(o, resultSet.getFloat(fieldNameByType.getValue()));
+                    else if (type.equals(float.class))
+                        field.setFloat(o, resultSet.getFloat(value));
 
-                    else if (field.getType().equals(int.class))
-                        field.setInt(o, resultSet.getInt(fieldNameByType.getValue()));
+                    else if (type.equals(int.class))
+                        field.setInt(o, resultSet.getInt(value));
 
-                    else if (field.getType().equals(long.class))
-                        field.setLong(o, resultSet.getLong(fieldNameByType.getValue()));
+                    else if (type.equals(long.class))
+                        field.setLong(o, resultSet.getLong(value));
 
-                    else if (field.getType().equals(double.class))
-                        field.setDouble(o, resultSet.getDouble(fieldNameByType.getValue()));
+                    else if (type.equals(double.class))
+                        field.setDouble(o, resultSet.getDouble(value));
 
-                    else if (field.getType().equals(BigDecimal.class))
-                        field.set(o, resultSet.getBigDecimal(fieldNameByType.getValue()));
+                    else if (type.equals(BigDecimal.class))
+                        field.set(o, resultSet.getBigDecimal(value));
 
-                    else if (field.getType().equals(String.class))
-                        field.set(o, resultSet.getString(fieldNameByType.getValue()));
+                    else if (type.equals(String.class))
+                        field.set(o, resultSet.getString(value));
 
-                    else if (field.getType().equals(DateTime.class)) {
-                        final String date = resultSet.getString(fieldNameByType.getValue());
+                    else if (type.equals(DateTime.class)) {
+                        final String date = resultSet.getString(value);
                         final DateTime dateTime = dateFormat(date).parseDateTime(date).toDateTime();
 
                         field.set(o, dateTime);
-                    } else if (field.getType().equals(Date.class)) {
-                        final String date = resultSet.getString(fieldNameByType.getValue());
+                    } else if (type.equals(Date.class)) {
+                        final String date = resultSet.getString(value);
 
                         final DateTime dateTime = dateFormat(date).parseDateTime(date);
 
                         field.set(o, dateTime.toDate());
-                    } else if (field.getType().equals(Boolean.class))
-                        field.set(o, resultSet.getBoolean(fieldNameByType.getValue()));
+                    } else if (type.equals(Boolean.class)) {
+                        boolean b = resultSet.getBoolean(value);
+                        field.set(o, resultSet.wasNull() ? null : b);
+                    }
 
-                    else if (field.getType().equals(Byte.class))
-                        field.set(o, resultSet.getByte(fieldNameByType.getValue()));
+                    else if (type.equals(Byte.class))
+                        field.set(o, resultSet.getByte(value));
 
-                    else if (field.getType().equals(Character.class)) {
-                        final String string = resultSet.getString(fieldNameByType.getValue());
+                    else if (type.equals(Character.class)) {
+                        final String string = resultSet.getString(value);
                         if (string.length() > 0)
                             field.setChar(o, string.charAt(0));
-                    } else if (field.getType().equals(Short.class))
-                        field.set(o, resultSet.getShort(fieldNameByType.getValue()));
+                    } else if (type.equals(Short.class))
+                        field.set(o, resultSet.getShort(value));
 
-                    else if (field.getType().equals(Float.class))
-                        field.set(o, resultSet.getFloat(fieldNameByType.getValue()));
+                    else if (type.equals(Float.class))
+                        field.set(o, resultSet.getFloat(value));
 
-                    else if (field.getType().equals(Integer.class))
-                        field.set(o, resultSet.getInt(fieldNameByType.getValue()));
+                    else if (type.equals(Integer.class))
+                        field.set(o, resultSet.getInt(value));
 
-                    else if (field.getType().equals(Long.class))
-                        field.set(o, resultSet.getLong(fieldNameByType.getValue()));
+                    else if (type.equals(Long.class))
+                        field.set(o, resultSet.getLong(value));
 
-                    else if (field.getType().equals(Double.class))
-                        field.set(o, resultSet.getDouble(fieldNameByType.getValue()));
+                    else if (type.equals(Double.class))
+                        field.set(o, resultSet.getDouble(value));
 
                     else
                         LOG.error("",
-                                new UnsupportedOperationException("unsupported type " + field.getType()));
+                                new UnsupportedOperationException("unsupported type " + type));
 
-                    if (Map.class.isAssignableFrom(rClass) && fieldNameByType.getValue().equals(keyName))
+                    if (Map.class.isAssignableFrom(rClass) && value.equals(keyName))
                         key = (K) field.get(o);
 
                 } catch (Exception e) {

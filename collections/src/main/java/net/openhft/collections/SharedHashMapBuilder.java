@@ -17,6 +17,8 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
+import net.openhft.lang.io.DirectStore;
+import net.openhft.lang.io.MappedStore;
 import net.openhft.lang.io.serialization.BytesMarshallableSerializer;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
@@ -30,6 +32,7 @@ import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
 public final class SharedHashMapBuilder<K, V> implements Cloneable {
@@ -56,7 +59,7 @@ public final class SharedHashMapBuilder<K, V> implements Cloneable {
     private long entries = 1 << 20;
     private int replicas = 0;
     private boolean transactional = false;
-    private long lockTimeOutMS = 1000;
+    private long lockTimeOutMS = 20000;
     private int metaDataBytes = 0;
     private SharedMapEventListener eventListener = SharedMapEventListeners.nop();
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.logging();
@@ -295,7 +298,7 @@ public final class SharedHashMapBuilder<K, V> implements Cloneable {
             throw new IllegalArgumentException("Identifier must be positive, " + identifier + " given");
 
         final VanillaSharedReplicatedHashMap<K, V> result =
-                new VanillaSharedReplicatedHashMap<K, V>(builder, file, kClass, vClass);
+                new VanillaSharedReplicatedHashMap<K, V>(builder, kClass, vClass);
 
         if (externalReplicatorBuilder != null)
             externalReplicator = applyExternalReplicator(result, externalReplicatorBuilder, kClass, vClass);
