@@ -203,7 +203,7 @@ public class SHMExternalReplicatorWithBuilderTest {
                 .externalReplicatorBuilder(builder)
                 .entries(20000);
 
-        map = sharedHashMapBuilder.create(getPersistenceFile(), Integer.class, BeanClass.class);
+        map = sharedHashMapBuilder.file(getPersistenceFile()).kClass(Integer.class).vClass(BeanClass.class).create();
         externalReplicator = sharedHashMapBuilder.externalReplicator();
     }
 

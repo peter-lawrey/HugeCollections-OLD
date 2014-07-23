@@ -57,8 +57,7 @@ public class TCPSocketReplicationBootStrapTests {
                 .entries(20000);
 
         final VanillaSharedReplicatedHashMap<Integer,
-                CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
 
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
@@ -78,15 +77,14 @@ public class TCPSocketReplicationBootStrapTests {
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
-                    .canReplicate(true)
-                    .create(map2File, Integer.class, CharSequence.class);
+                    .canReplicate(true).file(map2File).kClass(Integer.class).vClass(CharSequence.class).create();
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
             map2b.close();
         }
 
         // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
-        map2 = builder.create(map2File, Integer.class, CharSequence.class);
+        map2 = builder.file(map2File).kClass(Integer.class).vClass(CharSequence.class).create();
 
         // add data into it
         waitTillEqual(5000);
@@ -112,8 +110,7 @@ public class TCPSocketReplicationBootStrapTests {
                 .identifier((byte) 2)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000);
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a = (VanillaSharedReplicatedHashMap<Integer, CharSequence>) builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
 
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
@@ -133,15 +130,14 @@ public class TCPSocketReplicationBootStrapTests {
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
                     .entries(1000)
                     .identifier((byte) 2)
-                    .canReplicate(true)
-                    .create(map2File, Integer.class, CharSequence.class);
+                    .canReplicate(true).file(map2File).kClass(Integer.class).vClass(CharSequence.class).create();
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
             map2b.close();
         }
 
         // now restart map2a and doConnect it to map1, map1 should bootstrap the missing entry
-        map2 = builder.create(map2File, Integer.class, CharSequence.class);
+        map2 = builder.file(map2File).kClass(Integer.class).vClass(CharSequence.class).create();
 
         // add data into it
         waitTillEqual(20000);

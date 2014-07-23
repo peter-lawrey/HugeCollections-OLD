@@ -60,8 +60,7 @@ public class TCPSocketReplication4WayMapTest {
                 .entries(1000)
                 .identifier(identifier)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                .entries(20000).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
     }
 
     static SharedHashMap<IntValue, CharSequence> newTcpSocketShmIntValueString(
@@ -77,8 +76,7 @@ public class TCPSocketReplication4WayMapTest {
                 .entries(1000)
                 .identifier(identifier)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000)
-                .create(getPersistenceFile(), IntValue.class, CharSequence.class);
+                .entries(20000).file(getPersistenceFile()).kClass(IntValue.class).vClass(CharSequence.class).create();
     }
 
 

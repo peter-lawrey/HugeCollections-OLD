@@ -39,7 +39,7 @@ public class ProcessInstanceLimiterMain implements Runnable {
         SharedHashMapBuilder builder = new SharedHashMapBuilder();
         builder.entries(10000);
         builder.minSegments(2);
-        this.theSharedMap = builder.create(new File(System.getProperty("java.io.tmpdir") + "/" + sharedMapName), String.class, Data.class);
+        this.theSharedMap = builder.file(new File(System.getProperty("java.io.tmpdir") + "/" + sharedMapName)).kClass(String.class).vClass(Data.class).create();
         Thread t = new Thread(this, "ProcessInstanceLimiterMain updater");
         t.setDaemon(true);
         t.start();

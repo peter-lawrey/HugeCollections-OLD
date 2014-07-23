@@ -44,13 +44,13 @@ public class SHMHeaderTest {
             File file = new File(System.getProperty("java.io.tmpdir"), "headers-" + i);
             file.deleteOnExit();
             SharedHashMapBuilder builder1 = createBuilder(rand);
-            SharedHashMap<String, String> map = builder1.create(file, String.class, String.class);
+            SharedHashMap<String, String> map = builder1.file(file).kClass(String.class).vClass(String.class).create();
             // this is the sanitized builder
             SharedHashMapBuilder builder2 = builder1.clone();
             map.close();
             // on reopening
             SharedHashMapBuilder builder3 = createBuilder(rand);
-            SharedHashMap<String, String> map2 = builder3.create(file, String.class, String.class);
+            SharedHashMap<String, String> map2 = builder3.file(file).kClass(String.class).vClass(String.class).create();
             // this is the sanitized builder
             SharedHashMapBuilder builder4 = builder3.clone();
             assertEquals(builder2.toString(), builder4.toString());

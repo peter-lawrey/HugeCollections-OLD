@@ -57,8 +57,7 @@ public class SHMMetaDataTest {
                 };
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
                 .metaDataBytes(8)
-                .eventListener(listener)
-                .create(file, String.class, String.class);
+                .eventListener(listener).file(file).kClass(String.class).vClass(String.class).create();
 
         try {
             map.put("a", "aye");

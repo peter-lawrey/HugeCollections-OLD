@@ -87,8 +87,7 @@ public class TCPSocketReplicationTestPostConnection {
                 .identifier((byte) 2)
                 .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000);
-        final SharedHashMap<Integer, CharSequence> map2a = (SharedHashMap<Integer, CharSequence>) builder
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final SharedHashMap<Integer, CharSequence> map2a = (SharedHashMap<Integer, CharSequence>) builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
         map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
 
         Thread.sleep(1);
@@ -101,7 +100,7 @@ public class TCPSocketReplicationTestPostConnection {
         map1.put(6, "EXAMPLE-1");
 
         // recreate map2 with new unique file
-        map2 = builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        map2 = builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
 
 
         // allow time for the recompilation to resolve

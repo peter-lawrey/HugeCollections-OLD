@@ -85,8 +85,7 @@ public class SharedHashMapTest {
     public void testRemoveWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
@@ -132,8 +131,7 @@ public class SharedHashMapTest {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
                 .minSegments(1024)
-                .removeReturnsNull(true)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .removeReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
 
         for (int i = 1; i < 1024; i++) {
@@ -156,8 +154,7 @@ public class SharedHashMapTest {
         int count = 3000;
         final SharedHashMap<Object, Object> map = new SharedHashMapBuilder()
                 .entrySize(count)
-                .minSegments(2)
-                .create(getPersistenceFile(), Object.class, Object.class);
+                .minSegments(2).file(getPersistenceFile()).kClass(Object.class).vClass(Object.class).create();
 
 
         for (int i = 1; i < count; i++) {
@@ -181,8 +178,7 @@ public class SharedHashMapTest {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
                 .minSegments(2)
-                .removeReturnsNull(true)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .removeReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
@@ -227,8 +223,7 @@ public class SharedHashMapTest {
     public void testReplaceWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
 
         map.put("key1", "one");
@@ -293,8 +288,7 @@ public class SharedHashMapTest {
     public void testReplaceWithKeyAnd2Params() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         map.put("key1", "one");
         map.put("key2", "two");
@@ -335,8 +329,7 @@ public class SharedHashMapTest {
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
 
         map.put("key1", "one");
@@ -702,8 +695,7 @@ public class SharedHashMapTest {
                 .minSegments(segments)
                 .entrySize(entrySize)
                 .entryAndValueAlignment(alignment)
-                .generatedValueType(true)
-                .create(getPersistenceFile(), CharSequence.class, LongValue.class);
+                .generatedValueType(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(LongValue.class).create();
     }
 
     private static SharedHashMap<CharSequence, IntValue> getSharedStringIntMap(long entries, int segments, int entrySize) throws IOException {
@@ -712,8 +704,7 @@ public class SharedHashMapTest {
                 .minSegments(segments)
                 .entrySize(entrySize)
                 .generatedValueType(true)
-                .putReturnsNull(true)
-                .create(getPersistenceFile(), CharSequence.class, IntValue.class);
+                .putReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(IntValue.class).create();
     }
 
     private static void printStatus() {
@@ -743,8 +734,7 @@ public class SharedHashMapTest {
                         .minSegments(16)
                         .entrySize(32)
                         .putReturnsNull(true)
-                        .removeReturnsNull(true)
-                        .create(file, CharSequence.class, CharSequence.class);
+                        .removeReturnsNull(true).file(file).kClass(CharSequence.class).vClass(CharSequence.class).create();
         StringBuilder key = new StringBuilder();
         StringBuilder value = new StringBuilder();
         StringBuilder value2 = new StringBuilder();
@@ -1156,8 +1146,7 @@ public class SharedHashMapTest {
                         .minSegments(16)
                         .entrySize(32)
                         .putReturnsNull(true)
-                        .removeReturnsNull(true)
-                        .create(file, Integer.class, CharSequence.class);
+                        .removeReturnsNull(true).file(file).kClass(Integer.class).vClass(CharSequence.class).create();
 
         int[] expectedKeys = new int[noOfElements];
         String[] expectedValues = new String[noOfElements];
@@ -1180,20 +1169,17 @@ public class SharedHashMapTest {
         builder.entryAndValueAlignment(NO_ALIGNMENT);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.create(getPersistenceFile(),
-                                CharSequence.class, CharSequence.class)
+                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
         );
         builder.entryAndValueAlignment(Alignment.OF_4_BYTES);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.create(getPersistenceFile(),
-                                CharSequence.class, CharSequence.class)
+                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
         );
         builder.entryAndValueAlignment(OF_8_BYTES);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.create(getPersistenceFile(),
-                                CharSequence.class, CharSequence.class)
+                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
         );
     }
 
@@ -1239,14 +1225,12 @@ public class SharedHashMapTest {
 
     @Test
     public void equalsTest() throws IOException {
-        final SharedHashMap<Integer, String> map1 = new SharedHashMapBuilder().create
-                (getPersistenceFile(), Integer.class, String.class);
+        final SharedHashMap<Integer, String> map1 = new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Integer.class).vClass(String.class).create();
 
         map1.put(1, "one");
         map1.put(2, "two");
 
-        final SharedHashMap<Integer, String> map2 = new SharedHashMapBuilder().create
-                (getPersistenceFile(), Integer.class, String.class);
+        final SharedHashMap<Integer, String> map2 = new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Integer.class).vClass(String.class).create();
 
         map2.put(1, "one");
         map2.put(2, "two");

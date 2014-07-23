@@ -111,8 +111,7 @@ public class GuavaTest extends TestCase {
         @Override
         Map<CharSequence, CharSequence> newMap() {
             try {
-                return builder.create(SharedHashMapTest.getPersistenceFile(),
-                            CharSequence.class, CharSequence.class);
+                return builder.file(SharedHashMapTest.getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
             } catch (IOException e) {
                 throw new AssertionError(e);
             }

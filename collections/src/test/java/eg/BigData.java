@@ -37,7 +37,7 @@ public class BigData {
         new File(shmPath).deleteOnExit();
         System.out.println("SharedHashMap entries() = " + builder.entries());
         try {
-            TheSharedMap = builder.create(new File(shmPath), Long.class, BigDataStuff.class);
+            TheSharedMap = builder.file(new File(shmPath)).kClass(Long.class).vClass(BigDataStuff.class).create();
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

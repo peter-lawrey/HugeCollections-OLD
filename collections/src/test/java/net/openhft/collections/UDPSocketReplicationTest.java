@@ -46,8 +46,7 @@ public class UDPSocketReplicationTest {
         return new SharedHashMapBuilder()
                 .entries(1000)
                 .identifier((byte) identifier)
-                .udpReplicatorBuilder(udpReplicatorBuilder)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                .udpReplicatorBuilder(udpReplicatorBuilder).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
     }
 
 

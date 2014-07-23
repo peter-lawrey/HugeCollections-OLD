@@ -42,7 +42,7 @@ public class SHMTest5 {
         //// end of test
 
         String shmPath = System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "SHMTest5";
-        SharedHashMap<String, SHMTest5Data> theSharedMap = builder.create(new File(shmPath), String.class, SHMTest5Data.class);
+        SharedHashMap<String, SHMTest5Data> theSharedMap = builder.file(new File(shmPath)).kClass(String.class).vClass(SHMTest5Data.class).create();
 
         //Now get the shared data object, auto-creating if it's not there
         SHMTest5Data data = DataValueClasses.newDirectReference(SHMTest5Data.class);

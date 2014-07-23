@@ -52,13 +52,11 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
                 InetSocketAddress);
 
 
-
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .putReturnsNull(true)
                 .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .create(getPersistenceFile(), Integer.class, CharSequence.class);
+                .tcpReplicatorBuilder(tcpReplicatorBuilder).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
     }
 
 

@@ -52,7 +52,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
         SharedHashMap map = new SharedHashMapBuilder().entries(10)
                 .canReplicate(true)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -82,7 +82,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -113,7 +113,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -146,7 +146,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -176,7 +176,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
         SharedHashMap map = new SharedHashMapBuilder()
                 .canReplicate(true)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -205,7 +205,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
         SharedHashMap map = new SharedHashMapBuilder()
                 .canReplicate(true)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -235,7 +235,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -266,7 +266,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -297,7 +297,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 
@@ -326,7 +326,7 @@ public class TimeBasedReplicationTests extends JSR166TestCase {
                 .canReplicate(true)
                 .entries(10)
                 .identifier((byte) 1)
-                .timeProvider(timeProvider).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .timeProvider(timeProvider).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
         current(timeProvider);
 

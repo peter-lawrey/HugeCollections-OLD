@@ -35,7 +35,7 @@ public class GettingStartedTest {
     @Ignore
     public void testTheCodeInGuide() throws IOException {
         String tmpdir = System.getProperty("java.io.tmpdir");
-        Map<String, String> map = new SharedHashMapBuilder().create(new File(tmpdir + "/shared.map"), String.class, String.class);
+        Map<String, String> map = new SharedHashMapBuilder().file(new File(tmpdir + "/shared.map")).kClass(String.class).vClass(String.class).create();
         map.put("some.json", "missing");
         map.get("some.json");
 

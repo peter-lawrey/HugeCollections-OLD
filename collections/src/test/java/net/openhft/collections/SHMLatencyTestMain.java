@@ -77,8 +77,7 @@ public class SHMLatencyTestMain {
                 .entries(KEYS)
                 .entrySize(24)
                 .generatedKeyType(true)
-                .generatedValueType(true)
-                .create(file, LongValue.class, LongValue.class);
+                .generatedValueType(true).file(file).kClass(LongValue.class).vClass(LongValue.class).create();
 
         // add keys
         LongValue key = DataValueClasses.newInstance(LongValue.class);

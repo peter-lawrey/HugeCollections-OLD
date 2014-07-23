@@ -69,8 +69,7 @@ public class Builder {
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = (VanillaSharedReplicatedHashMap<Integer, CharSequence>)
-                builder.canReplicate(true).create(getPersistenceFile(), Integer.class,
-                        CharSequence.class);
+                builder.canReplicate(true).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
 
         final Replica.ModificationIterator modificationIterator = result
                 .acquireModificationIterator(externalIdentifier, NOP);
@@ -97,8 +96,7 @@ public class Builder {
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<Integer, Integer> result = (VanillaSharedReplicatedHashMap<Integer, Integer>)
-                builder.canReplicate(true).create(getPersistenceFile(), Integer.class,
-                        Integer.class);
+                builder.canReplicate(true).file(getPersistenceFile()).kClass(Integer.class).vClass(Integer.class).create();
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
@@ -132,8 +130,7 @@ public class Builder {
                         .identifier(localIdentifier);
 
         final Replica<IntValue, IntValue> result = (Replica<IntValue, IntValue>)
-                builder.canReplicate(true).create(getPersistenceFile(), IntValue.class,
-                        IntValue.class);
+                builder.canReplicate(true).file(getPersistenceFile()).kClass(IntValue.class).vClass(IntValue.class).create();
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
@@ -155,8 +152,7 @@ public class Builder {
                         .identifier(localIdentifier);
 
         final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result = (VanillaSharedReplicatedHashMap<CharSequence, CharSequence>)
-                builder.canReplicate(true).create(getPersistenceFile(), CharSequence.class,
-                        CharSequence.class);
+                builder.canReplicate(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
 
 
         final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),

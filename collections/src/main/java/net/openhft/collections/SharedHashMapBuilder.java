@@ -17,8 +17,6 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
-import net.openhft.lang.io.DirectStore;
-import net.openhft.lang.io.MappedStore;
 import net.openhft.lang.io.serialization.BytesMarshallableSerializer;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
@@ -32,10 +30,9 @@ import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
-public final class SharedHashMapBuilder<K, V> implements Cloneable {
+public class SharedHashMapBuilder<K, V> implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
 

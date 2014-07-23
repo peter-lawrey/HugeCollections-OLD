@@ -54,12 +54,7 @@ public class OpenJDKAndHashMapExamplesTest {
 
         SharedHashMap<String, BondVOInterface> shm = new SharedHashMapBuilder()
                 .generatedValueType(true)
-                .entrySize(512)
-                .create(
-                        new File(TMP + "/shm-myBondPortfolioSHM"),
-                        String.class,
-                        BondVOInterface.class
-                );
+                .entrySize(512).file(new File(TMP + "/shm-myBondPortfolioSHM")).kClass(String.class).vClass(BondVOInterface.class).create();
 
 
         BondVOInterface bondVO = DataValueClasses.newDirectReference(BondVOInterface.class);
@@ -79,12 +74,7 @@ public class OpenJDKAndHashMapExamplesTest {
 
         SharedHashMap<String, BondVOInterface> shmB = new SharedHashMapBuilder()
                 .generatedValueType(true)
-                .entrySize(320)
-                .create(
-                        new File(TMP + "/shm-myBondPortfolioSHM"),
-                        String.class,
-                        BondVOInterface.class
-                );
+                .entrySize(320).file(new File(TMP + "/shm-myBondPortfolioSHM")).kClass(String.class).vClass(BondVOInterface.class).create();
 
         // ZERO Copy but creates a new off heap reference each time
 

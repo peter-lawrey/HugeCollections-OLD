@@ -42,8 +42,7 @@ public class IntValueMapTest {
 
         final SharedHashMap<IntValue, CharSequence> map = new SharedHashMapBuilder()
                 .entries(1000)
-                .entries(20000)
-                .create(getPersistenceFile(), IntValue.class, CharSequence.class);
+                .entries(20000).file(getPersistenceFile()).kClass(IntValue.class).vClass(CharSequence.class).create();
 
         IntValue$$Native value = new IntValue$$Native();
         value.bytes(new ByteBufferBytes(ByteBuffer.allocateDirect(4)), 0);

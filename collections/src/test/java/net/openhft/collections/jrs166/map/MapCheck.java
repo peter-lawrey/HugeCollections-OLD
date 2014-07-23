@@ -122,9 +122,8 @@ public class MapCheck {
     static Map newMap() {
         try {
 
-//            return new ConcurrentHashMap();
-            return new SharedHashMapBuilder()
-                    .create(getPersistenceFile(), Object.class, Object.class);
+//            return new net.openhft.chronicle.map.ConcurrentHashMap();
+            return new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Object.class).vClass(Object.class).create();
 
         } catch (Exception e) {
             throw new RuntimeException("Can't instantiate SHM : " + e);

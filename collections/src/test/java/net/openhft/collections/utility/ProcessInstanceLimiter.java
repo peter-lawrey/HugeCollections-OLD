@@ -219,7 +219,7 @@ public class ProcessInstanceLimiter implements Runnable {
 		SharedHashMapBuilder builder = new SharedHashMapBuilder();
 		builder.entries(1000);
 		builder.entrySize(1024);
-		this.theSharedMap = builder.create(new File(sharedMapPath), String.class, Data.class);
+        this.theSharedMap = builder.file(new File(sharedMapPath)).kClass(String.class).vClass(Data.class).create();
 		Thread t = new Thread(this, "ProcessInstanceLimiter updater");
 		t.setDaemon(true);
 		t.start();

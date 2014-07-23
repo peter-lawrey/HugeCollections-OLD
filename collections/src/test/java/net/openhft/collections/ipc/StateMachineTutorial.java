@@ -39,11 +39,7 @@ public class StateMachineTutorial {
             File dataFile = new File(System.getProperty("java.io.tmpdir"),"hft-state-machine");
 
             map = new SharedHashMapBuilder()
-                .entries(8)
-                .create(
-                    dataFile,
-                    Integer.class,
-                    StateMachineData.class);
+                    .entries(8).file(dataFile).kClass(Integer.class).vClass(StateMachineData.class).create();
 
             if(args.length > 0) {
                 if("0".equalsIgnoreCase(args[0])) {
