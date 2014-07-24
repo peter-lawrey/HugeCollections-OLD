@@ -34,8 +34,7 @@ public class CheckSharedHashMapTest {
     public void test() throws IOException {
 
         final SharedHashMap<Integer, CharSequence> delegate = new SharedHashMapBuilder()
-                .entries(1000)
-                .create(Builder.getPersistenceFile(), Integer.class, CharSequence.class);
+                .entries(1000).file(Builder.getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
 
 
         final CheckSharedHashMap<Integer, CharSequence> checkSharedHashMap = new CheckSharedHashMap<Integer, CharSequence>(delegate);

@@ -34,7 +34,7 @@ import java.util.Arrays;
 
 public class SharedHashMapBuilder<K, V> implements Cloneable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(SharedHashMapBuilder.class.getName());
 
     static final int HEADER_SIZE = 128;
     static final int SEGMENT_HEADER = 64;
@@ -55,7 +55,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     private Alignment alignment = Alignment.OF_4_BYTES;
     private long entries = 1 << 20;
     private int replicas = 0;
-    private boolean transactional = false;
+    boolean transactional = false;
     private long lockTimeOutMS = 20000;
     private int metaDataBytes = 0;
     private SharedMapEventListener eventListener = SharedMapEventListeners.nop();
@@ -68,18 +68,18 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
 
     // replication
     private boolean canReplicate;
-    private byte identifier = Byte.MIN_VALUE;
-    private TcpReplicatorBuilder tcpReplicatorBuilder;
-    private ExternalReplicatorBuilder externalReplicatorBuilder;
+    byte identifier = Byte.MIN_VALUE;
+    TcpReplicatorBuilder tcpReplicatorBuilder;
+    ExternalReplicatorBuilder externalReplicatorBuilder;
 
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
-    private UdpReplicatorBuilder udpReplicatorBuilder;
+    UdpReplicatorBuilder udpReplicatorBuilder;
     private BytesMarshallerFactory bytesMarshallerFactory;
     private ObjectSerializer objectSerializer;
-    private ExternalReplicator externalReplicator;
-    private File file;
-    private Class kClass;
-    private Class vClass;
+    ExternalReplicator externalReplicator;
+    File file;
+    Class kClass;
+    Class vClass;
 
     public SharedHashMapBuilder() {
     }
@@ -613,10 +613,11 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     }
 
 
-    private <K, V> ExternalReplicator.AbstractExternalReplicator applyExternalReplicator(VanillaSharedReplicatedHashMap<K, V> map,
-                                                                                         ExternalReplicatorBuilder builder,
-                                                                                         Class<K> kClass,
-                                                                                         Class<V> vClass) {
+    <K, V> ExternalReplicator.AbstractExternalReplicator applyExternalReplicator
+            (VanillaSharedReplicatedHashMap<K, V> map,
+             ExternalReplicatorBuilder builder,
+             Class<K> kClass,
+             Class<V> vClass) {
         try {
 
             final ExternalReplicator.AbstractExternalReplicator externalReplicator;
@@ -650,8 +651,8 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     }
 
 
-    private <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
-                                            UdpReplicatorBuilder udpReplicatorBuilder)
+    <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
+                                    UdpReplicatorBuilder udpReplicatorBuilder)
             throws IOException {
 
         final InetAddress address = udpReplicatorBuilder.address();
@@ -674,8 +675,8 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     }
 
 
-    private <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
-                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder)
+    <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
+                                    @NotNull TcpReplicatorBuilder tcpReplicatorBuilder)
             throws IOException {
 
         result.addCloseable(new TcpReplicator(result, result, tcpReplicatorBuilder, entrySize()));

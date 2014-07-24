@@ -57,8 +57,7 @@ public class UDPMultiCastSocketReplicationTest1 {
         map1 = new SharedHashMapBuilder()
                 .identifier((byte) identifier)
                 .udpReplicatorBuilder(udpReplicatorBuilder)
-                .entries(20000)
-                .create(getPersistenceFile(), Integer.class, Integer.class);
+                .entries(20000).file(getPersistenceFile()).kClass(Integer.class).vClass(Integer.class).create();
     }
 
     @After
