@@ -1340,8 +1340,10 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         Entry<K, V> nextEntry, lastReturned;
 
-        Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
-
+        //Deque<Integer> segmentPositions = new ArrayDeque<Integer>(); //todo: replace with a more efficient, auto resizing int[]
+        
+        int entryCounter=0;
+        
         EntryIterator() {
             nextEntry = nextSegmentEntry();
         }
@@ -1367,16 +1369,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         Entry<K, V> nextSegmentEntry() {
             while (segmentIndex >= 0) {
-                if (segmentPositions.isEmpty()) {
+                if (/*segmentPositions.isEmpty() ||*/ entryCounter==0) {
                     switchToNextSegment();
                 } else {
                     final Segment segment = segments[segmentIndex];
                     segment.lock();
                     try {
-                        while (!segmentPositions.isEmpty()) {
-                            Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
+                        while (/*!segmentPositions.isEmpty() ||*/ entryCounter==1) {
+                        	//int segPosition = segmentPositions.removeFirst();                        	
+                            Entry<K, V> entry = segment.getEntry(0);
                             if (entry != null) {
-                                return entry;
+                            	entryCounter=0;
+                            	return entry;
                             }
                         }
                     } finally {
@@ -1387,8 +1391,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             return null;
         }
 
-        private void switchToNextSegment() {
-            segmentPositions.clear();
+        private void switchToNextSegment() {        	
+            //segmentPositions.clear();
+            entryCounter=0;
             segmentIndex--;
             if (segmentIndex >= 0) {
                 final Segment segment = segments[segmentIndex];
@@ -1403,7 +1408,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         @Override
         public void accept(int key, int value) {
-            segmentPositions.add(value);
+            //segmentPositions.add(value);
+            entryCounter=1;           
         }
     }
 
