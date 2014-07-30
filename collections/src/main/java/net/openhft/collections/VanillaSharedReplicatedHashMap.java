@@ -167,8 +167,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
     @Override
     void onHeaderCreated(Bytes headerBytes) {
         final long len = getHeaderSize() - super.getHeaderSize();
-        if (len == 0)
-            return;
+        assert len != 0;
         this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
     }
 
@@ -862,9 +861,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         }
 
 
-        /**
-         * removes all the entries
-         */
+        @Override
         void clear() {
 
             // we have to make sure that every calls notifies on remove,
@@ -875,28 +872,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
 
         }
 
+        @Override
         void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
             hashLookupLiveOnly.forEach(entryConsumer);
         }
 
-        /**
-         * returns a null value if the entry has been deleted
-         *
-         * @param pos
-         * @return a null value if the entry has been deleted
-         */
-        @Nullable
-        public Entry<K, V> getEntry(long pos) {
-            long offset = offsetFromPos(pos);
-            NativeBytes entry = entry(offset);
-            entry.readStopBit();
-            K key = keyMarshaller.read(entry);
-
-            // skip timestamp and id
-            entry.skip(10);
-
-            V value = readValue(entry, null); //todo: reusable container
-            return new WriteThroughEntry(key, value);
+        @Override
+        void skipBytesBetweenKeyAndValue(Bytes bytes) {
+            // timestamp, id and isDeleted flag
+            bytes.skip(10);
         }
     }
 

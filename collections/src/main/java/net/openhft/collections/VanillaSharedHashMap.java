@@ -1265,10 +1265,15 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             bytes.position(offsetFromPos(pos));
             bytes.readStopBit();
             K key = keyMarshaller.read(bytes);
+            skipBytesBetweenKeyAndValue(bytes);
             bytes.readStopBit();
             alignment.alignPositionAddr(bytes);
             V value = valueMarshaller.read(bytes);
             return new WriteThroughEntry(key, value);
+        }
+
+        void skipBytesBetweenKeyAndValue(Bytes bytes) {
+            // no bytes to skip
         }
 
         /**
