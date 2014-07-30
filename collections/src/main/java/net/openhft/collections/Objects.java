@@ -16,6 +16,7 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 
 import java.util.Arrays;
@@ -30,5 +31,10 @@ final class Objects {
 
     static boolean equal(@Nullable Object a, @Nullable Object b) {
         return a != null ? a.equals(b) : b == null;
+    }
+
+    static boolean builderEquals(@NotNull Object builder, @Nullable Object o) {
+        return builder == o ||
+                o != null && builder.getClass() == o.getClass() && builder.toString().equals(o.toString());
     }
 }

@@ -31,7 +31,7 @@ import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
-import static net.openhft.collections.Objects.equal;
+import static net.openhft.collections.Objects.builderEquals;
 
 public final class SharedHashMapBuilder implements Cloneable {
 
@@ -352,47 +352,12 @@ public final class SharedHashMapBuilder implements Cloneable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        SharedHashMapBuilder that = (SharedHashMapBuilder) o;
-
-        if (actualEntriesPerSegment != that.actualEntriesPerSegment) return false;
-        if (actualSegments != that.actualSegments) return false;
-        if (canReplicate != that.canReplicate) return false;
-        if (entries != that.entries) return false;
-        if (entrySize != that.entrySize) return false;
-        if (identifier != that.identifier) return false;
-        if (largeSegments != that.largeSegments) return false;
-        if (lockTimeOutMS != that.lockTimeOutMS) return false;
-        if (metaDataBytes != that.metaDataBytes) return false;
-        if (minSegments != that.minSegments) return false;
-        if (putReturnsNull != that.putReturnsNull) return false;
-        if (removeReturnsNull != that.removeReturnsNull) return false;
-        if (replicas != that.replicas) return false;
-        if (transactional != that.transactional) return false;
-
-        if (alignment != that.alignment) return false;
-        if (!equal(errorListener, that.errorListener))
-            return false;
-        if (!equal(tcpReplicatorBuilder, that.tcpReplicatorBuilder))
-            return false;
-        if (!equal(timeProvider, that.timeProvider))
-            return false;
-        if (!equal(udpReplicatorBuilder, that.udpReplicatorBuilder))
-            return false;
-        if (!equal(bytesMarshallerFactory, that.bytesMarshallerFactory))
-            return false;
-        return equal(objectSerializer, that.objectSerializer);
+        return builderEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minSegments, actualSegments, actualEntriesPerSegment, entrySize,
-                alignment, entries, replicas, transactional, lockTimeOutMS, metaDataBytes,
-                errorListener, putReturnsNull, removeReturnsNull, largeSegments, canReplicate,
-                identifier, tcpReplicatorBuilder, timeProvider, udpReplicatorBuilder,
-                bytesMarshallerFactory, objectSerializer);
+        return toString().hashCode();
     }
 
     public boolean canReplicate() {

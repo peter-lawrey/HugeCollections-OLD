@@ -29,6 +29,7 @@ import net.openhft.lang.model.constraints.Nullable;
 
 import java.io.*;
 
+import static net.openhft.collections.Objects.builderEquals;
 import static net.openhft.collections.Objects.hash;
 
 public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneable {
@@ -110,6 +111,11 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         public int hashCode() {
             return tClass.hashCode();
         }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{tClass=" + tClass + "}";
+        }
     }
 
     private static class ByteableMarshallerWithCustomFactory<T extends Byteable>
@@ -141,6 +147,11 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         @Override
         public int hashCode() {
             return hash(tClass, factory);
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{tClass=" + tClass + ",factory=" + factory + "}";
         }
     }
 
@@ -176,6 +187,12 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         public int hashCode() {
             return hash(marshaledClass(), factory);
         }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{marshaledClass=" + marshaledClass() +
+                    ",factory=" + factory + "}";
+        }
     }
 
     private static class ExternalizableMarshallerWithCustomFactory<T extends Externalizable>
@@ -208,6 +225,12 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         @Override
         public int hashCode() {
             return hash(marshaledClass(), factory);
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "{marshaledClass=" + marshaledClass() +
+                    ",factory=" + factory + "}";
         }
     }
 
@@ -436,8 +459,7 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
                 FileInputStream fis = new FileInputStream(file);
                 ObjectInputStream ois = new ObjectInputStream(fis);
                 try {
-                    VanillaSharedHashMap<K, V> map = (VanillaSharedHashMap<K, V>)
-                            ois.readObject();
+                    VanillaSharedHashMap<K, V> map = (VanillaSharedHashMap<K, V>) ois.readObject();
                     map.headerSize = roundUpMapHeaderSize(fis.getChannel().position());
                     map.createMappedStoreAndSegments(file);
                     return map;
@@ -522,31 +544,15 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         }
     }
 
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        SharedHashMapKeyValueSpecificBuilder that = (SharedHashMapKeyValueSpecificBuilder) o;
-        if (!builder.equals(that.builder)) return false;
-        if (this.keyClass != that.keyClass)
-            return false;
-        if (this.valueClass != that.valueClass)
-            return false;
-        if (!keyMarshaller.equals(that.keyMarshaller))
-            return false;
-        if (!valueMarshaller.equals(that.valueMarshaller))
-            return false;
-        if (!valueFactory.equals(that.valueFactory))
-            return false;
-        if (eventListener != null ? !eventListener.equals(that.eventListener) : that.eventListener != null)
-            return false;
-        return true;
+        return builderEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return hash(builder, keyClass, valueClass, keyMarshaller, valueMarshaller, valueFactory,
-                eventListener);
+        return toString().hashCode();
     }
 
     @Override
@@ -557,6 +563,7 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
                 ", valueClass=" + valueClass +
                 ", keyMarshaller=" + keyMarshaller +
                 ", valueMarshaller=" + valueMarshaller +
+                ", valueFactory=" + valueFactory +
                 ", eventListener=" + eventListener +
                 '}';
     }

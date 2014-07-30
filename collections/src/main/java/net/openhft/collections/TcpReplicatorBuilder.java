@@ -19,12 +19,15 @@
 package net.openhft.collections;
 
 import java.net.InetSocketAddress;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableSet;
+import static net.openhft.collections.Objects.builderEquals;
 
 /**
  * Configuration (builder) class for TCP replication feature of {@link SharedHashMap}.
@@ -69,28 +72,29 @@ public class TcpReplicatorBuilder implements Cloneable {
         return packetSize;
     }
 
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        TcpReplicatorBuilder that = (TcpReplicatorBuilder) o;
-
-        if (serverPort() != that.serverPort()) return false;
-        if (!endpoints().equals(that.endpoints())) return false;
-        return packetSize() == that.packetSize();
+        return builderEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(serverPort, endpoints, packetSize);
+        return toString().hashCode();
     }
 
     @Override
     public String toString() {
+        Set<InetSocketAddress> sortedEndpoints = new TreeSet<InetSocketAddress>(new Comparator<InetSocketAddress>() {
+            @Override
+            public int compare(InetSocketAddress a1, InetSocketAddress a2) {
+                return a1.toString().compareTo(a2.toString());
+            }
+        });
+        sortedEndpoints.addAll(endpoints());
         return "TcpReplication{" +
                 "serverPort=" + serverPort() +
-                ", endpoints=" + endpoints() +
+                ", endpoints=" + sortedEndpoints +
                 ", packetSize=" + packetSize() +
                 "}";
     }
