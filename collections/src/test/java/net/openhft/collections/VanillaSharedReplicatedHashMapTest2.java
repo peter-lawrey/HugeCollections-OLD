@@ -132,6 +132,23 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
     }
 
     /**
+     * clear removes all pairs
+     */
+    @Test
+    public void testKeySetRemove() throws IOException {
+        SharedHashMap map = map5();
+
+        System.out.print("map.keySet()=" + map.keySet());
+        for (Object k : map.keySet()) {
+            map.remove(k);
+        }
+
+
+        assertEquals(0, map.size());
+    }
+
+
+    /**
      * Maps with same contents are equal
      */
     @Test

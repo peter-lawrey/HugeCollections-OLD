@@ -17,7 +17,10 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
+import net.openhft.lang.collection.ATSDirectBitSet;
+import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.io.Bytes;
+import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.DirectStore;
 
 /**
@@ -32,6 +35,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
 
     private static final int UNSET_ENTRY = 0xFFFF;
+    private ATSDirectBitSet positions;
 
     private static void checkKey(int key) {
         if ((key & ~0xFFFF) != 0)
@@ -55,19 +59,31 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         capacityMask = capacity - 1;
         capacityMask2 = (capacity - 1) * ENTRY_SIZE;
         bytes = DirectStore.allocateLazy(capacity * ENTRY_SIZE).bytes();
+
+
+        // int size = (capacity + 7) >> 3;
+        DirectBytes bytes1 = DirectStore.allocate(
+                capacity).bytes();
+        positions = new ATSDirectBitSet(bytes1);
         clear();
+
     }
 
-    public VanillaShortShortMultiMap(Bytes bytes) {
-        capacity = (int) (bytes.capacity() / ENTRY_SIZE);
+
+    public VanillaShortShortMultiMap(Bytes multiMapBytes,Bytes multiMapBitSetBytes) {
+        capacity = (int) (multiMapBytes.capacity() / ENTRY_SIZE);
         assert capacity == Maths.nextPower2(capacity, 16);
         capacityMask = capacity - 1;
         capacityMask2 = (capacity - 1) * ENTRY_SIZE;
-        this.bytes = bytes;
+        this.bytes = multiMapBytes;
+
+        positions = new ATSDirectBitSet(multiMapBitSetBytes);
     }
+
 
     @Override
     public void put(int key, int value) {
+
         if (key == UNSET_KEY)
             key = HASH_INSTEAD_OF_UNSET_KEY;
         else checkKey(key);
@@ -78,6 +94,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             int hash2 = entry >>> 16;
             if (hash2 == UNSET_KEY) {
                 bytes.writeInt(pos, ((key << 16) | value));
+                positions.set(value);
                 return;
             }
             if (hash2 == key) {
@@ -107,6 +124,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
                 int value2 = entry & 0xFFFF;
                 if (value2 == value) {
                     posToRemove = pos;
+                    positions.clear(value);
                     break;
                 }
             } else if (hash2 == UNSET_KEY) {
@@ -134,6 +152,8 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             if (hash2 == key) {
                 int value2 = entry & 0xFFFF;
                 if (value2 == oldValue) {
+                    positions.clear(oldValue);
+                    positions.set(newValue);
                     bytes.writeInt(pos, ((key << 16) | newValue));
                     return true;
                 }
@@ -199,7 +219,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
-    @Override
+    //   @Override
     public void removePrevPos() {
         removePos((searchPos - ENTRY_SIZE) & capacityMask2);
     }
@@ -208,6 +228,9 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     public void replacePrevPos(int newValue) {
         checkValue(newValue);
         int prevPos = (((int) searchPos - ENTRY_SIZE) & capacityMask2);
+
+        positions.clear(prevPos);
+        positions.set(newValue);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
         bytes.writeInt(prevPos, ((searchHash << 16) | newValue));
@@ -215,6 +238,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
 
     @Override
     public void putAfterFailedSearch(int value) {
+        positions.set(value);
         checkValue(value);
         bytes.writeInt(searchPos, ((searchHash << 16) | value));
     }
@@ -253,7 +277,13 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     }
 
     @Override
+    public DirectBitSet getPositions() {
+        return positions;
+    }
+
+    @Override
     public void clear() {
+        positions.clear();
         for (int pos = 0; pos < bytes.capacity(); pos += ENTRY_SIZE) {
             bytes.writeInt(pos, UNSET_ENTRY);
         }

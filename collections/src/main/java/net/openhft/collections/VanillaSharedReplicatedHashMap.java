@@ -389,7 +389,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
             start += sizeOfMultiMap();
             hashLookupLiveOnly = createMultiMap(start);
+        }
 
+        public IntIntMultiMap getHashLookup() {
+            return hashLookupLiveOnly;
         }
 
         private long entrySize(long keyLen, long valueLen) {
