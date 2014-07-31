@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.channels.FileChannel;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Thread.currentThread;
 import static net.openhft.collections.AbstractVanillaSharedHashMap.Hasher.hash;
@@ -1358,34 +1357,19 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     final class EntryIterator implements Iterator<Entry<K, V>> {
 
         boolean wasNextCalledSinceLastRemove = false;
-
-        private final AtomicLong location = new AtomicLong();
+        private int seg;
+        private int pos;
 
         public EntryIterator() {
-            setLocation(segments.length - 1, -1);
-        }
-
-        private void setLocation(int seg, int pos) {
-            long current = location.get();
-            long next = (((long) pos) << 32) | (seg & 0xffffffffL);
-            boolean b = location.compareAndSet(current, next);
-            if (!b) setLocation(seg, pos);
-        }
-
-        private int getPosition(long location) {
-            return (int) (location >> 32);
-        }
-
-        private int getSegment(long location) {
-            return (int) location;
+            int pos1 = -1;
+            this.seg = segments.length - 1;
+            this.pos = pos1;
         }
 
         @Override
         public synchronized boolean hasNext() {
-
-            long location = this.location.get();
-            int pos = getPosition(location);
-            int segIndex = getSegment(location);
+            int pos = this.pos;
+            int segIndex = seg;
 
             for (; ; ) {
 
@@ -1403,10 +1387,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         @Override
         public Entry<K, V> next() {
-
-            long location = this.location.get();
-            int pos = getPosition(location);
-            int segIndex = getSegment(location);
+            int pos = this.pos;
+            int segIndex = seg;
 
             for (; ; ) {
 
@@ -1425,7 +1407,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     }
 
                     this.wasNextCalledSinceLastRemove = true;
-                    setLocation(segIndex, pos);
+                    this.seg = segIndex;
+                    this.pos = pos;
                     return segment.getEntry(pos);
 
                 } finally {
@@ -1442,9 +1425,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             if (!wasNextCalledSinceLastRemove)
                 throw new IllegalStateException();
 
-            long location = this.location.get();
-            int pos = getPosition(location);
-            int segIndex = getSegment(location);
+
+            int pos = this.pos;
+            int segIndex = seg;
 
             final Segment segment = segments[segIndex];
 
@@ -1463,9 +1446,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
                 final long entryEndAddr = entry.positionAddr() + segment.readValueLen(entry);
                 segment.decrementSize();
-                segment.free((int) pos, segment.inBlocks(entryEndAddr - segment.entryStartAddr(offset)));
+                segment.free(pos, segment.inBlocks(entryEndAddr - segment.entryStartAddr(offset)));
 
-                segment.getHashLookup().remove(segmentHash, (int) pos);
+                segment.getHashLookup().remove(segmentHash, pos);
                 wasNextCalledSinceLastRemove = false;
             } finally {
                 segment.unlock();
