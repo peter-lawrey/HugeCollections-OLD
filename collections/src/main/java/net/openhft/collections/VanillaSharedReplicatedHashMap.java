@@ -119,13 +119,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         this.eventListener = modificationDelegator;
     }
 
-    /**
-     * this is used to iterate over all the modification iterators
-     *
-     * @return
-     */
-    int assignedModIterBitSetSizeInBytes() {
-        return (int) align64((long) Math.ceil(127 + RESERVED_MOD_ITER / 8));
+    private int assignedModIterBitSetSizeInBytes() {
+        return (int) align64((127 + RESERVED_MOD_ITER) / 8);
     }
 
     @Override
