@@ -16,10 +16,17 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.collection.DirectBitSet;
+
 /**
  * This is only used to store keys and positions, but it could store int/int key/values for another purpose.
  */
 interface IntIntMultiMap {
+
+    /**
+     * @return gets all the active positions as a bitset
+     */
+    DirectBitSet getPositions();
 
     static interface EntryConsumer {
         void accept(int key, int value);
@@ -69,4 +76,6 @@ interface IntIntMultiMap {
     void clear();
 
     void forEach(EntryConsumer action);
+
+
 }

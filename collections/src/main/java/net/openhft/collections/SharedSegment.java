@@ -23,8 +23,8 @@ import net.openhft.lang.io.NativeBytes;
 import java.util.Map;
 
 /**
- * Allow access to the Segments that user used to make up the shared map, these methods should be used with exceptional caution
- * and were initially introduce to facilitate remote map replication.
+ * Allow access to the Segments that user used to make up the shared map, these methods should be used with
+ * exceptional caution and were initially introduce to facilitate remote map replication.
  */
 interface SharedSegment<K, V> {
 
@@ -39,5 +39,6 @@ interface SharedSegment<K, V> {
     int getIndex();
 
     long offsetFromPos(long pos);
+
 
 }

@@ -843,6 +843,7 @@ public class SharedHashMapTest {
         map.close();
     }
 
+
     @Test
     public void entrySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
         SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
@@ -851,8 +852,8 @@ public class SharedHashMapTest {
         Collection<CharSequence> values = map.values();
 
         Iterator<Map.Entry<Integer, CharSequence>> entryIterator = entrySet.iterator();
-        entryIterator.next();
-        entryIterator.next();
+        Map.Entry<Integer, CharSequence> next1 = entryIterator.next();
+        Map.Entry<Integer, CharSequence> next2 = entryIterator.next();
         entryIterator.remove();
         assertMap(map, new int[]{2, 3}, new CharSequence[]{"2", "3"});
         assertEntrySet(entrySet, new int[]{2, 3}, new CharSequence[]{"2", "3"});
@@ -936,6 +937,13 @@ public class SharedHashMapTest {
 
         map.close();
     }
+
+
+
+
+
+
+
 
     @Test
     public void valuesRemoveAllReflectedInMapAndOtherViews() throws IOException {
@@ -1090,6 +1098,16 @@ public class SharedHashMapTest {
         map.close();
 
         assertEquals(noOfElements, sum);
+    }
+
+
+    @Test(expected = IllegalStateException.class)
+    public void testRemoveWhenNextIsNotCalled() throws IOException {
+
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(2);
+
+        Iterator<Integer> iterator = map.keySet().iterator();
+        iterator.remove();
     }
 
     @Test
