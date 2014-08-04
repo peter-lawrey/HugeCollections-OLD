@@ -65,7 +65,7 @@ public class ClusterReplicationTest {
             map1a = clusterReplicatorBuilder.create((short) 1,
                     SharedHashMapBuilder.of(Integer.class, CharSequence.class)
                             .entries(1000)
-                            .file(getPersistenceFile()));
+                            .file(Builder.getPersistenceFile()));
 
             clusterA = clusterReplicatorBuilder.create();
 
@@ -86,7 +86,7 @@ public class ClusterReplicationTest {
             map1b = clusterReplicatorBuilder1.create((short) 1,
                     SharedHashMapBuilder.of(Integer.class, CharSequence.class)
                             .entries(1000)
-                            .file(getPersistenceFile()));
+                            .file(Builder.getPersistenceFile()));
 
             clusterB = clusterReplicatorBuilder1.create();
 
@@ -117,13 +117,13 @@ public class ClusterReplicationTest {
         map2b = clusterReplicatorBuilder1.create((short) 2,
                 SharedHashMapBuilder.of(Integer.class, CharSequence.class)
                         .entries(1000)
-                        .file(getPersistenceFile()));
+                        .file(Builder.getPersistenceFile()));
 
 
         map2a = clusterReplicatorBuilder.create((short) 2,
                 SharedHashMapBuilder.of(Integer.class, CharSequence.class)
                         .entries(1000)
-                        .file(getPersistenceFile()));
+                        .file(Builder.getPersistenceFile()));
 
         map2a.put(1, "EXAMPLE-2");
         map1a.put(1, "EXAMPLE-1");
@@ -134,8 +134,8 @@ public class ClusterReplicationTest {
         Assert.assertEquals("map1a=map1b", map1a, map1b);
         Assert.assertEquals("map2a=map2b", map2a, map2b);
 
-        assertTrue("map1a.empty", !map1a.isEmpty());
-        assertTrue("map2a.empty", !map2a.isEmpty());
+        Assert.assertTrue("map1a.empty", !map1a.isEmpty());
+        Assert.assertTrue("map2a.empty", !map2a.isEmpty());
 
     }
 
