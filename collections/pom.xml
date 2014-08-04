@@ -32,7 +32,7 @@
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>collections</artifactId>
-    <version>3.2.0-SNAPSHOT</version>
+    <version>3.2.0</version>
     <packaging>bundle</packaging>
     <name>OpenHFT/HugeCollections/collections</name>
     <description>Java Collections which are designed to be huge (may GB)</description>
@@ -199,7 +199,7 @@
         <url>scm:git:git@github.com:OpenHFT/HugeCollections.git</url>
         <connection>scm:git:git@github.com:OpenHFT/HugeCollections.git</connection>
         <developerConnection>scm:git:git@github.com:OpenHFT/HugeCollections.git</developerConnection>
-        <tag>master</tag>
+        <tag>collections-3.2.0</tag>
     </scm>
 
 </project>
