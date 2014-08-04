@@ -26,9 +26,9 @@
         <relativePath/>
     </parent>
 
-   <!-- <properties>
-        <additionalparam>-Xdoclint:none</additionalparam>
-    </properties>-->
+    <!-- <properties>
+         <additionalparam>-Xdoclint:none</additionalparam>
+     </properties>-->
 
 
     <modelVersion>4.0.0</modelVersion>
@@ -44,13 +44,13 @@
                 <groupId>net.openhft</groupId>
                 <artifactId>third-party-bom</artifactId>
                 <type>pom</type>
-                <version>3.4.2</version>
+                <version>3.4.6</version>
                 <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>lang</artifactId>
-                <version>6.4.5-SNAPSHOT</version>
+                <version>6.4.5</version>
             </dependency>
             <dependency>
                 <groupId>net.openhft</groupId>

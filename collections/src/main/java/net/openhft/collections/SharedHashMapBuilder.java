@@ -70,13 +70,13 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     private boolean canReplicate;
     byte identifier = Byte.MIN_VALUE;
     TcpReplicatorBuilder tcpReplicatorBuilder;
-    ExternalReplicatorBuilder externalReplicatorBuilder;
+  //  ExternalReplicatorBuilder externalReplicatorBuilder;
 
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
     UdpReplicatorBuilder udpReplicatorBuilder;
     private BytesMarshallerFactory bytesMarshallerFactory;
     private ObjectSerializer objectSerializer;
-    ExternalReplicator externalReplicator;
+ //   ExternalReplicator externalReplicator;
     File file;
     Class kClass;
     Class vClass;
@@ -297,8 +297,8 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         final VanillaSharedReplicatedHashMap<K, V> result =
                 new VanillaSharedReplicatedHashMap<K, V>(builder, kClass, vClass);
 
-        if (externalReplicatorBuilder != null)
-            externalReplicator = applyExternalReplicator(result, externalReplicatorBuilder, kClass, vClass);
+     //   if (externalReplicatorBuilder != null)
+      //      externalReplicator = applyExternalReplicator(result, externalReplicatorBuilder, kClass, vClass);
 
         if (tcpReplicatorBuilder != null)
             applyTcpReplication(result, tcpReplicatorBuilder);
@@ -613,7 +613,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     }
 
 
-    <K, V> ExternalReplicator.AbstractExternalReplicator applyExternalReplicator
+    /*<K, V> ExternalReplicator.AbstractExternalReplicator applyExternalReplicator
             (VanillaSharedReplicatedHashMap<K, V> map,
              ExternalReplicatorBuilder builder,
              Class<K> kClass,
@@ -648,7 +648,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         }
 
         return null;
-    }
+    }*/
 
 
     <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
@@ -746,14 +746,14 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         return this;
     }
 
-    public SharedHashMapBuilder externalReplicatorBuilder(@NotNull ExternalReplicatorBuilder externalReplicatorBuilder) {
+    /*public SharedHashMapBuilder externalReplicatorBuilder(@NotNull ExternalReplicatorBuilder externalReplicatorBuilder) {
         this.externalReplicatorBuilder = externalReplicatorBuilder;
         return this;
     }
 
     public <T extends ExternalReplicator> T externalReplicator() {
         return (T) externalReplicator;
-    }
+    }*/
 
 }
 
