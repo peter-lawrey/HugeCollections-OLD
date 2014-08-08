@@ -26,11 +26,35 @@ import net.openhft.lang.io.DirectStore;
  * Supports a simple interface for int -> int[] off heap.
  */
 class VanillaIntIntMultiMap implements IntIntMultiMap {
+
+    /**
+     * @param minCapacity as in {@link #VanillaIntIntMultiMap(int)} constructor
+     * @return size of {@link Bytes} to provide to {@link #VanillaIntIntMultiMap(Bytes, Bytes)}
+     *         constructor as the first argument
+     */
+    public static long sizeInBytes(int minCapacity) {
+        return indexToPos(Maths.nextPower2(minCapacity, 16));
+    }
+
+    /**
+     * @param minCapacity as in {@link #VanillaIntIntMultiMap(int)} constructor
+     * @return size of {@link Bytes} to provide to {@link #VanillaIntIntMultiMap(Bytes, Bytes)}
+     *         constructor as the second argument
+     */
+    public static long sizeOfBitSetInBytes(int minCapacity) {
+        return Maths.nextPower2(minCapacity, 64L) / 8L;
+    }
+
+    public static ATSDirectBitSet newPositions(int capacity) {
+        // bit set size should be at least 1 native long (in bits)
+        capacity = Math.max(capacity, 64);
+        // no round-up, because capacity is already a power of 2
+        int bitSetSizeInBytes = capacity / 8;
+        return new ATSDirectBitSet(DirectStore.allocateLazy(bitSetSizeInBytes).bytes());
+    }
+
     private static final int ENTRY_SIZE = 8;
     private static final int ENTRY_SIZE_SHIFT = 3;
-
-    // a bit set of  the active positions
-    final DirectBitSet positions;
 
     /**
      * Separate method because it is too easy to forget to cast to long before shifting.
@@ -42,13 +66,18 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     private static final int UNSET_KEY = 0;
     private static final int HASH_INSTEAD_OF_UNSET_KEY = -1;
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
+
+    private static int maskUnsetKey(int key) {
+        return key != UNSET_KEY ? key : HASH_INSTEAD_OF_UNSET_KEY;
+    }
+
     /**
-     * hash is in 32 higher order bits, because in Intel's little-endian they are written first in memory, and
-     * in memory we have keys and values in natural order: 4 bytes of k1, 4 bytes of v1, 4 bytes of k2, ...
-     * and this is somehow compatible with previous version of this class, where keys were written before
-     * values explicitly. <p></p> However, this layout increases latency of map operations by 1 clock cycle
-     * :), because we always need to perform shift to obtain the key between memory read and comparison with
-     * UNSET_KEY.
+     * hash is in 32 higher order bits, because in Intel's little-endian they are written first
+     * in memory, and in memory we have keys and values in natural order: 4 bytes of k1, 4 bytes
+     * of v1, 4 bytes of k2, ... and this is somehow compatible with previous version of this class,
+     * where keys were written before values explicitly. However, this layout increases latency
+     * of map operations by 1 clock cycle, because we always need to perform shift to obtain the key
+     * between memory read and comparison with UNSET_KEY.
      */
     private static final long UNSET_ENTRY = Integer.MIN_VALUE & 0xFFFFFFFFL;
 
@@ -56,6 +85,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     private final int capacityMask;
     private final long capacityMask2;
     private final Bytes bytes;
+    final DirectBitSet positions;
 
     public VanillaIntIntMultiMap(int minCapacity) {
         if (minCapacity < 0)
@@ -63,22 +93,10 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         capacity = Maths.nextPower2(minCapacity, 16);
         capacityMask = capacity - 1;
         capacityMask2 = indexToPos(capacity - 1);
-        bytes = DirectStore.allocateLazy(capacity * ENTRY_SIZE).bytes();
-
+        bytes = DirectStore.allocateLazy(indexToPos(capacity)).bytes();
         positions = newPositions(capacity);
-
         clear();
-
     }
-
-    public static ATSDirectBitSet newPositions(final int capacity1) {
-        long capacityInBits = capacity1 * 8;
-        long capacityAsLongs = (capacityInBits + 7) / 8;
-
-        return new ATSDirectBitSet(DirectStore.allocateLazy(
-                capacityAsLongs * 8).bytes());
-    }
-
 
     public VanillaIntIntMultiMap(Bytes multiMapBytes, Bytes multiMapBitSetBytes) {
         capacity = (int) (multiMapBytes.capacity() / ENTRY_SIZE);
@@ -86,23 +104,19 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         capacityMask = capacity - 1;
         capacityMask2 = indexToPos(capacity - 1);
         this.bytes = multiMapBytes;
-
         positions = new ATSDirectBitSet(multiMapBitSetBytes);
-
     }
-
 
     @Override
     public void put(int key, int value) {
-        positions.set(value);
-        if (key == UNSET_KEY)
-            key = HASH_INSTEAD_OF_UNSET_KEY;
+        key = maskUnsetKey(key);
         long pos = indexToPos(key & capacityMask);
         for (int i = 0; i <= capacityMask; i++) {
             long entry = bytes.readLong(pos);
             int hash2 = (int) (entry >> 32);
             if (hash2 == UNSET_KEY) {
                 bytes.writeLong(pos, (((long) key) << 32) | (value & 0xFFFFFFFFL));
+                positions.set(value);
                 return;
             }
             if (hash2 == key) {
@@ -117,22 +131,16 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
 
     @Override
     public boolean remove(int key, int value) {
-
-        if (key == UNSET_KEY)
-            key = HASH_INSTEAD_OF_UNSET_KEY;
+        key = maskUnsetKey(key);
         long pos = indexToPos(key & capacityMask);
-        long posToRemove = -1;
+        long posToRemove = -1L;
         for (int i = 0; i <= capacityMask; i++) {
             long entry = bytes.readLong(pos);
-//            int hash2 = bytes.readInt(pos + KEY);
             int hash2 = (int) (entry >> 32);
             if (hash2 == key) {
-//                int value2 = bytes.readInt(pos + VALUE);
                 int value2 = (int) entry;
                 if (value2 == value) {
-
                     posToRemove = pos;
-                    positions.clear(value);
                     break;
                 }
             } else if (hash2 == UNSET_KEY) {
@@ -142,15 +150,14 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         }
         if (posToRemove < 0)
             return false;
+        positions.clear(value);
         removePos(posToRemove);
         return true;
     }
 
     @Override
     public boolean replace(int key, int oldValue, int newValue) {
-
-        if (key == UNSET_KEY)
-            key = HASH_INSTEAD_OF_UNSET_KEY;
+        key = maskUnsetKey(key);
         long pos = indexToPos(key & capacityMask);
         for (int i = 0; i <= capacityMask; i++) {
             long entry = bytes.readLong(pos);
@@ -158,7 +165,6 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
             if (hash2 == key) {
                 int value2 = (int) entry;
                 if (value2 == oldValue) {
-
                     positions.clear(oldValue);
                     positions.set(newValue);
                     bytes.writeLong(pos, (((long) key) << 32) | (newValue & 0xFFFFFFFFL));
@@ -196,7 +202,6 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
                 posToRemove = posToShift;
             }
         }
-
         bytes.writeLong(posToRemove, UNSET_ENTRY);
     }
 
@@ -204,30 +209,27 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     // Stateful methods
 
     private int searchHash = -1;
-    private long searchPos = -1;
+    private long searchPos = -1L;
 
     @Override
     public int startSearch(int key) {
-        if (key == UNSET_KEY)
-            key = HASH_INSTEAD_OF_UNSET_KEY;
-
+        key = maskUnsetKey(key);
         searchPos = indexToPos(key & capacityMask);
         return searchHash = key;
     }
 
     @Override
     public int nextPos() {
-
-        //With linear searching, if you need to use a later position to store the information and you are
-        // near the end you might needing to wrap around and use the start of the array.
+        long pos = searchPos;
         for (int i = 0; i < capacity; i++) {
-            long entry = bytes.readLong(searchPos);
+            long entry = bytes.readLong(pos);
             int hash2 = (int) (entry >> 32);
             if (hash2 == UNSET_KEY) {
                 return UNSET_VALUE;
             }
-            searchPos = (searchPos + ENTRY_SIZE) & capacityMask2;
+            pos = (pos + ENTRY_SIZE) & capacityMask2;
             if (hash2 == searchHash) {
+                searchPos = pos;
                 return (int) entry;
             }
         }
@@ -235,21 +237,26 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         throw new IllegalStateException(getClass().getSimpleName() + " is full");
     }
 
-    //@Override
+    @Override
     public void removePrevPos() {
-        removePos((searchPos - ENTRY_SIZE) & capacityMask2);
+        long prevPos = (searchPos - ENTRY_SIZE) & capacityMask2;
+        long entry = bytes.readLong(prevPos);
+        int value = (int) entry;
+        positions.clear(value);
+        removePos(prevPos);
     }
 
     @Override
     public void replacePrevPos(int newValue) {
         long prevPos = ((searchPos - ENTRY_SIZE) & capacityMask2);
-
-        positions.clear(prevPos);
+        long oldEntry = bytes.readLong(prevPos);
+        int oldValue = (int) oldEntry;
+        positions.clear(oldValue);
         positions.set(newValue);
         // Don't need to overwrite searchHash, but we don't know our bytes
         // byte order, and can't determine offset of the value within entry.
-        long entry = (((long) searchHash) << 32) | (newValue & 0xFFFFFFFFL);
-        bytes.writeLong(prevPos, entry);
+        long newEntry = (((long) searchHash) << 32) | (newValue & 0xFFFFFFFFL);
+        bytes.writeLong(prevPos, newEntry);
     }
 
 
@@ -259,7 +266,6 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         long entry = (((long) searchHash) << 32) | (value & 0xFFFFFFFFL);
         bytes.writeLong(searchPos, entry);
     }
-
 
     public int getSearchHash() {
         return searchHash;
