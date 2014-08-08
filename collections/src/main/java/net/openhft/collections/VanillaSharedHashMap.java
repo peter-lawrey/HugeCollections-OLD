@@ -25,8 +25,8 @@ import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,15 +202,16 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return getHeaderSize() + segments.length * segmentSize();
     }
 
-
     long sizeOfMultiMap() {
-        int np2 = Maths.nextPower2(entriesPerSegment, 8);
-        return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment);
     }
 
-    long sizeOfMultiMapBitSet(long numberOfBits) {
-        long numberOfBytes = (numberOfBits + 7) / 8;
-        return align64(numberOfBytes);
+    long sizeOfMultiMapBitSet() {
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
     }
 
 
@@ -229,9 +230,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     long segmentSize() {
-        long sizeOfMultiMap = sizeOfMultiMap();
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment()
+                + align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
@@ -606,8 +606,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             createHashLookups(start);
-            long sizeOfMultiMap = sizeOfMultiMap();
-            start += (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
                     tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -626,14 +625,13 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
         IntIntMultiMap createMultiMap(long start) {
-            long sizeOfMultiMap = sizeOfMultiMap();
             final NativeBytes multiMapBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start = start + sizeOfMultiMap, null);
+                            start = start + sizeOfMultiMap(), null);
 
             final NativeBytes sizeOfMultiMapBitSetBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start + sizeOfMultiMapBitSet(sizeOfMultiMap), null);
+                            start + sizeOfMultiMapBitSet(), null);
             multiMapBytes.load();
             return useSmallMultiMaps() ?
                     new VanillaShortShortMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes) :
@@ -1030,7 +1028,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                             ? readValue(entry, null, valueLen) : null;
                     if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-                    hashLookup.remove(hashLookup.getSearchHash(), pos);
+                    hashLookup.removePrevPos();
                     decrementSize();
                     free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
                     notifyRemoved(offset, key, valueRemoved, pos);
@@ -1285,10 +1283,6 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
-            hashLookup.forEach(entryConsumer);
-        }
-
         public Entry<K, V> getEntry(long pos) {
             long offset = offsetFromPos(pos);
             NativeBytes entry = entry(offset);
@@ -1353,111 +1347,118 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-
-    final class EntryIterator implements Iterator<Entry<K, V>> {
-
-        boolean wasNextCalledSinceLastRemove = false;
-        private int seg;
-        private int pos;
+    class EntryIterator implements Iterator<Entry<K, V>> {
+        private int returnedSeg = -1;
+        private long returnedPos = -1L;
+        Entry<K, V> returnedEntry;
+        private int nextSeg;
+        private long nextPos;
 
         public EntryIterator() {
-            int pos1 = -1;
-            this.seg = segments.length - 1;
-            this.pos = pos1;
+            advance(nextSeg = segments.length - 1, nextPos = -1L);
+        }
+
+        private boolean advance(int segIndex, long pos) {
+            while (segIndex >= 0) {
+                pos = segments[segIndex].getHashLookup().getPositions().nextSetBit(pos + 1L);
+                if (pos >= 0L) {
+                    nextSeg = segIndex;
+                    nextPos = pos;
+                    return true;
+                } else {
+                    segIndex--;
+                    pos = -1L;
+                }
+            }
+            nextSeg = -1;
+            nextPos = -1L;
+            return false;
         }
 
         @Override
-        public synchronized boolean hasNext() {
-            int pos = this.pos;
-            int segIndex = seg;
-
-            for (; ; ) {
-
-                if (segIndex < 0)
-                    return false;
-
-                if (segments[segIndex].getHashLookup().getPositions().nextSetBit(pos + 1) != -1)
-                    return true;
-
-                segIndex--;
-                pos = -1;
-            }
-
+        public boolean hasNext() {
+            return nextSeg >= 0;
         }
 
         @Override
         public Entry<K, V> next() {
-            int pos = this.pos;
-            int segIndex = seg;
-
             for (; ; ) {
-
+                int segIndex = nextSeg;
+                long pos = nextPos;
                 if (segIndex < 0)
                     throw new NoSuchElementException();
-
                 final Segment segment = segments[segIndex];
-
                 try {
                     segment.lock();
-
-                    if ((pos = (int) segment.getHashLookup().getPositions().nextSetBit(pos + 1)) == -1) {
-                        segIndex--;
-                        pos = -1;
+                    if (segment.getHashLookup().getPositions().isClear(pos)) {
+                        // the pos was removed after the previous advance
+                        advance(segIndex, pos);
                         continue;
                     }
-
-                    this.wasNextCalledSinceLastRemove = true;
-                    this.seg = segIndex;
-                    this.pos = pos;
-                    return segment.getEntry(pos);
-
+                    advance(returnedSeg = segIndex, returnedPos = pos);
+                    return returnedEntry = segment.getEntry(pos);
                 } finally {
                     segment.unlock();
                 }
-
             }
         }
-
 
         @Override
         public void remove() {
-
-            if (!wasNextCalledSinceLastRemove)
+            int segIndex = returnedSeg;
+            if (segIndex < 0)
                 throw new IllegalStateException();
-
-
-            int pos = this.pos;
-            int segIndex = seg;
-
             final Segment segment = segments[segIndex];
-
+            final int pos = (int) returnedPos;
             try {
                 segment.lock();
-
-                final long offset = segment.offsetFromPos(pos);
-                final NativeBytes entry = segment.entry(offset);
-                final long limit = entry.limit();
-
-                final long keyLen = entry.readStopBit();
-                entry.limit(entry.position() + keyLen);
-
-                final int segmentHash = hasher.segmentHash(hash(entry));
-                entry.limit(limit);
-
-                final long entryEndAddr = entry.positionAddr() + segment.readValueLen(entry);
-                segment.decrementSize();
-                segment.free(pos, segment.inBlocks(entryEndAddr - segment.entryStartAddr(offset)));
-
-                segment.getHashLookup().remove(segmentHash, pos);
-                wasNextCalledSinceLastRemove = false;
+                if (segment.getHashLookup().getPositions().isClear(pos)) {
+                    // The case:
+                    // 1. iterator.next() - thread 1
+                    // 2. map.put() which cause relocation of the key, returned in above - thread 2
+                    // OR map.remove() which remove this key - thread 2
+                    // 3. iterator.remove() - thread 1
+                    AbstractVanillaSharedHashMap.this.remove(returnedEntry.getKey());
+                } else {
+                    removePresent(segment, pos);
+                }
+                returnedSeg = -1;
+                returnedEntry = null;
             } finally {
                 segment.unlock();
             }
+        }
 
+        void removePresent(Segment segment, int pos) {
+            // TODO handle the case:
+            // iterator.next() -- thread 1
+            // map.put() which cause relocation of the key, returned above -- thread 2
+            // map.put() which place a new key on the `pos` in current segment -- thread 3
+            // iterator.remove() -- thread 1
+            // The simple solution is to compare bytes in the map with the serialized bytes
+            // of returnedEntry.getKey(), but it seems rather wasteful to workaround so rare
+            // case.
+            final long offset = segment.offsetFromPos(pos);
+            final NativeBytes entry = segment.entry(offset);
+
+            final long limit = entry.limit();
+            final long keyLen = entry.readStopBit();
+            entry.limit(entry.position() + keyLen);
+            final int segmentHash = hasher.segmentHash(hash(entry));
+            entry.limit(limit);
+
+            entry.skip(keyLen);
+            long valueLen = segment.readValueLen(entry);
+            final long entryEndAddr = entry.positionAddr() + valueLen;
+            segment.getHashLookup().remove(segmentHash, pos);
+            segment.decrementSize();
+            segment.free(pos, segment.inBlocks(entryEndAddr - segment.entryStartAddr(offset)));
+            segment.notifyRemoved(offset, returnedEntry.getKey(), returnedEntry.getValue(), pos);
         }
     }
 
-    final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+    class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+        @NotNull
         public Iterator<Map.Entry<K, V>> iterator() {
             return new EntryIterator();
         }
