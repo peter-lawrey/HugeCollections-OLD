@@ -34,13 +34,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static net.openhft.collections.Replica.EntryResolver;
-import static net.openhft.collections.VanillaSharedHashMap.Hasher.hash;
+import static net.openhft.collections.AbstractVanillaSharedHashMap.Hasher.hash;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -384,8 +383,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         @Override
         void createHashLookups(long start) {
             hashLookupLiveAndDeleted = createMultiMap(start);
-
-            start += sizeOfMultiMap();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet());
             hashLookupLiveOnly = createMultiMap(start);
         }
 
@@ -1072,7 +1070,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     class EntryIterator extends VanillaSharedHashMap<K, V>.EntryIterator {
         @Override
-        void removePresent(int segIndex, VanillaSharedHashMap.Segment seg, int pos) {
+        void removePresent(VanillaSharedHashMap.Segment seg, int pos) {
             @SuppressWarnings("unchecked")
             Segment segment = (Segment) seg;
 

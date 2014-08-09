@@ -202,21 +202,16 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return getHeaderSize() + segments.length * segmentSize();
     }
 
-
-    private boolean chooseIntIntMultiMap() {
-        return entriesPerSegment > ((1 << 16) * 3 / 4);
-    }
-
     long sizeOfMultiMap() {
-        return chooseIntIntMultiMap() ?
-                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment) :
-                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment);
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment);
     }
 
     long sizeOfMultiMapBitSet() {
-        return chooseIntIntMultiMap() ?
-                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
-                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
     }
 
 
@@ -236,7 +231,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     long segmentSize() {
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + (sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
+                + align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
@@ -611,7 +606,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             createHashLookups(start);
-            start += (sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
                     tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -1365,14 +1360,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         private boolean advance(int segIndex, long pos) {
             while (segIndex >= 0) {
-                if (segments[segIndex].getHashLookup().getPositions().nextSetBit(pos + 1L) >= 0) {
+                pos = segments[segIndex].getHashLookup().getPositions().nextSetBit(pos + 1L);
+                if (pos >= 0L) {
                     nextSeg = segIndex;
                     nextPos = pos;
                     return true;
+                } else {
+                    segIndex--;
+                    pos = -1L;
                 }
-                segIndex--;
-                pos = -1L;
             }
+            nextSeg = -1;
+            nextPos = -1L;
             return false;
         }
 
@@ -1386,10 +1385,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             for (; ; ) {
                 int segIndex = nextSeg;
                 long pos = nextPos;
-                if (segIndex < 0) {
-                    returnedSeg = -1;
+                if (segIndex < 0)
                     throw new NoSuchElementException();
-                }
                 final Segment segment = segments[segIndex];
                 try {
                     segment.lock();
@@ -1421,9 +1418,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                     // 2. map.put() which cause relocation of the key, returned in above - thread 2
                     // OR map.remove() which remove this key - thread 2
                     // 3. iterator.remove() - thread 1
-                    remove(returnedEntry.getKey());
+                    AbstractVanillaSharedHashMap.this.remove(returnedEntry.getKey());
                 } else {
-                    removePresent(segIndex, segment, pos);
+                    removePresent(segment, pos);
                 }
                 returnedSeg = -1;
                 returnedEntry = null;
@@ -1432,7 +1429,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        void removePresent(int segIndex, Segment segment, int pos) {
+        void removePresent(Segment segment, int pos) {
             // TODO handle the case:
             // iterator.next() -- thread 1
             // map.put() which cause relocation of the key, returned above -- thread 2
