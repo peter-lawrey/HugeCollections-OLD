@@ -25,8 +25,8 @@ import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,15 +202,16 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return getHeaderSize() + segments.length * segmentSize();
     }
 
-
     long sizeOfMultiMap() {
-        int np2 = Maths.nextPower2(entriesPerSegment, 8);
-        return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment);
     }
 
-    long sizeOfMultiMapBitSet(long numberOfBits) {
-        long numberOfBytes = (numberOfBits + 7) / 8;
-        return align64(numberOfBytes);
+    long sizeOfMultiMapBitSet() {
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
     }
 
 
@@ -229,9 +230,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     long segmentSize() {
-        long sizeOfMultiMap = sizeOfMultiMap();
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment()
+                + align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
@@ -606,8 +606,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             createHashLookups(start);
-            long sizeOfMultiMap = sizeOfMultiMap();
-            start += (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
                     tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -626,14 +625,13 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
         IntIntMultiMap createMultiMap(long start) {
-            long sizeOfMultiMap = sizeOfMultiMap();
             final NativeBytes multiMapBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start = start + sizeOfMultiMap, null);
+                            start = start + sizeOfMultiMap(), null);
 
             final NativeBytes sizeOfMultiMapBitSetBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start + sizeOfMultiMapBitSet(sizeOfMultiMap), null);
+                            start + sizeOfMultiMapBitSet(), null);
             multiMapBytes.load();
             return useSmallMultiMaps() ?
                     new VanillaShortShortMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes) :

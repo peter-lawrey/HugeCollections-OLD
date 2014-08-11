@@ -20,13 +20,31 @@ import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.DirectBytes;
 import net.openhft.lang.io.DirectStore;
 
 /**
  * Supports a simple interface for int -> int[] off heap.
  */
 class VanillaShortShortMultiMap implements IntIntMultiMap {
+
+    /**
+     * @param minCapacity as in {@link #VanillaShortShortMultiMap(int)} constructor
+     * @return size of {@link Bytes} to provide to {@link #VanillaShortShortMultiMap(Bytes, Bytes)}
+     *         constructor as the first argument
+     */
+    public static long sizeInBytes(int minCapacity) {
+        return Maths.nextPower2(minCapacity, 16L) * ENTRY_SIZE;
+    }
+
+    /**
+     * @param minCapacity as in {@link #VanillaShortShortMultiMap(int)} constructor
+     * @return size of {@link Bytes} to provide to {@link #VanillaShortShortMultiMap(Bytes, Bytes)}
+     *         constructor as the second argument
+     */
+    public static long sizeOfBitSetInBytes(int minCapacity) {
+        return VanillaIntIntMultiMap.sizeOfBitSetInBytes(minCapacity);
+    }
+
     private static final int ENTRY_SIZE = 4;
     private static final int ENTRY_SIZE_SHIFT = 2;
 
@@ -35,7 +53,6 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     private static final int UNSET_VALUE = Integer.MIN_VALUE;
 
     private static final int UNSET_ENTRY = 0xFFFF;
-    private ATSDirectBitSet positions;
 
     private static void checkKey(int key) {
         if ((key & ~0xFFFF) != 0)
@@ -60,6 +77,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
     private final int capacityMask;
     private final int capacityMask2;
     private final Bytes bytes;
+    private ATSDirectBitSet positions;
 
     public VanillaShortShortMultiMap(int minCapacity) {
         if (minCapacity < 0 || minCapacity > (1 << 16))
@@ -68,16 +86,9 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         capacityMask = capacity - 1;
         capacityMask2 = (capacity - 1) * ENTRY_SIZE;
         bytes = DirectStore.allocateLazy(capacity * ENTRY_SIZE).bytes();
-
-
-        // int size = (capacity + 7) >> 3;
-        DirectBytes bytes1 = DirectStore.allocate(
-                capacity).bytes();
-        positions = new ATSDirectBitSet(bytes1);
+        positions = VanillaIntIntMultiMap.newPositions(capacity);
         clear();
-
     }
-
 
     public VanillaShortShortMultiMap(Bytes multiMapBytes,Bytes multiMapBitSetBytes) {
         capacity = (int) (multiMapBytes.capacity() / ENTRY_SIZE);
@@ -85,10 +96,8 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
         capacityMask = capacity - 1;
         capacityMask2 = (capacity - 1) * ENTRY_SIZE;
         this.bytes = multiMapBytes;
-
         positions = new ATSDirectBitSet(multiMapBitSetBytes);
     }
-
 
     @Override
     public void put(int key, int value) {
