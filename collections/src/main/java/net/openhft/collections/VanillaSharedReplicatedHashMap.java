@@ -33,13 +33,11 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static net.openhft.collections.Replica.EntryResolver;
-import static net.openhft.collections.AbstractVanillaSharedHashMap.Hasher.hash;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -121,8 +119,13 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         this.eventListener = modificationDelegator;
     }
 
-    private int assignedModIterBitSetSizeInBytes() {
-        return (int) align64((127 + RESERVED_MOD_ITER) / 8);
+    /**
+     * this is used to iterate over all the modification iterators
+     *
+     * @return
+     */
+    int assignedModIterBitSetSizeInBytes() {
+        return (int) align64((long) Math.ceil(127 + RESERVED_MOD_ITER / 8));
     }
 
     @Override
@@ -383,7 +386,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         @Override
         void createHashLookups(long start) {
             hashLookupLiveAndDeleted = createMultiMap(start);
-            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet());
+
+            start += sizeOfMultiMap();
             hashLookupLiveOnly = createMultiMap(start);
         }
 
@@ -876,40 +880,42 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             }
         }
 
-        @Override
-        public Entry<K, V> getEntry(long pos) {
-            long offset = offsetFromPos(pos);
-            NativeBytes entry = entry(offset);
-            entry.readStopBit();
-            K key = entry.readInstance(kClass, null);
-            long timestamp = entry.readLong();
-            entry.skip(2L); // identifier and isDeleted flag
-            V value = readValue(entry, null);
-            return new TimestampTrackingEntry(key, value, timestamp);
-        }
 
-        @Override
+        /**
+         * removes all the entries
+         */
         void clear() {
+
             // we have to make sure that every calls notifies on remove,
             // so that the replicators can pick it up
             for (K k : keySet()) {
                 VanillaSharedReplicatedHashMap.this.remove(k);
             }
-        }
-    }
 
-    class TimestampTrackingEntry extends SimpleEntry<K, V> {
-        long timestamp;
-        public TimestampTrackingEntry(K key, V value, long timestamp) {
-            super(key, value);
-            this.timestamp = timestamp;
         }
 
-        @Override
-        public V setValue(V value) {
-            long newTimestamp = timestamp = timeProvider.currentTimeMillis();
-            put(getKey(), value, localIdentifier, newTimestamp);
-            return super.setValue(value);
+        void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
+            hashLookupLiveOnly.forEach(entryConsumer);
+        }
+
+        /**
+         * returns a null value if the entry has been deleted
+         *
+         * @param pos
+         * @return a null value if the entry has been deleted
+         */
+        @Nullable
+        public Entry<K, V> getEntry(long pos) {
+            long offset = offsetFromPos(pos);
+            NativeBytes entry = entry(offset);
+            entry.readStopBit();
+            K key = entry.readInstance(kClass, null); //todo: readUsing?
+
+            // skip timestamp and id
+            entry.skip(10);
+
+            V value = readValue(entry, null); //todo: reusable container
+            return new WriteThroughEntry(key, value);
         }
     }
 
@@ -1068,66 +1074,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         }
     }
 
-    class EntryIterator extends VanillaSharedHashMap<K, V>.EntryIterator {
-        @Override
-        void removePresent(VanillaSharedHashMap.Segment seg, int pos) {
-            @SuppressWarnings("unchecked")
-            Segment segment = (Segment) seg;
-
-            final long offset = segment.offsetFromPos(pos);
-            final NativeBytes entry = segment.entry(offset);
-            final long limit = entry.limit();
-
-            final long keyLen = entry.readStopBit();
-            long keyPosition = entry.position();
-            entry.skip(keyLen);
-            long timestamp = entry.readLong();
-            entry.position(keyPosition);
-            if (timestamp > ((TimestampTrackingEntry) returnedEntry).timestamp) {
-                // The entry was updated after being returned from iterator.next()
-                // Check that it is still the entry with the same key
-                K key = returnedEntry.getKey();
-                DirectBytes returnedKeyBytes = getKeyAsBytes(key);
-                if (returnedKeyBytes.remaining() != keyLen || !entry.startsWith(returnedKeyBytes)) {
-                    // The case:
-                    // 1. iterator.next() - thread 1
-                    // 2. map.put() which cause relocation of the key, returned above - thread 2
-                    // OR map.remove() which remove this key - thread 2
-                    // 3. map.put() which place a new key on the `pos` in current segment - thread 3
-                    // 4. iterator.remove() - thread 1
-                    VanillaSharedReplicatedHashMap.this.remove(key);
-                    return;
-                }
-            }
-            entry.limit(entry.position() + keyLen);
-            final int segmentHash = hasher.segmentHash(hash(entry));
-            entry.limit(limit);
-
-            segment.hashLookupLiveOnly.remove(segmentHash, pos);
-            segment.decrementSize();
-
-            entry.skip(keyLen);
-            entry.writeLong(timeProvider.currentTimeMillis());
-            entry.writeByte(localIdentifier);
-            entry.writeBoolean(true);
-
-            segment.notifyRemoved(offset, returnedEntry.getKey(), returnedEntry.getValue(), pos);
-        }
-    }
-
-    class EntrySet extends VanillaSharedHashMap<K, V>.EntrySet {
-        @NotNull
-        @Override
-        public Iterator<Entry<K, V>> iterator() {
-            return new EntryIterator();
-        }
-    }
-
-    @NotNull
-    @Override
-    public Set<Entry<K, V>> entrySet() {
-        return new EntrySet();
-    }
 
     /**
      * receive an update from the map, via the SharedMapEventListener and delegates the changes to the currently active

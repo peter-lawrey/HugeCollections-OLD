@@ -25,8 +25,8 @@ import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,16 +202,15 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return getHeaderSize() + segments.length * segmentSize();
     }
 
+
     long sizeOfMultiMap() {
-        return useSmallMultiMaps() ?
-                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment) :
-                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment);
+        int np2 = Maths.nextPower2(entriesPerSegment, 8);
+        return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
     }
 
-    long sizeOfMultiMapBitSet() {
-        return useSmallMultiMaps() ?
-                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
-                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
+    long sizeOfMultiMapBitSet(long numberOfBits) {
+        long numberOfBytes = (numberOfBits + 7) / 8;
+        return align64(numberOfBytes);
     }
 
 
@@ -230,8 +229,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     long segmentSize() {
+        long sizeOfMultiMap = sizeOfMultiMap();
         long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
+                + (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
@@ -606,7 +606,8 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
             long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
             createHashLookups(start);
-            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
+            long sizeOfMultiMap = sizeOfMultiMap();
+            start += (sizeOfMultiMap + sizeOfMultiMapBitSet(sizeOfMultiMap)) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
                     tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -625,13 +626,14 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
         IntIntMultiMap createMultiMap(long start) {
+            long sizeOfMultiMap = sizeOfMultiMap();
             final NativeBytes multiMapBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start = start + sizeOfMultiMap(), null);
+                            start = start + sizeOfMultiMap, null);
 
             final NativeBytes sizeOfMultiMapBitSetBytes =
                     new NativeBytes(new VanillaBytesMarshallerFactory(), start,
-                            start + sizeOfMultiMapBitSet(), null);
+                            start + sizeOfMultiMapBitSet(sizeOfMultiMap), null);
             multiMapBytes.load();
             return useSmallMultiMaps() ?
                     new VanillaShortShortMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes) :
@@ -1028,7 +1030,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                             ? readValue(entry, null, valueLen) : null;
                     if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-                    hashLookup.removePrevPos();
+                    hashLookup.remove(hashLookup.getSearchHash(), pos);
                     decrementSize();
                     free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
                     notifyRemoved(offset, key, valueRemoved, pos);
