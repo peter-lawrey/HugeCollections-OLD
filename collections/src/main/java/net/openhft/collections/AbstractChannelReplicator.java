@@ -29,10 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
+import java.nio.channels.*;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Queue;
@@ -102,6 +99,9 @@ abstract class AbstractChannelReplicator implements Closeable {
                     public void run() {
                         try {
                             process();
+                        } catch (ClosedSelectorException e) {
+                            if (LOG.isDebugEnabled())
+                                LOG.debug("", e);
                         } catch (Exception e) {
                             LOG.error("", e);
                         }
@@ -138,8 +138,8 @@ abstract class AbstractChannelReplicator implements Closeable {
     }
 
     /**
-     * forces the TCP and UDP replicators to re-bootstrap
-     * This is called whenever a new SHM is added to a custer
+     * forces the TCP and UDP replicators to re-bootstrap This is called whenever a new SHM is added to a
+     * custer
      */
     public abstract void forceBootstrap();
 
