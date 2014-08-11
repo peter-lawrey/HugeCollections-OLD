@@ -1028,7 +1028,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                             ? readValue(entry, null, valueLen) : null;
                     if (expectedValue != null && !expectedValue.equals(valueRemoved))
                         return null;
-                    hashLookup.remove(hashLookup.getSearchHash(), pos);
+                    hashLookup.removePrevPos();
                     decrementSize();
                     free(pos, inBlocks(entryEndAddr - entryStartAddr(offset)));
                     notifyRemoved(offset, key, valueRemoved, pos);
