@@ -54,7 +54,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
     private final Map<SocketAddress, AbstractConnector> connectorBySocket = new ConcurrentHashMap<SocketAddress, AbstractConnector>();
 
 
-
     private final SelectionKey[] selectionKeysStore = new SelectionKey[Byte.MAX_VALUE + 1];
     private final BitSet activeKeys = new BitSet(selectionKeysStore.length);
 
@@ -527,19 +526,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
     /**
-     * this can be called when a new SHM is added to a cluster, we have to rebootstrap so will clear all the
-     * old bootstrap information
-     *
-     * @param key the nio SelectionKey
-     */
-    private void clearHandshaking(SelectionKey key) {
-        final Attached attached = (Attached) key.attachment();
-        activeKeys.clear(attached.remoteIdentifier);
-        selectionKeysStore[attached.remoteIdentifier] = null;
-        attached.clearHandShaking();
-    }
-
-    /**
      * used to exchange identifiers and timestamps and heartbeat intervals between the server and client
      *
      * @param key the SelectionKey relating to the this cha
@@ -712,17 +698,6 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
             handShakingComplete = true;
         }
 
-        void clearHandShaking() {
-            handShakingComplete = false;
-
-            remoteIdentifier = Byte.MIN_VALUE;
-            remoteBootstrapTimestamp = Long.MIN_VALUE;
-            remoteHeartbeatInterval = heartBeatInterval;
-            hasRemoteHeartbeatInterval = false;
-            remoteModificationIterator = null;
-
-
-        }
 
         /**
          * called whenever there is a change to the modification iterator
