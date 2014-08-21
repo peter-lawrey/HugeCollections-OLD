@@ -18,13 +18,18 @@ package net.openhft.collections;
 
 import net.openhft.lang.io.Bytes;
 
+import java.io.Serializable;
+
 /**
  * This event listener is called when key events occur.
  * <p>All these calls are synchronous while a lock is held so make them as quick as possible</p>
  *
  * TODO specify more clearly in which cases methods are called.
  */
-public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V> > {
+public abstract class SharedMapEventListener<K, V, M extends SharedHashMap<K, V>>
+        implements Serializable {
+    private static final long serialVersionUID = 0L;
+
     /**
      * This is called when there was no existing entry for a key.
      * Optionally you can provide a value to add to the map.

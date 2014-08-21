@@ -219,7 +219,7 @@ public class ProcessInstanceLimiter implements Runnable {
 		SharedHashMapBuilder builder = new SharedHashMapBuilder();
 		builder.entries(1000);
 		builder.entrySize(1024);
-        this.theSharedMap = builder.file(new File(sharedMapPath)).kClass(String.class).vClass(Data.class).create();
+        this.theSharedMap = builder.create(new File(sharedMapPath), String.class, Data.class);
 		Thread t = new Thread(this, "ProcessInstanceLimiter updater");
 		t.setDaemon(true);
 		t.start();
@@ -485,7 +485,7 @@ public class ProcessInstanceLimiter implements Runnable {
 		 * 
 		 * @param processType
 		 *            - the name of the type of process being limited
-		 * @param slot
+		 * @param index
 		 *            - the slot number held by the other process
 		 */
 		public void lockConflictDetected(String processType, int index);

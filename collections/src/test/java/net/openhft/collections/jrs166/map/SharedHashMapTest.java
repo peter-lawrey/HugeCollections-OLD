@@ -48,42 +48,44 @@ public class SharedHashMapTest extends JSR166TestCase {
 
     static SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
-        return new SharedHashMapBuilder()
-                .entries(size).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+        return new SharedHashMapBuilder().entries(size)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
     static SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .entries(size).file(getPersistenceFile()).kClass(ArrayList.class).vClass(CharSequence.class).create();
+                .entries(size).create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
 
     static SharedHashMap<ArrayList, CharSequence> newShmListBoolean() throws IOException {
 
-        return new SharedHashMapBuilder().file(getPersistenceFile()).kClass(ArrayList.class).vClass(CharSequence.class).create();
+        return new SharedHashMapBuilder()
+                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
     static SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .entries(size).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .entries(size).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
     }
 
 
     static SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
 
-        return new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+        return new SharedHashMapBuilder()
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
 
     static SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
 
-        return new SharedHashMapBuilder().file(getPersistenceFile()).kClass(BI.class).vClass(Boolean.class).create();
+        return new SharedHashMapBuilder().create(getPersistenceFile(), BI.class, Boolean.class);
 
     }
 

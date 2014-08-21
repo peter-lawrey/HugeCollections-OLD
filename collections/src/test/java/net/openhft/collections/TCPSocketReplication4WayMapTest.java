@@ -28,9 +28,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.Replicators.tcp;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -46,37 +46,34 @@ public class TCPSocketReplication4WayMapTest {
     private SharedHashMap<Integer, CharSequence> map3;
     private SharedHashMap<Integer, CharSequence> map4;
 
+    public static SharedHashMapBuilder newTcpSocketShmBuilder(
+            final byte identifier,
+            final int serverPort,
+            final InetSocketAddress... endpoints) throws IOException {
+        TcpReplicationConfig tcpConfig = TcpReplicationConfig.of(serverPort, endpoints)
+                .heartBeatInterval(1L, SECONDS);
+        return new SharedHashMapBuilder()
+                .entries(1000L)
+                .addReplicator(tcp(identifier, tcpConfig))
+                .entries(20000L);
+    }
+
     public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... endpoints) throws IOException {
-
-        final TcpReplicatorBuilder tcpReplicatorBuilder =
-                new TcpReplicatorBuilder(serverPort, endpoints)
-                .heartBeatInterval(1, SECONDS)      ;
-
-
-        return (T) new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+        return (T) newTcpSocketShmBuilder(identifier, serverPort, endpoints)
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
     static SharedHashMap<IntValue, CharSequence> newTcpSocketShmIntValueString(
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... endpoints) throws IOException {
-
-        final TcpReplicatorBuilder tcpReplicatorBuilder =
-                new TcpReplicatorBuilder(serverPort, endpoints)
-                .heartBeatInterval(100, MILLISECONDS) ;
-
-        return new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000).file(getPersistenceFile()).kClass(IntValue.class).vClass(CharSequence.class).create();
+        return newTcpSocketShmBuilder(identifier, serverPort, endpoints)
+                .toKeyValueSpecificBuilder(IntValue.class, CharSequence.class)
+                .keyMarshaller(ByteableIntValueMarshaller.INSTANCE)
+                .create(getPersistenceFile());
     }
 
 

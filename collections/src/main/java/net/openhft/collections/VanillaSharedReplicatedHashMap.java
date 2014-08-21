@@ -21,25 +21,19 @@ package net.openhft.collections;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.io.*;
-import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.model.Byteable;
-import net.openhft.lang.model.DataValueClasses;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.io.*;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static net.openhft.collections.Replica.EntryResolver;
-import static net.openhft.collections.AbstractVanillaSharedHashMap.Hasher.hash;
+import static net.openhft.collections.VanillaSharedHashMap.Hasher.hash;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
@@ -81,44 +75,34 @@ import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
  * @param <K> the entries key type
  * @param <V> the entries value type
  */
-class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<K, V>
-        implements SharedHashMap<K, V>, ReplicaExternalizable<K, V>, EntryResolver<K, V>,
+class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
+        implements SharedHashMap<K, V>, Replica, Replica.EntryExternalizable, EntryResolver<K, V>,
         Closeable {
+    private static final long serialVersionUID = 0L;
 
     static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    private static final int LAST_UPDATED_HEADER_SIZE = (127 * 8);
+    private static final long LAST_UPDATED_HEADER_SIZE = 128L * 8L;
 
     // for file, jdbc and UDP replication
     public static final int RESERVED_MOD_ITER = 8;
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-    private final Set<Closeable> closeables = new CopyOnWriteArraySet<Closeable>();
+    transient Set<Closeable> closeables;
+    private transient Bytes identifierUpdatedBytes;
 
-    private Bytes identifierUpdatedBytes;
-    private Bytes modDelBytes;
+    private transient ModificationDelegator modificationDelegator;
+    private transient long startOfModificationIterators;
 
-    private final ModificationDelegator modificationDelegator;
-    private int startOfModificationIterators;
-
-    public VanillaSharedReplicatedHashMap(@NotNull SharedHashMapBuilder builder,
-                                          @NotNull Class<K> kClass,
-                                          @NotNull Class<V> vClass) throws IOException {
-        super(builder, kClass, vClass);
-
-        this.timeProvider = builder.timeProvider();
-        this.localIdentifier = builder.identifier();
-        File file = builder.file();
-        ObjectSerializer objectSerializer = builder.objectSerializer();
-        BytesStore bytesStore = file == null
-                ? DirectStore.allocateLazy(sizeInBytes(), objectSerializer)
-                : new MappedStore(file, FileChannel.MapMode.READ_WRITE, sizeInBytes(), objectSerializer);
-        createMappedStoreAndSegments(bytesStore);
-
-        modificationDelegator = new ModificationDelegator(eventListener, modDelBytes, startOfModificationIterators);
-        this.eventListener = modificationDelegator;
+    public VanillaSharedReplicatedHashMap(
+            @NotNull SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder)
+            throws IOException {
+        super(kvBuilder);
+        this.timeProvider = kvBuilder.builder.timeProvider();
+        Replicator firstReplicator = kvBuilder.builder.firstReplicator;
+        this.localIdentifier = firstReplicator != null ? firstReplicator.identifier() : 1;
     }
 
     private int assignedModIterBitSetSizeInBytes() {
@@ -134,8 +118,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return Segment.class;
     }
 
-    int modIterBitSetSizeInBytes() {
-        return (int) align64(bitsPerSegmentInModIterBitSet() * segments.length / 8);
+    @Override
+    void initTransients() {
+        super.initTransients();
+        closeables = new CopyOnWriteArraySet<Closeable>();
+    }
+
+    long modIterBitSetSizeInBytes() {
+        return align64(bitsPerSegmentInModIterBitSet() * segments.length / 8);
     }
 
     private long bitsPerSegmentInModIterBitSet() {
@@ -148,15 +138,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return 2;
     }
 
-    int getHeaderSize() {
-        final int headerSize = super.getHeaderSize();
-
-        return headerSize + LAST_UPDATED_HEADER_SIZE + (modIterBitSetSizeInBytes() * (128 +
-                RESERVED_MOD_ITER)) + assignedModIterBitSetSizeInBytes();
+    @Override
+    long getHeaderSize() {
+        return super.getHeaderSize() + LAST_UPDATED_HEADER_SIZE +
+                (modIterBitSetSizeInBytes() * (128 + RESERVED_MOD_ITER)) +
+                assignedModIterBitSetSizeInBytes();
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
-        final int offset = identifier * 8;
+        final long offset = identifier * 8L;
 
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
@@ -169,30 +159,32 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     public long lastModificationTime(byte remoteIdentifier) {
         assert remoteIdentifier != this.identifier();
 
-        final int offset = remoteIdentifier * 8;
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
-        return identifierUpdatedBytes.readLong(offset);
+        return identifierUpdatedBytes.readLong(remoteIdentifier * 8L);
     }
-
 
     @Override
     void onHeaderCreated() {
 
-        int offset = super.getHeaderSize();
+        long offset = super.getHeaderSize();
 
         identifierUpdatedBytes = ms.bytes(offset, LAST_UPDATED_HEADER_SIZE).zeroOut();
         offset += LAST_UPDATED_HEADER_SIZE;
 
-        modDelBytes = ms.bytes(offset, assignedModIterBitSetSizeInBytes()).zeroOut();
+        Bytes modDelBytes = ms.bytes(offset, assignedModIterBitSetSizeInBytes()).zeroOut();
         offset += assignedModIterBitSetSizeInBytes();
 
         startOfModificationIterators = offset;
+
+        modificationDelegator = new ModificationDelegator(eventListener, modDelBytes);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener() {
+        return modificationDelegator;
+    }
+
     @Override
     public V put(K key, V value) {
         return put0(key, value, true, localIdentifier, timeProvider.currentTimeMillis());
@@ -215,11 +207,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
         return put0(key, value, true, identifier, timeStamp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public V putIfAbsent(@net.openhft.lang.model.constraints.NotNull K key, V value) {
+    public V putIfAbsent(@NotNull K key, V value) {
         return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
@@ -262,17 +251,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 timeProvider.currentTimeMillis());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public V remove(final Object key) {
         return removeIfValueIs(key, null, localIdentifier, timeProvider.currentTimeMillis());
     }
 
     /**
-     * Used in conjunction with map replication, all remove events that originate from a remote node will be processed
-     * using this method.
+     * Used in conjunction with map replication, all remove events that originate from a remote node
+     * will be processed using this method.
      *
      * @param key        key with which the specified value is associated
      * @param value      value expected to be associated with the specified key
@@ -281,20 +267,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      * @return {@code true} if the entry was removed
      * @see #remove(Object, Object)
      */
-
     V remove(K key, V value, byte identifier, long timeStamp) {
         assert identifier > 0;
-        return removeIfValueIs(key, null, identifier, timeStamp);
+        return removeIfValueIs(key, value, identifier, timeStamp);
     }
-
 
     void addCloseable(Closeable closeable) {
         closeables.add(closeable);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() {
         for (Closeable closeable : closeables) {
@@ -315,10 +296,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
     }
 
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public byte identifier() {
         return localIdentifier;
@@ -329,15 +306,12 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             (short remoteIdentifier,
              @NotNull final ModificationNotifier modificationNotifier) {
 
-        return modificationDelegator.acquireModificationIterator(remoteIdentifier, modificationNotifier);
+        return modificationDelegator
+                .acquireModificationIterator(remoteIdentifier, modificationNotifier);
     }
 
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public boolean remove(@net.openhft.lang.model.constraints.NotNull final Object key, final Object value) {
+    public boolean remove(@NotNull final Object key, final Object value) {
         if (value == null)
             return false; // CHM compatibility; I would throw NPE
         return removeIfValueIs(key, (V) value,
@@ -355,11 +329,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 timestamp, identifier);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    V replaceIfValueIs(@net.openhft.lang.model.constraints.NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -878,13 +849,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         @Override
         public Entry<K, V> getEntry(long pos) {
-            long offset = offsetFromPos(pos);
-            NativeBytes entry = entry(offset);
-            entry.readStopBit();
-            K key = entry.readInstance(kClass, null);
-            long timestamp = entry.readLong();
-            entry.skip(2L); // identifier and isDeleted flag
-            V value = readValue(entry, null);
+            bytes.position(offsetFromPos(pos) + metaDataBytes);
+            bytes.readStopBit();
+            K key = keyMarshaller.read(bytes);
+            long timestamp = bytes.readLong();
+            bytes.skip(2L); // identifier and isDeleted flag
+            bytes.readStopBit();
+            alignment.alignPositionAddr(bytes);
+            V value = valueMarshaller.read(bytes);
             return new TimestampTrackingEntry(key, value, timestamp);
         }
 
@@ -899,7 +871,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
     class TimestampTrackingEntry extends SimpleEntry<K, V> {
-        long timestamp;
+        private static final long serialVersionUID = 0L;
+
+        transient long timestamp;
         public TimestampTrackingEntry(K key, V value, long timestamp) {
             super(key, value);
             this.timestamp = timestamp;
@@ -915,13 +889,12 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * {@inheritDoc}
-     *
-     * <p>This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
-    public void writeExternalEntry(@NotNull AbstractBytes entry, @NotNull Bytes destination, int chronicleId) {
+    public void writeExternalEntry(@NotNull Bytes entry, @NotNull Bytes destination,
+                                   int chronicleId) {
 
         final long initialLimit = entry.limit();
 
@@ -993,10 +966,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
 
     /**
-     * {@inheritDoc}
-     *
-     * <p>This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1130,31 +1101,26 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
     }
 
     /**
-     * receive an update from the map, via the SharedMapEventListener and delegates the changes to the currently active
-     * modification iterators
+     * receive an update from the map, via the SharedMapEventListener and delegates the changes
+     * to the currently active modification iterators
      */
     class ModificationDelegator extends SharedMapEventListener<K, V, SharedHashMap<K, V>> {
+        private static final long serialVersionUID = 0L;
 
         // the assigned modification iterators
-        private final ATSDirectBitSet bitSet;
+        private final ATSDirectBitSet modIterSet;
 
         private final AtomicReferenceArray<ModificationIterator> modificationIterators =
                 new AtomicReferenceArray<ModificationIterator>(127 + RESERVED_MOD_ITER);
 
         private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
-        private long startOfModificationIterators;
 
         public ModificationDelegator(@NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
-                                     final Bytes bytes, long startOfModificationIterators) {
+                                     final Bytes bytes) {
             this.nextListener = nextListener;
-            this.startOfModificationIterators = startOfModificationIterators;
-            bitSet = new ATSDirectBitSet(bytes);
-
+            modIterSet = new ATSDirectBitSet(bytes);
         }
 
-        /**
-         * {@inheritDoc}
-         */
         public ModificationIterator acquireModificationIterator(
                 final short remoteIdentifier,
                 @NotNull final ModificationNotifier modificationNotifier) {
@@ -1178,14 +1144,11 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                         bytes, modificationNotifier);
 
                 modificationIterators.set(remoteIdentifier, newModificationIterator);
-                bitSet.set(remoteIdentifier);
+                modIterSet.set(remoteIdentifier);
                 return newModificationIterator;
             }
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                           boolean added, K key, V value, long pos, SharedSegment segment) {
@@ -1198,7 +1161,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 LOG.error("", e);
             }
 
-            for (long next = bitSet.nextSetBit(0); next > 0; next = bitSet.nextSetBit(next + 1)) {
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
                 try {
                     final ModificationIterator modificationIterator = modificationIterators.get((int) next);
                     modificationIterator.onPut(map, entry, metaDataBytes,
@@ -1211,9 +1174,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                              K key, V value, int pos, SharedSegment segment) {
@@ -1225,7 +1185,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 LOG.error("", e);
             }
 
-            for (long next = bitSet.nextSetBit(0); next > 0; next = bitSet.nextSetBit(next + 1)) {
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
                 try {
                     final ModificationIterator modificationIterator = modificationIterators.get((int) next);
                     modificationIterator.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
@@ -1236,6 +1196,17 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         }
 
+        @Override
+        void onRelocation(int pos, SharedSegment segment) {
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onRelocation(pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+        }
 
         @Override
         public V onGetMissing(SharedHashMap<K, V> map, Bytes keyBytes, K key,
@@ -1249,6 +1220,22 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             nextListener.onGetFound(map, entry, metaDataBytes, key, value);
         }
 
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
+
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void readObject(ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
     }
 
     /**
@@ -1267,7 +1254,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
      */
     class ModificationIterator extends SharedMapEventListener<K, V, SharedHashMap<K, V>>
             implements Replica.ModificationIterator {
-
+        private static final long serialVersionUID = 0L;
 
         private final ModificationNotifier modificationNotifier;
         private final ATSDirectBitSet changes;
@@ -1304,9 +1291,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             return (((long) segmentIndex) << segmentIndexShift) | pos;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                           boolean added, K key, V value, long pos, SharedSegment segment) {
@@ -1319,9 +1303,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             modificationNotifier.onChange();
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                              K key, V value, int pos, SharedSegment segment) {
@@ -1360,10 +1341,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
 
         /**
          * @param entryCallback call this to get an entry, this class will take care of the locking
-         * @param chronicleId
          * @return true if an entry was processed
          */
-        public boolean nextEntry(@NotNull final AbstractEntryCallback entryCallback, final int chronicleId) {
+        public boolean nextEntry(@NotNull final EntryCallback entryCallback, final int chronicleId) {
             long position = this.position;
             while (true) {
                 long oldPosition = position;
@@ -1430,46 +1410,41 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
             for (final Segment segment : (Segment[]) segments) {
                 segment.dirtyEntries(fromTimeStamp, entryModifiableCallback);
             }
+        }
 
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
+
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void readObject(ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+            throw new NotSerializableException(getClass().getCanonicalName());
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public K key(@NotNull AbstractBytes entry, K usingKey) {
-
+    public K key(@NotNull Bytes entry, K usingKey) {
         final long start = entry.position();
         try {
-
             // keyLen
             entry.readStopBit();
-
-            final long keyPosition = entry.position();
-
-            if (generatedValueType)
-                if (usingKey == null)
-                    usingKey = DataValueClasses.newDirectReference(kClass);
-                else
-                    assert usingKey instanceof Byteable;
-            if (usingKey instanceof Byteable) {
-                ((Byteable) usingKey).bytes(entry, keyPosition);
-                return usingKey;
-            }
-
-            return entry.readInstance(kClass, usingKey);
+            return keyMarshaller.read(entry, usingKey);
         } finally {
             entry.position(start);
         }
 
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public V value(@NotNull AbstractBytes entry, V usingValue) {
+    public V value(@NotNull Bytes entry, V usingValue) {
         final long start = entry.position();
         try {
 
@@ -1493,29 +1468,14 @@ class VanillaSharedReplicatedHashMap<K, V> extends AbstractVanillaSharedHashMap<
                 return null;
             }
 
-            final long valueOffset = entry.position();
-
-            if (generatedValueType)
-                if (usingValue == null)
-                    usingValue = DataValueClasses.newDirectReference(vClass);
-                else
-                    assert usingValue instanceof Byteable;
-            if (usingValue instanceof Byteable) {
-                ((Byteable) usingValue).bytes(entry, valueOffset);
-                return usingValue;
-            }
-
-            return entry.readInstance(vClass, usingValue);
+            return valueMarshaller.read(entry, usingValue);
         } finally {
             entry.position(start);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public boolean wasRemoved(@NotNull AbstractBytes entry) {
+    public boolean wasRemoved(@NotNull Bytes entry) {
         final long start = entry.position();
         try {
             return entry.readBoolean(entry.readStopBit() + 10);

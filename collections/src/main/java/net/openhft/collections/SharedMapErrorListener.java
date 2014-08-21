@@ -16,7 +16,9 @@
 
 package net.openhft.collections;
 
-public interface SharedMapErrorListener {
+import java.io.Serializable;
+
+public interface SharedMapErrorListener extends Serializable {
     void onLockTimeout(long threadId) throws IllegalStateException;
 
     void errorOnUnlock(IllegalMonitorStateException e);

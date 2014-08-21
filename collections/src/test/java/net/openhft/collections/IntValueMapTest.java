@@ -37,12 +37,13 @@ import static org.junit.Assert.assertEquals;
 public class IntValueMapTest {
 
     @Test
-    @Ignore
     public void test() throws IOException {
 
         final SharedHashMap<IntValue, CharSequence> map = new SharedHashMapBuilder()
-                .entries(1000)
-                .entries(20000).file(getPersistenceFile()).kClass(IntValue.class).vClass(CharSequence.class).create();
+                .entries(20000)
+                .toKeyValueSpecificBuilder(IntValue.class, CharSequence.class)
+                .keyMarshaller(ByteableIntValueMarshaller.INSTANCE)
+                .create(getPersistenceFile());
 
         IntValue$$Native value = new IntValue$$Native();
         value.bytes(new ByteBufferBytes(ByteBuffer.allocateDirect(4)), 0);
@@ -56,6 +57,5 @@ public class IntValueMapTest {
 
         // this will fail
         map.toString();
-
     }
 }

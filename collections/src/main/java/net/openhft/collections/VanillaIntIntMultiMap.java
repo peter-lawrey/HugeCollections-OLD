@@ -225,6 +225,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
             long entry = bytes.readLong(pos);
             int hash2 = (int) (entry >> 32);
             if (hash2 == UNSET_KEY) {
+                searchPos = pos;
                 return UNSET_VALUE;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;

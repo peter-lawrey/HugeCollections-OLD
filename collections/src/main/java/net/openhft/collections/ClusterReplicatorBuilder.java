@@ -18,120 +18,66 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.DirectStore;
-import net.openhft.lang.io.MappedStore;
-
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.channels.FileChannel;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static net.openhft.collections.SharedHashMapBuilder.UDP_REPLICATION_MODIFICATION_ITERATOR_ID;
 
 /**
  * @author Rob Austin.
  */
-public class ClusterReplicatorBuilder {
+public final class ClusterReplicatorBuilder {
 
-    Set<Closeable> closeables = new HashSet<Closeable>();
+    final byte identifier;
+    final int maxEntrySize;
 
-    private final byte identifier;
-    private UdpReplicatorBuilder udpReplicatorBuilder = null;
-    private TcpReplicatorBuilder tcpReplicatorBuilder = null;
+    private UdpReplicationConfig udpReplicationConfig = null;
+    private TcpReplicationConfig tcpReplicationConfig = null;
+    int maxNumberOfChronicles = 128;
 
-    private int maxEntrySize;
-    private int maxNumberOfChronicles = 128;
-    private ClusterReplicator clusterReplicator;
-
-
-    ClusterReplicatorBuilder(byte identifier, final int maxEntrySize1) {
+    ClusterReplicatorBuilder(byte identifier, final int maxEntrySize) {
         this.identifier = identifier;
-        this.maxEntrySize = maxEntrySize1;
-        if (!(identifier > 0 && identifier < 128))
-            throw new IllegalArgumentException("Identifier must be positive and <128, " +
-                    "identifier=" + identifier);
-    }
-
-    private final Map<Short, ReplicaExternalizable> replicas
-            = new ConcurrentHashMap<Short, ReplicaExternalizable>();
-
-    public ClusterReplicatorBuilder udpReplicator(UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
-        this.udpReplicatorBuilder = udpReplicatorBuilder;
-        return this;
-    }
-
-    public ClusterReplicatorBuilder tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
-        this.tcpReplicatorBuilder = tcpReplicatorBuilder;
-        return this;
-    }
-
-    /**
-     * @param chronicleChannel when clustering with a number of maps, each map will be called a chronicle channel
-     */
-    public <K, V> SharedHashMap<K, V> create(short chronicleChannel, SharedHashMapBuilder<K, V> builder) throws
-            IOException {
-
-        final SharedHashMapBuilder<K, V> builder0 = builder.toBuilder();
-        builder0.identifier(identifier);
-
-        final VanillaSharedReplicatedHashMap<K, V> result =
-                new VanillaSharedReplicatedHashMap<K, V>(builder0, builder0.<K>kClass(),
-                        builder0.<V>vClass());
-
-        if (clusterReplicator == null)
-            replicas.put(chronicleChannel, (ReplicaExternalizable) result);
-        else {
-            clusterReplicator.add(chronicleChannel, result);
+        this.maxEntrySize = maxEntrySize;
+        if (identifier <= 0) {
+            throw new IllegalArgumentException("Identifier must be positive, identifier=" +
+                    identifier);
         }
-        return result;
     }
 
+    public ClusterReplicatorBuilder udpReplication(UdpReplicationConfig replicationConfig) {
+        this.udpReplicationConfig = replicationConfig;
+        return this;
+    }
+
+    public ClusterReplicatorBuilder tcpReplication(TcpReplicationConfig replicationConfig) {
+        this.tcpReplicationConfig = replicationConfig;
+        return this;
+    }
+
+    public ClusterReplicatorBuilder maxNumberOfChronicles(int maxNumberOfChronicles) {
+        this.maxNumberOfChronicles = maxNumberOfChronicles;
+        return this;
+    }
 
     public ClusterReplicator create() throws IOException {
-
-        final ClusterReplicator clusterReplicator = new ClusterReplicator(identifier, maxNumberOfChronicles);
-
-        for (final Map.Entry<Short, ReplicaExternalizable> entry : replicas.entrySet()) {
-            clusterReplicator.add(entry.getKey(), entry.getValue());
-        }
-
-
-        if (tcpReplicatorBuilder != null) {
-            final TcpReplicator tcpReplicator = new TcpReplicator(clusterReplicator, clusterReplicator, tcpReplicatorBuilder,
+        final ClusterReplicator clusterReplicator = new ClusterReplicator(this);
+        if (tcpReplicationConfig != null) {
+            final TcpReplicator tcpReplicator = new TcpReplicator(
+                    clusterReplicator.asReplica,
+                    clusterReplicator.asEntryExternalizable,
+                    tcpReplicationConfig,
                     maxEntrySize);
-            closeables.add(tcpReplicator);
             clusterReplicator.add(tcpReplicator);
         }
 
-        if (udpReplicatorBuilder != null) {
-            final InetAddress address = udpReplicatorBuilder.address();
-
-            if (address == null)
-                throw new IllegalArgumentException("address can not be null");
-
-            if (address.isMulticastAddress() && udpReplicatorBuilder.networkInterface() == null) {
-                throw new IllegalArgumentException("MISSING: NetworkInterface, " +
-                        "When using a multicast addresses, please provided a networkInterface");
-            }
-
+        if (udpReplicationConfig != null) {
             final UdpReplicator udpReplicator =
-                    new UdpReplicator(clusterReplicator,
-                            udpReplicatorBuilder.clone(),
-                            maxEntrySize,
-                            identifier,
-                            UDP_REPLICATION_MODIFICATION_ITERATOR_ID);
-
-            closeables.add(udpReplicator);
+                    new UdpReplicator(clusterReplicator.asReplica,
+                            clusterReplicator.asEntryExternalizable,
+                            udpReplicationConfig,
+                            maxEntrySize);
             clusterReplicator.add(udpReplicator);
         }
-
-        this.clusterReplicator = clusterReplicator;
         return clusterReplicator;
-
     }
-
 }

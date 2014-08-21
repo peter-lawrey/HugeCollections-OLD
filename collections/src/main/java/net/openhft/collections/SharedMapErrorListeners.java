@@ -26,7 +26,8 @@ public final class SharedMapErrorListeners {
      * We can add some configuration-on-the-first-call in the future.
      */
 
-    private static final SharedMapErrorListener LOGGING = new SharedMapErrorListener() {
+    private static enum LoggingErrorListener implements SharedMapErrorListener {
+        INSTANCE;
         final Logger LOG = LoggerFactory.getLogger(getClass());
         @Override
         public void onLockTimeout(long threadId) throws IllegalStateException {
@@ -42,13 +43,14 @@ public final class SharedMapErrorListeners {
         public void errorOnUnlock(IllegalMonitorStateException e) {
             LOG.warn("Failed to unlock as expected", e);
         }
-    };
-
-    public static SharedMapErrorListener logging() {
-        return LOGGING;
     }
 
-    private static final SharedMapErrorListener ERROR = new SharedMapErrorListener() {
+    public static SharedMapErrorListener logging() {
+        return LoggingErrorListener.INSTANCE;
+    }
+
+    private static enum ThrowingErrorListener implements SharedMapErrorListener {
+        INSTANCE;
         @Override
         public void onLockTimeout(long threadId) throws IllegalStateException {
             throw new IllegalStateException("Unable to acquire lock held by threadId: " + threadId);
@@ -58,9 +60,9 @@ public final class SharedMapErrorListeners {
         public void errorOnUnlock(IllegalMonitorStateException e) {
             throw e;
         }
-    };
+    }
 
     public static SharedMapErrorListener error() {
-        return ERROR;
+        return ThrowingErrorListener.INSTANCE;
     }
 }

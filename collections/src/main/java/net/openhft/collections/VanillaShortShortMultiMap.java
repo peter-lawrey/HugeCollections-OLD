@@ -216,6 +216,7 @@ class VanillaShortShortMultiMap implements IntIntMultiMap {
             int entry = bytes.readInt(pos);
             int hash2 = entry >>> 16;
             if (hash2 == UNSET_KEY) {
+                searchPos = pos;
                 return UNSET_VALUE;
             }
             pos = (pos + ENTRY_SIZE) & capacityMask2;

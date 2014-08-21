@@ -27,13 +27,17 @@ public final class SharedMapEventListeners {
      * We can add some configuration-on-the-first-call in the future.
      */
 
-    static final SharedMapEventListener NOP = new SharedMapEventListener() {};
+    static final SharedMapEventListener NOP = new SharedMapEventListener() {
+        private static final long serialVersionUID = 0L;
+    };
 
+    @SuppressWarnings("unchecked")
     public static <K, V, M extends SharedHashMap<K, V>>  SharedMapEventListener<K, V, M> nop() {
         return NOP;
     }
 
     private static final SharedMapEventListener BYTES_LOGGING = new SharedMapEventListener() {
+        private static final long serialVersionUID = 0L;
         public final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
         @Override
@@ -86,11 +90,13 @@ public final class SharedMapEventListeners {
         }
     };
 
+    @SuppressWarnings("unchecked")
     public static <K, V, M extends SharedHashMap<K, V>> SharedMapEventListener<K, V, M> bytesLogging() {
         return BYTES_LOGGING;
     }
 
     private static final SharedMapEventListener KEY_VALUE_LOGGING = new SharedMapEventListener() {
+        private static final long serialVersionUID = 0L;
         public final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
         @Override
@@ -119,6 +125,7 @@ public final class SharedMapEventListeners {
         }
     };
 
+    @SuppressWarnings("unchecked")
     public static <K, V, M extends SharedHashMap<K, V>> SharedMapEventListener<K, V, M> keyValueLogging() {
         return KEY_VALUE_LOGGING;
     }

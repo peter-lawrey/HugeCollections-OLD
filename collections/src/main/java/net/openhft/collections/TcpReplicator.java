@@ -76,32 +76,30 @@ class TcpReplicator extends AbstractChannelReplicator implements Closeable {
 
 
     /**
-     * @param replica
-     * @param externalizable
-     * @param tcpReplicatorBuilder
-     * @param maxEntrySizeBytes    used to check that the last entry will fit into the buffer, it can not be
-     *                             smaller than the size of and entry, if it is set smaller the buffer will
-     *                             over flow, it can be larger then the entry, but setting it too large
-     *                             reduces the workable space in the buffer.
+     * @param maxEntrySizeBytes used to check that the last entry will fit into the buffer, it can not be
+     *                          smaller than the size of and entry, if it is set smaller the buffer will
+     *                          over flow, it can be larger then the entry, but setting it too large
+     *                          reduces the workable space in the buffer.
      * @throws IOException
      */
     TcpReplicator(@NotNull final Replica replica,
                   @NotNull final EntryExternalizable externalizable,
-                  @NotNull final TcpReplicatorBuilder tcpReplicatorBuilder,
+                  @NotNull final TcpReplicationConfig replicationConfig,
                   final int maxEntrySizeBytes) throws IOException {
 
-        super("TcpSocketReplicator-" + replica.identifier(), tcpReplicatorBuilder,
+        super("TcpSocketReplicator-" + replica.identifier(), replicationConfig.throttlingConfig(),
                 maxEntrySizeBytes);
 
-        serverInetSocketAddress = tcpReplicatorBuilder.serverInetSocketAddress();
+        serverInetSocketAddress = new InetSocketAddress(replicationConfig.serverPort());
 
-        heartBeatInterval = tcpReplicatorBuilder.heartBeatInterval(MILLISECONDS);
+        heartBeatInterval = replicationConfig.heartBeatInterval(MILLISECONDS);
 
-        long throttleBucketInterval = tcpReplicatorBuilder.throttleBucketInterval(MILLISECONDS);
+        long throttleBucketInterval =
+                replicationConfig.throttlingConfig().bucketInterval(MILLISECONDS);
         selectorTimeout = Math.min(heartBeatInterval, throttleBucketInterval);
 
-        packetSize = tcpReplicatorBuilder.packetSize();
-        endpoints = tcpReplicatorBuilder.endpoints();
+        packetSize = replicationConfig.packetSize();
+        endpoints = replicationConfig.endpoints();
 
         this.replica = replica;
         this.localIdentifier = replica.identifier();

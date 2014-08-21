@@ -250,7 +250,10 @@ public class MultiMapTimeBaseReplicationTest {
     private void waitTillFinished0() throws InterruptedException {
         int i = 0;
         for (; i < 2; i++) {
-            if (!(map2ToMap1.isEmpty() && map2ToMap1.isEmpty() && !segmentModificationIterator1.hasNext() && !segmentModificationIterator2.hasNext() && mapP1.isQueueEmpty() && mapP2.isQueueEmpty())) {
+            if (!(map2ToMap1.isEmpty() && map2ToMap1.isEmpty() &&
+                    !segmentModificationIterator1.hasNext() &&
+                    !segmentModificationIterator2.hasNext() &&
+                    mapP1.isQueueEmpty() && mapP2.isQueueEmpty())) {
                 i = 0;
             }
             Thread.sleep(1);

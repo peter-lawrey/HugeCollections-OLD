@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.collect.testing.features.MapFeature.*;
+import static net.openhft.collections.SharedHashMapTest.getPersistenceFile;
 
 
 public class GuavaTest extends TestCase {
@@ -111,19 +112,21 @@ public class GuavaTest extends TestCase {
         @Override
         Map<CharSequence, CharSequence> newMap() {
             try {
-                return builder.file(SharedHashMapTest.getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                return builder.create(getPersistenceFile(), CharSequence.class, CharSequence.class);
             } catch (IOException e) {
                 throw new AssertionError(e);
             }
         }
     }
 
-    static class HHMTestGenerator extends TestGenerator {
-
+    static class HHMTestGenerator extends SHMTestGenerator {
         @Override
         Map<CharSequence, CharSequence> newMap() {
-            return new HugeHashMap<CharSequence, CharSequence>(
-                    HugeConfig.DEFAULT, CharSequence.class, CharSequence.class);
+            try {
+                return builder.create(CharSequence.class, CharSequence.class);
+            } catch (IOException e) {
+                throw new AssertionError(e);
+            }
         }
     }
 }

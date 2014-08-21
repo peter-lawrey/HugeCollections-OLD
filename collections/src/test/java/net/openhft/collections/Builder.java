@@ -19,14 +19,11 @@
 package net.openhft.collections;
 
 
-import net.openhft.lang.values.IntValue;
-
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.ArrayBlockingQueue;
-
-import static net.openhft.collections.Replica.ModificationNotifier.NOP;
 
 /**
  * @author Rob Austin.
@@ -59,25 +56,16 @@ public class Builder {
     }
 
 
-    static VanillaSharedReplicatedHashMap<Integer, CharSequence> newShmIntString(
+    static <K, V> SharedHashMap<K, V> newShm(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
-
-        final SharedHashMapBuilder builder =
-                new SharedHashMapBuilder()
-                        .entries(size)
-                        .identifier(localIdentifier);
-
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> result = (VanillaSharedReplicatedHashMap<Integer, CharSequence>)
-                builder.canReplicate(true).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
-
-        final Replica.ModificationIterator modificationIterator = result
-                .acquireModificationIterator(externalIdentifier, NOP);
-        new QueueReplicator(modificationIterator,
-                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
-
-        return result;
-
+            final ArrayBlockingQueue<byte[]> output,
+            final byte localIdentifier, byte externalIdentifier,
+            Class<K> kClass, Class<V> vClass) throws IOException {
+        Replicator queue = QueueReplicator.of(localIdentifier, externalIdentifier, input, output);
+        return new SharedHashMapBuilder()
+                .entries(size)
+                .addReplicator(queue)
+                .create(getPersistenceFile(), kClass, vClass);
     }
 
     interface MapProvider<T> {
@@ -88,20 +76,25 @@ public class Builder {
 
     static MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>> newShmIntInt(
             int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
+            final ArrayBlockingQueue<byte[]> output,
+            final byte localIdentifier, byte externalIdentifier) throws IOException {
 
-        final SharedHashMapBuilder builder =
-                new SharedHashMapBuilder()
+        Replicator queue = QueueReplicator.of(localIdentifier, externalIdentifier, input, output);
+        final VanillaSharedReplicatedHashMap<Integer, Integer> result =
+                (VanillaSharedReplicatedHashMap<Integer, Integer>) new SharedHashMapBuilder()
                         .entries(size)
-                        .identifier(localIdentifier);
-
-        final VanillaSharedReplicatedHashMap<Integer, Integer> result = (VanillaSharedReplicatedHashMap<Integer, Integer>)
-                builder.canReplicate(true).file(getPersistenceFile()).kClass(Integer.class).vClass(Integer.class).create();
-
-
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
-
+                        .addReplicator(queue)
+                        .create(getPersistenceFile(), Integer.class, Integer.class);
+        QueueReplicator q = null;
+        for (Closeable closeable : result.closeables) {
+            if (closeable instanceof QueueReplicator) {
+                q = (QueueReplicator) closeable;
+                break;
+            }
+        }
+        if (q == null)
+            throw new AssertionError();
+        final QueueReplicator finalQ = q;
         return new MapProvider<VanillaSharedReplicatedHashMap<Integer, Integer>>() {
 
             @Override
@@ -111,56 +104,10 @@ public class Builder {
 
             @Override
             public boolean isQueueEmpty() {
-                return q.isEmpty();
+                return finalQ.isEmpty();
             }
 
         };
-
-
-    }
-
-
-    static Replica<IntValue, IntValue> newShmIntValueIntValue(
-            int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
-
-        final SharedHashMapBuilder builder =
-                new SharedHashMapBuilder()
-                        .entries(size)
-                        .identifier(localIdentifier);
-
-        final Replica<IntValue, IntValue> result = (Replica<IntValue, IntValue>)
-                builder.canReplicate(true).file(getPersistenceFile()).kClass(IntValue.class).vClass(IntValue.class).create();
-
-
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
-
-        return result;
-
-
-    }
-
-
-    static SharedHashMap<CharSequence, CharSequence> newShmStringString(
-            int size, final ArrayBlockingQueue<byte[]> input,
-            final ArrayBlockingQueue<byte[]> output, final byte localIdentifier, byte externalIdentifier) throws IOException {
-
-        final SharedHashMapBuilder builder =
-                new SharedHashMapBuilder()
-                        .entries(size)
-                        .identifier(localIdentifier);
-
-        final VanillaSharedReplicatedHashMap<CharSequence, CharSequence> result = (VanillaSharedReplicatedHashMap<CharSequence, CharSequence>)
-                builder.canReplicate(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
-
-
-        final QueueReplicator q = new QueueReplicator(result.acquireModificationIterator(externalIdentifier, NOP),
-                input, output, builder.entrySize(), (Replica.EntryExternalizable) result);
-
-        return result;
-
-
     }
 
 }

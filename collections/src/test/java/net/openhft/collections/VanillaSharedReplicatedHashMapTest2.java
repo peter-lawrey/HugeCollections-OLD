@@ -70,10 +70,12 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         final ArrayBlockingQueue<byte[]> map1ToMap2 = new ArrayBlockingQueue<byte[]>(100);
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map1 =
-                Builder.newShmIntString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
-        final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2 =
-                Builder.newShmIntString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+        final SharedHashMap<Integer, CharSequence> map1 =
+                Builder.newShm(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2,
+                        Integer.class, CharSequence.class);
+        final SharedHashMap<Integer, CharSequence> map2 =
+                Builder.newShm(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1,
+                        Integer.class, CharSequence.class);
 
         return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
 
@@ -87,9 +89,11 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
         final SharedHashMap<CharSequence, CharSequence> map1 =
-                Builder.newShmStringString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
+                Builder.newShm(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2,
+                        CharSequence.class, CharSequence.class);
         final SharedHashMap<CharSequence, CharSequence> map2 =
-                Builder.newShmStringString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+                Builder.newShm(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1,
+                        CharSequence.class, CharSequence.class);
 
         return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 
@@ -97,11 +101,9 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
 
 
     SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
-
         return new SharedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .identifier((byte) 1).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
-
+                .forceReplicatedImpl()
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
 

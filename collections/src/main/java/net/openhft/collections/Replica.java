@@ -27,7 +27,7 @@ import java.io.Closeable;
 /**
  * @author Rob Austin.
  */
-interface Replica<K, V> {
+public interface Replica extends Closeable {
 
     /**
      * Provides the unique Identifier associated with this map instance. <p> An identifier is used to
@@ -58,9 +58,14 @@ interface Replica<K, V> {
                                                      ModificationNotifier modificationNotifier);
 
     /**
-     * Used in conjunction with replication, to back fill data from a remote node. This node  may have missed
-     * updates while it was not been running or connected via TCP.
+     * Returns the timestamp of the last change from the specified remote node, already replicated
+     * to this Replica.
      *
+     * <p>Used in conjunction with replication, to back fill data from a remote node. This node
+     * may have missed updates while it was not been running or connected via TCP.
+     *
+     * @param remoteIdentifier the identifier of the remote node to check last replicated update
+     *        time from
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      * @see #identifier()
      */
@@ -71,7 +76,7 @@ interface Replica<K, V> {
      * notifies when there is a changed to the modification iterator
      */
     interface ModificationNotifier {
-        public static ModificationNotifier NOP = new ModificationNotifier() {
+        public static final ModificationNotifier NOP = new ModificationNotifier() {
             @Override
             public void onChange() {
             }
@@ -92,7 +97,7 @@ interface Replica<K, V> {
 
         /**
          * @return {@code true} if the is another entry to be received via {@link
-         * #nextEntry(net.openhft.collections.Replica.AbstractEntryCallback, int chronicleId)}
+         * #nextEntry(net.openhft.collections.Replica.EntryCallback, int chronicleId)}
          */
         boolean hasNext();
 
@@ -104,7 +109,7 @@ interface Replica<K, V> {
          * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method, {@code
          * false} if the entry was not accepted or was not available
          */
-        boolean nextEntry(@NotNull final AbstractEntryCallback callback, final int chronicleId);
+        boolean nextEntry(@NotNull final EntryCallback callback, final int chronicleId);
 
         /**
          * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer. It means all
@@ -120,65 +125,34 @@ interface Replica<K, V> {
     }
 
 
-    interface EntryCallback {
-        /**
-         * Called whenever a put() or remove() has occurred to a replicating map.
-         *
-         * @param entry       the entry you will receive, this does not have to be locked, as locking is
-         *                    already provided from the caller.
-         * @param chronicleId
-         * @return {@code false} if this entry should be ignored because the identifier of the source node is
-         * not from one of our changes, WARNING even though we check the identifier in the
-         * ModificationIterator the entry may have been updated.
-         */
-        public abstract boolean onEntry(final AbstractBytes entry, final int chronicleId);
-
-        /**
-         * Called just after {@see #onEntry(NativeBytes entry)}
-         *
-         * @see #onEntry(net.openhft.lang.io.AbstractBytes, int chronicleId) ;
-         */
-        public void onAfterEntry();
-
-        /**
-         * Called just before {@see #onEntry(NativeBytes entry)}
-         */
-        public void onBeforeEntry();
-
-    }
-
     /**
-     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes
-     *entry)} which will get called whenever a put() or remove() has occurred to the map
+     * Implemented typically by a replicator, This interface provides the event, which will get
+     * called whenever a put() or remove() has occurred to the map
      */
-    abstract class AbstractEntryCallback implements EntryCallback {
+    abstract class EntryCallback {
 
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
          *
-         * @param entry       the entry you will receive, this does not have to be locked, as locking is
-         *                    already provided from the caller.
-         * @param chronicleId
-         * @return {@code false} if this entry should be ignored because the identifier of the source node is
-         * not from one of our changes, WARNING even though we check the identifier in the
-         * ModificationIterator the entry may have been updated.
+         * @param entry       the entry you will receive, this does not have to be locked,
+         *                    as locking is already provided from the caller.
+         * @param chronicleId only assigned when clustering
+         * @return {@code false} if this entry should be ignored because the identifier
+         * of the source node is not from one of our changes, WARNING even though we check
+         * the identifier in the ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final AbstractBytes entry, final int chronicleId);
+        public abstract boolean onEntry(final Bytes entry, final int chronicleId);
 
         /**
-         * Called just after {@see #onEntry(NativeBytes entry)}
-         *
-         * @see EntryCallback#onEntry(net.openhft.lang.io.AbstractBytes, int chronicleId) ;
+         * Called just after {@link #onEntry(Bytes, int)}. No-op by default.
          */
         public void onAfterEntry() {
-            // no-op by default
         }
 
         /**
-         * Called just before {@see #onEntry(NativeBytes entry)}
+         * Called just before {@link #onEntry(Bytes, int)}. No-op by default.
          */
         public void onBeforeEntry() {
-            // no-op by default
         }
     }
 
@@ -196,13 +170,14 @@ interface Replica<K, V> {
          *                    add zeroBytes, if the identifier in the entry did not match the maps local
          * @param chronicleId used in cluster into identify the canonical map or queue
          */
-        void writeExternalEntry(@NotNull AbstractBytes entry, @NotNull Bytes destination, int chronicleId);
+        void writeExternalEntry(@NotNull Bytes entry, @NotNull Bytes destination, int chronicleId);
 
         /**
          * The map implements this method to restore its contents. This method must read the values in the
          * same sequence and with the same types as were written by {@code writeExternalEntry()}. This method
          * is typically called when we receive a remote replication event, this event could originate from
          * either a remote {@code put(K key, V value)} or {@code remove(Object key)}
+         * @param source bytes to read an entry from
          */
         void readExternalEntry(@NotNull Bytes source);
 
@@ -218,26 +193,23 @@ interface Replica<K, V> {
          * gets the key from the entry
          *
          * @param entry the bytes which the bytes which point to the entry
+         * @param usingKey the key object to reuse, if possible
          * @return the key which is in the entry
          */
-
-        K key(@NotNull AbstractBytes entry, K usingKey);
+        K key(@NotNull Bytes entry, K usingKey);
 
 
         /**
          * gets the value from the entry
          *
          * @param entry the bytes which reference to the entry
+         * @param usingValue the value object to reuse, if possible
          * @return the value which is in the entry or null if the value has been remove from the map
          */
-        V value(@NotNull AbstractBytes entry, V usingValue);
+        V value(@NotNull Bytes entry, V usingValue);
 
-        boolean wasRemoved(@NotNull AbstractBytes entry);
+        boolean wasRemoved(@NotNull Bytes entry);
 
     }
-
-
 }
 
-interface ReplicaExternalizable<K, V> extends Replica.EntryExternalizable, Replica<K, V>, Closeable {
-}

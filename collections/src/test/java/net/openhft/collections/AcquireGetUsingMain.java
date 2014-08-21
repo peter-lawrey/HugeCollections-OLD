@@ -27,7 +27,8 @@ import static org.junit.Assert.fail;
 public class AcquireGetUsingMain {
     public static void main(String[] args) throws Exception {
         File file = new File(System.getProperty("java.io.tmpdir") + "/test1");
-        SharedHashMap<String, Data> theSharedMap = new SharedHashMapBuilder().file(file).kClass(String.class).vClass(Data.class).create();
+        SharedHashMap<String, Data> theSharedMap = new SharedHashMapBuilder()
+                .create(file, String.class, Data.class);
         Data data = DataValueClasses.newDirectReference(Data.class);
         String processType = "testkey";
         if (theSharedMap.getUsing(processType, data) == null) {

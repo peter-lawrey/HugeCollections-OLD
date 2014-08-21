@@ -16,6 +16,9 @@
 
 package net.openhft.collections;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.primitives.Ints;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.DataValueGenerator;
 import net.openhft.lang.values.IntValue;
@@ -85,7 +88,8 @@ public class SharedHashMapTest {
     public void testRemoveWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .minSegments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
@@ -131,7 +135,8 @@ public class SharedHashMapTest {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
                 .minSegments(1024)
-                .removeReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .removeReturnsNull(true)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
         for (int i = 1; i < 1024; i++) {
@@ -154,7 +159,8 @@ public class SharedHashMapTest {
         int count = 3000;
         final SharedHashMap<Object, Object> map = new SharedHashMapBuilder()
                 .entrySize(count)
-                .minSegments(2).file(getPersistenceFile()).kClass(Object.class).vClass(Object.class).create();
+                .minSegments(2)
+                .create(getPersistenceFile(), Object.class, Object.class);
 
 
         for (int i = 1; i < count; i++) {
@@ -178,7 +184,8 @@ public class SharedHashMapTest {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
                 .minSegments(2)
-                .removeReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .removeReturnsNull(true)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         assertFalse(map.containsKey("key3"));
         map.put("key1", "one");
@@ -223,7 +230,8 @@ public class SharedHashMapTest {
     public void testReplaceWithKey() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .minSegments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
         map.put("key1", "one");
@@ -288,7 +296,8 @@ public class SharedHashMapTest {
     public void testReplaceWithKeyAnd2Params() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .minSegments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
         map.put("key1", "one");
         map.put("key2", "two");
@@ -329,7 +338,8 @@ public class SharedHashMapTest {
     public void testRemoveWithKeyAndValue() throws Exception {
 
         final SharedHashMap<CharSequence, CharSequence> map = new SharedHashMapBuilder()
-                .minSegments(2).file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                .minSegments(2)
+                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
 
         map.put("key1", "one");
@@ -410,12 +420,20 @@ public class SharedHashMapTest {
         for (int j = 1; j <= 3; j++) {
             for (int i = 0; i < entries; i++) {
                 CharSequence userCS = getUserCharSequence(i);
+                if (i * 9876 == 829682760) {
+                    System.out.println(1);
+                }
 
                 if (j > 1) {
-                    assertNotNull(map.getUsing(userCS, value));
+                    if (i == 1) {
+                        System.out.println(1);
+                    }
+                    assertNotNull(userCS.toString(), map.getUsing(userCS, value));
                 } else {
                     map.acquireUsing(userCS, value);
                 }
+                if (i >= 1)
+                assertTrue(userCS.toString(), map.containsKey(getUserCharSequence(1)));
                 assertEquals(j - 1, value.getValue());
 
                 value.addAtomicValue(1);
@@ -536,17 +554,24 @@ public class SharedHashMapTest {
 
     @Test
     @Ignore
-    public void testAcquirePerf() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException, ExecutionException {
+    public void testAcquirePerf()
+            throws IOException, ClassNotFoundException, IllegalAccessException,
+            InstantiationException, InterruptedException, ExecutionException {
 //        int runs = Integer.getInteger("runs", 10);
         for (int runs : new int[]{10, 50, 250, 500, 1000, 2500}) {
             final long entries = runs * 1000 * 1000L;
-            final SharedHashMap<CharSequence, IntValue> map = getSharedStringIntMap(entries, 1024, 20);
+            SharedHashMapBuilder builder = builder(entries, 1024, 20);
+            final SharedHashMap<CharSequence, IntValue> map = builder
+                    .toKeyValueSpecificBuilder(CharSequence.class, IntValue.class)
+                    .valueMarshallerAndFactory(ByteableIntValueMarshaller.INSTANCE,
+                            DirectIntValueFactory.INSTANCE)
+                    .create(getPersistenceFile());
 
             int procs = Runtime.getRuntime().availableProcessors();
             int threads = procs * 2; // runs > 100 ? procs / 2 : procs;
             int count = runs > 500 ? runs > 1200 ? 1 : 3 : 5;
             final int independence = 8; // Math.min(procs, runs > 500 ? 8 : 4);
-            System.out.println("\nKey size: " + runs + " Million entries. ");
+            System.out.println("\nKey size: " + runs + " Million entries. " + builder);
             for (int j = 0; j < count; j++) {
                 long start = System.currentTimeMillis();
                 ExecutorService es = Executors.newFixedThreadPool(procs);
@@ -695,16 +720,18 @@ public class SharedHashMapTest {
                 .minSegments(segments)
                 .entrySize(entrySize)
                 .entryAndValueAlignment(alignment)
-                .generatedValueType(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(LongValue.class).create();
+                .toKeyValueSpecificBuilder(CharSequence.class, LongValue.class)
+                .valueMarshallerAndFactory(ByteableLongValueMarshaller.INSTANCE,
+                        DirectLongValueFactory.INSTANCE)
+                .create(getPersistenceFile());
     }
 
-    private static SharedHashMap<CharSequence, IntValue> getSharedStringIntMap(long entries, int segments, int entrySize) throws IOException {
+    private static SharedHashMapBuilder builder(long entries, int segments, int entrySize) {
         return new SharedHashMapBuilder()
                 .entries(entries)
                 .minSegments(segments)
                 .entrySize(entrySize)
-                .generatedValueType(true)
-                .putReturnsNull(true).file(getPersistenceFile()).kClass(CharSequence.class).vClass(IntValue.class).create();
+                .putReturnsNull(true);
     }
 
     private static void printStatus() {
@@ -724,9 +751,6 @@ public class SharedHashMapTest {
     @Test
     public void testPutAndRemove() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-remove-test");
-        file.delete();
-        file.deleteOnExit();
         int entries = 100 * 1000;
         SharedHashMap<CharSequence, CharSequence> map =
                 new SharedHashMapBuilder()
@@ -734,7 +758,8 @@ public class SharedHashMapTest {
                         .minSegments(16)
                         .entrySize(32)
                         .putReturnsNull(true)
-                        .removeReturnsNull(true).file(file).kClass(CharSequence.class).vClass(CharSequence.class).create();
+                        .removeReturnsNull(true)
+                        .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
         StringBuilder key = new StringBuilder();
         StringBuilder value = new StringBuilder();
         StringBuilder value2 = new StringBuilder();
@@ -847,18 +872,21 @@ public class SharedHashMapTest {
     @Test
     public void entrySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
         SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
+        Map<Integer, CharSequence> refMap = new HashMap(map);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
 
         Iterator<Map.Entry<Integer, CharSequence>> entryIterator = entrySet.iterator();
-        Map.Entry<Integer, CharSequence> next1 = entryIterator.next();
-        Map.Entry<Integer, CharSequence> next2 = entryIterator.next();
+        entryIterator.next();
+        refMap.remove(entryIterator.next().getKey());
         entryIterator.remove();
-        assertMap(map, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertEntrySet(entrySet, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertKeySet(keySet, new int[]{2, 3});
-        assertValues(values, new CharSequence[]{"2", "3"});
+        int[] expectedKeys = Ints.toArray(refMap.keySet());
+        CharSequence[] expectedValues = refMap.values().toArray(new CharSequence[0]);
+        assertMap(map, expectedKeys, expectedValues);
+        assertEntrySet(entrySet, expectedKeys, expectedValues);
+        assertKeySet(keySet, expectedKeys);
+        assertValues(values, expectedValues);
 
         map.close();
     }
@@ -866,18 +894,21 @@ public class SharedHashMapTest {
     @Test
     public void keySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
         SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
+        Map<Integer, CharSequence> refMap = new HashMap(map);
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
 
         Iterator<Integer> keyIterator = keySet.iterator();
         keyIterator.next();
-        keyIterator.next();
+        refMap.remove(keyIterator.next());
         keyIterator.remove();
-        assertMap(map, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertEntrySet(entrySet, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertKeySet(keySet, new int[]{2, 3});
-        assertValues(values, new CharSequence[]{"2", "3"});
+        int[] expectedKeys = Ints.toArray(refMap.keySet());
+        CharSequence[] expectedValues = refMap.values().toArray(new CharSequence[0]);
+        assertMap(map, expectedKeys, expectedValues);
+        assertEntrySet(entrySet, expectedKeys, expectedValues);
+        assertKeySet(keySet, expectedKeys);
+        assertValues(values, expectedValues);
 
         map.close();
     }
@@ -885,18 +916,25 @@ public class SharedHashMapTest {
     @Test
     public void valuesIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
         SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
+        HashBiMap<Integer, CharSequence> refMap = HashBiMap.create(map);
+
         Set<Map.Entry<Integer, CharSequence>> entrySet = map.entrySet();
         Set<Integer> keySet = map.keySet();
         Collection<CharSequence> values = map.values();
 
         Iterator<CharSequence> valueIterator = values.iterator();
         valueIterator.next();
-        valueIterator.next();
+        refMap.inverse().remove(valueIterator.next());
         valueIterator.remove();
-        assertMap(map, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertEntrySet(entrySet, new int[]{2, 3}, new CharSequence[]{"2", "3"});
-        assertKeySet(keySet, new int[]{2, 3});
-        assertValues(values, new CharSequence[]{"2", "3"});
+        int[] expectedKeys = Ints.toArray(refMap.keySet());
+        CharSequence[] expectedValues = new CharSequence[expectedKeys.length];
+        for (int i = 0; i < expectedKeys.length; i++) {
+            expectedValues[i] = refMap.get(expectedKeys[i]);
+        }
+        assertMap(map, expectedKeys, expectedValues);
+        assertEntrySet(entrySet, expectedKeys, expectedValues);
+        assertKeySet(keySet, expectedKeys);
+        assertValues(values, expectedValues);
 
         map.close();
     }
@@ -1153,10 +1191,6 @@ public class SharedHashMapTest {
     }
 
     private SharedHashMap<Integer, CharSequence> getViewTestMap(int noOfElements) throws IOException {
-        String TMP = System.getProperty("java.io.tmpdir");
-        File file = new File(TMP + "/shm-remove-test");
-        file.delete();
-        file.deleteOnExit();
         int entries = 100 * 1000;
         SharedHashMap<Integer, CharSequence> map =
                 new SharedHashMapBuilder()
@@ -1164,7 +1198,8 @@ public class SharedHashMapTest {
                         .minSegments(16)
                         .entrySize(32)
                         .putReturnsNull(true)
-                        .removeReturnsNull(true).file(file).kClass(Integer.class).vClass(CharSequence.class).create();
+                        .removeReturnsNull(true)
+                        .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
         int[] expectedKeys = new int[noOfElements];
         String[] expectedValues = new String[noOfElements];
@@ -1187,17 +1222,20 @@ public class SharedHashMapTest {
         builder.entryAndValueAlignment(NO_ALIGNMENT);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class)
         );
         builder.entryAndValueAlignment(Alignment.OF_4_BYTES);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class)
         );
         builder.entryAndValueAlignment(OF_8_BYTES);
         testOversizeEntriesPutRemoveReplace(
                 (VanillaSharedHashMap<CharSequence, CharSequence>)
-                        builder.file(getPersistenceFile()).kClass(CharSequence.class).vClass(CharSequence.class).create()
+                        builder.create(getPersistenceFile(),
+                                CharSequence.class, CharSequence.class)
         );
     }
 
@@ -1243,12 +1281,14 @@ public class SharedHashMapTest {
 
     @Test
     public void equalsTest() throws IOException {
-        final SharedHashMap<Integer, String> map1 = new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Integer.class).vClass(String.class).create();
+        final SharedHashMap<Integer, String> map1 = new SharedHashMapBuilder().create
+                (getPersistenceFile(), Integer.class, String.class);
 
         map1.put(1, "one");
         map1.put(2, "two");
 
-        final SharedHashMap<Integer, String> map2 = new SharedHashMapBuilder().file(getPersistenceFile()).kClass(Integer.class).vClass(String.class).create();
+        final SharedHashMap<Integer, String> map2 = new SharedHashMapBuilder().create
+                (getPersistenceFile(), Integer.class, String.class);
 
         map2.put(1, "one");
         map2.put(2, "two");

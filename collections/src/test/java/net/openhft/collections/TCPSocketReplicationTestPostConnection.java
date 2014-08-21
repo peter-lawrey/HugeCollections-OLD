@@ -27,6 +27,8 @@ import java.net.InetSocketAddress;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmBuilder;
+import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -45,10 +47,10 @@ public class TCPSocketReplicationTestPostConnection {
     public void testPostConnection() throws IOException, InterruptedException {
 
 
-        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
+        map1 = newTcpSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
         Thread.sleep(1);
-        map2 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(500);
@@ -62,9 +64,9 @@ public class TCPSocketReplicationTestPostConnection {
     public void testPostConnectionNoSleep() throws IOException, InterruptedException {
 
 
-        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
+        map1 = newTcpSocketShmIntString((byte) 1, 8076);
         map1.put(5, "EXAMPLE-2");
-        map2 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
 
         // allow time for the recompilation to resolve
         waitTillEqual(1000);
@@ -77,18 +79,11 @@ public class TCPSocketReplicationTestPostConnection {
     @Test
     public void testBootStrapIntoNewMapWithNewFile() throws IOException, InterruptedException {
 
-        final TcpReplicatorBuilder tcpReplicatorBuilder =
-                new TcpReplicatorBuilder(8077, new InetSocketAddress("localhost", 8076))
-                        .heartBeatInterval(1, SECONDS);
-
-
-        final SharedHashMapBuilder builder = new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier((byte) 2)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000);
-        final SharedHashMap<Integer, CharSequence> map2a = (SharedHashMap<Integer, CharSequence>) builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
-        map1 = TCPSocketReplication4WayMapTest.newTcpSocketShmIntString((byte) 1, 8076);
+        SharedHashMapBuilder map2aBuilder =
+                newTcpSocketShmBuilder((byte) 2, 8077, new InetSocketAddress("localhost", 8076));
+        final SharedHashMap<Integer, CharSequence> map2a =
+                map2aBuilder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        map1 = newTcpSocketShmIntString((byte) 1, 8076);
 
         Thread.sleep(1);
         map1.put(5, "EXAMPLE-2");
@@ -100,7 +95,7 @@ public class TCPSocketReplicationTestPostConnection {
         map1.put(6, "EXAMPLE-1");
 
         // recreate map2 with new unique file
-        map2 = builder.file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+        map2 = map2aBuilder.create(getPersistenceFile(), Integer.class, CharSequence.class);
 
 
         // allow time for the recompilation to resolve

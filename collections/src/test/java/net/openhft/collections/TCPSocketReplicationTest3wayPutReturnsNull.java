@@ -46,23 +46,20 @@ public class TCPSocketReplicationTest3wayPutReturnsNull {
     static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
             final byte identifier,
             final int serverPort,
-            final InetSocketAddress... InetSocketAddress) throws IOException {
-
-        TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                InetSocketAddress);
-
-
+            final InetSocketAddress... endpoints) throws IOException {
+        TcpReplicationConfig tcpConfig = TcpReplicationConfig.of(serverPort, endpoints);
         return (T) new SharedHashMapBuilder()
                 .entries(1000)
                 .putReturnsNull(true)
-                .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+                .addReplicator(Replicators.tcp(identifier, tcpConfig))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077), new InetSocketAddress("localhost", 8078));
+        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077),
+                new InetSocketAddress("localhost", 8078));
         map2 = newTcpSocketShmIntString((byte) 2, 8077, new InetSocketAddress("localhost", 8078));
         map3 = newTcpSocketShmIntString((byte) 3, 8078);
     }

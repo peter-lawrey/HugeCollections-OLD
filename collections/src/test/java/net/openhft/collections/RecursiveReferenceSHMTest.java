@@ -50,8 +50,8 @@ public class RecursiveReferenceSHMTest {
         file.deleteOnExit();
         Map<String, StupidCycle> map = new SharedHashMapBuilder()
                 .entries(64)
-                .objectSerializer(new JDKObjectSerializer()).file(file).kClass(String.class).vClass(StupidCycle.class).create();
-
+                .objectSerializer(JDKObjectSerializer.INSTANCE)
+                .create(file, String.class, StupidCycle.class);
         map.put("Test", new StupidCycle());
         map.put("Test2", new StupidCycle2());
         StupidCycle cycle = (StupidCycle) map.get("Test");

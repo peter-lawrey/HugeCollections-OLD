@@ -45,53 +45,34 @@ public class ClusterReplicationTest {
     private ClusterReplicator clusterB;
     private ClusterReplicator clusterA;
 
-    private ClusterReplicatorBuilder clusterReplicatorBuilder;
-    private ClusterReplicatorBuilder clusterReplicatorBuilder1;
-
 
     @Before
 
     public void setup() throws IOException {
-
         {
-            final TcpReplicatorBuilder tcpReplicatorBuilder =
-                    new TcpReplicatorBuilder(8086, new InetSocketAddress("localhost", 8087)).heartBeatInterval(1, SECONDS);
+            TcpReplicationConfig tcpConfig = TcpReplicationConfig
+                    .of(8086, new InetSocketAddress("localhost", 8087))
+                    .heartBeatInterval(1, SECONDS);
 
-            clusterReplicatorBuilder = new ClusterReplicatorBuilder((byte) 1, 1024);
-            clusterReplicatorBuilder.tcpReplicatorBuilder(tcpReplicatorBuilder);
+            clusterA = new ClusterReplicatorBuilder((byte) 1, 1024).tcpReplication(tcpConfig)
+                    .create();
 
-
-            // this is how you add maps after the custer is created
-            map1a = clusterReplicatorBuilder.create((short) 1,
-                    SharedHashMapBuilder.of(Integer.class, CharSequence.class)
-                            .entries(1000)
-                            .file(getPersistenceFile()));
-
-            clusterA = clusterReplicatorBuilder.create();
-
+            map1a = new SharedHashMapBuilder().entries(1000)
+                    .addReplicator(clusterA.chronicleChannel((short) 1))
+                    .create(getPersistenceFile(), Integer.class, CharSequence.class);
         }
 
-
         {
+            TcpReplicationConfig tcpConfig =
+                    TcpReplicationConfig.of(8087).heartBeatInterval(1, SECONDS);
 
-            final TcpReplicatorBuilder tcpReplicatorBuilder =
-                    new TcpReplicatorBuilder(8087).heartBeatInterval(1, SECONDS);
+            clusterB = new ClusterReplicatorBuilder((byte) 2, 1024).tcpReplication(tcpConfig)
+                    .create();
 
-            clusterReplicatorBuilder1 = new ClusterReplicatorBuilder((byte)
-                    2, 1024);
-            clusterReplicatorBuilder1.tcpReplicatorBuilder(tcpReplicatorBuilder);
-
-
-            // this is how you add maps after the custer is created
-            map1b = clusterReplicatorBuilder1.create((short) 1,
-                    SharedHashMapBuilder.of(Integer.class, CharSequence.class)
-                            .entries(1000)
-                            .file(getPersistenceFile()));
-
-            clusterB = clusterReplicatorBuilder1.create();
-
+            map1b = new SharedHashMapBuilder().entries(1000)
+                    .addReplicator(clusterB.chronicleChannel((short) 1))
+                    .create(getPersistenceFile(), Integer.class, CharSequence.class);
         }
-
     }
 
     @After
@@ -114,16 +95,14 @@ public class ClusterReplicationTest {
         // todo remove this sleep
         Thread.sleep(100);
 
-        map2b = clusterReplicatorBuilder1.create((short) 2,
-                SharedHashMapBuilder.of(Integer.class, CharSequence.class)
-                        .entries(1000)
-                        .file(getPersistenceFile()));
+        map2b = new SharedHashMapBuilder().entries(1000)
+                .addReplicator(clusterB.chronicleChannel((short) 2))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
 
-        map2a = clusterReplicatorBuilder.create((short) 2,
-                SharedHashMapBuilder.of(Integer.class, CharSequence.class)
-                        .entries(1000)
-                        .file(getPersistenceFile()));
+        map2a = new SharedHashMapBuilder().entries(1000)
+                .addReplicator(clusterA.chronicleChannel((short) 2))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
         map2a.put(1, "EXAMPLE-2");
         map1a.put(1, "EXAMPLE-1");

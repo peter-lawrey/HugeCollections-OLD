@@ -29,6 +29,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.Replicators.udp;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -45,19 +46,15 @@ public class UDPMultiCastSocketReplicationTest1 {
     @Before
     public void setup() throws IOException {
 
-        final NetworkInterface interf = NetworkInterface.getByName("en0");
-
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(8078,
-                InetAddress.getByName("224.0.0.1"));
-
-        udpReplicatorBuilder.networkInterface(interf);
+        UdpReplicationConfig udpConfig = UdpReplicationConfig
+                .multiCast(InetAddress.getByName("224.0.0.1"), 8078, NetworkInterface.getByName("en0"));
 
         assertTrue(identifier >= 1 && identifier <= Byte.MAX_VALUE);
 
         map1 = new SharedHashMapBuilder()
-                .identifier((byte) identifier)
-                .udpReplicatorBuilder(udpReplicatorBuilder)
-                .entries(20000).file(getPersistenceFile()).kClass(Integer.class).vClass(Integer.class).create();
+                .entries(20000)
+                .addReplicator(udp((byte) identifier, udpConfig))
+                .create(getPersistenceFile(), Integer.class, Integer.class);
     }
 
     @After

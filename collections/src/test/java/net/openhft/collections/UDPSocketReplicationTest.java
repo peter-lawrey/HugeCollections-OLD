@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.Inet4Address;
 
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.Replicators.udp;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -41,12 +42,12 @@ public class UDPSocketReplicationTest {
             final int identifier,
             final int udpPort) throws IOException {
 
-        final UdpReplicatorBuilder udpReplicatorBuilder = new UdpReplicatorBuilder(udpPort,
-                Inet4Address.getByName("255.255.255.255"));
+        UdpReplicationConfig udpConfig = UdpReplicationConfig
+                .simple(Inet4Address.getByName("255.255.255.255"), udpPort);
         return new SharedHashMapBuilder()
                 .entries(1000)
-                .identifier((byte) identifier)
-                .udpReplicatorBuilder(udpReplicatorBuilder).file(getPersistenceFile()).kClass(Integer.class).vClass(CharSequence.class).create();
+                .addReplicator(udp((byte) identifier, udpConfig))
+                .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 
 

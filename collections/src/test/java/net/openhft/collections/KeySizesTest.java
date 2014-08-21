@@ -32,7 +32,8 @@ public class KeySizesTest {
     @Test
     public void testDifferentKeySizes() throws IOException {
         File tempFile = File.createTempFile("delete", "me");
-        Map<String, String> map = new SharedHashMapBuilder().file(tempFile).kClass(String.class).vClass(String.class).create();
+        Map<String, String> map = new SharedHashMapBuilder()
+                .create(tempFile, String.class, String.class);
 
         String k = "";
         for (int i = 0; i < 100; i++) {

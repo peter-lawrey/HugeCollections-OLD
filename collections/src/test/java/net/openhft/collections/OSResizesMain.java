@@ -35,7 +35,8 @@ public class OSResizesMain {
         File file = File.createTempFile("over-sized", "deleteme");
         SharedHashMap<String, String> map = new SharedHashMapBuilder()
                 .entrySize(1024 * 1024)
-                .entries(1024 * 1024).file(file).kClass(String.class).vClass(String.class).create();
+                .entries(1024 * 1024)
+                .create(file, String.class, String.class);
         for (int i = 0; i < 10000; i++) {
             char[] chars = new char[i];
             Arrays.fill(chars, '+');

@@ -18,6 +18,9 @@
 
 package net.openhft.collections;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+
 /**
  * TimeProvider was created initially to support testing of VanillaSharedReplicatedHashMap,
  * with the aim of possibly later providing and optimization to System.currentTimeMillis()
@@ -27,9 +30,11 @@ package net.openhft.collections;
  *
  * @author Rob Austin.
  */
-public abstract class TimeProvider {
+public abstract class TimeProvider implements Serializable {
+    private static final long serialVersionUID = 0L;
 
     private static class System extends TimeProvider {
+        private static final long serialVersionUID = 0L;
 
         public long currentTimeMillis() {
             return java.lang.System.currentTimeMillis();
@@ -48,6 +53,10 @@ public abstract class TimeProvider {
         @Override
         public String toString() {
             return getClass().getSimpleName();
+        }
+
+        private Object readResolve() throws ObjectStreamException {
+            return SYSTEM;
         }
     }
 

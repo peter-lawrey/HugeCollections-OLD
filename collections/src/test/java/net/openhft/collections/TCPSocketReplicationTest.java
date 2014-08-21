@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
 
+import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmBuilder;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -41,12 +43,14 @@ import static org.junit.Assert.assertTrue;
 public class TCPSocketReplicationTest {
 
 
+    private SharedHashMapBuilder map1Builder;
     private SharedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
 
     @Before
     public void setup() throws IOException {
-        map1 = newTcpSocketShmIntString((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
+        map1Builder = newTcpSocketShmBuilder((byte) 1, 8076, new InetSocketAddress("localhost", 8077));
+        map1 = map1Builder.create(getPersistenceFile(), Integer.class, CharSequence.class);
         map2 = newTcpSocketShmIntString((byte) 2, 8077);
     }
 

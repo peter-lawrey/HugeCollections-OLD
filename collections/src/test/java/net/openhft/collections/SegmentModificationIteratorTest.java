@@ -41,9 +41,9 @@ public class SegmentModificationIteratorTest {
                 .minSegments(segments)
                 .entrySize(entrySize)
                 .entryAndValueAlignment(alignment)
-                .generatedValueType(true)
+                .toKeyValueSpecificBuilder(CharSequence.class, LongValue.class)
                 .eventListener(eventListener)
-                .create(getPersistenceFile(), CharSequence.class, LongValue.class);
+                .create(getPersistenceFile());
     }
 
     @Test

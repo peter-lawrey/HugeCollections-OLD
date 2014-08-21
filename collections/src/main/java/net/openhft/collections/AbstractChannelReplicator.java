@@ -20,6 +20,7 @@ package net.openhft.collections;
 
 import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.io.Bytes;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
 import net.openhft.lang.thread.NamedThreadFactory;
@@ -64,7 +65,7 @@ abstract class AbstractChannelReplicator implements Closeable {
     @Nullable
     private final Throttler throttler;
 
-    AbstractChannelReplicator(String name, AbstractReplicationBuilder<?> replicationBuilder,
+    AbstractChannelReplicator(String name, ThrottlingConfig throttlingConfig,
                               int maxEntrySizeBytes)
             throws IOException {
         executorService = Executors.newSingleThreadExecutor(
@@ -72,10 +73,10 @@ abstract class AbstractChannelReplicator implements Closeable {
         selector = Selector.open();
         closeables.add(selector);
 
-        throttler = replicationBuilder.throttle(DAYS) > 0 ?
+        throttler = throttlingConfig.throttling(DAYS) > 0 ?
                 new Throttler(selector,
-                        replicationBuilder.throttleBucketInterval(MILLISECONDS),
-                        maxEntrySizeBytes, replicationBuilder.throttle(DAYS)) : null;
+                        throttlingConfig.bucketInterval(MILLISECONDS),
+                        maxEntrySizeBytes, throttlingConfig.throttling(DAYS)) : null;
     }
 
     void addPendingRegistration(Runnable registration) {
@@ -271,7 +272,7 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-    static class EntryCallback extends Replica.AbstractEntryCallback {
+    static class EntryCallback extends Replica.EntryCallback {
 
         private final Replica.EntryExternalizable externalizable;
         private final ByteBufferBytes in;
@@ -283,7 +284,7 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
 
         @Override
-        public boolean onEntry(final AbstractBytes entry, final int chronicleId) {
+        public boolean onEntry(final Bytes entry, final int chronicleId) {
             in.skip(SIZE_OF_SHORT);
             final long start = in.position();
             externalizable.writeExternalEntry(entry, in, chronicleId);
