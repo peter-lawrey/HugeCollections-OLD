@@ -1,5 +1,14 @@
+SharedHashMap is Deprected
+==============================
+
+SharedHashMap has been renamed to ChronicleMap and moved to the new Git Hub project [ChronicleMap](https://github.com/OpenHFT/Chronicle-Map) 
+
+All new development we be done on the ChronicleMap project, the old ShareHashMap code will remain in this project.
+
+
 HugeCollections
 ===============
+
 
 Huge Collections for Java using efficient off heap storage
 
