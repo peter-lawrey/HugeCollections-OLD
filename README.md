@@ -3,7 +3,7 @@ SharedHashMap is deprected
 
 SharedHashMap has been renamed to ChronicleMap and moved to the new Git Hub project [ChronicleMap](https://github.com/OpenHFT/Chronicle-Map) 
 
-All new development will be done on the ChronicleMap project, the old ShareHashMap code will remain in this project.
+All new development of SharedHashMap will be done on the ChronicleMap project, the old ShareHashMap code will remain here. ChronicleMap uses code from this project, but all new enhancements will be added to ChronicleMap.
 
 
 HugeCollections
