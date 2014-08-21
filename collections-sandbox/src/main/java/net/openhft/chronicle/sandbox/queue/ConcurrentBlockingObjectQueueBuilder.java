@@ -64,6 +64,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     private int port = 8096;
     private String host;
     private String fileName = "/share-queue-test" + System.nanoTime();
+    private boolean deleteOnExit;
 
     /**
      * returns the value to nearest {@parm powerOf2}
@@ -102,6 +103,10 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
     }
 
 
+    public void setDeleteOnExit(boolean deleteOnExit) {
+        this.deleteOnExit = deleteOnExit;
+    }
+
     public BlockingQueue<E> create() throws IOException {
 
         final DataLocator dataLocator;
@@ -115,6 +120,9 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
 
             final String tmp = System.getProperty("java.io.tmpdir");
             final File file = new File(tmp + fileName);
+
+            if (deleteOnExit)
+                file.deleteOnExit();
 
             int ringIndexLocationsStart = 0;
             int ringIndexLocationsLen = SIZE_OF_INT * 2;
@@ -171,7 +179,7 @@ public class ConcurrentBlockingObjectQueueBuilder<E> {
                 serverSocket.socket().setReuseAddress(true);
                 serverSocket.socket().bind(new InetSocketAddress(port));
                 serverSocket.configureBlocking(true);
-                LOG.info("Server waiting for client on port {}",port);
+                LOG.info("Server waiting for client on port {}", port);
                 serverSocket.socket().setReceiveBufferSize(RECEIVE_BUFFER_SIZE);
                 return serverSocket.accept();
             }

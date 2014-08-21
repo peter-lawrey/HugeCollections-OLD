@@ -17,28 +17,28 @@
 package net.openhft.collections;
 
 import net.openhft.lang.Maths;
-import net.openhft.lang.io.ByteBufferBytes;
 import net.openhft.lang.io.serialization.BytesMarshallableSerializer;
 import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.JDKObjectSerializer;
 import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 import static net.openhft.collections.Objects.builderEquals;
 
-public final class SharedHashMapBuilder implements Cloneable {
+public class SharedHashMapBuilder implements Cloneable {
 
-    static final Logger LOG = LoggerFactory.getLogger(TcpReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(SharedHashMapBuilder.class.getName());
 
-    static final int SEGMENT_HEADER = 64;
-    private static final byte[] MAGIC = "SharedHM".getBytes();
+    public static final short UDP_REPLICATION_MODIFICATION_ITERATOR_ID = 128;
 
     // used when configuring the number of segments.
     private int minSegments = -1;
@@ -51,8 +51,8 @@ public final class SharedHashMapBuilder implements Cloneable {
     private Alignment alignment = Alignment.OF_4_BYTES;
     private long entries = 1 << 20;
     private int replicas = 0;
-    private boolean transactional = false;
-    private long lockTimeOutMS = 1000;
+    boolean transactional = false;
+    private long lockTimeOutMS = 20000;
     private int metaDataBytes = 0;
     private SharedMapErrorListener errorListener = SharedMapErrorListeners.logging();
     private boolean putReturnsNull = false;
@@ -60,24 +60,26 @@ public final class SharedHashMapBuilder implements Cloneable {
     private boolean largeSegments = false;
 
     // replication
-    private boolean canReplicate;
-    private byte identifier = Byte.MIN_VALUE;
-    TcpReplicatorBuilder tcpReplicatorBuilder;
-
     private TimeProvider timeProvider = TimeProvider.SYSTEM;
-    UdpReplicatorBuilder udpReplicatorBuilder;
+    Replicator firstReplicator;
+    Map<Class<? extends Replicator>, Replicator> replicators =
+            new HashMap<Class<? extends Replicator>, Replicator>();
+
     private BytesMarshallerFactory bytesMarshallerFactory;
     private ObjectSerializer objectSerializer;
+
+    boolean forceReplicatedImpl = false;
+
+
+    public SharedHashMapBuilder() {
+    }
 
     @Override
     public SharedHashMapBuilder clone() {
 
         try {
+            @SuppressWarnings("unchecked")
             final SharedHashMapBuilder result = (SharedHashMapBuilder) super.clone();
-            if (tcpReplicatorBuilder() != null)
-                result.tcpReplicatorBuilder(tcpReplicatorBuilder().clone());
-            if (udpReplicatorBuilder() != null)
-                result.udpReplicatorBuilder(udpReplicatorBuilder().clone());
             return result;
 
         } catch (CloneNotSupportedException e) {
@@ -87,8 +89,10 @@ public final class SharedHashMapBuilder implements Cloneable {
 
 
     /**
-     * Set minimum number of segments. See concurrencyLevel in {@link java.util.concurrent.ConcurrentHashMap}.
+     * Set minimum number of segments. See concurrencyLevel
+     * in {@link java.util.concurrent.ConcurrentHashMap}.
      *
+     * @param minSegments the minimum number of segments in maps, constructed by this builder
      * @return this builder object back
      */
     public SharedHashMapBuilder minSegments(int minSegments) {
@@ -132,14 +136,18 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Specifies alignment of address in memory of entries and independently of address in memory of values
-     * within entries. <p/> <p>Useful when values of the map are updated intensively, particularly fields with
-     * volatile access, because it doesn't work well if the value crosses cache lines. Also, on some (nowadays
-     * rare) architectures any misaligned memory access is more expensive than aligned. <p/> <p>Note that
-     * specified {@link #entrySize()} will be aligned according to this alignment. I. e. if you set {@code
-     * entrySize(20)} and {@link net.openhft.collections.Alignment#OF_8_BYTES}, actual entry size will be 24
-     * (20 aligned to 8 bytes).
+     * Specifies alignment of address in memory of entries and independently of address in memory
+     * of values within entries.
      *
+     * <p>Useful when values of the map are updated intensively, particularly fields with
+     * volatile access, because it doesn't work well if the value crosses cache lines. Also, on some
+     * (nowadays rare) architectures any misaligned memory access is more expensive than aligned.
+     *
+     * <p>Note that specified {@link #entrySize()} will be aligned according to this alignment.
+     * I. e. if you set {@code entrySize(20)} and {@link Alignment#OF_8_BYTES}, actual entry size
+     * will be 24 (20 aligned to 8 bytes).
+     *
+     * @param alignment the new alignment of the maps constructed by this builder
      * @return this {@code SharedHashMapBuilder} back
      * @see #entryAndValueAlignment()
      */
@@ -149,8 +157,10 @@ public final class SharedHashMapBuilder implements Cloneable {
     }
 
     /**
-     * Returns alignment of addresses in memory of entries and independently of values within entries. <p/>
-     * <p>Default is {@link net.openhft.collections.Alignment#OF_4_BYTES}.
+     * Returns alignment of addresses in memory of entries and independently of values within
+     * entries.
+     *
+     * <p>Default is {@link Alignment#OF_4_BYTES}.
      *
      * @see #entryAndValueAlignment(Alignment)
      */
@@ -225,6 +235,12 @@ public final class SharedHashMapBuilder implements Cloneable {
             throws IOException {
         return new SharedHashMapKeyValueSpecificBuilder<K, V>(this.clone(), kClass, vClass)
                 .create(file);
+    }
+
+    public <K, V> SharedHashMap<K, V> create(Class<K> kClass, Class<V> vClass)
+            throws IOException {
+        return new SharedHashMapKeyValueSpecificBuilder<K, V>(this.clone(), kClass, vClass)
+                .create();
     }
 
     public <K, V> SharedHashMapKeyValueSpecificBuilder<K, V> toKeyValueSpecificBuilder(
@@ -341,15 +357,12 @@ public final class SharedHashMapBuilder implements Cloneable {
                 ", putReturnsNull=" + putReturnsNull() +
                 ", removeReturnsNull=" + removeReturnsNull() +
                 ", largeSegments=" + largeSegments() +
-                ", canReplicate=" + canReplicate() +
-                ", identifier=" + identifierToString() +
-                ", tcpReplicatorBuilder=" + tcpReplicatorBuilder() +
-                ", udpReplicatorBuilder=" + udpReplicatorBuilder() +
                 ", timeProvider=" + timeProvider() +
                 ", bytesMarshallerfactory=" + bytesMarshallerFactory() +
                 '}';
     }
 
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(Object o) {
         return builderEquals(this, o);
@@ -360,61 +373,22 @@ public final class SharedHashMapBuilder implements Cloneable {
         return toString().hashCode();
     }
 
-    public boolean canReplicate() {
-        return canReplicate || tcpReplicatorBuilder != null || udpReplicatorBuilder != null;
-    }
-
-    public SharedHashMapBuilder canReplicate(boolean canReplicate) {
-        this.canReplicate = canReplicate;
+    public SharedHashMapBuilder addReplicator(Replicator replicator) {
+        if (firstReplicator == null) {
+            firstReplicator = replicator;
+            replicators.put(replicator.getClass(), replicator);
+        } else {
+            if (replicator.identifier() != firstReplicator.identifier()) {
+                throw new IllegalArgumentException(
+                        "Identifiers of all replicators of the map should be the same");
+            }
+            if (replicators.containsKey(replicator.getClass())) {
+                throw new IllegalArgumentException("Replicator of " + replicator.getClass() +
+                        " class has already to the map");
+            }
+            replicators.put(replicator.getClass(), replicator);
+        }
         return this;
-    }
-
-
-    <K, V> void applyUdpReplication(VanillaSharedReplicatedHashMap<K, V> result,
-                                    UdpReplicatorBuilder udpReplicatorBuilder) throws IOException {
-
-        final InetAddress address = udpReplicatorBuilder.address();
-
-        if (address == null) {
-            throw new IllegalArgumentException("address can not be null");
-        }
-
-        if (address.isMulticastAddress() && udpReplicatorBuilder.networkInterface() == null) {
-            throw new IllegalArgumentException("MISSING: NetworkInterface, " +
-                    "When using a multicast addresses, please provided a " +
-                    "networkInterface");
-        }
-
-        // the udp modification modification iterator will not be stored in shared memory
-        final ByteBufferBytes updModIteratorBytes =
-                new ByteBufferBytes(ByteBuffer.allocate((int) result.modIterBitSetSizeInBytes()));
-
-
-        final UdpReplicator udpReplicator =
-                new UdpReplicator(result, udpReplicatorBuilder.clone(), entrySize(), result.identifier());
-
-        final VanillaSharedReplicatedHashMap.ModificationIterator udpModIterator =
-                result.new ModificationIterator(
-                        updModIteratorBytes,
-                        result.eventListener,
-                        udpReplicator);
-
-        udpReplicator.setModificationIterator(udpModIterator);
-
-        result.eventListener = udpModIterator;
-
-
-        result.addCloseable(udpReplicator);
-    }
-
-
-    <K, V> void applyTcpReplication(@NotNull VanillaSharedReplicatedHashMap<K, V> result,
-                                            @NotNull TcpReplicatorBuilder tcpReplicatorBuilder)
-            throws IOException {
-        result.addCloseable(new TcpReplicator(result,
-                result,
-                tcpReplicatorBuilder.clone(),
-                entrySize()));
     }
 
     public SharedHashMapBuilder timeProvider(TimeProvider timeProvider) {
@@ -426,45 +400,10 @@ public final class SharedHashMapBuilder implements Cloneable {
         return timeProvider;
     }
 
-    public byte identifier() {
-
-        if (identifier == Byte.MIN_VALUE)
-            throw new IllegalStateException("identifier is not set.");
-
-        return identifier;
-    }
-
-    private String identifierToString() {
-        return identifier == Byte.MIN_VALUE ? "identifier is not set" : (identifier + "");
-    }
-
-    public SharedHashMapBuilder identifier(byte identifier) {
-        this.identifier = identifier;
-        return this;
-    }
-
-    public SharedHashMapBuilder tcpReplicatorBuilder(TcpReplicatorBuilder tcpReplicatorBuilder) {
-        this.tcpReplicatorBuilder = tcpReplicatorBuilder;
-        return this;
-    }
-
-    public TcpReplicatorBuilder tcpReplicatorBuilder() {
-        return tcpReplicatorBuilder;
-    }
-
-
-    public UdpReplicatorBuilder udpReplicatorBuilder() {
-        return udpReplicatorBuilder;
-    }
-
-
-    public SharedHashMapBuilder udpReplicatorBuilder(UdpReplicatorBuilder udpReplicatorBuilder) {
-        this.udpReplicatorBuilder = udpReplicatorBuilder;
-        return this;
-    }
-
     public BytesMarshallerFactory bytesMarshallerFactory() {
-        return bytesMarshallerFactory == null ? bytesMarshallerFactory = new VanillaBytesMarshallerFactory() : bytesMarshallerFactory;
+        return bytesMarshallerFactory == null ?
+                bytesMarshallerFactory = new VanillaBytesMarshallerFactory() :
+                bytesMarshallerFactory;
     }
 
     public SharedHashMapBuilder bytesMarshallerFactory(BytesMarshallerFactory bytesMarshallerFactory) {
@@ -483,4 +422,13 @@ public final class SharedHashMapBuilder implements Cloneable {
         this.objectSerializer = objectSerializer;
         return this;
     }
+
+    /**
+     * For testing
+     */
+    SharedHashMapBuilder forceReplicatedImpl() {
+        this.forceReplicatedImpl = true;
+        return this;
+    }
 }
+

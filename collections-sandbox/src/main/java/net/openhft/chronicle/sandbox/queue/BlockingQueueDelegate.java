@@ -18,7 +18,7 @@
 
 package net.openhft.chronicle.sandbox.queue;
 
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.util.Collection;
 import java.util.Iterator;

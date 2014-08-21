@@ -20,91 +20,93 @@ package net.openhft.collections;
 
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
-import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.MappedStore;
-import net.openhft.lang.io.MultiStoreBytes;
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.*;
 import net.openhft.lang.model.Byteable;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.nio.channels.FileChannel;
+import java.io.*;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
+import static net.openhft.collections.Replica.EntryResolver;
+import static net.openhft.collections.VanillaSharedHashMap.Hasher.hash;
 import static net.openhft.lang.collection.DirectBitSet.NOT_FOUND;
 
 /**
- * A Replicating Multi Master HashMap <p> Each remote hash-map, mirrors its changes over to another remote
- * hash map, neither hash map is considered the master store of data, each hash map uses timestamps to
- * reconcile changes. We refer to in instance of a remote hash-map as a node. A node will be connected to any
- * number of other nodes, for the first implementation the maximum number of nodes will be fixed. The data
- * that is stored locally in each node will become eventually consistent. So changes made to one node, for
- * example by calling put() will be replicated over to the other node. To achieve a high level of performance
- * and throughput, the call to put() won’t block, with concurrentHashMap, It is typical to check the return
- * code of some methods to obtain the old value for example remove(). Due to the loose coupling and lock free
- * nature of this multi master implementation,  this return value will only be the old value on the nodes
- * local data store. In other words the nodes are only concurrent locally. Its worth realising that another
- * node performing exactly the same operation may return a different value. However reconciliation will ensure
- * the maps themselves become eventually consistent. <p> Reconciliation <p> If two ( or more nodes ) were to
- * receive a change to their maps for the same key but different values, say by a user of the maps, calling
- * the put(<key>,<value>). Then, initially each node will update its local store and each local store will
- * hold a different value, but the aim of multi master replication is to provide eventual consistency across
- * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change.
- * We will refer to this notification as an event. The event will hold a timestamp indicating the time the
- * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
- * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
- * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
- * applied to the local node, otherwise the event will be ignored. <p> If two ( or more nodes ) were to
- * receive a change to their maps for the same key but different values, say by a user of the maps, calling
- * the put(<key>,<value>). Then, initially each node will update its local store and each local store will
- * hold a different value, but the aim of multi master replication is to provide eventual consistency across
- * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change.
- * We will refer to this notification as an event. The event will hold a timestamp indicating the time the
- * change occurred, it will also hold the state transition, in this case it was a put with a key and value.
- * Eventual consistency is achieved by looking at the timestamp from the remote node, if for a given key, the
- * remote nodes timestamp is newer than the local nodes timestamp, then the event from the remote node will be
- * applied to the local node, otherwise the event will be ignored. <p> However there is an edge case that we
- * have to concern ourselves with, If two nodes update their map at the same time with different values, we
- * have to deterministically resolve which update wins, because of eventual consistency both nodes should end
- * up locally holding the same data. Although it is rare two remote nodes could receive an update to their
- * maps at exactly the same time for the same key, we have to handle this edge case, its therefore important
- * not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp
- * should win, but in this example both timestamps are the same, and the decision made to one node should be
- * identical to the decision made to the other. We resolve this simple dilemma by using a node identifier,
- * each node will have a unique identifier, the update from the node with the smallest identifier wins.
+ * A Replicating Multi Master HashMap
+ *
+ * <p>Each remote hash map, mirrors its changes over to another remote hash map, neither hash map is considered the
+ * master store of data, each hash map uses timestamps to reconcile changes. We refer to an instance of a remote
+ * hash-map as a node. A node will be connected to any number of other nodes, for the first implementation the maximum
+ * number of nodes will be fixed. The data that is stored locally in each node will become eventually consistent. So
+ * changes made to one node, for example by calling put() will be replicated over to the other node. To achieve a high
+ * level of performance and throughput, the call to put() won’t block, with concurrentHashMap, It is typical to check
+ * the return code of some methods to obtain the old value for example remove(). Due to the loose coupling and lock free
+ * nature of this multi master implementation,  this return value will only be the old value on the nodes local data
+ * store. In other words the nodes are only concurrent locally. Its worth realising that another node performing exactly
+ * the same operation may return a different value. However reconciliation will ensure the maps themselves become
+ * eventually consistent.
+ *
+ * <p>Reconciliation
+ *
+ * <p>If two ( or more nodes ) were to receive a change to their maps for the same key but different values, say by a
+ * user of the maps, calling the put(key, value). Then, initially each node will update its local store and each local
+ * store will hold a different value, but the aim of multi master replication is to provide eventual consistency across
+ * the nodes. So, with multi master when ever a node is changed it will notify the other nodes of its change. We will
+ * refer to this notification as an event. The event will hold a timestamp indicating the time the change occurred, it
+ * will also hold the state transition, in this case it was a put with a key and value. Eventual consistency is achieved
+ * by looking at the timestamp from the remote node, if for a given key, the remote nodes timestamp is newer than the
+ * local nodes timestamp, then the event from the remote node will be applied to the local node, otherwise the event
+ * will be ignored.
+ *
+ * <p>However there is an edge case that we have to concern ourselves with, If two nodes update their map at the same
+ * time with different values, we have to deterministically resolve which update wins, because of eventual consistency
+ * both nodes should end up locally holding the same data. Although it is rare two remote nodes could receive an update
+ * to their maps at exactly the same time for the same key, we have to handle this edge case, its therefore important
+ * not to rely on timestamps alone to reconcile the updates. Typically the update with the newest timestamp should win,
+ * but in this example both timestamps are the same, and the decision made to one node should be identical to the
+ * decision made to the other. We resolve this simple dilemma by using a node identifier, each node will have a unique
+ * identifier, the update from the node with the smallest identifier wins.
  *
  * @param <K> the entries key type
  * @param <V> the entries value type
  */
 class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
-        implements ReplicatedSharedHashMap<K, V>, ReplicatedSharedHashMap.EntryExternalizable, Closeable {
+        implements SharedHashMap<K, V>, Replica, Replica.EntryExternalizable, EntryResolver<K, V>,
+        Closeable {
     private static final long serialVersionUID = 0L;
 
-    private static final int MAX_UNSIGNED_SHORT = 1 << 16;
+    static final int MAX_UNSIGNED_SHORT = Character.MAX_VALUE;
 
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
-    private static final int LAST_UPDATED_HEADER_SIZE = (128 * 8);
+    private static final long LAST_UPDATED_HEADER_SIZE = 128L * 8L;
+
+    // for file, jdbc and UDP replication
+    public static final int RESERVED_MOD_ITER = 8;
 
     private final TimeProvider timeProvider;
     private final byte localIdentifier;
-    private transient Set<Closeable> closeables;
-    private transient AtomicReferenceArray<ModificationIterator> modificationIterators;
+    transient Set<Closeable> closeables;
     private transient Bytes identifierUpdatedBytes;
 
+    private transient ModificationDelegator modificationDelegator;
+    private transient long startOfModificationIterators;
+
     public VanillaSharedReplicatedHashMap(
-            @NotNull SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder, @NotNull File file)
+            @NotNull SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder)
             throws IOException {
         super(kvBuilder);
         this.timeProvider = kvBuilder.builder.timeProvider();
-        this.localIdentifier = kvBuilder.builder.identifier();
+        Replicator firstReplicator = kvBuilder.builder.firstReplicator;
+        this.localIdentifier = firstReplicator != null ? firstReplicator.identifier() : 1;
+    }
+
+    private int assignedModIterBitSetSizeInBytes() {
+        return (int) align64((127 + RESERVED_MOD_ITER) / 8);
     }
 
     @Override
@@ -120,7 +122,6 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
     void initTransients() {
         super.initTransients();
         closeables = new CopyOnWriteArraySet<Closeable>();
-        modificationIterators = new AtomicReferenceArray<ModificationIterator>(127);
     }
 
     long modIterBitSetSizeInBytes() {
@@ -137,12 +138,15 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         return 2;
     }
 
+    @Override
     long getHeaderSize() {
-        return super.getHeaderSize() + LAST_UPDATED_HEADER_SIZE;
+        return super.getHeaderSize() + LAST_UPDATED_HEADER_SIZE +
+                (modIterBitSetSizeInBytes() * (128 + RESERVED_MOD_ITER)) +
+                assignedModIterBitSetSizeInBytes();
     }
 
     void setLastModificationTime(byte identifier, long timestamp) {
-        final int offset = identifier * 8;
+        final long offset = identifier * 8L;
 
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
@@ -152,47 +156,59 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
 
 
     @Override
-    public long lastModificationTime(byte identifier) {
-        assert identifier != this.identifier();
+    public long lastModificationTime(byte remoteIdentifier) {
+        assert remoteIdentifier != this.identifier();
 
-        final int offset = identifier * 8;
         // purposely not volatile as this will impact performance,
         // and the worst that will happen is we'll end up loading more data on a bootstrap
-        return identifierUpdatedBytes.readLong(offset);
+        return identifierUpdatedBytes.readLong(remoteIdentifier * 8L);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    void onHeaderCreated(Bytes headerBytes) {
-        final long len = getHeaderSize() - super.getHeaderSize();
-        assert len != 0;
-        this.identifierUpdatedBytes = headerBytes.bytes(super.getHeaderSize(), len);
+    void onHeaderCreated() {
+
+        long offset = super.getHeaderSize();
+
+        identifierUpdatedBytes = ms.bytes(offset, LAST_UPDATED_HEADER_SIZE).zeroOut();
+        offset += LAST_UPDATED_HEADER_SIZE;
+
+        Bytes modDelBytes = ms.bytes(offset, assignedModIterBitSetSizeInBytes()).zeroOut();
+        offset += assignedModIterBitSetSizeInBytes();
+
+        startOfModificationIterators = offset;
+
+        modificationDelegator = new ModificationDelegator(eventListener, modDelBytes);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener() {
+        return modificationDelegator;
+    }
+
     @Override
     public V put(K key, V value) {
         return put0(key, value, true, localIdentifier, timeProvider.currentTimeMillis());
     }
 
     /**
-     * {@inheritDoc}
+     * Used in conjunction with map replication, all put events that originate from a remote node will be processed
+     * using this method.
+     *
+     * @param key        key with which the specified value is to be associated
+     * @param value      value to be associated with the specified key
+     * @param identifier a unique identifier for a replicating node
+     * @param timeStamp  timestamp in milliseconds, when the put event originally occurred
+     * @return the previous value
+     * @see #put(Object, Object)
      */
-    @Override
-    public V put(K key, V value, byte identifier, long timeStamp) {
+
+    V put(K key, V value, byte identifier, long timeStamp) {
         assert identifier > 0;
         return put0(key, value, true, identifier, timeStamp);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public V putIfAbsent(K key, V value) {
+    public V putIfAbsent(@NotNull K key, V value) {
         return put0(key, value, false, localIdentifier, timeProvider.currentTimeMillis());
     }
 
@@ -224,6 +240,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         return (Segment) segments[segmentNum];
     }
 
+    @Override
     V lookupUsing(K key, V value, boolean create) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -234,71 +251,31 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                 timeProvider.currentTimeMillis());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public V remove(final Object key) {
         return removeIfValueIs(key, null, localIdentifier, timeProvider.currentTimeMillis());
     }
 
     /**
-     * {@inheritDoc}
+     * Used in conjunction with map replication, all remove events that originate from a remote node
+     * will be processed using this method.
+     *
+     * @param key        key with which the specified value is associated
+     * @param value      value expected to be associated with the specified key
+     * @param identifier a unique identifier for a replicating node
+     * @param timeStamp  timestamp in milliseconds, when the remove event originally occurred
+     * @return {@code true} if the entry was removed
+     * @see #remove(Object, Object)
      */
-    @Override
-    public V remove(K key, V value, byte identifier, long timeStamp) {
+    V remove(K key, V value, byte identifier, long timeStamp) {
         assert identifier > 0;
-        return removeIfValueIs(key, null, identifier, timeStamp);
+        return removeIfValueIs(key, value, identifier, timeStamp);
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                            ModificationNotifier modificationNotifier,
-                                                            boolean deletedBackingFileOnExit)
-            throws IOException {
-
-        final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
-
-        if (modificationIterator != null)
-            return modificationIterator;
-
-        synchronized (modificationIterators) {
-            final ModificationIterator modificationIterator0 = modificationIterators.get(remoteIdentifier);
-
-            if (modificationIterator0 != null)
-                return modificationIterator0;
-
-            final File modificationIteratorFile = new File(file().getAbsolutePath() + '-' + remoteIdentifier + ".mod");
-
-            if (deletedBackingFileOnExit) {
-                modificationIteratorFile.delete();
-                modificationIteratorFile.deleteOnExit();
-            }
-            //  if (ms.file().deleteOnExit();)
-            // create a new modification iterator
-            final MappedStore mappedStore = new MappedStore(modificationIteratorFile, FileChannel.MapMode.READ_WRITE,
-                    modIterBitSetSizeInBytes());
-
-            final ModificationIterator newEventListener = new ModificationIterator(
-                    mappedStore.bytes(), eventListener, modificationNotifier);
-
-            modificationIterators.set(remoteIdentifier, newEventListener);
-            eventListener = newEventListener;
-            return newEventListener;
-        }
-    }
-
 
     void addCloseable(Closeable closeable) {
         closeables.add(closeable);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() {
         for (Closeable closeable : closeables) {
@@ -308,24 +285,33 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                 LOG.error("", e);
             }
         }
+
+        try {
+            // give time for stuff to fully close
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         super.close();
 
     }
 
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public byte identifier() {
         return localIdentifier;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public boolean remove(final Object key, final Object value) {
+    public Replica.ModificationIterator acquireModificationIterator
+            (short remoteIdentifier,
+             @NotNull final ModificationNotifier modificationNotifier) {
+
+        return modificationDelegator
+                .acquireModificationIterator(remoteIdentifier, modificationNotifier);
+    }
+
+    @Override
+    public boolean remove(@NotNull final Object key, final Object value) {
         if (value == null)
             return false; // CHM compatibility; I would throw NPE
         return removeIfValueIs(key, (V) value,
@@ -343,11 +329,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                 timestamp, identifier);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    V replaceIfValueIs(final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
@@ -371,10 +354,12 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         @Override
         void createHashLookups(long start) {
             hashLookupLiveAndDeleted = createMultiMap(start);
-
-            start += sizeOfMultiMap();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet());
             hashLookupLiveOnly = createMultiMap(start);
+        }
 
+        public IntIntMultiMap getHashLookup() {
+            return hashLookupLiveOnly;
         }
 
         private long entrySize(long keyLen, long valueLen) {
@@ -383,7 +368,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                     expectedStopBits(valueLen)) + valueLen;
             // replication enforces that the entry size will never be larger than an unsigned short
             if (result > MAX_UNSIGNED_SHORT)
-                throw new IllegalStateException("ENTRY SIZE TOO LARGE : Replicated " +
+                throw new IllegalStateException("ENTRY WRITE_BUFFER_SIZE TOO LARGE : Replicated " +
                         "SharedHashMap's" +
                         " are restricted to an " +
                         "entry size of " + MAX_UNSIGNED_SHORT + ", " +
@@ -402,7 +387,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                 long offset = searchKey(keyBytes, hash2, entry, hashLookupLiveOnly);
                 if (offset >= 0) {
 
-                    // skip the is deleted flag
+                    // skip the timestamp, identifier and is deleted flag
                     entry.skip(10);
 
                     return onKeyPresentOnAcquire(key, usingValue, offset, entry);
@@ -411,7 +396,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                     if (usingValue != null) {
                         // see VanillaSharedHashMap.Segment.acquire() for explanation
                         // why `usingValue` is `create`.
-                        offset = putEntryOnAcquire(keyBytes, hash2, usingValue, create);
+                        offset = putEntryOnAcquire(keyBytes, hash2, usingValue, create, timestamp);
                         incrementSize();
                         notifyPut(offset, true, key, usingValue, posFromOffset(offset));
                         return usingValue;
@@ -424,9 +409,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
             }
         }
 
-        private long putEntryOnAcquire(Bytes keyBytes, int hash2, V value, boolean usingValue) {
+        private long putEntryOnAcquire(Bytes keyBytes, int hash2, V value, boolean usingValue,
+                                       long timestamp) {
             return putEntry(keyBytes, hash2, value, usingValue, localIdentifier,
-                    timeProvider.currentTimeMillis(), hashLookupLiveOnly);
+                    timestamp, hashLookupLiveOnly);
         }
 
 
@@ -630,9 +616,10 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         }
 
         /**
-         * Used only with replication, its sometimes possible to receive an old ( or stale update ) from a
-         * remote map. This method is used to determine if we should ignore such updates. <p> We can reject
-         * put() and removes() when comparing times stamps with remote systems
+         * Used only with replication, its sometimes possible to receive an old ( or stale update ) from a remote map.
+         * This method is used to determine if we should ignore such updates.
+         *
+         * <p>We can reject put() and removes() when comparing times stamps with remote systems
          *
          * @param entry      the maps entry
          * @param timestamp  the time the entry was created or updated
@@ -659,19 +646,19 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         }
 
         /**
-         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface and
-         * {@code usingValue} is {@code true}, the value is backed with the bytes of this entry.
+         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface and {@code
+         * usingValue} is {@code true}, the value is backed with the bytes of this entry.
          *
          * @param keyBytes           serialized key
-         * @param hash2              a hash of the {@code keyBytes}. Caller was searching for the key in the
-         *                           {@code searchedHashLookup} using this hash.
+         * @param hash2              a hash of the {@code keyBytes}. Caller was searching for the key in the {@code
+         *                           searchedHashLookup} using this hash.
          * @param value              the value to put
-         * @param usingValue         {@code true} if the value should be backed with the bytes of the entry,
-         *                           if it implements {@link net.openhft.lang.model.Byteable} interface,
-         *                           {@code false} if it should put itself
+         * @param usingValue         {@code true} if the value should be backed with the bytes of the entry, if it
+         *                           implements {@link net.openhft.lang.model.Byteable} interface, {@code false} if it
+         *                           should put itself
          * @param identifier         the identifier of the outer SHM node
-         * @param timestamp          the timestamp when the entry was put <s>(this could be later if it was a
-         *                           remote put)</s> this method is called only from usual put or acquire
+         * @param timestamp          the timestamp when the entry was put <s>(this could be later if it was a remote
+         *                           put)</s> this method is called only from usual put or acquire
          * @param searchedHashLookup the hash lookup that used to find the entry based on the key
          * @return offset of the written entry in the Segment bytes
          * @see VanillaSharedHashMap.Segment#putEntry(net.openhft.lang.io.Bytes, Object, boolean)
@@ -860,39 +847,54 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
             }
         }
 
+        @Override
+        public Entry<K, V> getEntry(long pos) {
+            bytes.position(offsetFromPos(pos) + metaDataBytes);
+            bytes.readStopBit();
+            K key = keyMarshaller.read(bytes);
+            long timestamp = bytes.readLong();
+            bytes.skip(2L); // identifier and isDeleted flag
+            bytes.readStopBit();
+            alignment.alignPositionAddr(bytes);
+            V value = valueMarshaller.read(bytes);
+            return new TimestampTrackingEntry(key, value, timestamp);
+        }
 
         @Override
         void clear() {
-
             // we have to make sure that every calls notifies on remove,
             // so that the replicators can pick it up
             for (K k : keySet()) {
                 VanillaSharedReplicatedHashMap.this.remove(k);
             }
+        }
+    }
 
+    class TimestampTrackingEntry extends SimpleEntry<K, V> {
+        private static final long serialVersionUID = 0L;
+
+        transient long timestamp;
+        public TimestampTrackingEntry(K key, V value, long timestamp) {
+            super(key, value);
+            this.timestamp = timestamp;
         }
 
         @Override
-        void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
-            hashLookupLiveOnly.forEach(entryConsumer);
-        }
-
-        @Override
-        void skipBytesBetweenKeyAndValue(Bytes bytes) {
-            // timestamp, id and isDeleted flag
-            bytes.skip(10);
+        public V setValue(V value) {
+            long newTimestamp = timestamp = timeProvider.currentTimeMillis();
+            put(getKey(), value, localIdentifier, newTimestamp);
+            return super.setValue(value);
         }
     }
 
 
     /**
-     * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
-    public void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination) {
+    public void writeExternalEntry(@NotNull Bytes entry, @NotNull Bytes destination,
+                                   int chronicleId) {
 
         final long initialLimit = entry.limit();
 
@@ -964,10 +966,8 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
 
 
     /**
-     * {@inheritDoc}
-     * <p/>
-     * This method does not set a segment lock, A segment lock should be obtained before calling this method,
-     * especially when being used in a multi threaded context.
+     * This method does not set a segment lock, A segment lock should be obtained before calling
+     * this method, especially when being used in a multi threaded context.
      */
     @Override
     public void readExternalEntry(@NotNull Bytes source) {
@@ -1039,43 +1039,241 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         }
     }
 
+    class EntryIterator extends VanillaSharedHashMap<K, V>.EntryIterator {
+        @Override
+        void removePresent(VanillaSharedHashMap.Segment seg, int pos) {
+            @SuppressWarnings("unchecked")
+            Segment segment = (Segment) seg;
+
+            final long offset = segment.offsetFromPos(pos);
+            final NativeBytes entry = segment.entry(offset);
+            final long limit = entry.limit();
+
+            final long keyLen = entry.readStopBit();
+            long keyPosition = entry.position();
+            entry.skip(keyLen);
+            long timestamp = entry.readLong();
+            entry.position(keyPosition);
+            if (timestamp > ((TimestampTrackingEntry) returnedEntry).timestamp) {
+                // The entry was updated after being returned from iterator.next()
+                // Check that it is still the entry with the same key
+                K key = returnedEntry.getKey();
+                DirectBytes returnedKeyBytes = getKeyAsBytes(key);
+                if (returnedKeyBytes.remaining() != keyLen || !entry.startsWith(returnedKeyBytes)) {
+                    // The case:
+                    // 1. iterator.next() - thread 1
+                    // 2. map.put() which cause relocation of the key, returned above - thread 2
+                    // OR map.remove() which remove this key - thread 2
+                    // 3. map.put() which place a new key on the `pos` in current segment - thread 3
+                    // 4. iterator.remove() - thread 1
+                    VanillaSharedReplicatedHashMap.this.remove(key);
+                    return;
+                }
+            }
+            entry.limit(entry.position() + keyLen);
+            final int segmentHash = hasher.segmentHash(hash(entry));
+            entry.limit(limit);
+
+            segment.hashLookupLiveOnly.remove(segmentHash, pos);
+            segment.decrementSize();
+
+            entry.skip(keyLen);
+            entry.writeLong(timeProvider.currentTimeMillis());
+            entry.writeByte(localIdentifier);
+            entry.writeBoolean(true);
+
+            segment.notifyRemoved(offset, returnedEntry.getKey(), returnedEntry.getValue(), pos);
+        }
+    }
+
+    class EntrySet extends VanillaSharedHashMap<K, V>.EntrySet {
+        @NotNull
+        @Override
+        public Iterator<Entry<K, V>> iterator() {
+            return new EntryIterator();
+        }
+    }
+
+    @NotNull
+    @Override
+    public Set<Entry<K, V>> entrySet() {
+        return new EntrySet();
+    }
 
     /**
-     * Once a change occurs to a map, map replication requires that these changes are picked up by another
-     * thread, this class provides an iterator like interface to poll for such changes. <p> In most cases the
-     * thread that adds data to the node is unlikely to be the same thread that replicates the data over to
-     * the other nodes, so data will have to be marshaled between the main thread storing data to the map, and
-     * the thread running the replication. <p> One way to perform this marshalling, would be to pipe the data
-     * into a queue. However, This class takes another approach. It uses a bit set, and marks bits which
-     * correspond to the indexes of the entries that have changed. It then provides an iterator like interface
-     * to poll for such changes.
+     * receive an update from the map, via the SharedMapEventListener and delegates the changes
+     * to the currently active modification iterators
+     */
+    class ModificationDelegator extends SharedMapEventListener<K, V, SharedHashMap<K, V>> {
+        private static final long serialVersionUID = 0L;
+
+        // the assigned modification iterators
+        private final ATSDirectBitSet modIterSet;
+
+        private final AtomicReferenceArray<ModificationIterator> modificationIterators =
+                new AtomicReferenceArray<ModificationIterator>(127 + RESERVED_MOD_ITER);
+
+        private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
+
+        public ModificationDelegator(@NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
+                                     final Bytes bytes) {
+            this.nextListener = nextListener;
+            modIterSet = new ATSDirectBitSet(bytes);
+        }
+
+        public ModificationIterator acquireModificationIterator(
+                final short remoteIdentifier,
+                @NotNull final ModificationNotifier modificationNotifier) {
+
+            final ModificationIterator modificationIterator = modificationIterators.get(remoteIdentifier);
+
+            if (modificationIterator != null)
+                return modificationIterator;
+
+            synchronized (modificationIterators) {
+                final ModificationIterator modificationIterator0 = modificationIterators.get(remoteIdentifier);
+
+                if (modificationIterator0 != null)
+                    return modificationIterator0;
+
+                final Bytes bytes = ms.bytes(startOfModificationIterators + (modIterBitSetSizeInBytes()
+                                * remoteIdentifier),
+                        modIterBitSetSizeInBytes());
+
+                final ModificationIterator newModificationIterator = new ModificationIterator(
+                        bytes, modificationNotifier);
+
+                modificationIterators.set(remoteIdentifier, newModificationIterator);
+                modIterSet.set(remoteIdentifier);
+                return newModificationIterator;
+            }
+        }
+
+        @Override
+        public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                          boolean added, K key, V value, long pos, SharedSegment segment) {
+
+            assert VanillaSharedReplicatedHashMap.this == map :
+                    "ModificationIterator.onPut() is called from outside of the parent map";
+            try {
+                nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
+
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onPut(map, entry, metaDataBytes,
+                            added, key, value, pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+
+
+        }
+
+        @Override
+        public void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                             K key, V value, int pos, SharedSegment segment) {
+            assert VanillaSharedReplicatedHashMap.this == map :
+                    "ModificationIterator.onRemove() is called from outside of the parent map";
+            try {
+                nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
+            } catch (Exception e) {
+                LOG.error("", e);
+            }
+
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+
+        }
+
+        @Override
+        void onRelocation(int pos, SharedSegment segment) {
+            for (long next = modIterSet.nextSetBit(0); next > 0; next = modIterSet.nextSetBit(next + 1)) {
+                try {
+                    final ModificationIterator modificationIterator = modificationIterators.get((int) next);
+                    modificationIterator.onRelocation(pos, segment);
+                } catch (Exception e) {
+                    LOG.error("", e);
+                }
+            }
+        }
+
+        @Override
+        public V onGetMissing(SharedHashMap<K, V> map, Bytes keyBytes, K key,
+                              V usingValue) {
+            return nextListener.onGetMissing(map, keyBytes, key, usingValue);
+        }
+
+        @Override
+        public void onGetFound(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
+                               K key, V value) {
+            nextListener.onGetFound(map, entry, metaDataBytes, key, value);
+        }
+
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
+
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void readObject(ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
+    }
+
+    /**
+     * Once a change occurs to a map, map replication requires that these changes are picked up by another thread, this
+     * class provides an iterator like interface to poll for such changes.
+     *
+     * <p>In most cases the thread that adds data to the node is unlikely to be the same thread that replicates the data
+     * over to the other nodes, so data will have to be marshaled between the main thread storing data to the map, and
+     * the thread running the replication.
+     *
+     * <p>One way to perform this marshalling, would be to pipe the data into a queue. However, This class takes another
+     * approach. It uses a bit set, and marks bits which correspond to the indexes of the entries that have changed. It
+     * then provides an iterator like interface to poll for such changes.
      *
      * @author Rob Austin.
      */
     class ModificationIterator extends SharedMapEventListener<K, V, SharedHashMap<K, V>>
-            implements ReplicatedSharedHashMap.ModificationIterator {
-
+            implements Replica.ModificationIterator {
+        private static final long serialVersionUID = 0L;
 
         private final ModificationNotifier modificationNotifier;
         private final ATSDirectBitSet changes;
         private final int segmentIndexShift;
         private final long posMask;
-        private final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener;
+
         private final EntryModifiableCallback entryModifiableCallback = new EntryModifiableCallback();
 
-        private volatile long position = -1;
+        // records the current position of the cursor in the bitset
+        private long position = -1;
 
         /**
-         * @param bytes
-         * @param nextListener
+         * @param bytes                the back the bitset, used to mark which entries have changed
          * @param modificationNotifier called when ever there is a change applied
          */
         public ModificationIterator(@NotNull final Bytes bytes,
-                                    @NotNull final SharedMapEventListener<K, V, SharedHashMap<K, V>> nextListener,
                                     @NotNull final ModificationNotifier modificationNotifier) {
 
             this.modificationNotifier = modificationNotifier;
-            this.nextListener = nextListener;
             long bitsPerSegment = bitsPerSegmentInModIterBitSet();
             segmentIndexShift = Long.numberOfTrailingZeros(bitsPerSegment);
             posMask = bitsPerSegment - 1;
@@ -1093,46 +1291,27 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
             return (((long) segmentIndex) << segmentIndexShift) | pos;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onPut(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                           boolean added, K key, V value, long pos, SharedSegment segment) {
 
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onPut() is called from outside of the parent map";
-            try {
-                nextListener.onPut(map, entry, metaDataBytes, added, key, value, pos, segment);
-            } catch (Exception e) {
-                LOG.error("", e);
-            }
+
 
             changes.set(combine(segment.getIndex(), pos));
-
             modificationNotifier.onChange();
-
-
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
         public void onRemove(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
                              K key, V value, int pos, SharedSegment segment) {
             assert VanillaSharedReplicatedHashMap.this == map :
                     "ModificationIterator.onRemove() is called from outside of the parent map";
-            try {
-                nextListener.onRemove(map, entry, metaDataBytes, key, value, pos, segment);
-            } catch (Exception e) {
-                LOG.error("", e);
-            }
+
 
             changes.set(combine(segment.getIndex(), pos));
-
             modificationNotifier.onChange();
-
 
         }
 
@@ -1147,22 +1326,9 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
         }
 
 
-        @Override
-        public V onGetMissing(SharedHashMap<K, V> map, Bytes keyBytes, K key,
-                              V usingValue) {
-            return nextListener.onGetMissing(map, keyBytes, key, usingValue);
-        }
-
-        @Override
-        public void onGetFound(SharedHashMap<K, V> map, Bytes entry, int metaDataBytes,
-                               K key, V value) {
-            nextListener.onGetFound(map, entry, metaDataBytes, key, value);
-        }
-
-
         /**
-         * you can continue to poll hasNext() until data becomes available. If are are in the middle of
-         * processing an entry via {@code nextEntry}, hasNext will return true until the bit is cleared
+         * you can continue to poll hasNext() until data becomes available. If are are in the middle of processing an
+         * entry via {@code nextEntry}, hasNext will return true until the bit is cleared
          *
          * @return true if there is an entry
          */
@@ -1177,7 +1343,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
          * @param entryCallback call this to get an entry, this class will take care of the locking
          * @return true if an entry was processed
          */
-        public boolean nextEntry(@NotNull final EntryCallback entryCallback) {
+        public boolean nextEntry(@NotNull final EntryCallback entryCallback, final int chronicleId) {
             long position = this.position;
             while (true) {
                 long oldPosition = position;
@@ -1203,7 +1369,7 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
                         final NativeBytes entry = segment.entry(segment.offsetFromPos(segmentPos));
 
                         // if the entry should be ignored, we'll move the next entry
-                        final boolean success = entryCallback.onEntry(entry);
+                        final boolean success = entryCallback.onEntry(entry, chronicleId);
                         entryCallback.onAfterEntry();
                         if (success) {
                             return true;
@@ -1244,10 +1410,79 @@ class VanillaSharedReplicatedHashMap<K, V> extends VanillaSharedHashMap<K, V>
             for (final Segment segment : (Segment[]) segments) {
                 segment.dirtyEntries(fromTimeStamp, entryModifiableCallback);
             }
+        }
 
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            throw new NotSerializableException(getClass().getCanonicalName());
+        }
+
+        /**
+         * Always throws {@code NotSerializableException} since instances of this class
+         * are not intended to be serializable.
+         */
+        private void readObject(ObjectInputStream in)
+                throws IOException, ClassNotFoundException {
+            throw new NotSerializableException(getClass().getCanonicalName());
         }
     }
 
+    @Override
+    public K key(@NotNull Bytes entry, K usingKey) {
+        final long start = entry.position();
+        try {
+            // keyLen
+            entry.readStopBit();
+            return keyMarshaller.read(entry, usingKey);
+        } finally {
+            entry.position(start);
+        }
+
+    }
+
+    @Override
+    public V value(@NotNull Bytes entry, V usingValue) {
+        final long start = entry.position();
+        try {
+
+            // keyLen
+            entry.skip(entry.readStopBit());
+
+            //timeStamp
+            entry.readLong();
+
+            final byte identifier = entry.readByte();
+            if (identifier != localIdentifier) {
+                return null;
+            }
+
+            final boolean isDeleted = entry.readBoolean();
+            long valueLen;
+            if (!isDeleted) {
+                valueLen = entry.readStopBit();
+                assert valueLen > 0;
+            } else {
+                return null;
+            }
+
+            return valueMarshaller.read(entry, usingValue);
+        } finally {
+            entry.position(start);
+        }
+    }
+
+    @Override
+    public boolean wasRemoved(@NotNull Bytes entry) {
+        final long start = entry.position();
+        try {
+            return entry.readBoolean(entry.readStopBit() + 10);
+        } finally {
+            entry.position(start);
+        }
+    }
 
 }
 

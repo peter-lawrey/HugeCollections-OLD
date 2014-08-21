@@ -70,8 +70,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .entries(size)
-                .identifier((byte) 1)
-                .canReplicate(canReplicate)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
@@ -80,7 +79,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .entries(size)
-                .canReplicate(canReplicate)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
@@ -90,7 +89,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
 
         return new SharedHashMapBuilder()
-                .canReplicate(canReplicate)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
@@ -99,8 +98,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
 
         return new SharedHashMapBuilder()
                 .entries(size)
-                .identifier((byte) 1)
-                .canReplicate(canReplicate)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
     }
@@ -109,8 +107,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
     SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
 
         return new SharedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .identifier((byte) 1)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
@@ -118,8 +115,7 @@ public class VanillaSharedReplicatedHashMapTest extends JSR166TestCase {
     SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
 
         return new SharedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .create(getPersistenceFile(), BI.class, Boolean.class);
+                .forceReplicatedImpl().create(getPersistenceFile(), BI.class, Boolean.class);
 
     }
 

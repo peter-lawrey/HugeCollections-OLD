@@ -420,12 +420,20 @@ public class SharedHashMapTest {
         for (int j = 1; j <= 3; j++) {
             for (int i = 0; i < entries; i++) {
                 CharSequence userCS = getUserCharSequence(i);
+                if (i * 9876 == 829682760) {
+                    System.out.println(1);
+                }
 
                 if (j > 1) {
-                    assertNotNull(map.getUsing(userCS, value));
+                    if (i == 1) {
+                        System.out.println(1);
+                    }
+                    assertNotNull(userCS.toString(), map.getUsing(userCS, value));
                 } else {
                     map.acquireUsing(userCS, value);
                 }
+                if (i >= 1)
+                assertTrue(userCS.toString(), map.containsKey(getUserCharSequence(1)));
                 assertEquals(j - 1, value.getValue());
 
                 value.addAtomicValue(1);
@@ -860,6 +868,7 @@ public class SharedHashMapTest {
         map.close();
     }
 
+
     @Test
     public void entrySetIteratorRemoveReflectedInMapAndOtherViews() throws IOException {
         SharedHashMap<Integer, CharSequence> map = getViewTestMap(3);
@@ -966,6 +975,13 @@ public class SharedHashMapTest {
 
         map.close();
     }
+
+
+
+
+
+
+
 
     @Test
     public void valuesRemoveAllReflectedInMapAndOtherViews() throws IOException {
@@ -1120,6 +1136,16 @@ public class SharedHashMapTest {
         map.close();
 
         assertEquals(noOfElements, sum);
+    }
+
+
+    @Test(expected = IllegalStateException.class)
+    public void testRemoveWhenNextIsNotCalled() throws IOException {
+
+        SharedHashMap<Integer, CharSequence> map = getViewTestMap(2);
+
+        Iterator<Integer> iterator = map.keySet().iterator();
+        iterator.remove();
     }
 
     @Test

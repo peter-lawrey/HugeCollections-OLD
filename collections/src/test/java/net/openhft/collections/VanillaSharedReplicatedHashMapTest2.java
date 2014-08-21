@@ -71,9 +71,11 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
         final SharedHashMap<Integer, CharSequence> map1 =
-                Builder.newShmIntString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
+                Builder.newShm(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2,
+                        Integer.class, CharSequence.class);
         final SharedHashMap<Integer, CharSequence> map2 =
-                Builder.newShmIntString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+                Builder.newShm(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1,
+                        Integer.class, CharSequence.class);
 
         return new ReplicationCheckingMap<Integer, CharSequence>(map1, map2);
 
@@ -87,9 +89,11 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         final ArrayBlockingQueue<byte[]> map2ToMap1 = new ArrayBlockingQueue<byte[]>(100);
 
         final SharedHashMap<CharSequence, CharSequence> map1 =
-                Builder.newShmStringString(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2);
+                Builder.newShm(size, map1ToMap2, map2ToMap1, (byte) 1, (byte) 2,
+                        CharSequence.class, CharSequence.class);
         final SharedHashMap<CharSequence, CharSequence> map2 =
-                Builder.newShmStringString(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1);
+                Builder.newShm(size, map2ToMap1, map1ToMap2, (byte) 2, (byte) 1,
+                        CharSequence.class, CharSequence.class);
 
         return new ReplicationCheckingMap<CharSequence, CharSequence>(map1, map2);
 
@@ -97,12 +101,9 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
 
 
     SharedHashMap<Integer, CharSequence> newShmIntString() throws IOException {
-
         return new SharedHashMapBuilder()
-                .canReplicate(canReplicate)
-                .identifier((byte) 1)
+                .forceReplicatedImpl()
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
-
     }
 
 
@@ -131,6 +132,23 @@ public class VanillaSharedReplicatedHashMapTest2 extends JSR166TestCase {
         map.clear();
         assertEquals(0, map.size());
     }
+
+    /**
+     * clear removes all pairs
+     */
+    @Test
+    public void testKeySetRemove() throws IOException {
+        SharedHashMap map = map5();
+
+        System.out.print("map.keySet()=" + map.keySet());
+        for (Object k : map.keySet()) {
+            map.remove(k);
+        }
+
+
+        assertEquals(0, map.size());
+    }
+
 
     /**
      * Maps with same contents are equal

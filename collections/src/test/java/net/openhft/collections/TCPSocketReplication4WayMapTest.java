@@ -28,7 +28,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.Replicators.tcp;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -48,15 +50,12 @@ public class TCPSocketReplication4WayMapTest {
             final byte identifier,
             final int serverPort,
             final InetSocketAddress... endpoints) throws IOException {
-
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(serverPort,
-                endpoints).heartBeatIntervalMS(1000).deletedModIteratorFileOnExit(true);
-
+        TcpReplicationConfig tcpConfig = TcpReplicationConfig.of(serverPort, endpoints)
+                .heartBeatInterval(1L, SECONDS);
         return new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier(identifier)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
-                .entries(20000);
+                .entries(1000L)
+                .addReplicator(tcp(identifier, tcpConfig))
+                .entries(20000L);
     }
 
     public static <T extends SharedHashMap<Integer, CharSequence>> T newTcpSocketShmIntString(
@@ -111,7 +110,7 @@ public class TCPSocketReplication4WayMapTest {
         map4.remove(3);
 
         // allow time for the recompilation to resolve
-        waitTillEqual(1500);
+        waitTillEqual(2500);
 
         assertEquals("map2", map1, map2);
         assertEquals("map3", map1, map3);
@@ -174,6 +173,8 @@ public class TCPSocketReplication4WayMapTest {
         for (; t < timeOutMs; t++) {
             if (map1.equals(map2) &&
                     map1.equals(map3) &&
+                    map2.equals(map3) &&
+                    map4.equals(map3) &&
                     map1.equals(map4))
                 break;
             Thread.sleep(1);

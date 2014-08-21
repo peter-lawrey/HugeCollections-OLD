@@ -18,15 +18,18 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
+import net.openhft.lang.io.ByteBufferBytes;
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.model.constraints.NotNull;
+import net.openhft.lang.model.constraints.Nullable;
 import net.openhft.lang.thread.NamedThreadFactory;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -35,42 +38,54 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
+import static java.lang.Math.round;
 import static java.nio.channels.SelectionKey.OP_WRITE;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static net.openhft.collections.VanillaSharedReplicatedHashMap.MAX_UNSIGNED_SHORT;
 
 /**
  * @author Rob Austin.
  */
 abstract class AbstractChannelReplicator implements Closeable {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractChannelReplicator.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractChannelReplicator.class);
     static final int BITS_IN_A_BYTE = 8;
+    static final int SIZE_OF_SHORT = 2;
 
-    final ExecutorService executorService;
+    private final ExecutorService executorService;
     final Selector selector;
     final Set<Closeable> closeables = Collections.synchronizedSet(new LinkedHashSet<Closeable>());
+    private final Queue<Runnable> pendingRegistrations = new ConcurrentLinkedQueue<Runnable>();
+    @Nullable
+    private final Throttler throttler;
 
-    AbstractChannelReplicator(String name) throws IOException {
+    AbstractChannelReplicator(String name, ThrottlingConfig throttlingConfig,
+                              int maxEntrySizeBytes)
+            throws IOException {
         executorService = Executors.newSingleThreadExecutor(
                 new NamedThreadFactory(name, true));
         selector = Selector.open();
         closeables.add(selector);
+
+        throttler = throttlingConfig.throttling(DAYS) > 0 ?
+                new Throttler(selector,
+                        throttlingConfig.bucketInterval(MILLISECONDS),
+                        maxEntrySizeBytes, throttlingConfig.throttling(DAYS)) : null;
     }
 
+    void addPendingRegistration(Runnable registration) {
+        pendingRegistrations.add(registration);
+    }
 
-    /**
-     * Registers the SocketChannel with the selector
-     *
-     * @param selectableChannels the SelectableChannel to register
-     * @throws ClosedChannelException
-     */
-    void register(@NotNull final Queue<Runnable> selectableChannels) throws
-            ClosedChannelException {
-        for (Runnable runnable = selectableChannels.poll(); runnable != null; runnable = selectableChannels.poll()) {
+    void registerPendingRegistrations() throws ClosedChannelException {
+        for (Runnable runnable = pendingRegistrations.poll(); runnable != null;
+             runnable = pendingRegistrations.poll()) {
             try {
                 runnable.run();
             } catch (Exception e) {
@@ -79,10 +94,26 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
+    abstract void process() throws IOException;
+
+    final void start() {
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            process();
+                        } catch (Exception e) {
+                            LOG.error("", e);
+                        }
+                    }
+                }
+        );
+    }
+
 
     @Override
     public void close() {
-
         synchronized (this.closeables) {
             for (Closeable closeable : this.closeables) {
                 try {
@@ -91,9 +122,41 @@ abstract class AbstractChannelReplicator implements Closeable {
                     LOG.error("", e);
                 }
             }
+            closeables.clear();
         }
-        closeables.clear();
         executorService.shutdownNow();
+    }
+
+    void closeEarlyAndQuietly(SelectableChannel channel) {
+        try {
+            if (throttler != null)
+                throttler.remove(channel);
+            closeables.remove(channel);
+            channel.close();
+        } catch (IOException ex) {
+            // do nothing
+        }
+    }
+
+    /**
+     * forces the TCP and UDP replicators to re-bootstrap
+     * This is called whenever a new SHM is added to a custer
+     */
+    public abstract void forceBootstrap();
+
+    void checkThrottleInterval() throws ClosedChannelException {
+        if (throttler != null)
+            throttler.checkThrottleInterval();
+    }
+
+    void contemplateThrottleWrites(int bytesJustWritten) throws ClosedChannelException {
+        if (throttler != null)
+            throttler.contemplateThrottleWrites(bytesJustWritten);
+    }
+
+    void throttle(SelectableChannel channel) {
+        if (throttler != null)
+            throttler.add(channel);
     }
 
     /**
@@ -102,23 +165,23 @@ abstract class AbstractChannelReplicator implements Closeable {
      */
     static class Throttler {
 
-        private long lastTime = System.currentTimeMillis();
+        private final Selector selector;
         private final Set<SelectableChannel> channels = new CopyOnWriteArraySet<SelectableChannel>();
-        private long byteWritten;
-        private Selector selector;
-        private final int throttleInterval;
+        private final long throttleInterval;
         private final long maxBytesInInterval;
 
+        private long lastTime = System.currentTimeMillis();
+        private long bytesWritten;
+
         Throttler(@NotNull Selector selector,
-                  int throttleInterval,
+                  long throttleIntervalInMillis,
                   long serializedEntrySize,
-                  long bitsPerSecond) {
+                  long bitsPerDay) {
 
             this.selector = selector;
-            this.throttleInterval = throttleInterval;
-            this.maxBytesInInterval = (TimeUnit.SECONDS.toMillis(bitsPerSecond) /
-                    (throttleInterval * BITS_IN_A_BYTE))
-                    - serializedEntrySize;
+            this.throttleInterval = throttleIntervalInMillis;
+            double bytesPerMs = ((double) bitsPerDay) / DAYS.toMillis(1) / BITS_IN_A_BYTE;
+            this.maxBytesInInterval = round(bytesPerMs * throttleInterval) - serializedEntrySize;
         }
 
         public void add(SelectableChannel selectableChannel) {
@@ -141,11 +204,11 @@ abstract class AbstractChannelReplicator implements Closeable {
                 return;
 
             lastTime = time;
-            byteWritten = 0;
+            bytesWritten = 0;
 
 
             if (LOG.isDebugEnabled())
-                LOG.debug("Removing OP_WRITE on all channels");
+                LOG.debug("Restoring OP_WRITE on all channels");
 
             for (SelectableChannel selectableChannel : channels) {
 
@@ -161,16 +224,16 @@ abstract class AbstractChannelReplicator implements Closeable {
          * checks the number of bytes written in this interval, if this number of bytes exceeds a threshold,
          * the selected will de-register the socket that is being written to, until the interval is finished.
          *
-         * @param len the number of bytes just written
          * @throws ClosedChannelException
          */
-        public void contemplateUnregisterWriteSocket(int len) throws ClosedChannelException {
-            byteWritten += len;
-            if (byteWritten > maxBytesInInterval) {
+        public void contemplateThrottleWrites(int bytesJustWritten)
+                throws ClosedChannelException {
+            bytesWritten += bytesJustWritten;
+            if (bytesWritten > maxBytesInInterval) {
                 for (SelectableChannel channel : channels) {
                     final SelectionKey selectionKey = channel.keyFor(selector);
-
-                    selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
+                    if (selectionKey != null)
+                        selectionKey.interestOps(selectionKey.interestOps() & ~OP_WRITE);
 
                     if (LOG.isDebugEnabled())
                         LOG.debug("Throttling UDP writes");
@@ -209,18 +272,48 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
-    abstract static class AbstractConnector {
+    static class EntryCallback extends Replica.EntryCallback {
 
-        int connectionAttempts;
+        private final Replica.EntryExternalizable externalizable;
+        private final ByteBufferBytes in;
+
+        EntryCallback(@NotNull final Replica.EntryExternalizable externalizable,
+                      @NotNull final ByteBufferBytes in) {
+            this.externalizable = externalizable;
+            this.in = in;
+        }
+
+        @Override
+        public boolean onEntry(final Bytes entry, final int chronicleId) {
+            in.skip(SIZE_OF_SHORT);
+            final long start = in.position();
+            externalizable.writeExternalEntry(entry, in, chronicleId);
+
+            if (in.position() == start) {
+                in.position(in.position() - SIZE_OF_SHORT);
+                return false;
+            }
+
+            // write the length of the entry, just before the start, so when we read it back
+            // we read the length of the entry first and hence know how many preceding writer to read
+            final int entrySize = (int) (in.position() - start);
+            if (entrySize > MAX_UNSIGNED_SHORT)
+                throw new IllegalStateException("entry too large, the entry size=" + entrySize + ", " +
+                        "entries are limited to a size of " + MAX_UNSIGNED_SHORT);
+            in.writeUnsignedShort(start - SIZE_OF_SHORT, entrySize);
+
+            return true;
+        }
+    }
+
+    abstract class AbstractConnector {
 
         private final String name;
-
+        private int connectionAttempts = 0;
         private volatile SelectableChannel socketChannel;
-        private Set<Closeable> closeables;
 
-        public AbstractConnector(String name, Set<Closeable> closeables) {
+        public AbstractConnector(String name) {
             this.name = name;
-            this.closeables = closeables;
         }
 
         abstract SelectableChannel doConnect() throws IOException, InterruptedException;
@@ -267,7 +360,6 @@ abstract class AbstractChannelReplicator implements Closeable {
                         if (reconnectionInterval > 0)
                             Thread.sleep(reconnectionInterval);
 
-
                         synchronized (closeables) {
                             socketChannel = doConnect();
                             if (socketChannel == null)
@@ -301,5 +393,7 @@ abstract class AbstractChannelReplicator implements Closeable {
         }
     }
 
+    interface ChannelReplicatorBuilder {
+    }
 
 }

@@ -48,8 +48,7 @@ public class SharedHashMapTest extends JSR166TestCase {
 
     static SharedHashMap<Integer, CharSequence> newShmIntString(int size) throws IOException {
 
-        return new SharedHashMapBuilder()
-                .entries(size)
+        return new SharedHashMapBuilder().entries(size)
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
 
     }
@@ -57,8 +56,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     static SharedHashMap<ArrayList, CharSequence> newShmListBoolean(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .entries(size)
-                .create(getPersistenceFile(), ArrayList.class, CharSequence.class);
+                .entries(size).create(getPersistenceFile(), ArrayList.class, CharSequence.class);
 
     }
 
@@ -73,8 +71,7 @@ public class SharedHashMapTest extends JSR166TestCase {
     static SharedHashMap<CharSequence, CharSequence> newShmStringString(int size) throws IOException {
 
         return new SharedHashMapBuilder()
-                .entries(size)
-                .create(getPersistenceFile(), CharSequence.class, CharSequence.class);
+                .entries(size).create(getPersistenceFile(), CharSequence.class, CharSequence.class);
 
     }
 
@@ -88,8 +85,7 @@ public class SharedHashMapTest extends JSR166TestCase {
 
     static SharedHashMap<BI, Boolean> newShmBiBoolean() throws IOException {
 
-        return new SharedHashMapBuilder()
-                .create(getPersistenceFile(), BI.class, Boolean.class);
+        return new SharedHashMapBuilder().create(getPersistenceFile(), BI.class, Boolean.class);
 
     }
 

@@ -41,7 +41,7 @@ public class ProducerConcurrentBlockingObjectQueue<E> extends BlockingQueueDeleg
 
         builder.setClazz(clazz);
         builder.setType(REMOTE_PRODUCER);
-
+        builder.setDeleteOnExit(true);
         //todo change the way we default the max size, there is an unsafe method we can use
         builder.setMaxSize(10);
 

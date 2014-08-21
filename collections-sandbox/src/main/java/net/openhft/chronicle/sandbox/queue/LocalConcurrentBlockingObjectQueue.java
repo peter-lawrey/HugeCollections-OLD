@@ -35,7 +35,7 @@ public class LocalConcurrentBlockingObjectQueue<E> extends BlockingQueueDelegate
      */
     public LocalConcurrentBlockingObjectQueue(int capacity) {
         builder.setCapacity(capacity);
-
+        builder.setDeleteOnExit(true);
         BlockingQueue<E> delegate0 = null;
         try {
             delegate0 = builder.create();

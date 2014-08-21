@@ -16,28 +16,32 @@
 
 package net.openhft.collections;
 
-import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.NativeBytes;
+import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.BytesMarshaller;
 import net.openhft.lang.io.serialization.ObjectFactory;
+import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.*;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import net.openhft.lang.model.constraints.NotNull;
 import net.openhft.lang.model.constraints.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
 
 import static net.openhft.collections.Objects.builderEquals;
 import static net.openhft.collections.Objects.hash;
 
 public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneable {
+    private static final Logger LOG = LoggerFactory.getLogger(SharedHashMapKeyValueSpecificBuilder.class);
 
-    private static boolean marshallerDontUseFactory(Class c) {
-        return !Byteable.class.isAssignableFrom(c) &&
-                !BytesMarshallable.class.isAssignableFrom(c) &&
-                !Externalizable.class.isAssignableFrom(c);
+    private static boolean marshallerUseFactory(Class c) {
+        return Byteable.class.isAssignableFrom(c) ||
+                BytesMarshallable.class.isAssignableFrom(c) ||
+                Externalizable.class.isAssignableFrom(c);
     }
 
     @SuppressWarnings("unchecked")
@@ -156,14 +160,14 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
     }
 
     private static
-    class BytesMarshallableMarshallerMarshallerWithCustomFactory<T extends BytesMarshallable>
+    class BytesMarshallableMarshallerWithCustomFactory<T extends BytesMarshallable>
             extends BytesMarshallableMarshaller<T> {
         private static final long serialVersionUID = 0L;
 
         @NotNull private final ObjectFactory<T> factory;
 
-        BytesMarshallableMarshallerMarshallerWithCustomFactory(@NotNull Class<T> tClass,
-                                                               @NotNull ObjectFactory<T> factory) {
+        BytesMarshallableMarshallerWithCustomFactory(@NotNull Class<T> tClass,
+                                                     @NotNull ObjectFactory<T> factory) {
             super(tClass);
             this.factory = factory;
         }
@@ -178,8 +182,8 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         public boolean equals(Object obj) {
             if (obj == null || obj.getClass() != getClass())
                 return false;
-            BytesMarshallableMarshallerMarshallerWithCustomFactory that =
-                    (BytesMarshallableMarshallerMarshallerWithCustomFactory) obj;
+            BytesMarshallableMarshallerWithCustomFactory that =
+                    (BytesMarshallableMarshallerWithCustomFactory) obj;
             return that.marshaledClass() == marshaledClass() && that.factory.equals(this.factory);
         }
 
@@ -350,19 +354,19 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         this.keyClass = keyClass;
         this.valueClass = valueClass;
         Class<K> keyClassForMarshaller =
-                !marshallerDontUseFactory(keyClass) && keyClass.isInterface() ?
+                marshallerUseFactory(keyClass) && keyClass.isInterface() ?
                         DataValueClasses.directClassFor(keyClass) : keyClass;
         keyMarshaller = chooseDefaultMarshaller(keyClassForMarshaller);
         Class<V> valueClassForMarshaller =
-                !marshallerDontUseFactory(valueClass) && valueClass.isInterface() ?
+                marshallerUseFactory(valueClass) && valueClass.isInterface() ?
                         DataValueClasses.directClassFor(valueClass) : valueClass;
         valueMarshaller = chooseDefaultMarshaller(valueClassForMarshaller);
 
-        valueFactory = marshallerDontUseFactory(valueClass) ?
-                NullObjectFactory.INSTANCE :
+        valueFactory = marshallerUseFactory(valueClass) ?
                 new AllocateInstanceObjectFactory(valueClass.isInterface() ?
                         DataValueClasses.directClassFor(valueClass) :
-                        valueClass);
+                        valueClass) :
+                NullObjectFactory.INSTANCE;
     }
 
     @NotNull
@@ -396,7 +400,7 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
     @SuppressWarnings("unchecked")
     public SharedHashMapKeyValueSpecificBuilder<K, V> valueFactory(
             @NotNull ObjectFactory<V> valueFactory) {
-        if (marshallerDontUseFactory(valueClass)) {
+        if (!marshallerUseFactory(valueClass)) {
             throw new IllegalStateException("Default marshaller for " + valueClass +
                     " value don't use object factory");
         }
@@ -414,7 +418,7 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
                 valueMarshaller = new BytesMarshallableMarshaller(
                         ((AllocateInstanceObjectFactory) valueFactory).allocatedClass());
             } else {
-                valueMarshaller = new BytesMarshallableMarshallerMarshallerWithCustomFactory(
+                valueMarshaller = new BytesMarshallableMarshallerWithCustomFactory(
                         ((BytesMarshallableMarshaller) valueMarshaller).marshaledClass(),
                         valueFactory
                 );
@@ -482,38 +486,8 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
         if (!file.exists())
             throw new FileNotFoundException("Unable to create " + file);
 
-        VanillaSharedHashMap<K, V> map;
-        if (!builder.canReplicate()) {
-            map = new VanillaSharedHashMap<K, V>(this);
-        } else {
+        VanillaSharedHashMap<K, V> map = newMap();
 
-            if (builder.identifier() <= 0)
-                throw new IllegalArgumentException("Identifier must be positive, " +
-                        builder.identifier() + " given");
-
-            final VanillaSharedReplicatedHashMap<K, V> result =
-                    new VanillaSharedReplicatedHashMap<K, V>(this, file);
-
-            if (builder.tcpReplicatorBuilder != null)
-                builder.applyTcpReplication(result, builder.tcpReplicatorBuilder);
-
-
-            if (builder.udpReplicatorBuilder != null) {
-                if (builder.tcpReplicatorBuilder == null)
-                    SharedHashMapBuilder.LOG.warn(
-                            "MISSING TCP REPLICATION : The UdpReplicator only attempts to read data (" +
-                            "it does not enforce or guarantee delivery), you should use the UdpReplicator if " +
-                            "you have a large number of nodes, and you wish to receive the data before it " +
-                            "becomes available on TCP/IP. Since data delivery is not guaranteed, it is " +
-                            "recommended that you only use the UDP" +
-                            " " +
-                            "Replicator " +
-                            "in conjunction with a TCP Replicator"
-                    );
-                builder.applyUdpReplication(result, builder.udpReplicatorBuilder);
-            }
-            map = result;
-        }
         FileOutputStream fos = new FileOutputStream(file);
         ObjectOutputStream oos = new ObjectOutputStream(fos);
         try {
@@ -521,11 +495,57 @@ public final class SharedHashMapKeyValueSpecificBuilder<K, V> implements Cloneab
             oos.flush();
             map.headerSize = roundUpMapHeaderSize(fos.getChannel().position());
             map.createMappedStoreAndSegments(file);
-            return map;
+
         } finally {
             oos.close();
         }
+
+        ObjectSerializer objectSerializer = builder.objectSerializer();
+        BytesStore bytesStore = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
+                map.sizeInBytes(), objectSerializer);
+        map.createMappedStoreAndSegments(bytesStore);
+
+        return configureMap(map);
     }
+
+    public SharedHashMap<K, V> create() throws IOException {
+        VanillaSharedHashMap<K, V> map = newMap();
+        ObjectSerializer objectSerializer = builder.objectSerializer();
+        BytesStore bytesStore = DirectStore.allocateLazy(map.sizeInBytes(), objectSerializer);
+        map.createMappedStoreAndSegments(bytesStore);
+        return configureMap(map);
+    }
+
+    private VanillaSharedHashMap<K, V> newMap() throws IOException {
+        if (builder.firstReplicator == null && !builder.forceReplicatedImpl) {
+            return new VanillaSharedHashMap<K, V>(this);
+        } else {
+            return new VanillaSharedReplicatedHashMap<K, V>(this);
+        }
+    }
+
+    private VanillaSharedHashMap<K, V> configureMap(VanillaSharedHashMap<K, V> map)
+            throws IOException {
+        if (map instanceof VanillaSharedReplicatedHashMap) {
+            VanillaSharedReplicatedHashMap result = (VanillaSharedReplicatedHashMap) map;
+            for (Replicator replicator : builder.replicators.values()) {
+                Closeable token = replicator.applyTo(builder, result, result);
+                if (builder.replicators.size() == 1 && token.getClass() == UdpReplicator.class) {
+                    LOG.warn(
+                            "MISSING TCP REPLICATION : The UdpReplicator only attempts to read data " +
+                            "(it does not enforce or guarantee delivery), you should use" +
+                            "the UdpReplicator if you have a large number of nodes, and you wish" +
+                            "to receive the data before it becomes available on TCP/IP. Since data" +
+                            "delivery is not guaranteed, it is recommended that you only use" +
+                            "the UDP Replicator in conjunction with a TCP Replicator"
+                    );
+                }
+                result.addCloseable(token);
+            }
+        }
+        return map;
+    }
+
 
     private static long roundUpMapHeaderSize(long headerSize) {
         long roundUp = (headerSize + 127L) & ~127L;

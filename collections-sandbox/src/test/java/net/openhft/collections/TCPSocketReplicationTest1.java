@@ -27,7 +27,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
+import static net.openhft.collections.Replicators.tcp;
 
 /**
  * Test  VanillaSharedReplicatedHashMap where the Replicated is over a TCP Socket
@@ -41,24 +44,23 @@ public class TCPSocketReplicationTest1 {
     public static final String HOST_SERVER = System.getProperty("server", "server");
     static final InetSocketAddress[] ONE_SERVER = {new InetSocketAddress(HOST_SERVER, 8079)};
     public static final String HOST_SERVER2 = System.getProperty("server2", "server2");
-    static final InetSocketAddress[] TWO_SERVER = {new InetSocketAddress(HOST_SERVER, 8079), new InetSocketAddress(HOST_SERVER2, 8079)};
+    static final InetSocketAddress[] TWO_SERVER = {
+            new InetSocketAddress(HOST_SERVER, 8079),
+            new InetSocketAddress(HOST_SERVER2, 8079)
+    };
     private SharedHashMap<Integer, CharSequence> map1;
 
     @Before
     public void setup() throws IOException {
 
-        final TcpReplicatorBuilder tcpReplicatorBuilder = new TcpReplicatorBuilder(8079,
+        final TcpReplicationConfig tcpConfig = TcpReplicationConfig.of(8079,
                 hostId == 0 ? NO_SERVERS : hostId == 1 ? ONE_SERVER : TWO_SERVER)
-                .deletedModIteratorFileOnExit(true)
-                .throttleBucketIntervalMS(100)
-                .heartBeatIntervalMS(1000);
+                .heartBeatInterval(1, SECONDS);
 
 
         map1 = new SharedHashMapBuilder()
-                .entries(1000)
-                .identifier((byte) 2)
-                .tcpReplicatorBuilder(tcpReplicatorBuilder)
                 .entries(20000)
+                .addReplicator(tcp((byte) 2, tcpConfig))
                 .create(getPersistenceFile(), Integer.class, CharSequence.class);
     }
 

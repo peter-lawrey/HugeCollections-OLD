@@ -18,43 +18,16 @@
 
 package net.openhft.collections;
 
+import net.openhft.lang.io.AbstractBytes;
 import net.openhft.lang.io.Bytes;
-import net.openhft.lang.io.NativeBytes;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 /**
  * @author Rob Austin.
  */
-public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
-
-    /**
-     * Used in conjunction with map replication, all put events that originate from a remote node will be
-     * processed using this method.
-     *
-     * @param key        key with which the specified value is to be associated
-     * @param value      value to be associated with the specified key
-     * @param identifier a unique identifier for a replicating node
-     * @param timeStamp  timestamp in milliseconds, when the put event originally occurred
-     * @return the previous value
-     * @see #put(Object, Object)
-     */
-    V put(K key, V value, byte identifier, long timeStamp);
-
-    /**
-     * Used in conjunction with map replication, all remove events that originate from a remote node will be
-     * processed using this method.
-     *
-     * @param key        key with which the specified value is associated
-     * @param value      value expected to be associated with the specified key
-     * @param identifier a unique identifier for a replicating node
-     * @param timeStamp  timestamp in milliseconds, when the remove event originally occurred
-     * @return {@code true} if the entry was removed
-     * @see #remove(Object, Object)
-     */
-    V remove(K key, V value, byte identifier, long timeStamp);
-
+public interface Replica extends Closeable {
 
     /**
      * Provides the unique Identifier associated with this map instance. <p> An identifier is used to
@@ -73,34 +46,37 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     byte identifier();
 
     /**
-     * Gets (if it does not exist, creates) an instance of ModificationIterator dedicated for the remote node
-     * with the given identifier. It doesn't mean the returned ModificationIterator iterates though entries
-     * originating from that remote node, on the contrary, the iterator should be used to send the updates
-     * originating from this map to that remote node.
+     * Gets (if it does not exist, creates) an instance of ModificationIterator associated with a remote node,
+     * this weak associated is bound using the {@code identifier}.
      *
-     * @param remoteIdentifier         the identifier of the remote node
-     * @param modificationNotifier     called when ever there is a change applied to the modification
-     *                                 iterator
-     * @param deletedBackingFileOnExit deleted the file the backs the modification iterator upon exit
+     * @param remoteIdentifier     the identifier of the remote node
+     * @param modificationNotifier called when ever there is a change applied to the modification iterator
      * @return the ModificationIterator dedicated for replication to the remote node with the given identifier
      * @see #identifier()
      */
-    ModificationIterator acquireModificationIterator(byte remoteIdentifier,
-                                                     ModificationNotifier modificationNotifier, boolean deletedBackingFileOnExit) throws IOException;
-
+    ModificationIterator acquireModificationIterator(short remoteIdentifier,
+                                                     ModificationNotifier modificationNotifier);
 
     /**
-     * Used in conjunction with replication, to back filling data from a remote node that this node may have
-     * missed updates while it has not been running.
+     * Returns the timestamp of the last change from the specified remote node, already replicated
+     * to this Replica.
      *
+     * <p>Used in conjunction with replication, to back fill data from a remote node. This node
+     * may have missed updates while it was not been running or connected via TCP.
+     *
+     * @param remoteIdentifier the identifier of the remote node to check last replicated update
+     *        time from
      * @return a timestamp of the last modification to an entry, or 0 if there are no entries.
      * @see #identifier()
      */
-    long lastModificationTime(byte identifier);
+    long lastModificationTime(byte remoteIdentifier);
 
 
+    /**
+     * notifies when there is a changed to the modification iterator
+     */
     interface ModificationNotifier {
-        public static ModificationNotifier NOP = new ModificationNotifier() {
+        public static final ModificationNotifier NOP = new ModificationNotifier() {
             @Override
             public void onChange() {
             }
@@ -120,19 +96,20 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
     interface ModificationIterator {
 
         /**
-         * @return {@code true} if the is another entry to be received via {@link #nextEntry(EntryCallback
-         * callback)}
+         * @return {@code true} if the is another entry to be received via {@link
+         * #nextEntry(net.openhft.collections.Replica.EntryCallback, int chronicleId)}
          */
         boolean hasNext();
 
         /**
          * A non-blocking call that provides the entry that has changed to {@code callback.onEntry()}.
          *
-         * @param callback a callback which will be called when a new entry becomes available.
+         * @param callback    a callback which will be called when a new entry becomes available.
+         * @param chronicleId only assigned when clustering
          * @return {@code true} if the entry was accepted by the {@code callback.onEntry()} method, {@code
          * false} if the entry was not accepted or was not available
          */
-        boolean nextEntry(@NotNull final EntryCallback callback);
+        boolean nextEntry(@NotNull final EntryCallback callback, final int chronicleId);
 
         /**
          * Dirties all entries with a modification time equal to {@code fromTimeStamp} or newer. It means all
@@ -147,37 +124,35 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
         void dirtyEntries(long fromTimeStamp);
     }
 
+
     /**
-     * Implemented typically by a replicator, This interface provides the event {@see onEntry(NativeBytes
-     *entry)} which will get called whenever a put() or remove() has occurred to the map
+     * Implemented typically by a replicator, This interface provides the event, which will get
+     * called whenever a put() or remove() has occurred to the map
      */
     abstract class EntryCallback {
 
         /**
          * Called whenever a put() or remove() has occurred to a replicating map.
          *
-         * @param entry the entry you will receive, this does not have to be locked, as locking is already
-         *              provided from the caller.
-         * @return {@code false} if this entry should be ignored because the identifier of the source node is
-         * not from one of our changes, WARNING even though we check the identifier in the
-         * ModificationIterator the entry may have been updated.
+         * @param entry       the entry you will receive, this does not have to be locked,
+         *                    as locking is already provided from the caller.
+         * @param chronicleId only assigned when clustering
+         * @return {@code false} if this entry should be ignored because the identifier
+         * of the source node is not from one of our changes, WARNING even though we check
+         * the identifier in the ModificationIterator the entry may have been updated.
          */
-        public abstract boolean onEntry(final NativeBytes entry);
+        public abstract boolean onEntry(final Bytes entry, final int chronicleId);
 
         /**
-         * Called just after {@see #onEntry(NativeBytes entry)}
-         *
-         * @see #onEntry(NativeBytes entry);
+         * Called just after {@link #onEntry(Bytes, int)}. No-op by default.
          */
         public void onAfterEntry() {
-            // no-op by default
         }
 
         /**
-         * Called just before {@see #onEntry(NativeBytes entry)}
+         * Called just before {@link #onEntry(Bytes, int)}. No-op by default.
          */
         public void onBeforeEntry() {
-            // no-op by default
         }
     }
 
@@ -193,18 +168,48 @@ public interface ReplicatedSharedHashMap<K, V> extends SharedHashMap<K, V> {
          * @param entry       the byte location of the entry to be stored
          * @param destination a buffer the entry will be written to, the segment may reject this operation and
          *                    add zeroBytes, if the identifier in the entry did not match the maps local
-         *                    identifier
+         * @param chronicleId used in cluster into identify the canonical map or queue
          */
-        void writeExternalEntry(@NotNull NativeBytes entry, @NotNull Bytes destination);
+        void writeExternalEntry(@NotNull Bytes entry, @NotNull Bytes destination, int chronicleId);
 
         /**
          * The map implements this method to restore its contents. This method must read the values in the
          * same sequence and with the same types as were written by {@code writeExternalEntry()}. This method
          * is typically called when we receive a remote replication event, this event could originate from
          * either a remote {@code put(K key, V value)} or {@code remove(Object key)}
+         * @param source bytes to read an entry from
          */
         void readExternalEntry(@NotNull Bytes source);
 
     }
 
+    /**
+     * provides a key and value from NativeBytes, this can be used in conjunction with the modification
+     * iterator to get the key and value out of the NativeBytes
+     */
+    interface EntryResolver<K, V> {
+
+        /**
+         * gets the key from the entry
+         *
+         * @param entry the bytes which the bytes which point to the entry
+         * @param usingKey the key object to reuse, if possible
+         * @return the key which is in the entry
+         */
+        K key(@NotNull Bytes entry, K usingKey);
+
+
+        /**
+         * gets the value from the entry
+         *
+         * @param entry the bytes which reference to the entry
+         * @param usingValue the value object to reuse, if possible
+         * @return the value which is in the entry or null if the value has been remove from the map
+         */
+        V value(@NotNull Bytes entry, V usingValue);
+
+        boolean wasRemoved(@NotNull Bytes entry);
+
+    }
 }
+

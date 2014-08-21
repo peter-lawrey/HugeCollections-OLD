@@ -19,11 +19,13 @@
 package net.openhft.collections;
 
 import net.openhft.lang.io.ByteBufferBytes;
-import net.openhft.lang.io.NativeBytes;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.io.Bytes;
+import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
@@ -31,7 +33,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.lang.System.arraycopy;
-import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterator;
+import static net.openhft.collections.Replica.EntryExternalizable;
+import static net.openhft.collections.Replica.ModificationIterator;
+import static net.openhft.collections.Replica.ModificationNotifier.NOP;
 
 /**
  * This class replicates data from one ReplicatedShareHashMap to another using a queue it was originally
@@ -40,7 +44,33 @@ import static net.openhft.collections.ReplicatedSharedHashMap.ModificationIterat
  * @author Rob Austin.
  */
 
-public class QueueReplicator<K, V> {
+public class QueueReplicator implements Closeable {
+
+    public static Replicator of(final byte localIdentifier,
+                                final byte externalIdentifier,
+                                @NotNull final BlockingQueue<byte[]> input,
+                                @NotNull final BlockingQueue<byte[]> output) {
+        return new Replicator() {
+            boolean used = false;
+            @Override
+            public byte identifier() {
+                return localIdentifier;
+            }
+
+            @Override
+            protected Closeable applyTo(SharedHashMapBuilder builder,
+                                        Replica map,
+                                        EntryExternalizable entryExternalizable)
+                    throws IOException {
+                if (used)
+                    throw new IllegalStateException();
+                used = true;
+                return new QueueReplicator(
+                        map.acquireModificationIterator(externalIdentifier, NOP),
+                        input, output, builder.entrySize(), entryExternalizable);
+            }
+        };
+    }
 
     public static final short MAX_NUMBER_OF_ENTRIES_PER_CHUNK = 10;
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedReplicatedHashMap.class);
@@ -54,7 +84,7 @@ public class QueueReplicator<K, V> {
                            @NotNull final BlockingQueue<byte[]> input,
                            @NotNull final BlockingQueue<byte[]> output,
                            final int entrySize,
-                           @NotNull final ReplicatedSharedHashMap.EntryExternalizable externalizable) {
+                           @NotNull final EntryExternalizable externalizable) {
 
         //todo HCOLL-71 fix the 128 padding
         final int entrySize0 = entrySize + 128;
@@ -141,18 +171,13 @@ public class QueueReplicator<K, V> {
                 buffer = new ByteBufferBytes(ByteBuffer.allocate(entrySize0 * MAX_NUMBER_OF_ENTRIES_PER_CHUNK));
 
                 // this is used in nextEntry() below, its what could be described as callback method
-                final VanillaSharedReplicatedHashMap.EntryCallback entryCallback =
-                        new VanillaSharedReplicatedHashMap.EntryCallback() {
-
-
-                            /**
-                             * {@inheritDoc}
-                             */
+                final Replica.EntryCallback entryCallback =
+                        new Replica.EntryCallback() {
                             @Override
-                            public boolean onEntry(NativeBytes entry) {
+                            public boolean onEntry(Bytes entry, final int chronicleId) {
 
                                 entryBuffer.clear();
-                                externalizable.writeExternalEntry(entry, entryBuffer);
+                                externalizable.writeExternalEntry(entry, entryBuffer, chronicleId);
 
                                 if (entryBuffer.position() == 0)
                                     return false;
@@ -167,9 +192,6 @@ public class QueueReplicator<K, V> {
                                 return true;
                             }
 
-                            /**
-                             * {@inheritDoc}
-                             */
                             @Override
                             public void onBeforeEntry() {
                                 isWritingEntry.set(true);
@@ -180,7 +202,7 @@ public class QueueReplicator<K, V> {
                 try {
                     for (; ; ) {
 
-                        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback);
+                        final boolean wasDataRead = modificationIterator.nextEntry(entryCallback, 0);
 
                         if (wasDataRead) {
                             isWritingEntry.set(false);
@@ -230,5 +252,9 @@ public class QueueReplicator<K, V> {
         return !b && buffer.position() == 0;
     }
 
+    @Override
+    public void close() throws IOException {
+        // do nothing
+    }
 }
 

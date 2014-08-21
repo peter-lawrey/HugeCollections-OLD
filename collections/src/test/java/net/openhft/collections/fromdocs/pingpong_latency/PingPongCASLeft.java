@@ -77,10 +77,6 @@ public class PingPongCASLeft {
         return new SharedHashMapBuilder()
                 .entries(16)
                 .entrySize(64)
-                .create(
-                        new File(TMP + "/BondPortfolioSHM"),
-                        String.class,
-                        BondVOInterface.class
-                );
+                .create(new File(TMP + "/BondPortfolioSHM"), String.class, BondVOInterface.class);
     }
 }

@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmBuilder;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
@@ -39,9 +40,8 @@ import static org.junit.Assert.assertEquals;
 
 public class TCPSocketReplicationBootStrapTests {
 
-    private ReplicatedSharedHashMap<Integer, CharSequence> map1;
+    private VanillaSharedReplicatedHashMap<Integer, CharSequence> map1;
     private SharedHashMap<Integer, CharSequence> map2;
-
 
     @Test
     public void testBootstrap() throws IOException, InterruptedException {
@@ -50,9 +50,8 @@ public class TCPSocketReplicationBootStrapTests {
 
         SharedHashMapBuilder map2aBuilder =
                 newTcpSocketShmBuilder((byte) 2, 8076, new InetSocketAddress("localhost", 8079));
-        final ReplicatedSharedHashMap<Integer, CharSequence> map2a =
-                (ReplicatedSharedHashMap<Integer, CharSequence>)
-                    map2aBuilder.create(getPersistenceFile(), Integer.class, CharSequence.class);
+        final SharedHashMap<Integer, CharSequence> map2a =
+                map2aBuilder.create(getPersistenceFile(), Integer.class, CharSequence.class);
         map2a.put(10, "EXAMPLE-10");  // this will be the last time that map1 go an update from map2
 
         long lastModificationTime;
@@ -66,13 +65,9 @@ public class TCPSocketReplicationBootStrapTests {
         final File map2File = map2a.file();
         map2a.close();
 
-
         {
             // restart map 2 but don't doConnect it to map one
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
-                    .entries(1000)
-                    .identifier((byte) 2)
-                    .canReplicate(true)
                     .create(map2File, Integer.class, CharSequence.class);
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");
@@ -91,9 +86,7 @@ public class TCPSocketReplicationBootStrapTests {
 
     // todo we have to fix this
     @Test
-
     public void testBootstrapAndHeartbeat() throws IOException, InterruptedException {
-
         map1 = newTcpSocketShmIntString((byte) 1, 8079, new InetSocketAddress("localhost", 8076));
         SharedHashMapBuilder map2aBuilder = newTcpSocketShmBuilder((byte) 2, 8076);
         final VanillaSharedReplicatedHashMap<Integer, CharSequence> map2a =
@@ -116,9 +109,6 @@ public class TCPSocketReplicationBootStrapTests {
         {
             // restart map 2 but don't doConnect it to map one
             final SharedHashMap<Integer, CharSequence> map2b = new SharedHashMapBuilder()
-                    .entries(1000)
-                    .identifier((byte) 2)
-                    .canReplicate(true)
                     .create(map2File, Integer.class, CharSequence.class);
             // add data into it
             map2b.put(11, "ADDED WHEN DISCONNECTED TO MAP1");

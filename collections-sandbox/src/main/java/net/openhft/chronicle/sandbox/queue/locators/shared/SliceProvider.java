@@ -19,7 +19,7 @@
 package net.openhft.chronicle.sandbox.queue.locators.shared;
 
 import net.openhft.lang.io.AbstractBytes;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 /**
  * Created by Rob Austin

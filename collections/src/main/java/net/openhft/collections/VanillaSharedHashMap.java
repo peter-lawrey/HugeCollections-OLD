@@ -21,14 +21,13 @@ import net.openhft.lang.collection.DirectBitSet;
 import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
-import net.openhft.lang.io.serialization.BytesMarshallerFactory;
 import net.openhft.lang.io.serialization.ObjectSerializer;
 import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.io.serialization.BytesMarshaller;
 import net.openhft.lang.io.serialization.ObjectFactory;
 import net.openhft.lang.model.Byteable;
-import net.openhft.lang.model.constraints.NotNull;
-import net.openhft.lang.model.constraints.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +40,8 @@ import java.nio.channels.FileChannel;
 import java.util.*;
 
 import static java.lang.Thread.currentThread;
+import static net.openhft.collections.VanillaSharedHashMap.Hasher.hash;
+
 
 class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         implements SharedHashMap<K, V>, Serializable {
@@ -48,12 +49,11 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private static final Logger LOG = LoggerFactory.getLogger(VanillaSharedHashMap.class);
 
     /**
-     * Because DirectBitSet implementations couldn't find more than 64 continuous clear or set
-     * bits.
+     * Because DirectBitSet implementations couldn't find more than 64 continuous clear or set bits.
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
 
-    private final ObjectSerializer objectSerializer;
+    private static final int SEGMENT_HEADER = 64;
 
     private static int figureBufferAllocationFactor(SharedHashMapBuilder builder) {
         // if expected map size is about 1000, seems rather wasteful to allocate
@@ -67,19 +67,21 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     private transient ThreadLocal<DirectBytes> localBufferForKeys;
     private transient ThreadLocal<DirectBytes> localBufferForValues;
 
+    private final ObjectSerializer objectSerializer;
+
     final Class<K> kClass;
     final BytesMarshaller<K> keyMarshaller;
     private final Class<V> vClass;
-    private final BytesMarshaller<V> valueMarshaller;
+    final BytesMarshaller<V> valueMarshaller;
     private final ObjectFactory<V> valueFactory;
     private final long lockTimeOutNS;
     final int metaDataBytes;
     transient Segment[] segments; // non-final for close()
     // non-final for close() and because it is initialized out of constructor
-    transient MappedStore ms;
+    transient BytesStore ms;
     final Hasher hasher;
 
-    private final int replicas;
+    //   private final int replicas;
     final int entrySize;
     final Alignment alignment;
     final int actualSegments;
@@ -87,10 +89,7 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     private final SharedMapErrorListener errorListener;
 
-    /**
-     * Non-final because could be changed in VanillaSharedReplicatedHashMap.
-     */
-    volatile SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
+    final SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener;
 
     // if set the ReturnsNull fields will cause some functions to return NULL
     // rather than as returning the Object can be expensive for something you probably don't use.
@@ -99,7 +98,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     transient long headerSize;
     transient Set<Map.Entry<K, V>> entrySet;
-
 
     public VanillaSharedHashMap(SharedHashMapKeyValueSpecificBuilder<K, V> kvBuilder)
             throws IOException {
@@ -113,7 +111,7 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         lockTimeOutNS = builder.lockTimeOutMS() * 1000000;
 
-        this.replicas = builder.replicas();
+        //  this.replicas = builder.replicas();
         this.entrySize = builder.alignedEntrySize();
         this.alignment = builder.entryAndValueAlignment();
 
@@ -145,32 +143,34 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return Segment.class;
     }
 
-    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
-        initTransients();
-    }
+    long createMappedStoreAndSegments(BytesStore bytesStore) throws IOException {
+        this.ms = bytesStore;
 
-    long createMappedStoreAndSegments(File file) throws IOException {
-        this.ms = new MappedStore(file, FileChannel.MapMode.READ_WRITE,
-                sizeInBytes(), objectSerializer);
-
-        onHeaderCreated(ms.bytes(0, getHeaderSize()));
+        onHeaderCreated();
 
         long offset = getHeaderSize();
         long segmentSize = segmentSize();
         for (int i = 0; i < this.segments.length; i++) {
-            this.segments[i] = createSegment(ms.bytes(offset, segmentSize), i);
+            this.segments[i] = createSegment((NativeBytes) ms.bytes(offset, segmentSize), i);
             offset += segmentSize;
         }
         return offset;
     }
 
+    long createMappedStoreAndSegments(File file) throws IOException {
+        return createMappedStoreAndSegments(new MappedStore(file, FileChannel.MapMode.READ_WRITE,
+                sizeInBytes(), objectSerializer));
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        initTransients();
+    }
+
     /**
      * called when the header is created
-     *
-     * @param headerBytes the bytes that make up the header
      */
-    void onHeaderCreated(Bytes headerBytes) {
+    void onHeaderCreated() {
 
     }
 
@@ -189,8 +189,8 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * @param size positive number
-     * @return number of bytes taken by {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)}
-     * applied to {@code size}
+     * @return number of bytes taken by {@link net.openhft.lang.io.AbstractBytes#writeStopBit(long)} applied
+     * to {@code size}
      */
     static int expectedStopBits(long size) {
         if (size <= 127)
@@ -202,15 +202,21 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     long sizeInBytes() {
-        return getHeaderSize() +
-                segments.length * segmentSize();
+        return getHeaderSize() + segments.length * segmentSize();
     }
-
 
     long sizeOfMultiMap() {
-        int np2 = Maths.nextPower2(entriesPerSegment, 8);
-        return align64(np2 * (entriesPerSegment > (1 << 16) ? 8L : 4L));
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeInBytes(entriesPerSegment);
     }
+
+    long sizeOfMultiMapBitSet() {
+        return useSmallMultiMaps() ?
+                VanillaShortShortMultiMap.sizeOfBitSetInBytes(entriesPerSegment) :
+                VanillaIntIntMultiMap.sizeOfBitSetInBytes(entriesPerSegment);
+    }
+
 
     boolean useSmallMultiMaps() {
         return entriesPerSegment <= (1 << 16);
@@ -221,14 +227,14 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     int numberOfBitSets() {
-        return 1 // for free list
-                + (replicas > 0 ? 1 : 0) // deleted set
-                + replicas; // to notify each replica of a change.
+        return 1; // for free list
+        //  + (replicas > 0 ? 1 : 0) // deleted set
+        //   + replicas; // to notify each replica of a change.
     }
 
     long segmentSize() {
-        long ss = SharedHashMapBuilder.SEGMENT_HEADER
-                + sizeOfMultiMap() * multiMapsPerSegment()
+        long ss = SEGMENT_HEADER
+                + align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment()
                 + numberOfBitSets() * sizeOfBitSets() // the free list and 0+ dirty lists.
                 + sizeOfEntriesInSegment();
         if ((ss & 63) != 0)
@@ -248,7 +254,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         // if the size is a multiple of 4096 or slightly more. Make sure it is at least 64 more than a multiple.
         if ((ss & 4093) < 64)
             ss = (ss & ~63) + 64;
-        ;
 
         return ss;
     }
@@ -268,9 +273,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return (l + 63) & ~63;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void close() {
         if (ms == null)
@@ -278,6 +280,10 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         ms.free();
         segments = null;
         ms = null;
+    }
+
+    SharedMapEventListener<K, V, SharedHashMap<K, V>> eventListener() {
+        return eventListener;
     }
 
     private DirectBytes acquireBufferForKey() {
@@ -319,17 +325,11 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public V put(K key, V value) {
         return put0(key, value, true);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public V putIfAbsent(K key, V value) {
         return put0(key, value, false);
@@ -339,7 +339,7 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         checkKey(key);
         checkValue(value);
         Bytes keyBytes = getKeyAsBytes(key);
-        long hash = Hasher.hash(keyBytes);
+        long hash = hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
         return segments[segmentNum].put(keyBytes, key, value, segmentHash, replaceIfPresent);
@@ -360,9 +360,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         return buffer;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public V get(Object key) {
         return lookupUsing((K) key, null, false);
@@ -381,20 +378,17 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     V lookupUsing(K key, V value, boolean create) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes(key);
-        long hash = Hasher.hash(keyBytes);
+        long hash = hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
         return segments[segmentNum].acquire(keyBytes, key, value, segmentHash, create);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean containsKey(final Object key) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes((K) key);
-        long hash = Hasher.hash(keyBytes);
+        long hash = hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
 
@@ -407,9 +401,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             segment.clear();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @NotNull
     @Override
     public Set<Entry<K, V>> entrySet() {
@@ -418,8 +409,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     /**
-     * {@inheritDoc}
-     *
      * @throws NullPointerException if the specified key is null
      */
     @Override
@@ -428,8 +417,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * {@inheritDoc}
-     *
      * @throws NullPointerException if the specified key is null
      */
     @Override
@@ -441,9 +428,9 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     /**
-     * removes ( if there exists ) an entry from the map, if the {@param key} and {@param
-     * expectedValue} match that of a maps.entry. If the {@param expectedValue} equals null then (
-     * if there exists ) an entry whose key equals {@param key} this is removed.
+     * removes ( if there exists ) an entry from the map, if the {@param key} and {@param expectedValue} match
+     * that of a maps.entry. If the {@param expectedValue} equals null then ( if there exists ) an entry whose
+     * key equals {@param key} this is removed.
      *
      * @param key           the key of the entry to remove
      * @param expectedValue null if not required
@@ -452,15 +439,13 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
     V removeIfValueIs(final Object key, final V expectedValue) {
         checkKey(key);
         Bytes keyBytes = getKeyAsBytes((K) key);
-        long hash = Hasher.hash(keyBytes);
+        long hash = hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
         return segments[segmentNum].remove(keyBytes, (K) key, expectedValue, segmentHash);
     }
 
     /**
-     * {@inheritDoc}
-     *
      * @throws NullPointerException if any of the arguments are null
      */
     @Override
@@ -471,10 +456,6 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
     /**
-     * {@inheritDoc}
-     *
-     * @return the previous value associated with the specified key, or <tt>null</tt> if there was
-     * no mapping for the key
      * @throws NullPointerException if the specified key or value is null
      */
     @Override
@@ -503,16 +484,16 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * replace the value in a map, only if the existing entry equals {@param existingValue}
      *
      * @param key           the key into the map
-     * @param existingValue the expected existing value in the map ( could be null when we don't
-     *                      wish to do this check )
+     * @param existingValue the expected existing value in the map ( could be null when we don't wish to do
+     *                      this check )
      * @param newValue      the new value you wish to store in the map
      * @return the value that was replaced
      */
-    V replaceIfValueIs(@NotNull final K key, final V existingValue, final V newValue) {
+    V replaceIfValueIs(@net.openhft.lang.model.constraints.NotNull final K key, final V existingValue, final V newValue) {
         checkKey(key);
         checkValue(newValue);
         Bytes keyBytes = getKeyAsBytes(key);
-        long hash = Hasher.hash(keyBytes);
+        long hash = hash(keyBytes);
         int segmentNum = hasher.getSegment(hash);
         int segmentHash = hasher.segmentHash(hash);
         return segments[segmentNum].replace(keyBytes, key, existingValue, newValue, segmentHash);
@@ -580,7 +561,7 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         static final int PAD1_OFFSET = SIZE_OFFSET + 4; // 32-bit
         static final int REPLICA_OFFSET = PAD1_OFFSET + 4; // 64-bit
 
-        private final NativeBytes bytes;
+        final NativeBytes bytes;
         private final int index;
         final MultiStoreBytes tmpBytes = new MultiStoreBytes();
         private IntIntMultiMap hashLookup;
@@ -597,9 +578,9 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             this.bytes = bytes;
             this.index = index;
 
-            long start = bytes.startAddr() + SharedHashMapBuilder.SEGMENT_HEADER;
+            long start = bytes.startAddr() + SEGMENT_HEADER;
             createHashLookups(start);
-            start += sizeOfMultiMap() * multiMapsPerSegment();
+            start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
                     tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
             freeList = new SingleThreadedDirectBitSet(bsBytes);
@@ -612,13 +593,23 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             hashLookup = createMultiMap(start);
         }
 
+        public IntIntMultiMap getHashLookup() {
+            return hashLookup;
+        }
+
+
         IntIntMultiMap createMultiMap(long start) {
             final NativeBytes multiMapBytes =
-                    new NativeBytes(new VanillaBytesMarshallerFactory(), start, start + sizeOfMultiMap(), null);
+                    new NativeBytes(new VanillaBytesMarshallerFactory(), start,
+                            start = start + sizeOfMultiMap(), null);
+
+            final NativeBytes sizeOfMultiMapBitSetBytes =
+                    new NativeBytes(new VanillaBytesMarshallerFactory(), start,
+                            start + sizeOfMultiMapBitSet(), null);
             multiMapBytes.load();
             return useSmallMultiMaps() ?
-                    new VanillaShortShortMultiMap(multiMapBytes) :
-                    new VanillaIntIntMultiMap(multiMapBytes);
+                    new VanillaShortShortMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes) :
+                    new VanillaIntIntMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes);
         }
 
         public int getIndex() {
@@ -722,18 +713,17 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Used to acquire an object of type V from the Segment. <p/> {@code usingValue} is reused
-         * to read the value if key is present in this Segment, if key is absent in this Segment:
-         * <p/> <ol><li>If {@code create == false}, just {@code null} is returned (except when event
-         * listener provides a value "on get missing" - then it is put into this Segment for the
-         * key).</li> <p/> <li>If {@code create == true}, {@code usingValue} or a newly created
-         * instance of value class, if {@code usingValue == null}, is put into this Segment for the
-         * key.</li></ol>
+         * Used to acquire an object of type V from the Segment. <p/> {@code usingValue} is reused to read the
+         * value if key is present in this Segment, if key is absent in this Segment: <p/> <ol><li>If {@code
+         * create == false}, just {@code null} is returned (except when event listener provides a value "on
+         * get missing" - then it is put into this Segment for the key).</li> <p/> <li>If {@code create ==
+         * true}, {@code usingValue} or a newly created instance of value class, if {@code usingValue ==
+         * null}, is put into this Segment for the key.</li></ol>
          *
          * @param keyBytes serialized {@code key}
          * @param hash2    a hash code related to the {@code keyBytes}
-         * @return the value which is finally associated with the given key in this Segment after
-         * execution of this method, or {@code null}.
+         * @return the value which is finally associated with the given key in this Segment after execution of
+         * this method, or {@code null}.
          */
         V acquire(Bytes keyBytes, K key, V usingValue, int hash2, boolean create) {
             lock();
@@ -847,15 +837,14 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface
-         * and {@code usingValue} is {@code true}, the value is backed with the bytes of this
-         * entry.
+         * Puts entry. If {@code value} implements {@link net.openhft.lang.model.Byteable} interface and
+         * {@code usingValue} is {@code true}, the value is backed with the bytes of this entry.
          *
          * @param keyBytes   serialized key
          * @param value      the value to put
-         * @param usingValue {@code true} if the value should be backed with the bytes of the entry,
-         *                   if it implements {@link net.openhft.lang.model.Byteable} interface,
-         *                   {@code false} if it should put itself
+         * @param usingValue {@code true} if the value should be backed with the bytes of the entry, if it
+         *                   implements {@link net.openhft.lang.model.Byteable} interface, {@code false} if it
+         *                   should put itself
          * @return offset of the written entry in the Segment bytes
          */
         private long putEntry(Bytes keyBytes, V value, boolean usingValue) {
@@ -974,14 +963,13 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Removes a key (or key-value pair) from the Segment. <p/> The entry will only be removed
-         * if {@code expectedValue} equals to {@code null} or the value previously corresponding to
-         * the specified key.
+         * Removes a key (or key-value pair) from the Segment. <p/> The entry will only be removed if {@code
+         * expectedValue} equals to {@code null} or the value previously corresponding to the specified key.
          *
          * @param keyBytes bytes of the key to remove
          * @param hash2    a hash code related to the {@code keyBytes}
-         * @return the value of the entry that was removed if the entry corresponding to the {@code
-         * keyBytes} exists and {@link #removeReturnsNull} is {@code false}, {@code null} otherwise
+         * @return the value of the entry that was removed if the entry corresponding to the {@code keyBytes}
+         * exists and {@link #removeReturnsNull} is {@code false}, {@code null} otherwise
          */
         V remove(Bytes keyBytes, K key, V expectedValue, int hash2) {
             lock();
@@ -1036,9 +1024,9 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Replaces the specified value for the key with the given value. <p/> {@code newValue} is
-         * set only if the existing value corresponding to the specified key is equal to {@code
-         * expectedValue} or {@code expectedValue == null}.
+         * Replaces the specified value for the key with the given value. <p/> {@code newValue} is set only if
+         * the existing value corresponding to the specified key is equal to {@code expectedValue} or {@code
+         * expectedValue == null}.
          *
          * @param hash2 a hash code related to the {@code keyBytes}
          * @return the replaced value or {@code null} if the value was not replaced
@@ -1086,33 +1074,33 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
 
         void notifyPut(long offset, boolean added, K key, V value, final long pos) {
-            if (eventListener != SharedMapEventListeners.NOP) {
+            if (eventListener() != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener().onPut(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         added, key, value, pos, this);
             }
         }
 
         void notifyGet(long offset, K key, V value) {
-            if (eventListener != SharedMapEventListeners.NOP) {
+            if (eventListener() != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener().onGetFound(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value);
             }
         }
 
         V notifyMissed(Bytes keyBytes, K key, V usingValue) {
-            if (eventListener != SharedMapEventListeners.NOP) {
-                return eventListener.onGetMissing(VanillaSharedHashMap.this, keyBytes,
+            if (eventListener() != SharedMapEventListeners.NOP) {
+                return eventListener().onGetMissing(VanillaSharedHashMap.this, keyBytes,
                         key, usingValue);
             }
             return null;
         }
 
         void notifyRemoved(long offset, K key, V value, final int pos) {
-            if (eventListener != SharedMapEventListeners.NOP) {
+            if (eventListener() != SharedMapEventListeners.NOP) {
                 tmpBytes.storePositionAndSize(bytes, offset, entrySize);
-                eventListener.onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
+                eventListener().onRemove(VanillaSharedHashMap.this, tmpBytes, metaDataBytes,
                         key, value, pos, this);
             }
         }
@@ -1129,22 +1117,21 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Replaces value in existing entry. May cause entry relocation, because there may be not
-         * enough space for new value in location already allocated for this entry.
+         * Replaces value in existing entry. May cause entry relocation, because there may be not enough space
+         * for new value in location already allocated for this entry.
          *
          * @param pos             index of the first block occupied by the entry
-         * @param offset          relative offset of the entry in Segment bytes (before, i. e.
-         *                        including metaData)
+         * @param offset          relative offset of the entry in Segment bytes (before, i. e. including
+         *                        metaData)
          * @param entry           relative pointer in Segment bytes
          * @param valueLenPos     relative position of value "stop bit" in entry
          * @param entryEndAddr    absolute address of the entry end
          * @param valueBytes      serialized value, or {@code null} if valueAsByteable is given
-         * @param valueAsByteable the value to put as {@code Byteable}, or {@code null} if
-         *                        valueBytes is given
-         * @param allowOversize   {@code true} if the entry is allowed become oversized if it was
-         *                        not yet
-         * @return relative offset of the entry in Segment bytes after putting value (that may cause
-         * entry relocation)
+         * @param valueAsByteable the value to put as {@code Byteable}, or {@code null} if valueBytes is
+         *                        given
+         * @param allowOversize   {@code true} if the entry is allowed become oversized if it was not yet
+         * @return relative offset of the entry in Segment bytes after putting value (that may cause entry
+         * relocation)
          */
         long putValue(int pos, long offset, NativeBytes entry, long valueLenPos,
                       long entryEndAddr, @Nullable Bytes valueBytes,
@@ -1196,7 +1183,7 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
                         break newValueDoesNotFit;
                     // RELOCATION
                     free(pos, oldSizeInBlocks);
-                    eventListener.onRelocation(pos, this);
+                    eventListener().onRelocation(pos, this);
                     int prevPos = pos;
                     pos = alloc(newSizeInBlocks);
                     // putValue() is called from put() and replace()
@@ -1257,23 +1244,14 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             }
         }
 
-        void visit(IntIntMultiMap.EntryConsumer entryConsumer) {
-            hashLookup.forEach(entryConsumer);
-        }
-
         public Entry<K, V> getEntry(long pos) {
-            bytes.position(offsetFromPos(pos));
+            bytes.position(offsetFromPos(pos) + metaDataBytes);
             bytes.readStopBit();
             K key = keyMarshaller.read(bytes);
-            skipBytesBetweenKeyAndValue(bytes);
             bytes.readStopBit();
             alignment.alignPositionAddr(bytes);
             V value = valueMarshaller.read(bytes);
             return new WriteThroughEntry(key, value);
-        }
-
-        void skipBytesBetweenKeyAndValue(Bytes bytes) {
-            // no bytes to skip
         }
 
         /**
@@ -1327,68 +1305,56 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-    final class EntryIterator implements Iterator<Entry<K, V>>, IntIntMultiMap.EntryConsumer {
+    class EntryIterator implements Iterator<Entry<K, V>> {
+        private int returnedSeg = -1;
+        private long returnedPos = -1L;
+        Entry<K, V> returnedEntry;
+        private int nextSeg;
+        private long nextPos;
 
-        int segmentIndex = segments.length;
-
-        Entry<K, V> nextEntry, lastReturned;
-
-        //todo: replace with a more efficient, auto resizing int[]
-        Deque<Integer> segmentPositions = new ArrayDeque<Integer>();
-
-        EntryIterator() {
-            nextEntry = nextSegmentEntry();
+        public EntryIterator() {
+            advance(nextSeg = segments.length - 1, nextPos = -1L);
         }
 
-        public boolean hasNext() {
-            return nextEntry != null;
-        }
-
-        public void remove() {
-            if (lastReturned == null) throw new IllegalStateException();
-            VanillaSharedHashMap.this.remove(lastReturned.getKey());
-            lastReturned = null;
-        }
-
-        public Map.Entry<K, V> next() {
-            Entry<K, V> e = nextEntry;
-            if (e == null)
-                throw new NoSuchElementException();
-            lastReturned = e; // cannot assign until after null check
-            nextEntry = nextSegmentEntry();
-            return e;
-        }
-
-        Entry<K, V> nextSegmentEntry() {
-            while (segmentIndex >= 0) {
-                if (segmentPositions.isEmpty()) {
-                    switchToNextSegment();
+        private boolean advance(int segIndex, long pos) {
+            while (segIndex >= 0) {
+                pos = segments[segIndex].getHashLookup().getPositions().nextSetBit(pos + 1L);
+                if (pos >= 0L) {
+                    nextSeg = segIndex;
+                    nextPos = pos;
+                    return true;
                 } else {
-                    final Segment segment = segments[segmentIndex];
-                    segment.lock();
-                    try {
-                        while (!segmentPositions.isEmpty()) {
-                            Entry<K, V> entry = segment.getEntry(segmentPositions.removeFirst());
-                            if (entry != null) {
-                                return entry;
-                            }
-                        }
-                    } finally {
-                        segment.unlock();
-                    }
+                    segIndex--;
+                    pos = -1L;
                 }
             }
-            return null;
+            nextSeg = -1;
+            nextPos = -1L;
+            return false;
         }
 
-        private void switchToNextSegment() {
-            segmentPositions.clear();
-            segmentIndex--;
-            if (segmentIndex >= 0) {
-                final Segment segment = segments[segmentIndex];
-                segment.lock();
+        @Override
+        public boolean hasNext() {
+            return nextSeg >= 0;
+        }
+
+        @Override
+        public Entry<K, V> next() {
+            for (; ; ) {
+                int segIndex = nextSeg;
+                long pos = nextPos;
+                if (segIndex < 0)
+                    throw new NoSuchElementException();
+                final Segment segment = segments[segIndex];
                 try {
-                    segments[segmentIndex].visit(this);
+                    segment.lock();
+                    if (segment.getHashLookup().getPositions().isClear(pos)) {
+                        // the pos was removed after the previous advance
+                        advance(segIndex, pos);
+                        continue;
+                    }
+                    advance(returnedSeg = segIndex, returnedPos = pos);
+                    return returnedEntry = segment.getEntry(pos);
                 } finally {
                     segment.unlock();
                 }
@@ -1396,12 +1362,61 @@ class VanillaSharedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         @Override
-        public void accept(int key, int value) {
-            segmentPositions.add(value);
+        public void remove() {
+            int segIndex = returnedSeg;
+            if (segIndex < 0)
+                throw new IllegalStateException();
+            final Segment segment = segments[segIndex];
+            final int pos = (int) returnedPos;
+            try {
+                segment.lock();
+                if (segment.getHashLookup().getPositions().isClear(pos)) {
+                    // The case:
+                    // 1. iterator.next() - thread 1
+                    // 2. map.put() which cause relocation of the key, returned in above - thread 2
+                    // OR map.remove() which remove this key - thread 2
+                    // 3. iterator.remove() - thread 1
+                    VanillaSharedHashMap.this.remove(returnedEntry.getKey());
+                } else {
+                    removePresent(segment, pos);
+                }
+                returnedSeg = -1;
+                returnedEntry = null;
+            } finally {
+                segment.unlock();
+            }
+        }
+
+        void removePresent(Segment segment, int pos) {
+            // TODO handle the case:
+            // iterator.next() -- thread 1
+            // map.put() which cause relocation of the key, returned above -- thread 2
+            // map.put() which place a new key on the `pos` in current segment -- thread 3
+            // iterator.remove() -- thread 1
+            // The simple solution is to compare bytes in the map with the serialized bytes
+            // of returnedEntry.getKey(), but it seems rather wasteful to workaround so rare
+            // case.
+            final long offset = segment.offsetFromPos(pos);
+            final NativeBytes entry = segment.entry(offset);
+
+            final long limit = entry.limit();
+            final long keyLen = entry.readStopBit();
+            entry.limit(entry.position() + keyLen);
+            final int segmentHash = hasher.segmentHash(hash(entry));
+            entry.limit(limit);
+
+            entry.skip(keyLen);
+            long valueLen = segment.readValueLen(entry);
+            final long entryEndAddr = entry.positionAddr() + valueLen;
+            segment.getHashLookup().remove(segmentHash, pos);
+            segment.decrementSize();
+            segment.free(pos, segment.inBlocks(entryEndAddr - segment.entryStartAddr(offset)));
+            segment.notifyRemoved(offset, returnedEntry.getKey(), returnedEntry.getValue(), pos);
         }
     }
 
-    final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+    class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+        @NotNull
         public Iterator<Map.Entry<K, V>> iterator() {
             return new EntryIterator();
         }

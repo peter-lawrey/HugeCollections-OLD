@@ -40,7 +40,6 @@ public class IntValueMapTest {
     public void test() throws IOException {
 
         final SharedHashMap<IntValue, CharSequence> map = new SharedHashMapBuilder()
-                .entries(1000)
                 .entries(20000)
                 .toKeyValueSpecificBuilder(IntValue.class, CharSequence.class)
                 .keyMarshaller(ByteableIntValueMarshaller.INSTANCE)

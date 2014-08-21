@@ -122,7 +122,7 @@ public class MapCheck {
     static Map newMap() {
         try {
 
-//            return new ConcurrentHashMap();
+//            return new net.openhft.chronicle.map.ConcurrentHashMap();
             return new SharedHashMapBuilder()
                     .create(getPersistenceFile(), Object.class, Object.class);
 

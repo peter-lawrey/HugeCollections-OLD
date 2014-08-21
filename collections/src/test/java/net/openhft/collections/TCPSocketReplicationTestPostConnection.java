@@ -25,6 +25,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.collections.Builder.getPersistenceFile;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmBuilder;
 import static net.openhft.collections.TCPSocketReplication4WayMapTest.newTcpSocketShmIntString;
@@ -112,7 +113,8 @@ public class TCPSocketReplicationTestPostConnection {
 
         for (final Closeable closeable : new Closeable[]{map1, map2}) {
             try {
-                closeable.close();
+                if (closeable != null)
+                    closeable.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }

@@ -19,7 +19,7 @@ package net.openhft.chronicle.sandbox.queue.locators.shared;
 import net.openhft.chronicle.sandbox.queue.locators.DataLocator;
 import net.openhft.chronicle.sandbox.queue.locators.shared.remote.SocketWriter;
 import net.openhft.lang.io.DirectBytes;
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,7 +18,7 @@
 
 package net.openhft.collections;
 
-import org.jetbrains.annotations.NotNull;
+import net.openhft.lang.model.constraints.NotNull;
 
 import java.io.File;
 import java.io.IOException;
