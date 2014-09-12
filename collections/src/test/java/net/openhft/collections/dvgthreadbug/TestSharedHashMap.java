@@ -24,9 +24,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,7 +41,6 @@ public class TestSharedHashMap {
     TestDataValue data6 = DataValueClasses.newDirectReference(TestDataValue.class);
     TestDataValue data7 = DataValueClasses.newDirectReference(TestDataValue.class);
     TestDataValue data8 = DataValueClasses.newDirectReference(TestDataValue.class);
-    ExecutorService threads = Executors.newFixedThreadPool(2);
 
     @Before
     public void setUp() throws Exception {
@@ -91,7 +91,7 @@ public class TestSharedHashMap {
     }
 
     @Test
-    public void test() throws InterruptedException {
+    public void test() throws InterruptedException, ExecutionException {
         long startMem = memoryUsed();
         //Simple case just to prove all is OK
         data1.setLongString("AAAAAAAAAAAAAAAAAAAA");
@@ -101,11 +101,15 @@ public class TestSharedHashMap {
 
         System.out.println("Start threads to test concurrent read/write in same segment .. this used to fail");
         //..change data7 to another e.g. data2 and should work
-        threads.execute(new TestTask(data1, "AAAAAAAAAAAAAAAAAAAA"));
-        threads.execute(new TestTask(data7, "BBBBBBBBBBBBBBBBBBBB"));
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+
+        Future<?> a = threads.submit(new TestTask(data1, "AAAAAAAAAAAAAAAAAAAA"));
+        Future<?> b = threads.submit(new TestTask(data7, "BBBBBBBBBBBBBBBBBBBB"));
+        a.get();
+        b.get();
         threads.shutdown();
-        threads.awaitTermination(1, TimeUnit.MINUTES);
         long memUsed = memoryUsed() - startMem;
+        System.out.printf("Used %,d KB memory%n", memUsed / 1024);
         assertEquals(1 << 20, memUsed, 1 << 20);
     }
 
