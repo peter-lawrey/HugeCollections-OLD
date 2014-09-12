@@ -81,9 +81,17 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     Class kClass;
     Class vClass;
 
+    /**
+     * @deprecated Use of(kClass, vClass)
+     */
+    @Deprecated
     public SharedHashMapBuilder() {
     }
 
+    /**
+     * @deprecated Use of(kClass, vClass)
+     */
+    @Deprecated
     public SharedHashMapBuilder(Class<K> kClass, Class<V> vClass) {
         this.kClass = kClass;
         this.vClass = vClass;
@@ -143,7 +151,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
      * @see #entryAndValueAlignment(Alignment)
      * @see #entryAndValueAlignment()
      */
-    public SharedHashMapBuilder entrySize(int entrySize) {
+    public SharedHashMapBuilder<K, V> entrySize(int entrySize) {
         this.entrySize = entrySize;
         return this;
     }
@@ -247,12 +255,12 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
     }
 
 
-    public SharedHashMapBuilder kClass(Class kClass) {
+    public SharedHashMapBuilder<K, V> kClass(Class<K> kClass) {
         this.kClass = kClass;
         return this;
     }
 
-    public SharedHashMapBuilder vClass(Class vClass) {
+    public SharedHashMapBuilder<K, V> vClass(Class<V> vClass) {
         this.vClass = vClass;
         return this;
     }
@@ -324,7 +332,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
      * method will be shortly removed
      */
     @Deprecated
-    public <K, V> SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
+    public SharedHashMap<K, V> create(File file, Class<K> kClass, Class<V> vClass) throws IOException {
         return file(file).kClass(kClass).vClass(vClass).create();
     }
 
@@ -464,7 +472,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         return generatedKeyType;
     }
 
-    public SharedHashMapBuilder generatedKeyType(boolean generatedKeyType) {
+    public SharedHashMapBuilder<K, V> generatedKeyType(boolean generatedKeyType) {
         this.generatedKeyType = generatedKeyType;
         return this;
     }
@@ -473,7 +481,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         return generatedValueType;
     }
 
-    public SharedHashMapBuilder generatedValueType(boolean generatedValueType) {
+    public SharedHashMapBuilder<K, V> generatedValueType(boolean generatedValueType) {
         this.generatedValueType = generatedValueType;
         return this;
     }
@@ -482,13 +490,13 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         return entries > 1L << (20 + 15) || largeSegments;
     }
 
-    public SharedHashMapBuilder largeSegments(boolean largeSegments) {
+    public SharedHashMapBuilder<K, V> largeSegments(boolean largeSegments) {
         this.largeSegments = largeSegments;
         return this;
     }
 
 
-    public SharedHashMapBuilder metaDataBytes(int metaDataBytes) {
+    public SharedHashMapBuilder<K, V> metaDataBytes(int metaDataBytes) {
         if ((metaDataBytes & 0xFF) != metaDataBytes)
             throw new IllegalArgumentException("MetaDataBytes must be [0..255] was " + metaDataBytes);
         this.metaDataBytes = metaDataBytes;
@@ -499,7 +507,7 @@ public class SharedHashMapBuilder<K, V> implements Cloneable {
         return metaDataBytes;
     }
 
-    public SharedHashMapBuilder eventListener(SharedMapEventListener eventListener) {
+    public SharedHashMapBuilder<K, V> eventListener(SharedMapEventListener eventListener) {
         this.eventListener = eventListener;
         return this;
     }
