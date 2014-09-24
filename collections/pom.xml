@@ -15,15 +15,14 @@
   ~ limitations under the License.
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 
     <parent>
         <groupId>net.openhft</groupId>
         <artifactId>java-parent-pom</artifactId>
         <version>1.1.0</version>
-        <relativePath/>
+        <relativePath />
     </parent>
 
     <!-- <properties>
@@ -33,7 +32,7 @@
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>collections</artifactId>
-    <version>3.2.2-SNAPSHOT</version>
+    <version>3.2.2</version>
     <packaging>bundle</packaging>
     <name>OpenHFT/HugeCollections/collections</name>
     <description>Java Collections which are designed to be huge (may GB)</description>
@@ -201,7 +200,7 @@
         <url>scm:git:git@github.com:OpenHFT/HugeCollections.git</url>
         <connection>scm:git:git@github.com:OpenHFT/HugeCollections.git</connection>
         <developerConnection>scm:git:git@github.com:OpenHFT/HugeCollections.git</developerConnection>
-        <tag>master</tag>
+        <tag>collections-3.2.2</tag>
     </scm>
 
 </project>
