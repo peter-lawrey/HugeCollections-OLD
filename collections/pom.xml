@@ -15,14 +15,15 @@
   ~ limitations under the License.
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 
     <parent>
         <groupId>net.openhft</groupId>
         <artifactId>java-parent-pom</artifactId>
         <version>1.1.0</version>
-        <relativePath />
+        <relativePath/>
     </parent>
 
     <!-- <properties>
@@ -49,7 +50,7 @@
             <dependency>
                 <groupId>net.openhft</groupId>
                 <artifactId>lang</artifactId>
-                <version>6.4.7-SNAPSHOT</version>
+                <version>6.4.7</version>
             </dependency>
             <dependency>
                 <groupId>net.openhft</groupId>
@@ -140,7 +141,6 @@
     <build>
 
 
-
         <plugins>
 
             <plugin>
@@ -183,18 +183,18 @@
             </plugin>
 
 
-           <!-- <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
--->
+            <!-- <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-jar-plugin</artifactId>
+                 <executions>
+                     <execution>
+                         <goals>
+                             <goal>test-jar</goal>
+                         </goals>
+                     </execution>
+                 </executions>
+             </plugin>
+ -->
 
         </plugins>
     </build>
