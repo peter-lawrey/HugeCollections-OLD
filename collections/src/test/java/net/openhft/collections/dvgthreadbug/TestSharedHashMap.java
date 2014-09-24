@@ -16,6 +16,7 @@
 
 package net.openhft.collections.dvgthreadbug;
 
+import net.openhft.collections.Builder;
 import net.openhft.collections.SharedHashMap;
 import net.openhft.collections.SharedHashMapBuilder;
 import net.openhft.lang.model.DataValueClasses;
@@ -23,7 +24,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,7 +50,7 @@ public class TestSharedHashMap {
                     .actualSegments(1) // only used for testing purposes.
                     .entries(2048)
                     .entrySize(256)
-                    .file(new File("/run/shm/TestOpenHFT"))
+                    .file(Builder.getPersistenceFile() )
                     .create();
 
             //Map entries are loaded into various segments in mappeddatastore
