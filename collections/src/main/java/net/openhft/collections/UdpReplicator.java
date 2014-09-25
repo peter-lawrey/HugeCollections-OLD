@@ -44,10 +44,10 @@ import static net.openhft.collections.Replica.ModificationNotifier;
 
 
 /**
- * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ),
- * typically, you should use the UdpReplicator if you have a large number of nodes,
- * and you wish to receive the data before it becomes available on TCP/IP.
- * In order to not miss data, UdpReplicator should be used in conjunction with the TCP Replicator.
+ * The UdpReplicator attempts to read the data ( but it does not enforce or grantee delivery ), typically, you
+ * should use the UdpReplicator if you have a large number of nodes, and you wish to receive the data before
+ * it becomes available on TCP/IP. In order to not miss data, UdpReplicator should be used in conjunction with
+ * the TCP Replicator.
  */
 class UdpReplicator extends AbstractChannelReplicator implements ModificationNotifier, Closeable {
 
@@ -270,12 +270,15 @@ class UdpReplicator extends AbstractChannelReplicator implements ModificationNot
         /**
          * update that are throttled are rejected.
          *
-         * @param socketChannel        the socketChannel that we will write to
+         * @param socketChannel the socketChannel that we will write to
          * @throws InterruptedException
          * @throws IOException
          */
         int writeAll(@NotNull final DatagramChannel socketChannel)
                 throws InterruptedException, IOException {
+
+            if (modificationIterator == null)
+                return 0;
 
             out.clear();
             in.clear();

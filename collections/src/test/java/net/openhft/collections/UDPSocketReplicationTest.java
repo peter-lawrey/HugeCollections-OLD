@@ -20,7 +20,6 @@ package net.openhft.collections;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.Closeable;
@@ -77,7 +76,7 @@ public class UDPSocketReplicationTest {
 
 
     @Test
-    @Ignore
+
     public void testBufferOverflow() throws IOException, InterruptedException {
 
         for (int i = 0; i < 1024; i++) {
