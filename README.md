@@ -5,6 +5,8 @@ SharedHashMap has been renamed to ChronicleMap and moved to the new Git Hub proj
 
 All new development of SharedHashMap will be done on the ChronicleMap project, the old ShareHashMap code will remain here. ChronicleMap uses code from this project, but all new enhancements will be added to ChronicleMap.
 
+If you are running this in production and wish to have professionally supported code, please see http://openhft.net/support
+
 
 HugeCollections
 ===============
