@@ -22,7 +22,6 @@ import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.*;
 import net.openhft.lang.io.serialization.BytesMarshallable;
 import net.openhft.lang.io.serialization.ObjectSerializer;
-import net.openhft.lang.io.serialization.impl.VanillaBytesMarshallerFactory;
 import net.openhft.lang.model.Byteable;
 import net.openhft.lang.model.DataValueClasses;
 import org.jetbrains.annotations.NotNull;
@@ -62,6 +61,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
      * Because DirectBitSet implementations couldn't find more than 64 continuous clear or set bits.
      */
     private static final int MAX_ENTRY_OVERSIZE_FACTOR = 64;
+    public static final ObjectSerializer NO_OBJECT_SERIALIZER = (ObjectSerializer) null;
 
 /*    private final ObjectSerializer objectSerializer;
     private SharedHashMapBuilder builder;*/
@@ -608,7 +608,9 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             createHashLookups(start);
             start += align64(sizeOfMultiMap() + sizeOfMultiMapBitSet()) * multiMapsPerSegment();
             final NativeBytes bsBytes = new NativeBytes(
-                    tmpBytes.objectSerializer(), start, start + sizeOfBitSets(), null);
+                    NO_OBJECT_SERIALIZER, start, start + sizeOfBitSets(), null);
+            // warm memory eagerly.
+//            bsBytes.load();
             freeList = new SingleThreadedDirectBitSet(bsBytes);
             start += numberOfBitSets() * sizeOfBitSets();
             entriesOffset = start - bytes.startAddr();
@@ -626,16 +628,18 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
 
         IntIntMultiMap createMultiMap(long start) {
             final NativeBytes multiMapBytes =
-                    new NativeBytes(new VanillaBytesMarshallerFactory(), start,
+                    new NativeBytes(NO_OBJECT_SERIALIZER, start,
                             start = start + sizeOfMultiMap(), null);
 
-            final NativeBytes sizeOfMultiMapBitSetBytes =
-                    new NativeBytes(new VanillaBytesMarshallerFactory(), start,
+            final NativeBytes multiMapBitSetBytes =
+                    new NativeBytes(NO_OBJECT_SERIALIZER, start,
                             start + sizeOfMultiMapBitSet(), null);
+            // warm memory eagerly.
             multiMapBytes.load();
+            multiMapBitSetBytes.load();
             return useSmallMultiMaps() ?
-                    new VanillaShortShortMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes) :
-                    new VanillaIntIntMultiMap(multiMapBytes, sizeOfMultiMapBitSetBytes);
+                    new VanillaShortShortMultiMap(multiMapBytes, multiMapBitSetBytes) :
+                    new VanillaIntIntMultiMap(multiMapBytes, multiMapBitSetBytes);
         }
 
         public int getIndex() {
@@ -713,7 +717,7 @@ abstract class AbstractVanillaSharedHashMap<K, V> extends AbstractMap<K, V>
             entry.storePositionAndSize(bytes, offset,
                     // "Infinity". Limit not used when treating entries as
                     // possibly oversized
-                    bytes.limit() - offset);
+                    bytes.capacity() - offset);
             return entry;
         }
 

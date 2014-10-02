@@ -19,6 +19,7 @@ package net.openhft.collections;
 import net.openhft.lang.Maths;
 import net.openhft.lang.collection.ATSDirectBitSet;
 import net.openhft.lang.collection.DirectBitSet;
+import net.openhft.lang.collection.SingleThreadedDirectBitSet;
 import net.openhft.lang.io.Bytes;
 import net.openhft.lang.io.DirectStore;
 
@@ -30,7 +31,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     /**
      * @param minCapacity as in {@link #VanillaIntIntMultiMap(int)} constructor
      * @return size of {@link Bytes} to provide to {@link #VanillaIntIntMultiMap(Bytes, Bytes)}
-     *         constructor as the first argument
+     * constructor as the first argument
      */
     public static long sizeInBytes(int minCapacity) {
         return indexToPos(Maths.nextPower2(minCapacity, 16));
@@ -39,7 +40,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
     /**
      * @param minCapacity as in {@link #VanillaIntIntMultiMap(int)} constructor
      * @return size of {@link Bytes} to provide to {@link #VanillaIntIntMultiMap(Bytes, Bytes)}
-     *         constructor as the second argument
+     * constructor as the second argument
      */
     public static long sizeOfBitSetInBytes(int minCapacity) {
         return Maths.nextPower2(minCapacity, 64L) / 8L;
@@ -104,7 +105,7 @@ class VanillaIntIntMultiMap implements IntIntMultiMap {
         capacityMask = capacity - 1;
         capacityMask2 = indexToPos(capacity - 1);
         this.bytes = multiMapBytes;
-        positions = new ATSDirectBitSet(multiMapBitSetBytes);
+        positions = new SingleThreadedDirectBitSet(multiMapBitSetBytes);
     }
 
     @Override
