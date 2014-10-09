@@ -1,7 +1,7 @@
 SharedHashMap is deprecated
 ==============================
 
-SharedHashMap has been renamed to ChronicleMap and moved to the new Git Hub project [ChronicleMap](https://github.com/OpenHFT/Chronicle-Map) 
+<h3>SharedHashMap has been renamed to ChronicleMap and moved to the new GitHub project https://github.com/OpenHFT/Chronicle-Map</h3>
 
 All new development of SharedHashMap will be done on the ChronicleMap project, the old ShareHashMap code will remain here. ChronicleMap uses code from this project, but all new enhancements will be added to ChronicleMap.
 
